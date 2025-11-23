@@ -22,7 +22,6 @@ namespace Consolonia.Core.Infrastructure
         private ConsoleColor _originalBackground;
         private ConsoleColor _originalForeground;
         private bool _supportsComplexEmoji;
-        private bool _supportsEmojiVariation;
 
         public DefaultNetConsoleOutput()
         {
@@ -34,8 +33,6 @@ namespace Consolonia.Core.Infrastructure
         public virtual PixelBufferSize Size { get; set; }
 
         public virtual bool SupportsComplexEmoji => _supportsComplexEmoji;
-
-        public virtual bool SupportsEmojiVariation => _supportsEmojiVariation;
 
         public virtual void SetTitle(string title)
         {
@@ -159,12 +156,6 @@ namespace Consolonia.Core.Infrastructure
             WriteText("👨‍👩‍👧‍👦");
             (int left2, _) = Console.GetCursorPosition();
             _supportsComplexEmoji = left2 - left == 2;
-
-            // write out a wide char
-            WriteText("⚙\ufe0f");
-            (int left3, _) = Console.GetCursorPosition();
-            _supportsEmojiVariation = left3 - left2 == 2;
-
 
             Console.Clear();
         }

@@ -130,8 +130,6 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual bool SupportsComplexEmoji => _consoleOutput.SupportsComplexEmoji;
 
-        public virtual bool SupportsEmojiVariation => _consoleOutput.SupportsEmojiVariation;
-
         public abstract bool SupportsAltSolo { get; }
 
         public event Action Resized;

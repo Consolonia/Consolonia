@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using Avalonia;
@@ -11,6 +10,7 @@ using Consolonia.Core.Dummy;
 using Consolonia.Core.Infrastructure;
 using Consolonia.PlatformSupport;
 using Consolonia.PlatformSupport.Clipboard;
+using jinek.X11;
 using X11Clipboard = Consolonia.PlatformSupport.Clipboard.X11Clipboard;
 
 // ReSharper disable CheckNamespace
@@ -78,18 +78,22 @@ namespace Consolonia
             {
                 if (IsWslPlatform())
                     clipboardImpl = new WslClipboard();
-                else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
-                    clipboardImpl = new X11Clipboard();
                 else
                     try
                     {
-                        // alternatively use xclip CLI tool
-                        clipboardImpl = new XClipClipboard();
+                        clipboardImpl = new X11Clipboard();
                     }
-                    catch (NotSupportedException err2)
+                    catch (X11ClipboardException)
                     {
-                        Debug.WriteLine(err2.Message);
-                        clipboardImpl = new ConsoleClipboard();
+                        try
+                        {
+                            // alternatively use xclip CLI tool
+                            clipboardImpl = new XClipClipboard();
+                        }
+                        catch (NotSupportedException)
+                        {
+                            clipboardImpl = new ConsoleClipboard();
+                        }
                     }
             }
             else
