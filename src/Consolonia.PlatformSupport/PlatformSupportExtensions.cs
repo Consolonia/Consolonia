@@ -36,7 +36,7 @@ namespace Consolonia
                         ? new AnsiConsoleOutput()
                         : new WindowsLegacyConsoleOutput()),
 #pragma warning restore CA1416 // Validate platform compatibility
-                PlatformID.Unix or PlatformID.MacOSX => new CursesConsole(),
+                PlatformID.Unix or PlatformID.MacOSX => CreateUnixConsole(),
                 _ => new DefaultNetConsole()
             };
 
@@ -191,6 +191,26 @@ namespace Consolonia
         {
             return Environment.GetEnvironmentVariable("WT_SESSION") is not null ||
                    Environment.GetEnvironmentVariable("VSAPPIDNAME") != null;
+        }
+
+        /// <summary>
+        /// Creates the appropriate console implementation for Unix/MacOSX platforms.
+        /// Prefers GpmConsole if GPM is available in TTY environments, otherwise falls back to CursesConsole.
+        /// </summary>
+        private static IConsole CreateUnixConsole()
+        {
+            // Check if we're in a TTY environment (not X11/Wayland)
+            bool isTty = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
+                         string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
+
+            // If in TTY and GPM is available, use GpmConsole for better mouse support
+            if (isTty && GpmNativeBindings.IsGpmAvailable())
+            {
+                return new GpmConsole();
+            }
+
+            // Otherwise use standard CursesConsole
+            return new CursesConsole();
         }
     }
 }
