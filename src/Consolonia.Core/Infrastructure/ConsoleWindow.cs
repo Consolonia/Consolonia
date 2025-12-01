@@ -480,33 +480,7 @@ namespace Consolonia.Core.Infrastructure
 
         private string GetCursorText()
         {
-            return _cursorType switch
-            {
-                StandardCursorType.Arrow => "◤",
-                StandardCursorType.Cross => "+",
-                StandardCursorType.Hand => "👆",
-                StandardCursorType.Help => "?",
-                StandardCursorType.No => "🚫",
-                StandardCursorType.SizeAll => "*",
-                StandardCursorType.SizeNorthSouth => "⬍",
-                StandardCursorType.SizeWestEast => "⬌",
-                StandardCursorType.Wait => "⧖",
-                StandardCursorType.Ibeam => "I",
-                StandardCursorType.UpArrow => "⬆",
-                StandardCursorType.TopSide => "⬍", // "⬆",
-                StandardCursorType.BottomSide => "⬍", // "⬇",
-                StandardCursorType.LeftSide => "⬌", // "⬅",
-                StandardCursorType.RightSide => "⬌", // "⮕",
-                StandardCursorType.TopLeftCorner => "⤡", // "⬉",
-                StandardCursorType.TopRightCorner => "⤢", // "⬈",
-                StandardCursorType.BottomLeftCorner => "⤢", // "⬋",
-                StandardCursorType.BottomRightCorner => "⤡", // "⬊",
-                StandardCursorType.DragCopy => "+",
-                StandardCursorType.DragLink => "⤻",
-                StandardCursorType.DragMove => "◤",
-                StandardCursorType.AppStarting => "⧖",
-                _ => " "
-            };
+            return Console.GetCursorText(_cursorType);
         }
 
         protected virtual void OnCursorChanged(ConsoleCursor obj)
