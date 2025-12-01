@@ -67,6 +67,11 @@ namespace Consolonia.NUnit
             throw new NotSupportedException();
         }
 
+        public string GetCursorText(StandardCursorType cursorType)
+        {
+            // Unit test console doesn't render actual cursors
+            return string.Empty;
+        }
 
         public void SetCaretStyle(CaretStyle caretStyle)
         {
