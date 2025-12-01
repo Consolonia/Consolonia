@@ -200,13 +200,18 @@ namespace Consolonia
         private static IConsole CreateUnixConsole()
         {
             // Check if we're in a TTY environment (not X11/Wayland)
-            bool isTty = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
+            bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
                          string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
 
             // If in TTY and GPM is available, use GpmConsole for better mouse support
-            if (isTty && GpmNativeBindings.IsGpmAvailable())
+            //if (isTty && GpmNativeBindings.IsGpmAvailable())
+            //{
+            //    return new GpmConsole();
+            //}
+            if (isTTY)
             {
-                return new GpmConsole();
+                return new EvdevConsole();
+
             }
 
             // Otherwise use standard CursesConsole
