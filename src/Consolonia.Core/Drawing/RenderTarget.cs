@@ -166,11 +166,10 @@ namespace Consolonia.Core.Drawing
 
                     {
                         // checking cache
-                        //todo: this check does not check mouse cursor on top of any of the following pixels
-                        //todo: it also does not consider that some of them will be replaced by space. But both issues go as pessimistic, just unnecessary redraws
+                        //todo: it does not consider that some of them will be replaced by space. But issue is pessimistic, just unnecessary redraws
                         bool anyDifferent = false;
                         for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
-                            if (_cache[x + i, y] != pixelBuffer[(ushort)(x + i), y])
+                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
                             {
                                 anyDifferent = true;
                                 break;
