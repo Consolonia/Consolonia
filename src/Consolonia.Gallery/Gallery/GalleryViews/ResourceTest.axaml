@@ -5,9 +5,10 @@
                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                     mc:Ignorable="d">
     <Design.PreviewWith>
+        <!-- ConsolePreview is not available for this project
         <console:ConsolePreview Columns="80"
                                 Rows="40"
-                                FileName="GalleryTextBlock.axaml" />
+                                FileName="GalleryTextBlock.axaml" />-->
     </Design.PreviewWith>
 
 </ResourceDictionary>
