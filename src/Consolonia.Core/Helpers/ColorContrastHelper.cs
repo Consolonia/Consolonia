@@ -82,10 +82,11 @@ namespace Consolonia.Core.Helpers
         /// <param name="backgroundColor">The background color to contrast against.</param>
         /// <param name="minimumContrastRatio">Minimum required contrast ratio (default: 3.0 per WCAG AA).</param>
         /// <returns>A color that meets the minimum contrast requirement.</returns>
-        public static Color GetContrastingColor(Color backgroundColor, double minimumContrastRatio = MinimumContrastRatio)
+        public static Color GetContrastingColor(Color backgroundColor,
+            double minimumContrastRatio = MinimumContrastRatio)
         {
             // First try simple inversion
-            var invertedColor = Color.FromRgb(
+            Color invertedColor = Color.FromRgb(
                 (byte)(255 - backgroundColor.R),
                 (byte)(255 - backgroundColor.G),
                 (byte)(255 - backgroundColor.B));
