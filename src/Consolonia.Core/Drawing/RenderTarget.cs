@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
@@ -202,11 +203,14 @@ namespace Consolonia.Core.Drawing
             }
         }
 
+        /// <summary>
+        ///     Gets a contrasting color for the cursor that meets WCAG 3:1 minimum contrast ratio.
+        ///     First attempts simple color inversion; if that doesn't provide sufficient contrast
+        ///     (e.g., for mid-tone grays), falls back to high-contrast black or white.
+        /// </summary>
         private static Color GetInvertColor(Color color)
         {
-            return Color.FromRgb((byte)(255 - color.R),
-                (byte)(255 - color.G),
-                (byte)(255 - color.B));
+            return ColorContrastHelper.GetContrastingColor(color);
         }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
