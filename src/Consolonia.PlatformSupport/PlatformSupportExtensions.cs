@@ -164,23 +164,30 @@ namespace Consolonia
                         if (Console.IsOutputRedirected || IsWindowsTerminal())
                             result = new RgbConsoleColorMode();
                         else
-                            result = new EgaConsoleColorMode();
+                            result = new EgaConsoleColorMode(true);
                     }
                         break;
                     case PlatformID.MacOSX:
                         result = new RgbConsoleColorMode();
                         break;
                     case PlatformID.Unix:
+                        if (Environment.GetEnvironmentVariable("COLORTERM") is "truecolor" or "24bit")
+                        {
+                            result = new RgbConsoleColorMode();
+                            break;
+                        }
+                        
                         string term = Environment.GetEnvironmentVariable("TERM");
                         result = term switch
                         {
-                            "linux" or "xterm-direct" or "xterm-color" => new EgaConsoleColorMode(),
+                            "linux" => new EgaConsoleColorMode(false),
+                             "xterm-direct" or "xterm-color" => new EgaConsoleColorMode(true),
                             "xterm-256color" or "screen-256color" or "tmux-256color" => new RgbConsoleColorMode(),
-                            _ => new EgaConsoleColorMode()
+                            _ => new EgaConsoleColorMode(false) // for example "xterm" which is set by Far2l ran from tty
                         };
                         break;
                     default:
-                        result = new EgaConsoleColorMode();
+                        result = new EgaConsoleColorMode(true);
                         break;
                 }
 

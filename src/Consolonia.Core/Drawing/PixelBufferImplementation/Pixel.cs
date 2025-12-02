@@ -178,7 +178,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     if (isNoForegroundOnTop)
                         // merge the PixelForeground color with the pixelAbove background color
                         newForeground = new PixelForeground(Foreground.Symbol,
-                            MergeColors(Foreground.Color, aboveBgColor),
+                            MergeColors(Foreground.Color, aboveBgColor, true),
                             Foreground.Weight,
                             Foreground.Style,
                             Foreground.TextDecoration);
@@ -189,7 +189,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             }
 
             // Background is always blended
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor));
+            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false));
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
         }
@@ -201,14 +201,14 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <param name="source"></param>
         /// <returns>source blended into target</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Color MergeColors(in Color target, in Color source)
+        private static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
         {
             // Fast paths to avoid calling into the ConsoleColorMode when not needed
             byte a = source.A;
             if (a == 0x00) return target; // fully transparent source
             if (a == 0xFF) return source; // fully opaque source
 
-            return ConsoleColorMode.Value.Blend(target, source);
+            return ConsoleColorMode.Value.Blend(target, source, isTargetForeground);
         }
 
         public override bool Equals([NotNullWhen(true)] object obj)

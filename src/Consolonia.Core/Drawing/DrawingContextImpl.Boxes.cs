@@ -357,48 +357,26 @@ namespace Consolonia.Core.Drawing
             ushort gradiantHeight = (ushort)Math.Max(1, pixelRect.Height);
             ushort brushY = (ushort)(targetRect.Y - pixelRect.Y);
 
-            switch (brush)
+            for (ushort y = (ushort)targetRect.Y; y < (ushort)targetRect.Bottom; y++, brushY++)
             {
-                case ShadeBrush:
-                    for (ushort y = (ushort)targetRect.Y; y < targetRect.Bottom; y++, brushY++)
-                    for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++)
-                        _pixelBuffer[x, y] = _pixelBuffer[x, y].Shade();
-                    break;
-                case BrightenBrush:
-                    for (ushort y = (ushort)targetRect.Y; y < targetRect.Bottom; y++, brushY++)
-                    for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++)
-                        _pixelBuffer[x, y] = _pixelBuffer[x, y].Brighten();
-                    break;
-                case InvertBrush:
-                    for (ushort y = (ushort)targetRect.Y; y < targetRect.Bottom; y++, brushY++)
-                    for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++)
-                        _pixelBuffer[x, y] = _pixelBuffer[x, y].Invert();
-                    break;
-                default:
-                    for (ushort y = (ushort)targetRect.Y; y < (ushort)targetRect.Bottom; y++, brushY++)
+                ushort brushX = (ushort)(targetRect.X - pixelRect.X);
+                for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++, brushX++)
+                {
+                    Pixel pixelAbove;
+                    if (solidColorBrush == null)
                     {
-                        ushort brushX = (ushort)(targetRect.X - pixelRect.X);
-                        for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++, brushX++)
-                        {
-                            Pixel pixelAbove;
-                            if (solidColorBrush == null)
-                            {
-                                Color backgroundColor =
-                                    brush.FromPosition(brushX, brushY, gradiantWidth, gradiantHeight);
-                                pixelAbove = new Pixel(new PixelBackground(backgroundColor));
-                            }
-                            else
-                            {
-                                pixelAbove = solidPixel;
-                            }
-
-                            _pixelBuffer[x, y] = _pixelBuffer[x, y].Blend(pixelAbove);
-                        }
+                        Color backgroundColor =
+                            brush.FromPosition(brushX, brushY, gradiantWidth, gradiantHeight);
+                        pixelAbove = new Pixel(new PixelBackground(backgroundColor));
+                    }
+                    else
+                    {
+                        pixelAbove = solidPixel;
                     }
 
-                    break;
+                    _pixelBuffer[x, y] = _pixelBuffer[x, y].Blend(pixelAbove);
+                }
             }
-
             _consoleWindowImpl.DirtyRegions.AddRect(targetRect);
         }
 

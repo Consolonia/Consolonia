@@ -5,12 +5,13 @@ using Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor;
 // ReSharper disable once CheckNamespace
 namespace Consolonia
 {
-    //todo: define xaml namespace for out classes
     /// <summary>
     ///     Avalonia axaml extension which consumes ConsoleColor and produces AvaloniaColor
     /// </summary>
     public class EgaColorExtension : MarkupExtension
     {
+        private static readonly EgaConsoleColorMode EgaConsoleColorMode = new(true);
+        
         public EgaColorExtension()
         {
             Color = ConsoleColor.Black;
@@ -32,7 +33,7 @@ namespace Consolonia
 
         public override object ProvideValue(IServiceProvider serviceProvider)
         {
-            return EgaConsoleColorMode.ConvertToAvaloniaColor(Color, Mode);
+            return EgaConsoleColorMode.ConvertToAvaloniaColor(Color, true, Mode);
         }
     }
 }
