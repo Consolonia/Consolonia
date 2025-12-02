@@ -10,7 +10,6 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
-using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
@@ -205,13 +204,50 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Gets a contrasting color for the cursor that meets WCAG AA 3:1 minimum contrast ratio
-        ///     for non-text elements. First attempts simple color inversion; if that doesn't provide
-        ///     sufficient contrast (e.g., for mid-tone grays), falls back to high-contrast black or white.
+        ///     Inverts color with WCAG 3:1 contrast fallback.
         /// </summary>
         private static Color GetInvertColor(Color color)
         {
-            return ColorContrastHelper.GetContrastingColor(color);
+            const double minimumContrastRatio = 3.0;
+
+            double GetLinearChannelValue(byte channelValue)
+            {
+                double sRgb = channelValue / 255.0;
+                return sRgb <= 0.03928
+                    ? sRgb / 12.92
+                    : Math.Pow((sRgb + 0.055) / 1.055, 2.4);
+            }
+
+            double GetRelativeLuminance(Color c)
+            {
+                double r = GetLinearChannelValue(c.R);
+                double g = GetLinearChannelValue(c.G);
+                double b = GetLinearChannelValue(c.B);
+                return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            }
+
+            double GetContrastRatio(Color c1, Color c2)
+            {
+                double l1 = GetRelativeLuminance(c1);
+                double l2 = GetRelativeLuminance(c2);
+                double lighter = Math.Max(l1, l2);
+                double darker = Math.Min(l1, l2);
+                return (lighter + 0.05) / (darker + 0.05);
+            }
+
+            // Try simple inversion first
+            Color invertedColor = Color.FromRgb(
+                (byte)(255 - color.R),
+                (byte)(255 - color.G),
+                (byte)(255 - color.B));
+
+            if (GetContrastRatio(invertedColor, color) >= minimumContrastRatio)
+                return invertedColor;
+
+            // Fall back to black or white based on which provides better contrast
+            double contrastWithBlack = GetContrastRatio(Colors.Black, color);
+            double contrastWithWhite = GetContrastRatio(Colors.White, color);
+            return contrastWithBlack > contrastWithWhite ? Colors.Black : Colors.White;
         }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
