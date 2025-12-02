@@ -1,21 +1,23 @@
 using System;
-using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 namespace Consolonia.Core.Infrastructure
 {
-    public readonly struct ConsoleCursor
+    public readonly struct ConsoleCursor(PixelBufferCoordinate coordinate, string type)
         : IComparable<ConsoleCursor>, IEquatable<ConsoleCursor>
     {
-        public PixelBufferCoordinate Coordinate { get; init; }
-        public string Type { get; init; }
-        public byte Width { get; init; }
+        public PixelBufferCoordinate Coordinate { get; } = coordinate;
+        public string Type { get; } = type;
 
-        public ConsoleCursor(PixelBufferCoordinate coordinate, string type)
+        public byte Width
         {
-            Coordinate = coordinate;
-            Type = type;
-            Width = (byte)type.MeasureText();
+            get
+            {
+                checked
+                {
+                    return (byte)(Type?.Length ?? 0);
+                }
+            }
         }
 
         public bool IsEmpty()
