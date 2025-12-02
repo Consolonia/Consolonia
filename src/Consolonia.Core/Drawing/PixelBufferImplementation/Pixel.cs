@@ -197,8 +197,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     merge colors with alpha blending
         /// </summary>
-        /// <param name="target"></param>
-        /// <param name="source"></param>
         /// <returns>source blended into target</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
