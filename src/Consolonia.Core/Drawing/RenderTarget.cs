@@ -132,13 +132,15 @@ namespace Consolonia.Core.Drawing
                         continue;
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
-                    if (_consoleCursor.Coordinate.Y == y && !_consoleCursor.IsEmpty() &&
-                        _consoleCursor.Coordinate.X == x)
-                        pixel = pixel.Blend(new Pixel(new PixelForeground(new Symbol(_consoleCursor.Type),
+                    if (!_consoleCursor.IsEmpty() &&
+                        _consoleCursor.Coordinate.Y == y &&
+                        _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
+                        pixel = pixel.Blend(new Pixel(new PixelForeground(
+                            new Symbol(_consoleCursor.Type[x - _consoleCursor.Coordinate.X], 1),
                             GetInvertColor(pixel.Background.Color))));
 
                     if (pixel.Width > 1)
-                        // checking that there are enough empty pixels after current wide character
+                        // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
                             if (pixelBuffer[(ushort)(x + i), y].Width != 0)
                             {
@@ -150,7 +152,7 @@ namespace Consolonia.Core.Drawing
                             }
 
                     {
-                        // tracking if on wide character currently
+                        // tracking if we are on wide character sequence currently
                         if (pixel.Width > 1)
                             isWide = true;
                         else if (pixel.Width == 1)
@@ -158,7 +160,7 @@ namespace Consolonia.Core.Drawing
                     }
 
                     if (pixel.Width == 0 && !isWide)
-                        // fallback to spaces if wide character missed
+                        // fallback to spaces instead of empty chars in case wide character at the beginning was overwritten or we detected there is no room for it previously
                         pixel = new Pixel(
                             new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
                                 pixel.Foreground.Style, pixel.Foreground.TextDecoration), pixel.Background,
