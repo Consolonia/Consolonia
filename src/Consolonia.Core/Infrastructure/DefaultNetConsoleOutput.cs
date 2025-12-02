@@ -72,7 +72,8 @@ namespace Consolonia.Core.Infrastructure
             {
                 Flush();
 
-                (ConsoleColor consoleColor, _) = EgaConsoleColorMode.Instance.Value.ConvertToConsoleColorMode(pixel.Background.Color, false);
+                (ConsoleColor consoleColor, _) =
+                    EgaConsoleColorMode.Instance.Value.ConvertToConsoleColorMode(pixel.Background.Color, false);
                 Console.BackgroundColor = consoleColor;
                 _lastBackgroundColor = pixel.Background.Color;
             }
@@ -81,7 +82,8 @@ namespace Consolonia.Core.Infrastructure
             {
                 Flush();
 
-                (ConsoleColor consoleColor, _) = EgaConsoleColorMode.Instance.Value.ConvertToConsoleColorMode(pixel.Foreground.Color, true);
+                (ConsoleColor consoleColor, _) =
+                    EgaConsoleColorMode.Instance.Value.ConvertToConsoleColorMode(pixel.Foreground.Color, true);
                 Console.ForegroundColor = consoleColor;
                 _lastForegroundColor = pixel.Foreground.Color;
             }

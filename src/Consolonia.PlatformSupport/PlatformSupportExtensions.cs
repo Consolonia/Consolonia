@@ -176,14 +176,15 @@ namespace Consolonia
                             result = new RgbConsoleColorMode();
                             break;
                         }
-                        
+
                         string term = Environment.GetEnvironmentVariable("TERM");
                         result = term switch
                         {
                             "linux" => new EgaConsoleColorMode(false),
-                             "xterm-direct" or "xterm-color" => new EgaConsoleColorMode(true),
+                            "xterm-direct" or "xterm-color" => new EgaConsoleColorMode(true),
                             "xterm-256color" or "screen-256color" or "tmux-256color" => new RgbConsoleColorMode(),
-                            _ => new EgaConsoleColorMode(false) // for example "xterm" which is set by Far2l ran from tty
+                            _ => new EgaConsoleColorMode(
+                                false) // for example "xterm" which is set by Far2l ran from tty
                         };
                         break;
                     default:

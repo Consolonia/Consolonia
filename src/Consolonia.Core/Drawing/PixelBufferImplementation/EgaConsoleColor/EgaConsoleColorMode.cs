@@ -9,9 +9,23 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
 {
     public class EgaConsoleColorMode : IConsoleColorMode
     {
-        private readonly bool _supportBrightBackground;
+        public static readonly Lazy<EgaConsoleColorMode> Instance = new(() =>
+        {
+            try
+            {
+                return (EgaConsoleColorMode)AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>();
+            }
+            catch (InvalidCastException exception)
+            {
+                throw new ConsoloniaException(
+                    "EgaConsoleColorMode is not supported on this platform. ",
+                    exception);
+            }
+        });
+
         private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _backgroundConsoleColorMap;
         private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _consoleColorMap;
+        private readonly bool _supportBrightBackground;
 
         public EgaConsoleColorMode(bool supportBrightBackground)
         {
@@ -40,20 +54,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
 
             _backgroundConsoleColorMap = supportBrightBackground ? _consoleColorMap : [.._consoleColorMap.Take(8)];
         }
-
-        public static readonly Lazy<EgaConsoleColorMode> Instance = new(() =>
-        {
-            try
-            {
-                return (EgaConsoleColorMode)AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>();
-            }
-            catch (InvalidCastException exception)
-            {
-                throw new ConsoloniaException(
-                    "EgaConsoleColorMode is not supported on this platform. ",
-                    exception);
-            }
-        });
 
         /// <inheritdoc />
         public Color Blend(Color color1, Color color2, bool isTargetForeground)
@@ -122,8 +122,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                 .First().Color;
         }
 
-        private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground) =>
-            isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
+        private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground)
+        {
+            return isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
+        }
 
         private ConsoleColor Shade(ConsoleColor color, bool isForeground)
         {

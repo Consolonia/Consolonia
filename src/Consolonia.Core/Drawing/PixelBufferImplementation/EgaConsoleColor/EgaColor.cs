@@ -11,7 +11,7 @@ namespace Consolonia
     public class EgaColorExtension : MarkupExtension
     {
         private static readonly EgaConsoleColorMode EgaConsoleColorMode = new(true);
-        
+
         public EgaColorExtension()
         {
             Color = ConsoleColor.Black;

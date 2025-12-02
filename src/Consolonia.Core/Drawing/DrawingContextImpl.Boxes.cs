@@ -377,6 +377,7 @@ namespace Consolonia.Core.Drawing
                     _pixelBuffer[x, y] = _pixelBuffer[x, y].Blend(pixelAbove);
                 }
             }
+
             _consoleWindowImpl.DirtyRegions.AddRect(targetRect);
         }
 
