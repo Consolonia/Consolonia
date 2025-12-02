@@ -204,9 +204,9 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Gets a contrasting color for the cursor that meets WCAG 3:1 minimum contrast ratio.
-        ///     First attempts simple color inversion; if that doesn't provide sufficient contrast
-        ///     (e.g., for mid-tone grays), falls back to high-contrast black or white.
+        ///     Gets a contrasting color for the cursor that meets WCAG AA 3:1 minimum contrast ratio
+        ///     for non-text elements. First attempts simple color inversion; if that doesn't provide
+        ///     sufficient contrast (e.g., for mid-tone grays), falls back to high-contrast black or white.
         /// </summary>
         private static Color GetInvertColor(Color color)
         {
