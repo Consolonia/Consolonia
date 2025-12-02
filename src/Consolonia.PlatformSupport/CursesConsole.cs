@@ -9,6 +9,8 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -544,7 +546,7 @@ namespace Consolonia.PlatformSupport
 
         private void HandleMouseInput(Curses.MouseEvent ev)
         {
-            // System.Diagnostics.Debug.WriteLine($"{JsonConvert.SerializeObject(ev)} {(Curses.Event)ev.ButtonState}");
+            System.Diagnostics.Debug.WriteLine($"HandleMouseInput: ButtonState:{ev.ButtonState} X:{ev.X} Y:{ev.Y} z:{ev.Z} {ev.ID}");
 
             const double velocity = 1;
 

@@ -30,16 +30,18 @@ namespace Consolonia.PlatformSupport
 
         /// <summary>
         /// GPM mouse button identifiers
+        /// Note: These match the gpm.h definitions exactly
         /// </summary>
         [Flags]
-        public enum GpmButtons : ushort
+        public enum GpmButtons : byte  // Changed to byte since buttons field is byte
         {
-            GPM_B_LEFT = 1,
-            GPM_B_MIDDLE = 2,
-            GPM_B_RIGHT = 4,
-            GPM_B_UP = 8,
-            GPM_B_DOWN = 16,
-            GPM_B_FOURTH = 32
+            GPM_B_NONE = 0,
+            GPM_B_RIGHT = 1,    
+            GPM_B_MIDDLE = 2,   
+            GPM_B_LEFT = 4,     
+            GPM_B_FOURTH = 8,   
+            GPM_B_UP = 16,      // scroll wheel up
+            GPM_B_DOWN = 32     // scroll wheel down
         }
 
         /// <summary>

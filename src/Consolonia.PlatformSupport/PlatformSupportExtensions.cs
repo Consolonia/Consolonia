@@ -199,20 +199,23 @@ namespace Consolonia
         /// </summary>
         private static IConsole CreateUnixConsole()
         {
+            Console.ReadKey();
             // Check if we're in a TTY environment (not X11/Wayland)
             bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
                          string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
-
+isTTY = true;
             // If in TTY and GPM is available, use GpmConsole for better mouse support
-            //if (isTty && GpmNativeBindings.IsGpmAvailable())
-            //{
-            //    return new GpmConsole();
-            //}
-            if (isTTY)
+            if (isTTY && GpmNativeBindings.IsGpmAvailable())
             {
-                return new EvdevConsole();
-
+                return new GpmConsole();
             }
+            // if (isTTY)
+            // {
+            //     Console.WriteLine("Using EvdevConsole for TTY environment.");
+            //     Console.ReadKey();
+            //     return new EvdevConsole();
+
+            // }
 
             // Otherwise use standard CursesConsole
             return new CursesConsole();
