@@ -8,21 +8,21 @@ namespace Consolonia.Core.Tests
     public class ColorContrastHelperTests
     {
         [Test]
-        public void GetRelativeLuminance_Black_ReturnsZero()
+        public void GetRelativeLuminanceWithBlackReturnsZero()
         {
             double luminance = ColorContrastHelper.GetRelativeLuminance(Colors.Black);
             Assert.AreEqual(0.0, luminance, 0.0001);
         }
 
         [Test]
-        public void GetRelativeLuminance_White_ReturnsOne()
+        public void GetRelativeLuminanceWithWhiteReturnsOne()
         {
             double luminance = ColorContrastHelper.GetRelativeLuminance(Colors.White);
             Assert.AreEqual(1.0, luminance, 0.0001);
         }
 
         [Test]
-        public void GetRelativeLuminance_MidGray_ReturnsMidValue()
+        public void GetRelativeLuminanceWithMidGrayReturnsMidValue()
         {
             var gray = Color.FromRgb(128, 128, 128);
             double luminance = ColorContrastHelper.GetRelativeLuminance(gray);
@@ -31,14 +31,14 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastRatio_BlackAndWhite_Returns21()
+        public void GetContrastRatioWithBlackAndWhiteReturns21()
         {
             double ratio = ColorContrastHelper.GetContrastRatio(Colors.Black, Colors.White);
             Assert.AreEqual(21.0, ratio, 0.0001);
         }
 
         [Test]
-        public void GetContrastRatio_SameColor_Returns1()
+        public void GetContrastRatioWithSameColorReturns1()
         {
             var red = Colors.Red;
             double ratio = ColorContrastHelper.GetContrastRatio(red, red);
@@ -46,7 +46,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastRatio_IsSymmetric()
+        public void GetContrastRatioIsSymmetric()
         {
             var color1 = Color.FromRgb(100, 150, 200);
             var color2 = Color.FromRgb(200, 100, 50);
@@ -58,21 +58,21 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetHighContrastColor_DarkBackground_ReturnsWhite()
+        public void GetHighContrastColorWithDarkBackgroundReturnsWhite()
         {
             Color result = ColorContrastHelper.GetHighContrastColor(Colors.Black);
             Assert.AreEqual(Colors.White, result);
         }
 
         [Test]
-        public void GetHighContrastColor_LightBackground_ReturnsBlack()
+        public void GetHighContrastColorWithLightBackgroundReturnsBlack()
         {
             Color result = ColorContrastHelper.GetHighContrastColor(Colors.White);
             Assert.AreEqual(Colors.Black, result);
         }
 
         [Test]
-        public void GetHighContrastColor_DarkBlue_ReturnsWhite()
+        public void GetHighContrastColorWithDarkBlueReturnsWhite()
         {
             var darkBlue = Color.FromRgb(0, 0, 139);
             Color result = ColorContrastHelper.GetHighContrastColor(darkBlue);
@@ -80,7 +80,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetHighContrastColor_LightYellow_ReturnsBlack()
+        public void GetHighContrastColorWithLightYellowReturnsBlack()
         {
             var lightYellow = Color.FromRgb(255, 255, 200);
             Color result = ColorContrastHelper.GetHighContrastColor(lightYellow);
@@ -88,7 +88,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_Black_ReturnsInvertedWhite()
+        public void GetContrastingColorWithBlackReturnsInvertedWhite()
         {
             Color result = ColorContrastHelper.GetContrastingColor(Colors.Black);
             // Inverted black is white, which has 21:1 contrast, so should be returned
@@ -96,7 +96,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_White_ReturnsInvertedBlack()
+        public void GetContrastingColorWithWhiteReturnsInvertedBlack()
         {
             Color result = ColorContrastHelper.GetContrastingColor(Colors.White);
             // Inverted white is black, which has 21:1 contrast, so should be returned
@@ -104,7 +104,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_MidGray_ReturnsFallbackHighContrast()
+        public void GetContrastingColorWithMidGrayReturnsFallbackHighContrast()
         {
             // Mid-gray (128,128,128) inverts to (127,127,127) with very low contrast
             var midGray = Color.FromRgb(128, 128, 128);
@@ -119,7 +119,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_MidGray_MeetsMinimumContrastRatio()
+        public void GetContrastingColorWithMidGrayMeetsMinimumContrastRatio()
         {
             var midGray = Color.FromRgb(128, 128, 128);
             Color result = ColorContrastHelper.GetContrastingColor(midGray);
@@ -130,7 +130,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_LowContrastInversion_ReturnsFallback()
+        public void GetContrastingColorWithLowContrastInversionReturnsFallback()
         {
             // Gray values around 128 result in low contrast inversions
             for (byte grayValue = 100; grayValue <= 155; grayValue++)
@@ -146,7 +146,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_HighContrastInversion_ReturnsInversion()
+        public void GetContrastingColorWithHighContrastInversionReturnsInversion()
         {
             // Very dark colors should invert to very light colors with good contrast
             var darkColor = Color.FromRgb(10, 10, 10);
@@ -157,7 +157,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_VeryLightColor_ReturnsInversion()
+        public void GetContrastingColorWithVeryLightColorReturnsInversion()
         {
             // Very light colors should invert to very dark colors with good contrast
             var lightColor = Color.FromRgb(245, 245, 245);
@@ -168,7 +168,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void GetContrastingColor_CustomMinimumRatio_IsRespected()
+        public void GetContrastingColorWithCustomMinimumRatioIsRespected()
         {
             var midGray = Color.FromRgb(128, 128, 128);
 
@@ -183,14 +183,14 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void MinimumContrastRatio_Is3()
+        public void MinimumContrastRatioIs3()
         {
             // WCAG AA requires 3:1 for non-text elements
             Assert.AreEqual(3.0, ColorContrastHelper.MinimumContrastRatio);
         }
 
         [Test]
-        public void GetContrastingColor_AllColors_MeetMinimumContrast()
+        public void GetContrastingColorWithAllColorsMeetsMinimumContrast()
         {
             // Sample various colors across the RGB spectrum
             var testColors = new[]
