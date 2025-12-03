@@ -42,11 +42,12 @@ namespace Consolonia.PlatformSupport
                     eventMask = (ushort)(
                         GpmNativeBindings.GpmEventType.GPM_MOVE |
                         GpmNativeBindings.GpmEventType.GPM_DOWN |
-                        GpmNativeBindings.GpmEventType.GPM_UP 
-                        //GpmNativeBindings.GpmEventType.GPM_DRAG |
-                        //GpmNativeBindings.GpmEventType.GPM_SINGLE |
-                        //GpmNativeBindings.GpmEventType.GPM_DOUBLE |
-                        //GpmNativeBindings.GpmEventType.GPM_TRIPLE
+                        GpmNativeBindings.GpmEventType.GPM_UP |
+                        GpmNativeBindings.GpmEventType.GPM_DRAG |
+                        GpmNativeBindings.GpmEventType.GPM_SINGLE |
+                        GpmNativeBindings.GpmEventType.GPM_DOUBLE |
+                        GpmNativeBindings.GpmEventType.GPM_TRIPLE | 
+                        GpmNativeBindings.GpmEventType.GPM_HARD
                     ),
                     defaultMask = 0,
                     minMod = 0,
@@ -182,7 +183,7 @@ namespace Consolonia.PlatformSupport
 
         private void ProcessGpmEvent(GpmNativeBindings.Gpm_Event gpmEvent)
         {
-            System.Diagnostics.Debug.WriteLine($"GPM Event: buttons={gpmEvent.buttons} (0x{gpmEvent.buttons:X2}), type={gpmEvent.type}, x={gpmEvent.x}, y={gpmEvent.y}, dx={gpmEvent.dx}, dy={gpmEvent.dy} wdx={gpmEvent.wdx} wdy={gpmEvent.wdy}");
+            System.Diagnostics.Debug.WriteLine($"GPM Event: buttons={gpmEvent.buttons} (0x{gpmEvent.buttons:X2}), type={gpmEvent.type}, x={gpmEvent.x}, y={gpmEvent.y}, dx={gpmEvent.dx}, dy={gpmEvent.dy} ");
 
             // Convert 1-based GPM coordinates to 0-based
             var point = new Point(gpmEvent.x - 1, gpmEvent.y - 1);
@@ -194,49 +195,6 @@ namespace Consolonia.PlatformSupport
             if ((gpmEvent.modifiers & 0x08) != 0) modifiers |= RawInputModifiers.Alt;
 
             var buttons = (GpmNativeBindings.GpmButtons)gpmEvent.buttons;
-
-            // Handle wheel events - GPM can report wheel in multiple ways:
-            // 1. Button flags: GPM_B_UP (16) or GPM_B_DOWN (32) 
-            // 2. Some mice report wheel up as B_FOURTH + B_UP (24)
-            // 3. Some report wheel via dy delta with GPM_MOVE type
-            
-            // Check for wheel via button flags (mask out B_FOURTH which sometimes accompanies wheel)
-            bool hasWheelUp = buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_UP);
-            bool hasWheelDown = buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_DOWN);
-            
-            if (hasWheelUp)
-            {
-                System.Diagnostics.Debug.WriteLine("GPM: Wheel UP detected (button flag)");
-                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, 1), modifiers);
-                _lastButtonState = buttons;
-                return;
-            }
-            if (hasWheelDown)
-            {
-                System.Diagnostics.Debug.WriteLine("GPM: Wheel DOWN detected (button flag)");
-                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -1), modifiers);
-                _lastButtonState = buttons;
-                return;
-            }
-            
-            // Check for wheel via dy delta on GPM_MOVE with no regular buttons pressed
-            // Some GPM configurations report scroll this way
-            if (gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_MOVE) && 
-                gpmEvent.dy != 0 &&
-                (buttons & (GpmNativeBindings.GpmButtons.GPM_B_LEFT | 
-                           GpmNativeBindings.GpmButtons.GPM_B_MIDDLE | 
-                           GpmNativeBindings.GpmButtons.GPM_B_RIGHT)) == 0)
-            {
-                // Check if this looks like a wheel event (no position change, just dy)
-                // Wheel events typically have dy of -1 or +1
-                if (gpmEvent.dy >= -3 && gpmEvent.dy <= 3 && gpmEvent.dy != 0)
-                {
-                    System.Diagnostics.Debug.WriteLine($"GPM: Wheel detected via dy={gpmEvent.dy}");
-                    RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, gpmEvent.dy), modifiers);
-                    _lastButtonState = buttons;
-                    return;
-                }
-            }
 
             // Add button state to modifiers for regular mouse events
             if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_LEFT))
@@ -250,6 +208,41 @@ namespace Consolonia.PlatformSupport
             _lastPosition = point;
 
             // Process event type for regular mouse events
+
+            // Handle wheel events - GPM can report wheel in multiple ways:
+            // 1. Button flags: GPM_B_UP (16) or GPM_B_DOWN (32) 
+            // 2. Some mice report wheel up as B_FOURTH + B_UP (24)
+            // 3. Some report wheel via dy delta with GPM_MOVE type
+            
+            // Check for wheel via button flags (mask out B_FOURTH which sometimes accompanies wheel)
+            bool hasWheelUp = buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_UP);
+            bool hasWheelDown = buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_DOWN);
+            
+            // wheel events come with no movement (dx=0, dy=0)
+            if (!hasWheelUp && !hasWheelDown && gpmEvent.dx == 0 && gpmEvent.dy == 0)
+            {
+                // Reverse engineered combos for some mice:
+                hasWheelUp = buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_DOWN) &&
+                             buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_LEFT);
+                hasWheelDown = buttons == GpmNativeBindings.GpmButtons.GPM_B_NONE;
+            }   
+            
+            if (hasWheelUp)
+            {
+                System.Diagnostics.Debug.WriteLine("GPM: Wheel UP detected (button flag)");
+                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, 1), modifiers);
+                _lastButtonState = buttons;
+                return;
+            }
+
+            if (hasWheelDown)
+            {
+                System.Diagnostics.Debug.WriteLine("GPM: Wheel DOWN detected (button flag)");
+                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -1), modifiers);
+                _lastButtonState = buttons;
+                return;
+            }
+
             if (gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_DOWN))
             {
                 ProcessButtonDown(buttons, point, modifiers);

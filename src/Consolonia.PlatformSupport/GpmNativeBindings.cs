@@ -21,11 +21,11 @@ namespace Consolonia.PlatformSupport
             GPM_DRAG = 2,
             GPM_DOWN = 4,
             GPM_UP = 8,
-            GPM_SINGLE = 16,
-            GPM_DOUBLE = 32,
-            GPM_TRIPLE = 64,
-            GPM_MFLAG = 128,
-            GPM_HARD = 256
+            GPM_SINGLE = 16, // 0x10
+            GPM_DOUBLE = 32, // 0x20
+            GPM_TRIPLE = 64, // 0x40
+            GPM_MFLAG = 128, // 0x80
+            GPM_HARD = 256   // 0x100
         }
 
         /// <summary>
