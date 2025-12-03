@@ -33,7 +33,7 @@ namespace Consolonia
         {
             return builder.UseConsole(new DefaultNetConsole());
         }
-        
+
         public static AppBuilder UseEgaConsoleColorMode(this AppBuilder builder, bool supportBrightBackground)
         {
             return builder.UseConsoleColorMode(new EgaConsoleColorMode(supportBrightBackground));
