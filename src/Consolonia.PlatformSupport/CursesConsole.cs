@@ -14,9 +14,11 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Avalonia.Logging;
 using Avalonia.Threading;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Helpers.InputProcessing;
+using Consolonia.Core.Helpers.Logging;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
 using Consolonia.Core.Text;
@@ -28,6 +30,8 @@ namespace Consolonia.PlatformSupport
 {
     public class CursesConsole : ConsoleBase
     {
+        private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
+        
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
                 (Key.ShiftMask, RawInputModifiers.Shift),
@@ -382,6 +386,7 @@ namespace Consolonia.PlatformSupport
                         return;
                     case Curses.KeyMouse:
                         Curses.getmouse(out Curses.MouseEvent ev);
+                        _verboseLogger.Log2($"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
                         HandleMouseInput(ev);
                         return;
                 }
