@@ -14,9 +14,9 @@ namespace Consolonia.PlatformSupport
         Drag = 2,
         Down = 4,
         Up = 8,
-        Single = 16, // 0x10
-        Double = 32, // 0x20
-        Triple = 64, // 0x40
+        SingleClick = 16, // 0x10
+        DoubleClick = 32, // 0x20
+        TripleClick = 64, // 0x40
         MFlag = 128, // 0x80
         Hard = 256   // 0x100
     }
@@ -93,9 +93,9 @@ namespace Consolonia.PlatformSupport
             if (Type.HasFlag(GpmEventType.Drag)) parts.Add("DRAG");
             if (Type.HasFlag(GpmEventType.Down)) parts.Add("DOWN");
             if (Type.HasFlag(GpmEventType.Up)) parts.Add("UP");
-            if (Type.HasFlag(GpmEventType.Single)) parts.Add("SINGLE");
-            if (Type.HasFlag(GpmEventType.Double)) parts.Add("DOUBLE");
-            if (Type.HasFlag(GpmEventType.Triple)) parts.Add("TRIPLE");
+            if (Type.HasFlag(GpmEventType.SingleClick)) parts.Add("SINGLE");
+            if (Type.HasFlag(GpmEventType.DoubleClick)) parts.Add("DOUBLE");
+            if (Type.HasFlag(GpmEventType.TripleClick)) parts.Add("TRIPLE");
             if (Type.HasFlag(GpmEventType.MFlag)) parts.Add("MFLAG");
             if (Type.HasFlag(GpmEventType.Hard)) parts.Add("HARD");
             // if (type.HasFlag(GpmEventType.GPM_ENTER)) parts.Add("ENTER");
@@ -144,6 +144,15 @@ namespace Consolonia.PlatformSupport
         public int VirtualConsole;                // Virtual console
     }
 
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Timeval
+    {
+        public long Sec;   // Changed from int to long for 64-bit compatibility
+        public long Usec;  // Changed from int to long for 64-bit compatibility
+    }
+
+#pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
 
     /// <summary>
     /// Native bindings for libgpm (General Purpose Mouse) library
@@ -205,7 +214,7 @@ namespace Consolonia.PlatformSupport
                 int fd = GPM.Open(ref conn, 0);
                 if (fd >= 0)
                 {
-                    Close();
+                    _ = Close();
                     return true;
                 }
                 return false;
@@ -234,5 +243,10 @@ namespace Consolonia.PlatformSupport
         /// <returns>0 on success</returns>
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Gpm_DrawPointer")]
         public static extern int DrawPointer(int x, int y, int flag);
+
+        [DllImport("libc", EntryPoint = "select", SetLastError = true)]
+        public static extern int Select(int nfds, IntPtr readfds, IntPtr writefds, IntPtr exceptfds, ref Timeval timeout);
+
     }
+#pragma warning restore CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
 }

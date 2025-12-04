@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,8 +9,6 @@ using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
-using Consolonia.Core.InternalHelpers;
-using Unix.Terminal;
 
 namespace Consolonia.PlatformSupport
 {
@@ -34,7 +31,7 @@ namespace Consolonia.PlatformSupport
             InitializeGpm();
         }
 
-        
+
         private void InitializeGpm()
         {
             try
@@ -57,7 +54,7 @@ namespace Consolonia.PlatformSupport
                 // Hide the GPM hardware cursor (we draw our own in software)
                 try
                 {
-                    GPM.DrawPointer(-1, -1, 0);
+                    _ = GPM.DrawPointer(-1, -1, 0);
                 }
                 catch (EntryPointNotFoundException)
                 {
@@ -182,7 +179,7 @@ namespace Consolonia.PlatformSupport
                     };
 
                     // Call select
-                    return Select(_gpmFd + 1, readfds, IntPtr.Zero, IntPtr.Zero, ref timeout);
+                    return GPM.Select(_gpmFd + 1, readfds, IntPtr.Zero, IntPtr.Zero, ref timeout);
                 }
                 finally
                 {
@@ -325,7 +322,7 @@ namespace Consolonia.PlatformSupport
                 {
                     if (_gpmFd >= 0)
                     {
-                        GPM.Close();
+                        _ = GPM.Close();
                         _gpmFd = -1;
                     }
                 }
@@ -343,19 +340,5 @@ namespace Consolonia.PlatformSupport
 
             base.Dispose(disposing);
         }
-
-        #region P/Invoke for select()
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct Timeval
-        {
-            public long Sec;   // Changed from int to long for 64-bit compatibility
-            public long Usec;  // Changed from int to long for 64-bit compatibility
-        }
-
-        [DllImport("libc", EntryPoint = "select", SetLastError = true)]
-        private static extern int Select(int nfds, IntPtr readfds, IntPtr writefds, IntPtr exceptfds, ref Timeval timeout);
-
-        #endregion
     }
 }
