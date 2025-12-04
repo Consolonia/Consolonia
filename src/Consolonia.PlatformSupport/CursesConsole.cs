@@ -8,8 +8,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -32,8 +30,6 @@ namespace Consolonia.PlatformSupport
 {
     public class CursesConsole : ConsoleBase
     {
-        private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
-        
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
                 (Key.ShiftMask, RawInputModifiers.Shift),
@@ -99,12 +95,17 @@ namespace Consolonia.PlatformSupport
 
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
+        private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
 
         private Curses.Window _cursesWindow;
 
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
+
+        private bool _supportsMouse;
+
+        private bool _supportsMouseMove;
 
         public CursesConsole()
             : base(new AnsiConsoleOutput())
@@ -116,11 +117,7 @@ namespace Consolonia.PlatformSupport
         }
 
         public override bool SupportsAltSolo => false;
-
-        private bool _supportsMouse;
         public override bool SupportsMouse => _supportsMouse;
-
-        private bool _supportsMouseMove;
         public override bool SupportsMouseMove => _supportsMouseMove;
 
 
@@ -213,10 +210,10 @@ namespace Consolonia.PlatformSupport
             Curses.Event mouseMask = Curses.mousemask(
                 Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
                 out Curses.Event _);
-            
+
             _supportsMouse = mouseMask != 0;
             _supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition);
-            
+
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
 
@@ -230,7 +227,7 @@ namespace Consolonia.PlatformSupport
             {
                 _supportsMouseMove = false;
             }
-            
+
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
@@ -257,7 +254,7 @@ namespace Consolonia.PlatformSupport
         }
 
         /// <summary>
-        /// Bug workaround https://lists.gnu.org/archive/html/bug-ncurses/2022-04/msg00020.html
+        ///     Bug workaround https://lists.gnu.org/archive/html/bug-ncurses/2022-04/msg00020.html
         /// </summary>
         private static bool DoesCursesActuallySupportMouseMove()
         {
@@ -269,7 +266,6 @@ namespace Consolonia.PlatformSupport
             string versionOnly = cursesVersion[(cursesVersion.LastIndexOf(' ') + 1)..];
 
             return Version.Parse(versionOnly) >= Version.Parse("6.4");
-            
         }
 
         public override void PauseIO(Task task)
@@ -426,10 +422,11 @@ namespace Consolonia.PlatformSupport
                     case Curses.KeyMouse:
                         if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
                         {
-                            _verboseLogger.Log2($"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
+                            _verboseLogger.Log2(
+                                $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
                             HandleMouseInput(ev);
                         }
-                        
+
                         return;
                 }
 

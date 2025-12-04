@@ -3,8 +3,6 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
-using Avalonia.Logging;
-using Consolonia.Core.Helpers.Logging;
 using Consolonia.Fonts;
 
 namespace Consolonia.Gallery
