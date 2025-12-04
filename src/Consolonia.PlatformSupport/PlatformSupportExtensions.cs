@@ -203,7 +203,7 @@ namespace Consolonia
             bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
                          string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
             // If in TTY and GPM is available, use GpmConsole for better mouse support
-            if (isTTY && GpmNativeBindings.IsGpmAvailable())
+            if (isTTY && GPM.IsGpmAvailable())
             {
                 return new GpmConsole();
             }

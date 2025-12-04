@@ -23,9 +23,9 @@ namespace Consolonia.PlatformSupport
     {
         private readonly CancellationTokenSource _gpmCancellation;
         private int _gpmFd = -1;
-        private GpmNativeBindings.Gpm_Connect _gpmConnection;
+        private GpmConnect _gpmConnection;
         private bool _gpmInitialized;
-        private GpmNativeBindings.GpmButtons _lastButtonState = 0;
+        private GpmButtons _lastButtonState = 0;
         private Point _lastPosition = new Point(0, 0);
         private RawInputModifiers _currentModifiers = RawInputModifiers.None;
 
@@ -41,8 +41,7 @@ namespace Consolonia.PlatformSupport
 
             //disable cursers mouse, we are talking to GPM directly.
             Curses.mousemask(0,
-                out Curses.Event _);
-
+                 out Curses.Event _);
         }
 
         private void InitializeGpm()
@@ -50,24 +49,15 @@ namespace Consolonia.PlatformSupport
             try
             {
                 // Set up GPM connection
-                _gpmConnection = new GpmNativeBindings.Gpm_Connect
+                _gpmConnection = new GpmConnect
                 {
-                    eventMask = (ushort)(
-                        GpmNativeBindings.GpmEventType.GPM_MOVE |
-                        GpmNativeBindings.GpmEventType.GPM_DOWN |
-                        GpmNativeBindings.GpmEventType.GPM_UP |
-                        GpmNativeBindings.GpmEventType.GPM_DRAG |
-                        GpmNativeBindings.GpmEventType.GPM_SINGLE |
-                        GpmNativeBindings.GpmEventType.GPM_DOUBLE |
-                        GpmNativeBindings.GpmEventType.GPM_TRIPLE |
-                        GpmNativeBindings.GpmEventType.GPM_HARD
-                    ),
-                    defaultMask = 0,
-                    minMod = 0,
-                    maxMod = 0
+                    EventMask = 0xffff,
+                    DefaultMask = 0,
+                    MinMod = 0,
+                    MaxMod = 0
                 };
 
-                _gpmFd = GpmNativeBindings.Gpm_Open(ref _gpmConnection, 0);
+                _gpmFd = GPM.Open(ref _gpmConnection, 0);
                 if (_gpmFd < 0)
                 {
                     return;
@@ -76,7 +66,7 @@ namespace Consolonia.PlatformSupport
                 // Hide the GPM hardware cursor (we draw our own in software)
                 try
                 {
-                    GpmNativeBindings.Gpm_DrawPointer(-1, -1, 0);
+                    GPM.DrawPointer(-1, -1, 0);
                 }
                 catch (EntryPointNotFoundException)
                 {
@@ -118,39 +108,45 @@ namespace Consolonia.PlatformSupport
 
                     if (result > 0)
                     {
-                        Stopwatch sw = Stopwatch.StartNew();
                         // Process ALL available events in one batch
                         // This reduces the overhead of DispatchInputAsync calls
-                        var events = new List<GpmNativeBindings.Gpm_Event>();
-                        
-                        // Read first event (we know it's available from select)
-                        int eventResult = GpmNativeBindings.Gpm_GetEvent(out GpmNativeBindings.Gpm_Event gpmEvent);
-                        if (eventResult > 0)
-                            events.Add(gpmEvent);
-                        
-                        // Keep reading while events are available (non-blocking)
-                        // Use select with 0 timeout to check if more events are ready
-                        while (WaitForGpmEvent(0) > 0)
-                        {
-                            eventResult = GpmNativeBindings.Gpm_GetEvent(out gpmEvent);
-                            if (eventResult > 0)
-                                events.Add(gpmEvent);
-                            else
-                                break;
-                                
-                            // Safety limit to prevent infinite loop
-                            if (events.Count >= 100)
-                                break;
-                        }
+                        var events = new List<GpmEvent>();
 
-                        // Process all events in one dispatcher call
-                        if (events.Count > 0)
+                        // Read first event (we know it's available from select)
+                        int eventResult = GPM.GetEvent(out GpmEvent gpmEvent);
+                        if (eventResult > 0)
                         {
-                            await DispatchInputAsync(() =>
+                            events.Add(gpmEvent);
+                            Console.WriteLine(gpmEvent.Dump());
+
+
+                            // Keep reading while events are available (non-blocking)
+                            // Use select with 0 timeout to check if more events are ready
+                            while (WaitForGpmEvent(0) > 0)
                             {
-                                foreach (var ev in events)
-                                    ProcessGpmEvent(ev);
-                            });
+                                eventResult = GPM.GetEvent(out gpmEvent);
+                                if (eventResult > 0)
+                                {
+                                    events.Add(gpmEvent);
+                                    Console.WriteLine(gpmEvent.Dump());
+                                }
+                                else
+                                    break;
+
+                                // Safety limit to prevent infinite loop
+                                if (events.Count >= 100)
+                                    break;
+                            }
+
+                            // Process all events in one dispatcher call
+                            if (events.Count > 0)
+                            {
+                                await DispatchInputAsync(() =>
+                                {
+                                    foreach (var ev in events)
+                                        ProcessGpmEvent(ev);
+                                });
+                            }
                         }
                     }
                 }
@@ -213,27 +209,27 @@ namespace Consolonia.PlatformSupport
             }
         }
 
-        private void ProcessGpmEvent(GpmNativeBindings.Gpm_Event gpmEvent)
+        private void ProcessGpmEvent(GpmEvent gpmEvent)
         {
-            // Debug.WriteLine($"GPM Event: buttons={gpmEvent.buttons} (0x{gpmEvent.buttons:X2}), type={gpmEvent.type}, x={gpmEvent.x}, y={gpmEvent.y}, dx={gpmEvent.dx}, dy={gpmEvent.dy}, clicks={gpmEvent.clicks}");
-
             // Convert 1-based GPM coordinates to 0-based
-            var point = new Point(gpmEvent.x - 1, gpmEvent.y - 1);
+            var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
             // Translate GPM modifiers to Avalonia modifiers
             var modifiers = RawInputModifiers.None;
-            if ((gpmEvent.modifiers & 0x01) != 0) modifiers |= RawInputModifiers.Shift;
-            if ((gpmEvent.modifiers & 0x04) != 0) modifiers |= RawInputModifiers.Control;
-            if ((gpmEvent.modifiers & 0x08) != 0) modifiers |= RawInputModifiers.Alt;
 
-            var buttons = (GpmNativeBindings.GpmButtons)gpmEvent.buttons;
+            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Shift))
+                modifiers |= RawInputModifiers.Shift;
+            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Control))
+                modifiers |= RawInputModifiers.Control;
+            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Alt))
+                modifiers |= RawInputModifiers.Alt;
 
             // Add button state to modifiers for regular mouse events
-            if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_LEFT))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
                 modifiers |= RawInputModifiers.LeftMouseButton;
-            if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_MIDDLE))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
                 modifiers |= RawInputModifiers.MiddleMouseButton;
-            if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_RIGHT))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
                 modifiers |= RawInputModifiers.RightMouseButton;
 
             _currentModifiers = modifiers;
@@ -241,81 +237,81 @@ namespace Consolonia.PlatformSupport
 
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
-            if (gpmEvent.dx == 0 && gpmEvent.dy == 0)
+            if (gpmEvent.DeltaX == 0 && gpmEvent.DeltaY == 0)
             {
                 // Pattern 1: buttons=0x18 (B_FOURTH+B_UP), type=MFLAG = scroll UP
-                if (gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_MFLAG) &&
-                    buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_UP))
+                if (gpmEvent.Type.HasFlag(GpmEventType.MFlag) &&
+                    gpmEvent.Buttons.HasFlag(GpmButtons.Up))
                 {
                     // Debug.WriteLine("GPM: Wheel UP detected (MFLAG pattern)");
                     RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, 1), modifiers);
-                    _lastButtonState = buttons;
+                    _lastButtonState = gpmEvent.Buttons;
                     return;
                 }
 
                 // Pattern 2: buttons=0, type=MOVE = scroll DOWN
-                if (gpmEvent.type == GpmNativeBindings.GpmEventType.GPM_MOVE &&
-                    buttons == GpmNativeBindings.GpmButtons.GPM_B_NONE)
+                if (gpmEvent.Type == GpmEventType.Move &&
+                    gpmEvent.Buttons == GpmButtons.None)
                 {
                     // Debug.WriteLine("GPM: Wheel DOWN detected (MOVE+no buttons pattern)");
                     RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -1), modifiers);
-                    _lastButtonState = buttons;
+                    _lastButtonState = gpmEvent.Buttons;
                     return;
                 }
             }
 
-            if (gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_MOVE) ||
-                     gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_DRAG))
+            if (gpmEvent.Type.HasFlag(GpmEventType.Move) ||
+                     gpmEvent.Type.HasFlag(GpmEventType.Drag))
             {
                 RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers);
             }
-            else if (gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_DOWN))
+            else if (gpmEvent.Type.HasFlag(GpmEventType.Down))
             {
                 //Debug.WriteLine($"GPM: Button DOWN {buttons} detected");
-                ProcessButtonDown(buttons, point, modifiers);
+                ProcessButtonDown(gpmEvent, point, modifiers);
             }
-            else if (gpmEvent.type.HasFlag(GpmNativeBindings.GpmEventType.GPM_UP))
+            else if (gpmEvent.Type.HasFlag(GpmEventType.Up))
             {
                 //Debug.WriteLine($"GPM: Button UP {buttons} detected");
-                ProcessButtonUp(buttons, point, modifiers);
+                ProcessButtonUp(gpmEvent, point, modifiers);
             }
 
-            _lastButtonState = buttons;
+            _lastButtonState = gpmEvent.Buttons;
         }
 
 
-        private void ProcessButtonDown(GpmNativeBindings.GpmButtons buttons, Point point, RawInputModifiers modifiers)
+        private void ProcessButtonDown(GpmEvent gpmEvent, Point point, RawInputModifiers modifiers)
         {
-            if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_LEFT))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
             {
                 RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, null, modifiers);
             }
 
-            if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_MIDDLE))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
             {
                 RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, null, modifiers);
             }
 
-            if (buttons.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_RIGHT))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
             {
                 RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null, modifiers);
             }
         }
 
-        private void ProcessButtonUp(GpmNativeBindings.GpmButtons buttons, Point point, RawInputModifiers modifiers)
+        private void ProcessButtonUp(GpmEvent gpmEvent, Point point, RawInputModifiers modifiers)
         {
             // Check for transitions from pressed to released
-            if (_lastButtonState.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_LEFT))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
             {
                 RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, null, modifiers);
             }
 
-            if (_lastButtonState.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_MIDDLE))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
             {
                 RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, null, modifiers);
             }
 
-            if (_lastButtonState.HasFlag(GpmNativeBindings.GpmButtons.GPM_B_RIGHT))
+            if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
             {
                 RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, null, modifiers);
             }
@@ -331,7 +327,7 @@ namespace Consolonia.PlatformSupport
                 {
                     if (_gpmFd >= 0)
                     {
-                        GpmNativeBindings.Gpm_Close();
+                        GPM.Close();
                         _gpmFd = -1;
                     }
                 }
