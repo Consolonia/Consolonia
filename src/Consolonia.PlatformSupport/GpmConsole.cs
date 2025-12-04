@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -113,27 +114,44 @@ namespace Consolonia.PlatformSupport
                     }
 
                     // Use select to wait for GPM events with timeout
-                    int result = WaitForGpmEvent(10); // 10ms timeout
+                    int result = WaitForGpmEvent(1000); // 1000ms timeout
 
                     if (result > 0)
                     {
-                        // GPM event available
+                        Stopwatch sw = Stopwatch.StartNew();
+                        // Process ALL available events in one batch
+                        // This reduces the overhead of DispatchInputAsync calls
+                        var events = new List<GpmNativeBindings.Gpm_Event>();
+                        
+                        // Read first event (we know it's available from select)
                         int eventResult = GpmNativeBindings.Gpm_GetEvent(out GpmNativeBindings.Gpm_Event gpmEvent);
-
                         if (eventResult > 0)
+                            events.Add(gpmEvent);
+                        
+                        // Keep reading while events are available (non-blocking)
+                        // Use select with 0 timeout to check if more events are ready
+                        while (WaitForGpmEvent(0) > 0)
                         {
-                            await DispatchInputAsync(() => ProcessGpmEvent(gpmEvent));
+                            eventResult = GpmNativeBindings.Gpm_GetEvent(out gpmEvent);
+                            if (eventResult > 0)
+                                events.Add(gpmEvent);
+                            else
+                                break;
+                                
+                            // Safety limit to prevent infinite loop
+                            if (events.Count >= 100)
+                                break;
                         }
-                    }
-                    else if (result == 0)
-                    {
-                        // Timeout - continue loop
-                        continue;
-                    }
-                    else
-                    {
-                        // Error - wait a bit before retrying
-                        await Task.Delay(100, _gpmCancellation.Token);
+
+                        // Process all events in one dispatcher call
+                        if (events.Count > 0)
+                        {
+                            await DispatchInputAsync(() =>
+                            {
+                                foreach (var ev in events)
+                                    ProcessGpmEvent(ev);
+                            });
+                        }
                     }
                 }
                 catch (OperationCanceledException)

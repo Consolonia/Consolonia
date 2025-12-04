@@ -199,11 +199,9 @@ namespace Consolonia
         /// </summary>
         private static IConsole CreateUnixConsole()
         {
-            Console.ReadKey();
             // Check if we're in a TTY environment (not X11/Wayland)
             bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
                          string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
-isTTY = true;
             // If in TTY and GPM is available, use GpmConsole for better mouse support
             if (isTTY && GpmNativeBindings.IsGpmAvailable())
             {
