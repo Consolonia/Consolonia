@@ -25,23 +25,34 @@ namespace Consolonia.PlatformSupport
         private int _gpmFd = -1;
         private GpmConnect _gpmConnection;
         private bool _gpmInitialized;
-        private GpmButtons _lastButtonState = 0;
-        private Point _lastPosition = new Point(0, 0);
-        private RawInputModifiers _currentModifiers = RawInputModifiers.None;
+        private RawInputModifiers _keyboardModifiers = RawInputModifiers.None;
 
         public GpmConsole()
+            : base(false)
         {
             _gpmCancellation = new CancellationTokenSource();
             InitializeGpm();
         }
 
-        public override void PrepareConsole()
+        /// <summary>
+        /// Get the current modifier state, combining GPM and tracked keyboard modifiers
+        /// </summary>
+        private RawInputModifiers GetCombinedModifiers(GpmModifiers gpmModifiers)
         {
-            base.PrepareConsole();
+            RawInputModifiers modifiers = RawInputModifiers.None;
 
-            //disable cursers mouse, we are talking to GPM directly.
-            Curses.mousemask(0,
-                 out Curses.Event _);
+            // Start with tracked keyboard modifiers
+            modifiers = _keyboardModifiers;
+
+            // Add GPM-reported modifiers (in case GPM does report them)
+            if (gpmModifiers.HasFlag(GpmModifiers.Shift))
+                modifiers |= RawInputModifiers.Shift;
+            if (gpmModifiers.HasFlag(GpmModifiers.Control))
+                modifiers |= RawInputModifiers.Control;
+            if (gpmModifiers.HasFlag(GpmModifiers.Alt))
+                modifiers |= RawInputModifiers.Alt;
+
+            return modifiers;
         }
 
         private void InitializeGpm()
@@ -117,8 +128,7 @@ namespace Consolonia.PlatformSupport
                         if (eventResult > 0)
                         {
                             events.Add(gpmEvent);
-                            Console.WriteLine(gpmEvent.Dump());
-
+                            // Console.WriteLine(gpmEvent.Dump());
 
                             // Keep reading while events are available (non-blocking)
                             // Use select with 0 timeout to check if more events are ready
@@ -128,7 +138,7 @@ namespace Consolonia.PlatformSupport
                                 if (eventResult > 0)
                                 {
                                     events.Add(gpmEvent);
-                                    Console.WriteLine(gpmEvent.Dump());
+                                    // Console.WriteLine(gpmEvent.Dump());
                                 }
                                 else
                                     break;
@@ -187,8 +197,8 @@ namespace Consolonia.PlatformSupport
                     // Set timeout
                     var timeout = new Timeval
                     {
-                        tv_sec = timeoutMs / 1000,
-                        tv_usec = (timeoutMs % 1000) * 1000
+                        Sec = timeoutMs / 1000,
+                        Usec = (timeoutMs % 1000) * 1000
                     };
 
                     // Call select
@@ -214,15 +224,8 @@ namespace Consolonia.PlatformSupport
             // Convert 1-based GPM coordinates to 0-based
             var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
-            // Translate GPM modifiers to Avalonia modifiers
-            var modifiers = RawInputModifiers.None;
-
-            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Shift))
-                modifiers |= RawInputModifiers.Shift;
-            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Control))
-                modifiers |= RawInputModifiers.Control;
-            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Alt))
-                modifiers |= RawInputModifiers.Alt;
+            // Get combined modifiers (tracked keyboard + GPM)
+            var modifiers = GetCombinedModifiers(gpmEvent.Modifiers);
 
             // Add button state to modifiers for regular mouse events
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
@@ -232,8 +235,6 @@ namespace Consolonia.PlatformSupport
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
                 modifiers |= RawInputModifiers.RightMouseButton;
 
-            _currentModifiers = modifiers;
-            _lastPosition = point;
 
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
@@ -245,7 +246,6 @@ namespace Consolonia.PlatformSupport
                 {
                     // Debug.WriteLine("GPM: Wheel UP detected (MFLAG pattern)");
                     RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, 1), modifiers);
-                    _lastButtonState = gpmEvent.Buttons;
                     return;
                 }
 
@@ -255,7 +255,6 @@ namespace Consolonia.PlatformSupport
                 {
                     // Debug.WriteLine("GPM: Wheel DOWN detected (MOVE+no buttons pattern)");
                     RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -1), modifiers);
-                    _lastButtonState = gpmEvent.Buttons;
                     return;
                 }
             }
@@ -275,8 +274,6 @@ namespace Consolonia.PlatformSupport
                 //Debug.WriteLine($"GPM: Button UP {buttons} detected");
                 ProcessButtonUp(gpmEvent, point, modifiers);
             }
-
-            _lastButtonState = gpmEvent.Buttons;
         }
 
 
@@ -351,8 +348,8 @@ namespace Consolonia.PlatformSupport
         [StructLayout(LayoutKind.Sequential)]
         private struct Timeval
         {
-            public long tv_sec;   // Changed from int to long for 64-bit compatibility
-            public long tv_usec;  // Changed from int to long for 64-bit compatibility
+            public long Sec;   // Changed from int to long for 64-bit compatibility
+            public long Usec;  // Changed from int to long for 64-bit compatibility
         }
 
         [DllImport("libc", EntryPoint = "select", SetLastError = true)]

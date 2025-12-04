@@ -30,6 +30,8 @@ namespace Consolonia.PlatformSupport
 {
     public class CursesConsole : ConsoleBase
     {
+        private bool _supportMouse = true;
+
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
                 (Key.ShiftMask, RawInputModifiers.Shift),
@@ -38,7 +40,7 @@ namespace Consolonia.PlatformSupport
                 (Key.BackTab, RawInputModifiers.Shift)
             ]);
 
-        private static readonly FlagTranslator<Key, ConsoleKey>
+       private static readonly FlagTranslator<Key, ConsoleKey>
             KeyFlagTranslator = new([
                 (Key.BackTab, ConsoleKey.Tab),
                 (Key.Backspace, ConsoleKey.Backspace),
@@ -103,8 +105,14 @@ namespace Consolonia.PlatformSupport
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
 
         public CursesConsole()
+            : this(true)
+        {
+        }
+
+        protected CursesConsole(bool supportMouse)
             : base(new AnsiConsoleOutput())
         {
+            _supportMouse = supportMouse;
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
             StartSizeCheckTimerAsync(2500);
@@ -204,9 +212,10 @@ namespace Consolonia.PlatformSupport
             Curses.noecho();
             _cursesWindow.keypad(true);
             Curses.cbreak();
-            Curses.mousemask(
-                Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
-                out Curses.Event _);
+            if (_supportMouse)
+                Curses.mousemask(
+                    Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
+                    out Curses.Event _);
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableAllMouseEvents);
