@@ -132,13 +132,15 @@ namespace Consolonia.Core.Drawing
                         continue;
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
-                    if (_consoleCursor.Coordinate.Y == y && !_consoleCursor.IsEmpty() &&
-                        _consoleCursor.Coordinate.X == x)
-                        pixel = new Pixel(new PixelForeground(new Symbol(_consoleCursor.Type),
-                            GetInvertColor(pixel.Background.Color)));
+                    if (!_consoleCursor.IsEmpty() &&
+                        _consoleCursor.Coordinate.Y == y &&
+                        _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
+                        pixel = pixel.Blend(new Pixel(new PixelForeground(
+                            new Symbol(_consoleCursor.Type[x - _consoleCursor.Coordinate.X], 1),
+                            GetInvertColor(pixel.Background.Color))));
 
                     if (pixel.Width > 1)
-                        // checking that there are enough empty pixels after current wide character
+                        // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
                             if (pixelBuffer[(ushort)(x + i), y].Width != 0)
                             {
@@ -150,7 +152,7 @@ namespace Consolonia.Core.Drawing
                             }
 
                     {
-                        // tracking if on wide character currently
+                        // tracking if we are on wide character sequence currently
                         if (pixel.Width > 1)
                             isWide = true;
                         else if (pixel.Width == 1)
@@ -158,7 +160,7 @@ namespace Consolonia.Core.Drawing
                     }
 
                     if (pixel.Width == 0 && !isWide)
-                        // fallback to spaces if wide character missed
+                        // fallback to spaces instead of empty chars in case wide character at the beginning was overwritten or we detected there is no room for it previously
                         pixel = new Pixel(
                             new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
                                 pixel.Foreground.Style, pixel.Foreground.TextDecoration), pixel.Background,
@@ -166,11 +168,10 @@ namespace Consolonia.Core.Drawing
 
                     {
                         // checking cache
-                        //todo: this check does not check mouse cursor on top of any of the following pixels
-                        //todo: it also does not consider that some of them will be replaced by space. But both issues go as pessimistic, just unnecessary redraws
+                        //todo: it does not consider that some of them will be replaced by space. But issue is pessimistic, just unnecessary redraws
                         bool anyDifferent = false;
                         for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
-                            if (_cache[x + i, y] != pixelBuffer[(ushort)(x + i), y])
+                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
                             {
                                 anyDifferent = true;
                                 break;
