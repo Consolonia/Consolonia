@@ -30,8 +30,8 @@ namespace Consolonia.Gallery
         public static AppBuilder BuildAvaloniaApp()
         {
             return AppBuilder.Configure<App>()
-                .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Input))
-                /*.LogToException()*/
+                /*.LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Input))*/
+                .LogToException()
                 // adding skia to have bitmap support
                 .UseSkia()
                 .UseConsolonia()

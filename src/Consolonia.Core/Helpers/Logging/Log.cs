@@ -25,7 +25,7 @@ namespace Consolonia.Core.Helpers.Logging
             [CallerFilePath] string sourcePath = null)
         {
             string sourceName = Path.GetFileName(sourcePath ?? "default");
-            logger.Log(sourceName, "{Raw}", message);
+            logger.Log(sourceName, "{Raw}", message); // using template because our message contains placeholders
         }
 
         public static void Log2<T>(this ParametrizedLogger logger, string messageTemplate, T parameter,

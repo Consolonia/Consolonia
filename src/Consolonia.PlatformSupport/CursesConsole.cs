@@ -222,6 +222,7 @@ namespace Consolonia.PlatformSupport
 
             if (_supportsMouseMove && DoesCursesActuallySupportMouseMove())
             {
+                // old ncurses messes up with this
                 WriteText(Esc.EnableAllMouseEvents);
                 WriteText(Esc.EnableExtendedMouseTracking);
             }
