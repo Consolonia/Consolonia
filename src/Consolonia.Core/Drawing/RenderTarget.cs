@@ -206,7 +206,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>
         ///     Inverts color with WCAG 3:1 contrast fallback.
         /// </summary>
-        private static Color GetInvertColor(Color color)
+        internal static Color GetInvertColor(Color color)
         {
             const double minimumContrastRatio = 3.0;
 
