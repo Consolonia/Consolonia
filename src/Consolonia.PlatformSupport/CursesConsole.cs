@@ -9,8 +9,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -40,9 +38,9 @@ namespace Consolonia.PlatformSupport
                 (Key.BackTab, RawInputModifiers.Shift)
             ]);
 
-       private static readonly FlagTranslator<Key, ConsoleKey>
-            KeyFlagTranslator = new([
-                (Key.BackTab, ConsoleKey.Tab),
+        private static readonly FlagTranslator<Key, ConsoleKey>
+             KeyFlagTranslator = new([
+                 (Key.BackTab, ConsoleKey.Tab),
                 (Key.Backspace, ConsoleKey.Backspace),
                 (Key.CursorDown, ConsoleKey.DownArrow),
                 (Key.CursorLeft, ConsoleKey.LeftArrow),
@@ -86,7 +84,7 @@ namespace Consolonia.PlatformSupport
                 ((Key)91, ConsoleKey.Oem4), // '[' key
                 ((Key)93, ConsoleKey.Oem6), // ']' key
                 ((Key)39, ConsoleKey.Oem7) // '\'' key
-            ]);
+             ]);
 
         private static readonly FlagTranslator<Curses.Event, RawInputModifiers>
             MouseModifiersFlagTranslator = new([
@@ -526,10 +524,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                {
-                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                    break;
-                }
+                    {
+                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                        break;
+                    }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
