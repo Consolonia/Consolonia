@@ -157,5 +157,15 @@ namespace Consolonia.PlatformSupport
                 return false;
             }
         }
+
+        /// <summary>
+        /// Control GPM cursor visibility
+        /// </summary>
+        /// <param name="x">X position (-1 to hide cursor)</param>
+        /// <param name="y">Y position</param>
+        /// <param name="flag">Drawing flag</param>
+        /// <returns>0 on success</returns>
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int Gpm_DrawPointer(int x, int y, int flag);
     }
 }

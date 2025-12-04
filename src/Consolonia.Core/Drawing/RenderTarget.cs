@@ -96,8 +96,8 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-            for (ushort x = 0; x < width; x++)
-                cache[x, y] = Pixel.Empty;
+                for (ushort x = 0; x < width; x++)
+                    cache[x, y] = Pixel.Empty;
 
             return cache;
         }
@@ -134,9 +134,11 @@ namespace Consolonia.Core.Drawing
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (_consoleCursor.Coordinate.Y == y && !_consoleCursor.IsEmpty() &&
                         _consoleCursor.Coordinate.X == x)
-                        pixel = new Pixel(new PixelForeground(new Symbol(_consoleCursor.Type),
-                            GetInvertColor(pixel.Background.Color)));
-
+                    {
+                        var cursorText = _consoleCursor.Type == " " ? pixel.Foreground.Symbol.GetText() : _consoleCursor.Type;
+                        pixel = new Pixel(new PixelForeground(new Symbol(cursorText),
+                                      GetInvertColor(pixel.Background.Color)));
+                    }
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
