@@ -8,6 +8,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -115,9 +117,12 @@ namespace Consolonia.PlatformSupport
 
         public override bool SupportsAltSolo => false;
 
-        public override bool SupportsMouse => true;
+        private bool _supportsMouse;
+        public override bool SupportsMouse => _supportsMouse;
 
-        public override bool SupportsMouseMove => true;
+        private bool _supportsMouseMove;
+        public override bool SupportsMouseMove => _supportsMouseMove;
+
 
         private void StartEventLoop()
         {
@@ -148,7 +153,6 @@ namespace Consolonia.PlatformSupport
                     }
             });
         }
-
 
         private readonly List<(int code, int wch)> _rowInputBuffer = new(1000); //todo: low magic number
 
@@ -206,14 +210,28 @@ namespace Consolonia.PlatformSupport
             Curses.noecho();
             _cursesWindow.keypad(true);
             Curses.cbreak();
-            Curses.mousemask(
+            Curses.Event mouseMask = Curses.mousemask(
                 Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
                 out Curses.Event _);
+            
+            _supportsMouse = mouseMask != 0;
+            _supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition);
+            
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
-            WriteText(Esc.EnableAllMouseEvents);
+
+            if (_supportsMouseMove && DoesCursesActuallySupportMouseMove())
+            {
+                WriteText(Esc.EnableAllMouseEvents);
+                WriteText(Esc.EnableExtendedMouseTracking);
+            }
+            else
+            {
+                _supportsMouseMove = false;
+            }
+            
             WriteText(Esc.EnableBracketedPasteMode);
-            WriteText(Esc.EnableExtendedMouseTracking);
+
             base.PrepareConsole();
         }
 
@@ -221,8 +239,12 @@ namespace Consolonia.PlatformSupport
         {
             base.RestoreConsole();
 
-            WriteText(Esc.DisableAllMouseEvents);
-            WriteText(Esc.DisableExtendedMouseTracking);
+            if (_supportsMouseMove)
+            {
+                WriteText(Esc.DisableAllMouseEvents);
+                WriteText(Esc.DisableExtendedMouseTracking);
+            }
+
             WriteText(Esc.DisableBracketedPasteMode);
             Flush();
             Curses.mousemask(0, out Curses.Event _);
@@ -231,6 +253,22 @@ namespace Consolonia.PlatformSupport
             Curses.echo();
             Curses.noraw();
             Curses.endwin();
+        }
+
+        /// <summary>
+        /// Bug workaround https://lists.gnu.org/archive/html/bug-ncurses/2022-04/msg00020.html
+        /// </summary>
+        private static bool DoesCursesActuallySupportMouseMove()
+        {
+            string cursesVersion = Curses.curses_version();
+            if (string.IsNullOrEmpty(cursesVersion) ||
+                !cursesVersion.ToUpperInvariant().Contains("NCURSES")) // bug is known to exist in ncurses only
+                return true;
+
+            string versionOnly = cursesVersion[(cursesVersion.LastIndexOf(' ') + 1)..];
+
+            return Version.Parse(versionOnly) >= Version.Parse("6.4");
+            
         }
 
         public override void PauseIO(Task task)
@@ -385,9 +423,12 @@ namespace Consolonia.PlatformSupport
                         CheckSize();
                         return;
                     case Curses.KeyMouse:
-                        Curses.getmouse(out Curses.MouseEvent ev);
-                        _verboseLogger.Log2($"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
-                        HandleMouseInput(ev);
+                        if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                        {
+                            _verboseLogger.Log2($"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
+                            HandleMouseInput(ev);
+                        }
+                        
                         return;
                 }
 
