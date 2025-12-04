@@ -213,14 +213,16 @@ namespace Consolonia.PlatformSupport
             _cursesWindow.keypad(true);
             Curses.cbreak();
             if (_supportMouse)
+            {
                 Curses.mousemask(
                     Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
                     out Curses.Event _);
+                WriteText(Esc.EnableAllMouseEvents);
+                WriteText(Esc.EnableExtendedMouseTracking);
+            }
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
-            WriteText(Esc.EnableAllMouseEvents);
             WriteText(Esc.EnableBracketedPasteMode);
-            WriteText(Esc.EnableExtendedMouseTracking);
             base.PrepareConsole();
         }
 

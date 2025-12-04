@@ -28,33 +28,13 @@ namespace Consolonia.PlatformSupport
         private RawInputModifiers _keyboardModifiers = RawInputModifiers.None;
 
         public GpmConsole()
-            : base(false)
+            : base(supportMouse: false)
         {
             _gpmCancellation = new CancellationTokenSource();
             InitializeGpm();
         }
 
-        /// <summary>
-        /// Get the current modifier state, combining GPM and tracked keyboard modifiers
-        /// </summary>
-        private RawInputModifiers GetCombinedModifiers(GpmModifiers gpmModifiers)
-        {
-            RawInputModifiers modifiers = RawInputModifiers.None;
-
-            // Start with tracked keyboard modifiers
-            modifiers = _keyboardModifiers;
-
-            // Add GPM-reported modifiers (in case GPM does report them)
-            if (gpmModifiers.HasFlag(GpmModifiers.Shift))
-                modifiers |= RawInputModifiers.Shift;
-            if (gpmModifiers.HasFlag(GpmModifiers.Control))
-                modifiers |= RawInputModifiers.Control;
-            if (gpmModifiers.HasFlag(GpmModifiers.Alt))
-                modifiers |= RawInputModifiers.Alt;
-
-            return modifiers;
-        }
-
+        
         private void InitializeGpm()
         {
             try
@@ -274,6 +254,27 @@ namespace Consolonia.PlatformSupport
                 //Debug.WriteLine($"GPM: Button UP {buttons} detected");
                 ProcessButtonUp(gpmEvent, point, modifiers);
             }
+        }
+
+        /// <summary>
+        /// Get the current modifier state, combining GPM and tracked keyboard modifiers
+        /// </summary>
+        private RawInputModifiers GetCombinedModifiers(GpmModifiers gpmModifiers)
+        {
+            RawInputModifiers modifiers = RawInputModifiers.None;
+
+            // Start with tracked keyboard modifiers
+            modifiers = _keyboardModifiers;
+
+            // Add GPM-reported modifiers (in case GPM does report them)
+            if (gpmModifiers.HasFlag(GpmModifiers.Shift))
+                modifiers |= RawInputModifiers.Shift;
+            if (gpmModifiers.HasFlag(GpmModifiers.Control))
+                modifiers |= RawInputModifiers.Control;
+            if (gpmModifiers.HasFlag(GpmModifiers.Alt))
+                modifiers |= RawInputModifiers.Alt;
+
+            return modifiers;
         }
 
 
