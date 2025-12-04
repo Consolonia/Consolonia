@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -293,7 +294,7 @@ namespace Consolonia.Core.Infrastructure
         {
             return cursorType switch
             {
-                StandardCursorType.Arrow => "^",
+                StandardCursorType.Arrow => " ",
                 StandardCursorType.Cross => "+",
                 StandardCursorType.Hand => "@",
                 StandardCursorType.Help => "?",

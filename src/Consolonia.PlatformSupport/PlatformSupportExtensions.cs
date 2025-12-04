@@ -209,13 +209,6 @@ isTTY = true;
             {
                 return new GpmConsole();
             }
-            // if (isTTY)
-            // {
-            //     Console.WriteLine("Using EvdevConsole for TTY environment.");
-            //     Console.ReadKey();
-            //     return new EvdevConsole();
-
-            // }
 
             // Otherwise use standard CursesConsole
             return new CursesConsole();

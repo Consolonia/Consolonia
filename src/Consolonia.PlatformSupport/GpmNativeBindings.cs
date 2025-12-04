@@ -129,7 +129,7 @@ namespace Consolonia.PlatformSupport
             {
                 var conn = new Gpm_Connect
                 {
-                    eventMask = (ushort)(GpmEventType.GPM_MOVE | GpmEventType.GPM_DOWN | GpmEventType.GPM_UP | GpmEventType.GPM_DRAG),
+                    eventMask = 0, 
                     defaultMask = 0,
                     minMod = 0,
                     maxMod = 0
