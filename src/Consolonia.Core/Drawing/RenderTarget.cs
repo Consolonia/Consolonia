@@ -135,9 +135,12 @@ namespace Consolonia.Core.Drawing
                     if (!_consoleCursor.IsEmpty() &&
                         _consoleCursor.Coordinate.Y == y &&
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
+                    {
+                        var cursorText = _consoleCursor.Type == " " ? pixel.Foreground.Symbol.GetText() : _consoleCursor.Type;
                         pixel = pixel.Blend(new Pixel(new PixelForeground(
-                            new Symbol(_consoleCursor.Type[x - _consoleCursor.Coordinate.X], 1),
+                            new Symbol(cursorText[x - _consoleCursor.Coordinate.X], 1),
                             GetInvertColor(pixel.Background.Color))));
+                    }
 
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
