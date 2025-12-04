@@ -232,60 +232,6 @@ namespace Consolonia.Core.Infrastructure
         #endregion
 
         /// <summary>
-        ///     Get cursor text for the specified cursor type.
-        ///     Default implementation tries to lookup from Icon resources, falls back to TTY-safe ASCII.
-        /// </summary>
-        /// <param name="cursorType">The standard cursor type</param>
-        /// <returns>Text representation of the cursor</returns>
-        public virtual string GetCursorText(StandardCursorType cursorType)
-        {
-            // Map cursor types to Icon resource keys
-            string? resourceKey = cursorType switch
-            {
-                StandardCursorType.Arrow => String.Empty,
-                StandardCursorType.Cross => "Icon_Add",
-                StandardCursorType.Hand => "Icon_Hand",
-                StandardCursorType.Help => "Icon_Help",
-                StandardCursorType.No => "Icon_Cancel",
-                StandardCursorType.SizeAll => "Icon_SizeAll",
-                StandardCursorType.SizeNorthSouth => "Icon_ArrowUpDown",
-                StandardCursorType.SizeWestEast => "Icon_ArrowLeftRight",
-                StandardCursorType.Wait => "Icon_Loading",
-                StandardCursorType.Ibeam => "Icon_Ibeam",
-                StandardCursorType.UpArrow => "Icon_ArrowUp",
-                StandardCursorType.TopSide => "Icon_ArrowUp",
-                StandardCursorType.BottomSide => "Icon_ArrowDown",
-                StandardCursorType.LeftSide => "Icon_ArrowLeft",
-                StandardCursorType.RightSide => "Icon_ArrowRight",
-                StandardCursorType.TopLeftCorner => "Icon_ArrowUpLeft",
-                StandardCursorType.TopRightCorner => "Icon_ArrowUpRight",
-                StandardCursorType.BottomLeftCorner => "Icon_ArrowDownLeft",
-                StandardCursorType.BottomRightCorner => "Icon_ArrowDownRight",
-                StandardCursorType.DragCopy => "Icon_Copy",
-                StandardCursorType.DragLink => "Icon_Share",
-                StandardCursorType.DragMove => "Icon_ArrowRight",
-                StandardCursorType.AppStarting => "Icon_Loading",
-                _ => null
-            };
-
-            if (resourceKey == String.Empty)
-                return String.Empty; 
-
-            // Try to find the resource from Avalonia's resource system
-            if (resourceKey != null)
-            {
-                if (Application.Current!.TryFindResource(resourceKey, out var resource))
-                {
-                    if (resource is string iconText)
-                        return iconText;
-                }
-            }
-
-            // Fallback to TTY-safe ASCII
-            return GetTTYSafeCursorText(cursorType);
-        }
-
-        /// <summary>
         ///     Get TTY-safe ASCII cursor text
         /// </summary>
         /// <param name="cursorType">The standard cursor type</param>

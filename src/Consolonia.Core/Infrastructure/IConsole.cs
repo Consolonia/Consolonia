@@ -38,12 +38,5 @@ namespace Consolonia.Core.Infrastructure
         event Action<bool> FocusEvent;
 
         void PauseIO(Task task);
-
-        /// <summary>
-        ///     Get cursor text for the specified cursor type
-        /// </summary>
-        /// <param name="cursorType">The standard cursor type</param>
-        /// <returns>Text representation of the cursor</returns>
-        string GetCursorText(StandardCursorType cursorType);
     }
 }

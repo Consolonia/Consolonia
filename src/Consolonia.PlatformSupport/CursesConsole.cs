@@ -760,42 +760,5 @@ namespace Consolonia.PlatformSupport
 
             base.Dispose(disposing);
         }
-
-        // Add this method to CursesConsole class
-        public override string GetCursorText(StandardCursorType cursorType)
-        {
-            // Check if we're running on a basic TTY terminal
-            if (IsTTY())
-            {
-                // use TTY-safe ASCII
-                return GetTTYSafeCursorText(cursorType);
-            }
-
-            return base.GetCursorText(cursorType);
-        }
-
-        private bool IsTTY()
-        {
-            // Check if we're running on a basic TTY terminal
-            string? term = Environment.GetEnvironmentVariable("TERM");
-
-            // TTY terminals typically have TERM set to basic values or not set at all
-            if (string.IsNullOrEmpty(term))
-                return true;
-
-            // Check for basic terminal types that don't support extended Unicode
-            string termLower = term.ToLowerInvariant();
-            if (termLower is "linux" or "vt100" or "vt220" or "vt320" or "vt52" or "ansi" or "dumb")
-                return true;
-
-            // Modern terminals that support Unicode well
-            if (termLower.Contains("xterm") || termLower.Contains("screen") ||
-                termLower.Contains("tmux") || termLower.Contains("rxvt") ||
-                termLower.Contains("konsole") || termLower.Contains("gnome"))
-                return false;
-
-            // Default to assuming TTY for unknown terminals to be safe
-            return true;
-        }
     }
 }
