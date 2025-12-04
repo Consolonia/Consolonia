@@ -62,10 +62,10 @@ namespace Consolonia.PlatformSupport
                 // Set up GPM connection
                 _gpmConnection = new GpmConnect
                 {
-                    EventMask = 0xffff,
-                    DefaultMask = 0,
-                    MinMod = 0,
-                    MaxMod = 0
+                    EventMask = 0xffff,  // Receive all events
+                    DefaultMask = 0,     // Explicitly disable all default handling
+                    MinMod = 0,          // Accept events with no modifiers or more
+                    MaxMod = 0xffff      // Accept events with any/all modifiers (0xFFFF or ~0)
                 };
 
                 _gpmFd = GPM.Open(ref _gpmConnection, 0);
