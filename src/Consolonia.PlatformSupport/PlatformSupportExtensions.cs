@@ -194,8 +194,8 @@ namespace Consolonia
         }
 
         /// <summary>
-        /// Creates the appropriate console implementation for Unix/MacOSX platforms.
-        /// Prefers GpmConsole if GPM is available in TTY environments, otherwise falls back to CursesConsole.
+        ///     Creates the appropriate console implementation for Unix/MacOSX platforms.
+        ///     Prefers GpmConsole if GPM is available in TTY environments, otherwise falls back to CursesConsole.
         /// </summary>
         private static IConsole CreateUnixConsole()
         {
@@ -204,10 +204,7 @@ namespace Consolonia
             bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
                          string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
             // If in TTY and GPM is available, use GpmConsole for better mouse support
-            if (isTTY && Gpm.IsGpmAvailable())
-            {
-                return new GpmConsole();
-            }
+            if (isTTY && Gpm.IsGpmAvailable()) return new GpmConsole();
 
             // Otherwise use standard CursesConsole
             return new CursesConsole();

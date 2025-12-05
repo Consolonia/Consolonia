@@ -136,13 +136,13 @@ namespace Consolonia.Core.Drawing
                         _consoleCursor.Coordinate.Y == y &&
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
                     {
-                        var cursorChar  = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
+                        char cursorChar = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
                         // only if we are drawing a " " and the pixel underneath is not wide char
                         // do we lift the character from the underlying pixel and invert it
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
                             cursorChar = pixel.Foreground.Symbol.Character;
                         pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
-                                          new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                            new PixelBackground(GetContrastColor(pixel.Background.Color)));
                     }
 
                     if (pixel.Width > 1)
@@ -224,7 +224,7 @@ namespace Consolonia.Core.Drawing
             double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
             // Use white text for dark backgrounds, black text for light backgrounds
-            var result= luminance > 0.5 ? Colors.Black : Colors.White;
+            Color result = luminance > 0.5 ? Colors.Black : Colors.White;
             return result;
         }
 

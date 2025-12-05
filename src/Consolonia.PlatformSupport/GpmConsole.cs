@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,18 +14,18 @@ using Consolonia.Core.Infrastructure;
 namespace Consolonia.PlatformSupport
 {
     /// <summary>
-    /// Console implementation with GPM (General Purpose Mouse) support for TTY environments
-    /// This wraps CursesConsole and adds libgpm mouse input handling
+    ///     Console implementation with GPM (General Purpose Mouse) support for TTY environments
+    ///     This wraps CursesConsole and adds libgpm mouse input handling
     /// </summary>
     public class GpmConsole : CursesConsole
     {
         private readonly CancellationTokenSource _gpmCancellation;
-        private int _gpmFd = -1;
         private GpmConnect _gpmConnection;
+        private int _gpmFd = -1;
         private bool _gpmInitialized;
 
         public GpmConsole()
-            : base(supportMouse: false)
+            : base(false)
         {
             _gpmCancellation = new CancellationTokenSource();
             InitializeGpm();
@@ -38,17 +39,14 @@ namespace Consolonia.PlatformSupport
                 // Set up GPM connection
                 _gpmConnection = new GpmConnect
                 {
-                    EventMask = 0xffff,  // Receive all events
-                    DefaultMask = 0,     // Explicitly disable all default handling
-                    MinMod = 0,          // Accept events with no modifiers or more
-                    MaxMod = 0xffff      // Accept events with any/all modifiers (0xFFFF or ~0)
+                    EventMask = 0xffff, // Receive all events
+                    DefaultMask = 0, // Explicitly disable all default handling
+                    MinMod = 0, // Accept events with no modifiers or more
+                    MaxMod = 0xffff // Accept events with any/all modifiers (0xFFFF or ~0)
                 };
 
                 _gpmFd = Gpm.Open(ref _gpmConnection, 0);
-                if (_gpmFd < 0)
-                {
-                    return;
-                }
+                if (_gpmFd < 0) return;
 
                 // Hide the GPM hardware cursor (we draw our own in software)
                 try
@@ -58,7 +56,7 @@ namespace Consolonia.PlatformSupport
                 catch (EntryPointNotFoundException)
                 {
                     // Function not available, cursor will remain visible
-                    System.Diagnostics.Debug.WriteLine("Gpm_DrawPointer not available, GPM cursor will be visible");
+                    Debug.WriteLine("Gpm_DrawPointer not available, GPM cursor will be visible");
                 }
 
                 _gpmInitialized = true;
@@ -66,11 +64,9 @@ namespace Consolonia.PlatformSupport
             }
             catch (DllNotFoundException)
             {
-                return;
             }
             catch (EntryPointNotFoundException)
             {
-                return;
             }
         }
 
@@ -79,7 +75,6 @@ namespace Consolonia.PlatformSupport
             await Helper.WaitDispatcherInitialized();
 
             while (!_gpmCancellation.Token.IsCancellationRequested && !Disposed)
-            {
                 try
                 {
                     // Check for pause
@@ -104,18 +99,16 @@ namespace Consolonia.PlatformSupport
                         if (eventResult > 0)
                         {
                             events.Add(gpmEvent);
-                            // Console.WriteLine(gpmEvent.Dump());
 
+                            // Console.WriteLine(gpmEvent.Dump());
                             // Keep reading while events are available (non-blocking)
                             // Use select with 0 timeout to check if more events are ready
                             while (WaitForGpmEvent(0) > 0)
                             {
                                 eventResult = Gpm.GetEvent(out gpmEvent);
                                 if (eventResult > 0)
-                                {
                                     events.Add(gpmEvent);
-                                    // Console.WriteLine(gpmEvent.Dump());
-                                }
+                                // Console.WriteLine(gpmEvent.Dump());
                                 else
                                     break;
 
@@ -126,13 +119,11 @@ namespace Consolonia.PlatformSupport
 
                             // Process all events in one dispatcher call
                             if (events.Count > 0)
-                            {
                                 await DispatchInputAsync(() =>
                                 {
-                                    foreach (var ev in events)
+                                    foreach (GpmEvent ev in events)
                                         ProcessGpmEvent(ev);
                                 });
-                            }
                         }
                     }
                 }
@@ -146,7 +137,6 @@ namespace Consolonia.PlatformSupport
                         () => throw new ConsoloniaException("Exception in GPM event processing loop", ex),
                         DispatcherPriority.MaxValue);
                 }
-            }
         }
 
         private int WaitForGpmEvent(int timeoutMs)
@@ -174,7 +164,7 @@ namespace Consolonia.PlatformSupport
                     var timeout = new Timeval
                     {
                         Sec = timeoutMs / 1000,
-                        Usec = (timeoutMs % 1000) * 1000
+                        Usec = timeoutMs % 1000 * 1000
                     };
 
                     // Call select
@@ -201,7 +191,7 @@ namespace Consolonia.PlatformSupport
             var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
             // Get combined modifiers (tracked keyboard + GPM)
-            RawInputModifiers modifiers = RawInputModifiers.None;
+            var modifiers = RawInputModifiers.None;
 
             // Add GPM-reported modifiers (in case GPM does report them)
             if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Shift))
@@ -244,57 +234,39 @@ namespace Consolonia.PlatformSupport
             }
 
             if (gpmEvent.Type.HasFlag(GpmEventType.Move) ||
-                     gpmEvent.Type.HasFlag(GpmEventType.Drag))
-            {
+                gpmEvent.Type.HasFlag(GpmEventType.Drag))
                 RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers);
-            }
             else if (gpmEvent.Type.HasFlag(GpmEventType.Down))
-            {
                 //Debug.WriteLine($"GPM: Button DOWN {buttons} detected");
                 ProcessButtonDown(gpmEvent, point, modifiers);
-            }
             else if (gpmEvent.Type.HasFlag(GpmEventType.Up))
-            {
                 //Debug.WriteLine($"GPM: Button UP {buttons} detected");
                 ProcessButtonUp(gpmEvent, point, modifiers);
-            }
         }
 
         private void ProcessButtonDown(GpmEvent gpmEvent, Point point, RawInputModifiers modifiers)
         {
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
-            {
                 RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, null, modifiers);
-            }
 
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
-            {
                 RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, null, modifiers);
-            }
 
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
-            {
                 RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null, modifiers);
-            }
         }
 
         private void ProcessButtonUp(GpmEvent gpmEvent, Point point, RawInputModifiers modifiers)
         {
             // Check for transitions from pressed to released
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
-            {
                 RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, null, modifiers);
-            }
 
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
-            {
                 RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, null, modifiers);
-            }
 
             if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
-            {
                 RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, null, modifiers);
-            }
         }
 
         protected override void Dispose(bool disposing)

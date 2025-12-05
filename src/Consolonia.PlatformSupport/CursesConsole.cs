@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,8 +29,6 @@ namespace Consolonia.PlatformSupport
 {
     public class CursesConsole : ConsoleBase
     {
-        private bool _supportMouse;
-
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
                 (Key.ShiftMask, RawInputModifiers.Shift),
@@ -95,6 +94,7 @@ namespace Consolonia.PlatformSupport
 
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
+        private readonly bool _supportMouse;
 
         private Curses.Window _cursesWindow;
 
@@ -218,6 +218,7 @@ namespace Consolonia.PlatformSupport
                 WriteText(Esc.EnableAllMouseEvents);
                 WriteText(Esc.EnableExtendedMouseTracking);
             }
+
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableBracketedPasteMode);
@@ -555,7 +556,7 @@ namespace Consolonia.PlatformSupport
 
         private void HandleMouseInput(Curses.MouseEvent ev)
         {
-            System.Diagnostics.Debug.WriteLine($"HandleMouseInput: ButtonState:{ev.ButtonState} X:{ev.X} Y:{ev.Y} z:{ev.Z} {ev.ID}");
+            Debug.WriteLine($"HandleMouseInput: ButtonState:{ev.ButtonState} X:{ev.X} Y:{ev.Y} z:{ev.Z} {ev.ID}");
 
             const double velocity = 1;
 

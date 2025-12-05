@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Consolonia.PlatformSupport
 {
     /// <summary>
-    /// GPM event types
+    ///     GPM event types
     /// </summary>
     [Flags]
     public enum GpmEventType : ushort
@@ -18,27 +19,27 @@ namespace Consolonia.PlatformSupport
         DoubleClick = 32, // 0x20
         TripleClick = 64, // 0x40
         MFlag = 128, // 0x80
-        Hard = 256   // 0x100
+        Hard = 256 // 0x100
     }
 
     /// <summary>
-    /// GPM mouse button identifiers
-    /// Note: These match the gpm.h definitions exactly
+    ///     GPM mouse button identifiers
+    ///     Note: These match the gpm.h definitions exactly
     /// </summary>
     [Flags]
-    public enum GpmButtons : byte  // Changed to byte since buttons field is byte
+    public enum GpmButtons : byte // Changed to byte since buttons field is byte
     {
         None = 0,
         Right = 1,
         Middle = 2,
         Left = 4,
         Fourth = 8,
-        Up = 16,      // scroll wheel up
-        Down = 32     // scroll wheel down
+        Up = 16, // scroll wheel up
+        Down = 32 // scroll wheel down
     }
 
     /// <summary>
-    /// GPM keyboard modifier flags (matches Linux keyboard modifiers)
+    ///     GPM keyboard modifier flags (matches Linux keyboard modifiers)
     /// </summary>
     [Flags]
     public enum GpmModifiers : byte
@@ -50,7 +51,7 @@ namespace Consolonia.PlatformSupport
     }
 
     /// <summary>
-    /// GPM margin values
+    ///     GPM margin values
     /// </summary>
     [Flags]
     public enum GpmMargin : ushort
@@ -62,32 +63,33 @@ namespace Consolonia.PlatformSupport
     }
 
     /// <summary>
-    /// GPM event structure
+    ///     GPM event structure
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     [DebuggerDisplay("{Dump()}")]
     public struct GpmEvent
     {
-        public GpmButtons Buttons;        // Current button state
-        public GpmModifiers Modifiers;      // Shift, control, etc.
-        public ushort VirtualConsole;          // Virtual console number
-        public short DeltaX;           // Delta x (movement)
-        public short DeltaY;           // Delta y (movement)
-        public short X;            // Absolute x position (1-based)
-        public short Y;            // Absolute y position (1-based)
-        public GpmEventType Type;  // Event type
-        public int Clicks;         // Click count
-        public GpmMargin Margin;   // Screen margin
+        public GpmButtons Buttons; // Current button state
+        public GpmModifiers Modifiers; // Shift, control, etc.
+        public ushort VirtualConsole; // Virtual console number
+        public short DeltaX; // Delta x (movement)
+        public short DeltaY; // Delta y (movement)
+        public short X; // Absolute x position (1-based)
+        public short Y; // Absolute y position (1-based)
+        public GpmEventType Type; // Event type
+        public int Clicks; // Click count
+        public GpmMargin Margin; // Screen margin
 
 
         public string Dump()
         {
-            return $"Type: {DecodeType(),-30} Buttons: {DecodeButtons(),-15} Mods: {DecodeModifiers(),-15} Pos: [{X,3},{Y,3}] Δ: ({DeltaX,3},{DeltaY,3})";
+            return
+                $"Type: {DecodeType(),-30} Buttons: {DecodeButtons(),-15} Mods: {DecodeModifiers(),-15} Pos: [{X,3},{Y,3}] Δ: ({DeltaX,3},{DeltaY,3})";
         }
 
         private string DecodeType()
         {
-            var parts = new System.Collections.Generic.List<string>();
+            var parts = new List<string>();
 
             if (Type.HasFlag(GpmEventType.Move)) parts.Add("MOVE");
             if (Type.HasFlag(GpmEventType.Drag)) parts.Add("DRAG");
@@ -106,7 +108,7 @@ namespace Consolonia.PlatformSupport
 
         private string DecodeButtons()
         {
-            var parts = new System.Collections.Generic.List<string>();
+            var parts = new List<string>();
 
             if (Buttons.HasFlag(GpmButtons.Left)) parts.Add("LEFT");
             if (Buttons.HasFlag(GpmButtons.Middle)) parts.Add("MIDDLE");
@@ -120,7 +122,7 @@ namespace Consolonia.PlatformSupport
 
         private string DecodeModifiers()
         {
-            var parts = new System.Collections.Generic.List<string>();
+            var parts = new List<string>();
 
             if (Modifiers.HasFlag(GpmModifiers.Shift)) parts.Add("SHIFT");
             if (Modifiers.HasFlag(GpmModifiers.Control)) parts.Add("CTRL");
@@ -131,32 +133,32 @@ namespace Consolonia.PlatformSupport
     }
 
     /// <summary>
-    /// GPM connection structure
+    ///     GPM connection structure
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct GpmConnect
     {
-        public ushort EventMask;      // Event types to receive
-        public ushort DefaultMask;    // Default event mask
-        public ushort MinMod;         // Minimum modifier
-        public ushort MaxMod;         // Maximum modifier
-        public int Pid;               // Process ID
-        public int VirtualConsole;                // Virtual console
+        public ushort EventMask; // Event types to receive
+        public ushort DefaultMask; // Default event mask
+        public ushort MinMod; // Minimum modifier
+        public ushort MaxMod; // Maximum modifier
+        public int Pid; // Process ID
+        public int VirtualConsole; // Virtual console
     }
 
 
     [StructLayout(LayoutKind.Sequential)]
     public struct Timeval
     {
-        public long Sec;   // Changed from int to long for 64-bit compatibility
-        public long Usec;  // Changed from int to long for 64-bit compatibility
+        public long Sec; // Changed from int to long for 64-bit compatibility
+        public long Usec; // Changed from int to long for 64-bit compatibility
     }
 
 #pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
 
     /// <summary>
-    /// Native bindings for libgpm (General Purpose Mouse) library
-    /// Used for mouse input in TTY environments without X11/Wayland
+    ///     Native bindings for libgpm (General Purpose Mouse) library
+    ///     Used for mouse input in TTY environments without X11/Wayland
     /// </summary>
     internal static class Gpm
     {
@@ -164,7 +166,7 @@ namespace Consolonia.PlatformSupport
 
 
         /// <summary>
-        /// Open a connection to the GPM daemon
+        ///     Open a connection to the GPM daemon
         /// </summary>
         /// <param name="conn">Connection structure to initialize</param>
         /// <param name="flag">Connection flags (0 = default)</param>
@@ -173,14 +175,14 @@ namespace Consolonia.PlatformSupport
         public static extern int Open(ref GpmConnect conn, int flag);
 
         /// <summary>
-        /// Close the GPM connection
+        ///     Close the GPM connection
         /// </summary>
         /// <returns>0 on success, -1 on error</returns>
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Gpm_Close")]
         public static extern int Close();
 
         /// <summary>
-        /// Get a mouse event (blocking)
+        ///     Get a mouse event (blocking)
         /// </summary>
         /// <param name="event">Event structure to fill</param>
         /// <returns>1 if event received, 0 if no event, -1 on error</returns>
@@ -189,14 +191,14 @@ namespace Consolonia.PlatformSupport
 
 
         /// <summary>
-        /// Get file descriptor for select/poll
+        ///     Get file descriptor for select/poll
         /// </summary>
         /// <returns>File descriptor</returns>
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Gpm_Fd")]
         public static extern int GetFd();
 
         /// <summary>
-        /// Check if GPM is available
+        ///     Check if GPM is available
         /// </summary>
         /// <returns>True if GPM daemon is running and accessible</returns>
         public static bool IsGpmAvailable()
@@ -211,12 +213,13 @@ namespace Consolonia.PlatformSupport
                     MaxMod = 0
                 };
 
-                int fd = Gpm.Open(ref conn, 0);
+                int fd = Open(ref conn, 0);
                 if (fd >= 0)
                 {
                     _ = Close();
                     return true;
                 }
+
                 return false;
             }
             catch (DllNotFoundException)
@@ -235,7 +238,7 @@ namespace Consolonia.PlatformSupport
         }
 
         /// <summary>
-        /// Control GPM cursor visibility
+        ///     Control GPM cursor visibility
         /// </summary>
         /// <param name="x">X position (-1 to hide cursor)</param>
         /// <param name="y">Y position</param>
@@ -245,8 +248,8 @@ namespace Consolonia.PlatformSupport
         public static extern int DrawPointer(int x, int y, int flag);
 
         [DllImport("libc", EntryPoint = "select", SetLastError = true)]
-        public static extern int Select(int nfds, IntPtr readfds, IntPtr writefds, IntPtr exceptfds, ref Timeval timeout);
-
+        public static extern int Select(int nfds, IntPtr readfds, IntPtr writefds, IntPtr exceptfds,
+            ref Timeval timeout);
     }
 #pragma warning restore CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
 }

@@ -23,11 +23,13 @@ namespace Consolonia.Gallery
             if (((ConsoloniaLifetime)ApplicationLifetime).IsRgbColorMode()
                 && !((ConsoloniaLifetime)ApplicationLifetime).Args.Any(argument => argument != null &&
                     argument.EndsWith(TurboVisionProgramParameter, StringComparison.OrdinalIgnoreCase)))
+            {
                 Styles.Add(new ModernTheme());
+            }
             else
             {
                 bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
-                         string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
+                             string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
                 if (isTTY)
                     Styles.Add(new TurboVisionCompatibleTheme());
                 else

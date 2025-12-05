@@ -67,7 +67,7 @@ namespace Consolonia.NUnit
             throw new NotSupportedException();
         }
 
-        
+
         public void SetCaretStyle(CaretStyle caretStyle)
         {
         }
