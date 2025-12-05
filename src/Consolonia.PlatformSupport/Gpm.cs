@@ -9,7 +9,7 @@ namespace Consolonia.PlatformSupport
     ///     GPM event types
     /// </summary>
     [Flags]
-    public enum GpmEventType : ushort
+    internal enum GpmEventType : ushort
     {
         Move = 1,
         Drag = 2,
@@ -27,22 +27,22 @@ namespace Consolonia.PlatformSupport
     ///     Note: These match the gpm.h definitions exactly
     /// </summary>
     [Flags]
-    public enum GpmButtons : byte // Changed to byte since buttons field is byte
+    internal enum GpmButtons : byte // Changed to byte since buttons field is byte
     {
         None = 0,
         Right = 1,
         Middle = 2,
         Left = 4,
         Fourth = 8,
-        Up = 16, // scroll wheel up
-        Down = 32 // scroll wheel down
+        WheelUp = 16,
+        WheelDown = 32 
     }
 
     /// <summary>
     ///     GPM keyboard modifier flags (matches Linux keyboard modifiers)
     /// </summary>
     [Flags]
-    public enum GpmModifiers : byte
+    internal enum GpmModifiers : byte
     {
         None = 0x00,
         Shift = 0x01,
@@ -54,7 +54,7 @@ namespace Consolonia.PlatformSupport
     ///     GPM margin values
     /// </summary>
     [Flags]
-    public enum GpmMargin : ushort
+    internal enum GpmMargin : ushort
     {
         Top = 1,
         Bottom = 2,
@@ -67,19 +67,18 @@ namespace Consolonia.PlatformSupport
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     [DebuggerDisplay("{Dump()}")]
-    public struct GpmEvent
+    internal struct GpmEvent
     {
-        public GpmButtons Buttons; // Current button state
-        public GpmModifiers Modifiers; // Shift, control, etc.
-        public ushort VirtualConsole; // Virtual console number
-        public short DeltaX; // Delta x (movement)
-        public short DeltaY; // Delta y (movement)
-        public short X; // Absolute x position (1-based)
-        public short Y; // Absolute y position (1-based)
-        public GpmEventType Type; // Event type
-        public int Clicks; // Click count
-        public GpmMargin Margin; // Screen margin
-
+        public GpmButtons Buttons;
+        public GpmModifiers Modifiers; 
+        public ushort VirtualConsole; 
+        public short DeltaX; 
+        public short DeltaY; 
+        public short X; 
+        public short Y; 
+        public GpmEventType Type; 
+        public int Clicks; 
+        public GpmMargin Margin; 
 
         public string Dump()
         {
@@ -114,8 +113,8 @@ namespace Consolonia.PlatformSupport
             if (Buttons.HasFlag(GpmButtons.Middle)) parts.Add("MIDDLE");
             if (Buttons.HasFlag(GpmButtons.Right)) parts.Add("RIGHT");
             if (Buttons.HasFlag(GpmButtons.Fourth)) parts.Add("FOURTH");
-            if (Buttons.HasFlag(GpmButtons.Up)) parts.Add("UP");
-            if (Buttons.HasFlag(GpmButtons.Down)) parts.Add("DOWN");
+            if (Buttons.HasFlag(GpmButtons.WheelUp)) parts.Add("UP");
+            if (Buttons.HasFlag(GpmButtons.WheelDown)) parts.Add("DOWN");
 
             return parts.Count > 0 ? string.Join("|", parts) : "NONE";
         }
@@ -136,22 +135,21 @@ namespace Consolonia.PlatformSupport
     ///     GPM connection structure
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    public struct GpmConnect
+    internal struct GpmConnect
     {
-        public ushort EventMask; // Event types to receive
-        public ushort DefaultMask; // Default event mask
-        public ushort MinMod; // Minimum modifier
-        public ushort MaxMod; // Maximum modifier
-        public int Pid; // Process ID
-        public int VirtualConsole; // Virtual console
+        public ushort EventMask;
+        public ushort DefaultMask;
+        public ushort MinMod;
+        public ushort MaxMod;
+        public int Pid;
+        public int VirtualConsole;
     }
 
-
     [StructLayout(LayoutKind.Sequential)]
-    public struct Timeval
+    internal struct Timeval
     {
-        public long Sec; // Changed from int to long for 64-bit compatibility
-        public long Usec; // Changed from int to long for 64-bit compatibility
+        public long Sec;
+        public long Usec;
     }
 
 #pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes

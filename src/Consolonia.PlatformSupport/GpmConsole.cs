@@ -216,7 +216,7 @@ namespace Consolonia.PlatformSupport
             {
                 // Pattern 1: buttons=0x18 (B_FOURTH+B_UP), type=MFLAG = scroll UP
                 if (gpmEvent.Type.HasFlag(GpmEventType.MFlag) &&
-                    gpmEvent.Buttons.HasFlag(GpmButtons.Up))
+                    gpmEvent.Buttons.HasFlag(GpmButtons.WheelUp))
                 {
                     // Debug.WriteLine("GPM: Wheel UP detected (MFLAG pattern)");
                     RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, 1), modifiers);
