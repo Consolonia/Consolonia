@@ -239,7 +239,6 @@ namespace Consolonia.PlatformSupport
                 }
             }
 
-            Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableBracketedPasteMode);
 
