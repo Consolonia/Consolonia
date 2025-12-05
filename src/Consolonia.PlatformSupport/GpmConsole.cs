@@ -263,21 +263,10 @@ namespace Consolonia.PlatformSupport
             {
                 _gpmCancellation?.Cancel();
 
-                try
+                if (_gpmFd >= 0)
                 {
-                    if (_gpmFd >= 0)
-                    {
-                        _ = Gpm.Close();
-                        _gpmFd = -1;
-                    }
-                }
-                catch (DllNotFoundException)
-                {
-                    // Library unloaded, ignore
-                }
-                catch (EntryPointNotFoundException)
-                {
-                    // Entry point not found, ignore
+                    _ = Gpm.Close();
+                    _gpmFd = -1;
                 }
 
                 _gpmCancellation?.Dispose();
