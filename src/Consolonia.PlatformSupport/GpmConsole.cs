@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -145,41 +145,28 @@ namespace Consolonia.PlatformSupport
 
             try
             {
-                // Use P/Invoke to call select() with the GPM file descriptor
-                IntPtr readfds = Marshal.AllocHGlobal(128); // fd_set size
-                try
-                {
-                    // Initialize fd_set
-                    for (int i = 0; i < 128; i++)
-                        Marshal.WriteByte(readfds, i, 0);
+                // Create a list with a single socket for the GPM file descriptor
+                var checkRead = new List<Socket>();
+                
+                // Wrap the file descriptor in a Socket using the SafeSocketHandle constructor
+                var gpmSocket = new Socket(new SafeSocketHandle((IntPtr)_gpmFd, ownsHandle: false));
+                
+                checkRead.Add(gpmSocket);
 
-                    // Set the bit for our fd (fd_set is a bit array)
-                    int byteIndex = _gpmFd / 8;
-                    int bitIndex = _gpmFd % 8;
-                    byte currentByte = Marshal.ReadByte(readfds, byteIndex);
-                    currentByte |= (byte)(1 << bitIndex);
-                    Marshal.WriteByte(readfds, byteIndex, currentByte);
+                // Convert timeout to microseconds for Socket.Select
+                int timeoutMicroseconds = timeoutMs * 1000;
 
-                    // Set timeout
-                    var timeout = new Timeval
-                    {
-                        Sec = timeoutMs / 1000,
-                        Usec = timeoutMs % 1000 * 1000
-                    };
+                // Call Socket.Select
+                Socket.Select(checkRead, null, null, timeoutMicroseconds);
 
-                    // Call select
-                    return Gpm.Select(_gpmFd + 1, readfds, IntPtr.Zero, IntPtr.Zero, ref timeout);
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(readfds);
-                }
+                // If the socket is still in the list, data is available
+                return checkRead.Count > 0 ? 1 : 0;
             }
-            catch (DllNotFoundException)
+            catch (SocketException)
             {
                 return -1;
             }
-            catch (EntryPointNotFoundException)
+            catch (ObjectDisposedException)
             {
                 return -1;
             }

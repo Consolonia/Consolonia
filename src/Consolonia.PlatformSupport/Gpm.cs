@@ -189,13 +189,6 @@ namespace Consolonia.PlatformSupport
 
 
         /// <summary>
-        ///     Get file descriptor for select/poll
-        /// </summary>
-        /// <returns>File descriptor</returns>
-        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Gpm_Fd")]
-        public static extern int GetFd();
-
-        /// <summary>
         ///     Check if GPM is available
         /// </summary>
         /// <returns>True if GPM daemon is running and accessible</returns>
@@ -244,10 +237,6 @@ namespace Consolonia.PlatformSupport
         /// <returns>0 on success</returns>
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Gpm_DrawPointer")]
         public static extern int DrawPointer(int x, int y, int flag);
-
-        [DllImport("libc", EntryPoint = "select", SetLastError = true)]
-        public static extern int Select(int nfds, IntPtr readfds, IntPtr writefds, IntPtr exceptfds,
-            ref Timeval timeout);
     }
 #pragma warning restore CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
 }
