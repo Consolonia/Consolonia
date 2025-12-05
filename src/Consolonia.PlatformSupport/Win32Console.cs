@@ -268,8 +268,6 @@ namespace Consolonia.PlatformSupport
                 case MOUSE_EVENT_FLAG.DOUBLE_CLICK:
                     RawPointerEventType downButtonEvent =
                         MouseButtonDownEventTypeTranslator.Translate(mouseEvent.dwButtonState);
-                    RawPointerEventType upButtonEvent =
-                        MouseButtonUpEventTypeTranslator.Translate(mouseEvent.dwButtonState);
                     // we will already have processed the original click as down/up
                     // so now we just generate down/up again and avalonia
                     // will turn it into a double click internally.
