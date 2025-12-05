@@ -136,8 +136,10 @@ namespace Consolonia.Core.Drawing
                         _consoleCursor.Coordinate.Y == y &&
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
                     {
-                        var cursorText = _consoleCursor.Type == " " ? pixel.Foreground.Symbol.GetText() : _consoleCursor.Type;
-                        pixel = new Pixel(new PixelForeground(new Symbol(cursorText[x - _consoleCursor.Coordinate.X], 1), pixel.Background.Color),
+                        var cursorChar  = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
+                        if (cursorChar == ' ' && pixel.Width == 1)
+                            cursorChar = pixel.Foreground.Symbol.Character;
+                        pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
                                           new PixelBackground(GetContrastColor(pixel.Background.Color)));
                     }
 
