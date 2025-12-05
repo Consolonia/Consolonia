@@ -137,12 +137,25 @@ namespace Consolonia.Core.Drawing
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
                     {
                         char cursorChar = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
-                        // only if we are drawing a " " and the pixel underneath is not wide char
-                        // do we lift the character from the underlying pixel and invert it
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
+                        {
+                            // floating cursor tracking effect 
+                            // if we are drawing a " " and the pixel underneath is not wide char
+                            // then we lift the character from the underlying pixel and invert it
                             cursorChar = pixel.Foreground.Symbol.Character;
-                        pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
-                            new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
+                                new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                        }
+                        else
+                        {
+                            // simply draw the mouse cursor character in the current pixel colors.
+                            var foreground = (pixel.Foreground.Color != Colors.Transparent) ?
+                                 pixel.Foreground.Color : GetContrastColor(pixel.Background.Color);
+                            pixel = new Pixel(
+                                new PixelForeground(new Symbol(cursorChar, 1), foreground,
+                                    pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
+                                pixel.Background, pixel.CaretStyle);
+                        }
                     }
 
                     if (pixel.Width > 1)
