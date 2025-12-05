@@ -149,8 +149,9 @@ namespace Consolonia.Core.Drawing
                         else
                         {
                             // simply draw the mouse cursor character in the current pixel colors.
-                            var foreground = (pixel.Foreground.Color != Colors.Transparent) ?
-                                 pixel.Foreground.Color : GetContrastColor(pixel.Background.Color);
+                            Color foreground = pixel.Foreground.Color != Colors.Transparent
+                                ? pixel.Foreground.Color
+                                : GetContrastColor(pixel.Background.Color);
                             pixel = new Pixel(
                                 new PixelForeground(new Symbol(cursorChar, 1), foreground,
                                     pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
