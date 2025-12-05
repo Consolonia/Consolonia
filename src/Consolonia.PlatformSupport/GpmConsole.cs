@@ -20,12 +20,11 @@ namespace Consolonia.PlatformSupport
     /// </summary>
     public class GpmConsole : CursesConsole
     {
-
         private static readonly FlagTranslator<GpmModifiers, RawInputModifiers>
             GpmModifiersFlagTranslator = new([
                 (GpmModifiers.Shift, RawInputModifiers.Shift),
                 (GpmModifiers.Alt, RawInputModifiers.Alt),
-                (GpmModifiers.Control, RawInputModifiers.Control),
+                (GpmModifiers.Control, RawInputModifiers.Control)
             ]);
 
         private static readonly FlagTranslator<GpmButtons, RawInputModifiers>
@@ -33,7 +32,7 @@ namespace Consolonia.PlatformSupport
                 (GpmButtons.Left, RawInputModifiers.LeftMouseButton),
                 (GpmButtons.Middle, RawInputModifiers.MiddleMouseButton),
                 (GpmButtons.Right, RawInputModifiers.RightMouseButton),
-                (GpmButtons.Fourth, RawInputModifiers.XButton1MouseButton),
+                (GpmButtons.Fourth, RawInputModifiers.XButton1MouseButton)
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
@@ -195,8 +194,8 @@ namespace Consolonia.PlatformSupport
             var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
             // Get combined modifiers (tracked keyboard + GPM)
-            var modifiers = GpmModifiersFlagTranslator.Translate(gpmEvent.Modifiers)
-                | GpmButtonsFlagTranslator.Translate(gpmEvent.Buttons);
+            RawInputModifiers modifiers = GpmModifiersFlagTranslator.Translate(gpmEvent.Modifiers)
+                                          | GpmButtonsFlagTranslator.Translate(gpmEvent.Buttons);
 
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
