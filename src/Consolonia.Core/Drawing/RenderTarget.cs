@@ -137,7 +137,9 @@ namespace Consolonia.Core.Drawing
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
                     {
                         var cursorChar  = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
-                        if (cursorChar == ' ' && pixel.Width == 1)
+                        // only if we are drawing a " " and the pixel underneath is not wide char
+                        // do we lift the character from the underlying pixel and invert it
+                        if (_consoleCursor.Type == " " && pixel.Width == 1)
                             cursorChar = pixel.Foreground.Symbol.Character;
                         pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
                                           new PixelBackground(GetContrastColor(pixel.Background.Color)));
