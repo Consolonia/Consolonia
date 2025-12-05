@@ -137,9 +137,8 @@ namespace Consolonia.Core.Drawing
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
                     {
                         var cursorText = _consoleCursor.Type == " " ? pixel.Foreground.Symbol.GetText() : _consoleCursor.Type;
-                        pixel = pixel.Blend(new Pixel(new PixelForeground(
-                            new Symbol(cursorText[x - _consoleCursor.Coordinate.X], 1),
-                            GetInvertColor(pixel.Background.Color))));
+                        pixel = new Pixel(new PixelForeground(new Symbol(cursorText[x - _consoleCursor.Coordinate.X], 1), pixel.Background.Color),
+                                          new PixelBackground(GetContrastColor(pixel.Background.Color)));
                     }
 
                     if (pixel.Width > 1)
@@ -206,11 +205,23 @@ namespace Consolonia.Core.Drawing
             }
         }
 
-        private static Color GetInvertColor(Color color)
+
+        private static Color GetContrastColor(Color color)
         {
-            return Color.FromRgb((byte)(255 - color.R),
-                (byte)(255 - color.G),
-                (byte)(255 - color.B));
+            // Calculate relative luminance using the formula from WCAG 2.0
+            // https://www.w3.org/TR/WCAG20/#relativeluminancedef
+            double r = color.R / 255.0;
+            double g = color.G / 255.0;
+            double b = color.B / 255.0;
+
+            r = r <= 0.03928 ? r / 12.92 : Math.Pow((r + 0.055) / 1.055, 2.4);
+            g = g <= 0.03928 ? g / 12.92 : Math.Pow((g + 0.055) / 1.055, 2.4);
+            b = b <= 0.03928 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
+            double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+            // Use white text for dark backgrounds, black text for light backgrounds
+            var result= luminance > 0.5 ? Colors.Black : Colors.White;
+            return result;
         }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
