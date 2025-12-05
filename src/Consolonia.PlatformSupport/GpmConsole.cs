@@ -45,7 +45,7 @@ namespace Consolonia.PlatformSupport
                     MaxMod = 0xffff      // Accept events with any/all modifiers (0xFFFF or ~0)
                 };
 
-                _gpmFd = GPM.Open(ref _gpmConnection, 0);
+                _gpmFd = Gpm.Open(ref _gpmConnection, 0);
                 if (_gpmFd < 0)
                 {
                     return;
@@ -54,7 +54,7 @@ namespace Consolonia.PlatformSupport
                 // Hide the GPM hardware cursor (we draw our own in software)
                 try
                 {
-                    _ = GPM.DrawPointer(-1, -1, 0);
+                    _ = Gpm.DrawPointer(-1, -1, 0);
                 }
                 catch (EntryPointNotFoundException)
                 {
@@ -101,7 +101,7 @@ namespace Consolonia.PlatformSupport
                         var events = new List<GpmEvent>();
 
                         // Read first event (we know it's available from select)
-                        int eventResult = GPM.GetEvent(out GpmEvent gpmEvent);
+                        int eventResult = Gpm.GetEvent(out GpmEvent gpmEvent);
                         if (eventResult > 0)
                         {
                             events.Add(gpmEvent);
@@ -111,7 +111,7 @@ namespace Consolonia.PlatformSupport
                             // Use select with 0 timeout to check if more events are ready
                             while (WaitForGpmEvent(0) > 0)
                             {
-                                eventResult = GPM.GetEvent(out gpmEvent);
+                                eventResult = Gpm.GetEvent(out gpmEvent);
                                 if (eventResult > 0)
                                 {
                                     events.Add(gpmEvent);
@@ -179,7 +179,7 @@ namespace Consolonia.PlatformSupport
                     };
 
                     // Call select
-                    return GPM.Select(_gpmFd + 1, readfds, IntPtr.Zero, IntPtr.Zero, ref timeout);
+                    return Gpm.Select(_gpmFd + 1, readfds, IntPtr.Zero, IntPtr.Zero, ref timeout);
                 }
                 finally
                 {
@@ -322,7 +322,7 @@ namespace Consolonia.PlatformSupport
                 {
                     if (_gpmFd >= 0)
                     {
-                        _ = GPM.Close();
+                        _ = Gpm.Close();
                         _gpmFd = -1;
                     }
                 }

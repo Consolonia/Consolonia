@@ -158,7 +158,7 @@ namespace Consolonia.PlatformSupport
     /// Native bindings for libgpm (General Purpose Mouse) library
     /// Used for mouse input in TTY environments without X11/Wayland
     /// </summary>
-    internal static class GPM
+    internal static class Gpm
     {
         private const string LibraryName = "libgpm.so.2";
 
@@ -211,7 +211,7 @@ namespace Consolonia.PlatformSupport
                     MaxMod = 0
                 };
 
-                int fd = GPM.Open(ref conn, 0);
+                int fd = Gpm.Open(ref conn, 0);
                 if (fd >= 0)
                 {
                     _ = Close();

@@ -200,10 +200,11 @@ namespace Consolonia
         private static IConsole CreateUnixConsole()
         {
             // Check if we're in a TTY environment (not X11/Wayland)
+            // Resharper disable InconsistentNaming
             bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
                          string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
             // If in TTY and GPM is available, use GpmConsole for better mouse support
-            if (isTTY && GPM.IsGpmAvailable())
+            if (isTTY && Gpm.IsGpmAvailable())
             {
                 return new GpmConsole();
             }
