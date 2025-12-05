@@ -87,3 +87,5 @@ dotnet tool uninstall -g Consolonia.Gallery
 ## See wiki for documentation
 https://github.com/jinek/Consolonia/wiki
 
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=Consolonia/Consolonia&type=date&legend=top-left)](https://www.star-history.com/#Consolonia/Consolonia&type=date&legend=top-left)
