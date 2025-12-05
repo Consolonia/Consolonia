@@ -96,7 +96,7 @@ namespace Consolonia.PlatformSupport
 
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
-        private readonly bool _supportMouse;
+        private readonly bool _monitorMouse;
         private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
 
         private Curses.Window _cursesWindow;
@@ -117,7 +117,7 @@ namespace Consolonia.PlatformSupport
         protected CursesConsole(bool supportMouse)
             : base(new AnsiConsoleOutput())
         {
-            _supportMouse = supportMouse;
+            _monitorMouse = supportMouse;
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
             StartSizeCheckTimerAsync(2500);
@@ -215,39 +215,32 @@ namespace Consolonia.PlatformSupport
             Curses.noecho();
             _cursesWindow.keypad(true);
             Curses.cbreak();
-            if (_supportMouse)
+            if (_monitorMouse)
             {
-                Curses.mousemask(
+                Curses.Event mouseMask = Curses.mousemask(
                     Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
                     out Curses.Event _);
-                WriteText(Esc.EnableAllMouseEvents);
-                WriteText(Esc.EnableExtendedMouseTracking);
+
+                _supportsMouse = mouseMask != 0;
+                _supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition);
+
+                Curses.mouseinterval(0); // if we don't do this mouse events are dropped
+                Curses.timeout(NoInputTimeout);
+
+                if (_supportsMouseMove && DoesCursesActuallySupportMouseMove())
+                {
+                    // old ncurses messes up with this
+                    WriteText(Esc.EnableAllMouseEvents);
+                    WriteText(Esc.EnableExtendedMouseTracking);
+                }
+                else
+                {
+                    _supportsMouseMove = false;
+                }
             }
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             Curses.timeout(NoInputTimeout);
-            WriteText(Esc.EnableBracketedPasteMode);
-            Curses.Event mouseMask = Curses.mousemask(
-                Curses.Event.AllEvents | Curses.Event.ReportMousePosition,
-                out Curses.Event _);
-
-            _supportsMouse = mouseMask != 0;
-            _supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition);
-
-            Curses.mouseinterval(0); // if we don't do this mouse events are dropped
-            Curses.timeout(NoInputTimeout);
-
-            if (_supportsMouseMove && DoesCursesActuallySupportMouseMove())
-            {
-                // old ncurses messes up with this
-                WriteText(Esc.EnableAllMouseEvents);
-                WriteText(Esc.EnableExtendedMouseTracking);
-            }
-            else
-            {
-                _supportsMouseMove = false;
-            }
-
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
