@@ -324,6 +324,13 @@ namespace Unix.Terminal {
 		static public int reset_shell_mode () => methods.reset_shell_mode ();
 		static public int savetty () => methods.savetty ();
 		static public int resetty () => methods.resetty ();
+
+		static public string curses_version ()
+		{
+			var del = methods.curses_version;
+			var ptr = del ();
+			return ptr == IntPtr.Zero ? string.Empty : Marshal.PtrToStringAnsi (ptr);
+		}
 	}
 
 #pragma warning disable RCS1102 // Make class static.
@@ -397,8 +404,9 @@ namespace Unix.Terminal {
 		public delegate int reset_shell_mode ();
 		public delegate int savetty ();
 		public delegate int resetty ();
+		public delegate IntPtr curses_version ();
 	}
-
+	
 	internal class NativeMethods {
 		public readonly Delegates.initscr initscr;
 		public readonly Delegates.endwin endwin;
@@ -469,6 +477,7 @@ namespace Unix.Terminal {
 		public readonly Delegates.reset_shell_mode reset_shell_mode;
 		public readonly Delegates.savetty savetty;
 		public readonly Delegates.resetty resetty;
+		public readonly Delegates.curses_version curses_version;
 		public UnmanagedLibrary UnmanagedLibrary;
 
 		public NativeMethods (UnmanagedLibrary lib)
@@ -543,6 +552,7 @@ namespace Unix.Terminal {
 			reset_shell_mode = lib.GetNativeMethodDelegate<Delegates.reset_shell_mode> ("reset_shell_mode");
 			savetty = lib.GetNativeMethodDelegate<Delegates.savetty> ("savetty");
 			resetty = lib.GetNativeMethodDelegate<Delegates.resetty> ("resetty");
+			curses_version = lib.GetNativeMethodDelegate<Delegates.curses_version> ("curses_version");
 		}
 	}
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
