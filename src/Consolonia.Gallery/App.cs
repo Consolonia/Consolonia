@@ -27,14 +27,7 @@ namespace Consolonia.Gallery
                 Styles.Add(new ModernTheme());
             }
             else
-            {
-                bool isTTY = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
-                             string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
-                if (isTTY)
-                    Styles.Add(new TurboVisionCompatibleTheme());
-                else
-                    Styles.Add(new TurboVisionTheme());
-            }
+                Styles.Add(new TurboVisionTheme());
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 desktop.MainWindow = new MainWindow(); // designer runs as classic desktop
