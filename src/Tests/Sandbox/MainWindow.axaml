@@ -2,30 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Sandbox.MainWindow"
         Title="Sandbox">
-    <WrapPanel ItemSpacing="2">
-        <TextBlock Padding="2" Background="Gray" Cursor="Arrow">Arrow</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="Cross">Cross</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="Hand">Hand</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="Help">Help</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="No">No</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="SizeAll">SizeAll</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="SizeNorthSouth">SizeNorthSouth</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="SizeWestEast">SizeWestEast</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="Wait">Wait</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="Ibeam">Ibeam</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="UpArrow">UpArrow</TextBlock>
-            
-        <TextBlock Padding="2" Background="Gray" Cursor="TopSide">TopSide</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="BottomSide">BottomSide</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="LeftSide">LeftSide</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="RightSide">RightSide</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="TopLeftCorner">TopLeftCorner</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="TopRightCorner">TopRightCorner</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="BottomLeftCorner">BottomLeftCorner</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="BottomRightCorner">BottomRightCorner</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="DragCopy">DragCopy</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="DragLink">DragLink</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="DragMove">DragMove</TextBlock>
-        <TextBlock Padding="2" Background="Gray" Cursor="AppStarting">AppStarting</TextBlock>
-    </WrapPanel>
+     <StackPanel>
+        <Button Content="E_xit"
+                Click="OnExit"
+                HorizontalAlignment="Left" />
+    </StackPanel>
 </Window>

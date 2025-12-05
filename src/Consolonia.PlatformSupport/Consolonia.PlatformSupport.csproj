@@ -6,7 +6,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="EvDevSharpWrapper" Version="0.3.0" />
       <PackageReference Include="jinek.X11Clipboard.Fork" Version="1.0.0" />
       <PackageReference Include="Vanara.PInvoke.Kernel32" Version="4.0.4" />
     </ItemGroup>
