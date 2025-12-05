@@ -96,8 +96,8 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-            for (ushort x = 0; x < width; x++)
-                cache[x, y] = Pixel.Empty;
+                for (ushort x = 0; x < width; x++)
+                    cache[x, y] = Pixel.Empty;
 
             return cache;
         }
@@ -223,8 +223,11 @@ namespace Consolonia.Core.Drawing
             b = b <= 0.03928 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
             double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-            // Use white text for dark backgrounds, black text for light backgrounds
-            Color result = luminance > 0.5 ? Colors.Black : Colors.White;
+            // Choose black or white based on which provides better contrast
+            // White luminance = 1.0, Black luminance = 0.0
+            double contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05);
+            double contrastWithBlack = (luminance + 0.05) / (0.0 + 0.05);
+            Color result = contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
             return result;
         }
 
