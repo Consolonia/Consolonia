@@ -169,9 +169,11 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         public PointerEventViewModel(PointerEventArgs e, PointerPoint point, [CallerMemberName] string name = null)
         {
             Name = name;
-            Summary = $"[{point.Position.X},{point.Position.Y}] {name} ({e.KeyModifiers.ToString()})";
+            var button = (e is PointerReleasedEventArgs pre ? pre.InitialPressMouseButton : MouseButton.None);
+            Summary = $"[{point.Position.X},{point.Position.Y}] {e.Properties.PointerUpdateKind} {name} ({e.KeyModifiers.ToString()}) ";
             Details =
                 $"""
+                 Kind: {e.Properties.PointerUpdateKind}
                  Position: [{point.Position}]
                  KeyModifiers: {e.KeyModifiers}
                  WheelData: {(e is PointerWheelEventArgs pwe ? pwe.Delta : 0)}
@@ -180,7 +182,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                  Pointer.Id: {point.Pointer.Id}
                  Pointer.IsPrimary: {point.Pointer.IsPrimary}
                  Pointer.Captured: {point.Pointer.Captured}
-                 InitialPressMouseButton: {(e is PointerReleasedEventArgs pre ? pre.InitialPressMouseButton : MouseButton.None)}
+                 InitialPressMouseButton: {button}
                  """;
         }
     }

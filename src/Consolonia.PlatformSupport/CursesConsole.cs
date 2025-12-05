@@ -103,7 +103,7 @@ namespace Consolonia.PlatformSupport
 
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
-        private RawInputModifiers _moveModifers;
+        private Point _lastPoint;
 
         private bool _supportsMouse;
 
@@ -569,10 +569,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                {
-                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                    break;
-                }
+                    {
+                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                        break;
+                    }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
@@ -600,17 +600,10 @@ namespace Consolonia.PlatformSupport
 
         private void HandleMouseInput(Curses.MouseEvent ev)
         {
-            Debug.WriteLine($"HandleMouseInput: ButtonState:{ev.ButtonState} X:{ev.X} Y:{ev.Y} z:{ev.Z} {ev.ID}");
-
             const double velocity = 1;
 
             RawInputModifiers rawInputModifiers = MouseModifiersFlagTranslator.Translate(ev.ButtonState);
 
-            Vector? wheelDelta = null;
-            if (ev.ButtonState.HasFlag(Curses.Event.ButtonWheeledDown))
-                wheelDelta = new Vector(0, -velocity);
-            if (ev.ButtonState.HasFlag(Curses.Event.ButtonWheeledUp))
-                wheelDelta = new Vector(0, velocity);
             var point = new Point(ev.X, ev.Y);
             foreach (Curses.Event flag in ev.ButtonState.GetFlags())
                 switch (flag)
@@ -620,105 +613,59 @@ namespace Consolonia.PlatformSupport
                     case Curses.Event.ButtonShift:
                         // we ignore these, as they are picked up by input modifiers
                         break;
-                    case Curses.Event.Button1Clicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.LeftButtonDown, RawPointerEventType.LeftButtonUp,
-                            1, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button1DoubleClicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.LeftButtonDown, RawPointerEventType.LeftButtonUp,
-                            2, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button1TripleClicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.LeftButtonDown, RawPointerEventType.LeftButtonUp,
-                            3, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button2Clicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.MiddleButtonDown,
-                            RawPointerEventType.MiddleButtonUp, 1, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button2DoubleClicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.MiddleButtonDown,
-                            RawPointerEventType.MiddleButtonUp, 2, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button2TripleClicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.MiddleButtonDown,
-                            RawPointerEventType.MiddleButtonUp, 3, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button3Clicked:
-                    case Curses.Event.Button4Clicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.RightButtonDown,
-                            RawPointerEventType.RightButtonUp, 1, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button3DoubleClicked:
-                    case Curses.Event.Button4DoubleClicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.RightButtonDown,
-                            RawPointerEventType.RightButtonUp, 2, point, rawInputModifiers);
-                        break;
-                    case Curses.Event.Button3TripleClicked:
-                    case Curses.Event.Button4TripleClicked:
-                        RaiseMouseClickedEvent(RawPointerEventType.RightButtonDown,
-                            RawPointerEventType.RightButtonUp, 3, point, rawInputModifiers);
-                        break;
                     case Curses.Event.Button1Pressed:
-                        _moveModifers = rawInputModifiers | RawInputModifiers.LeftMouseButton;
-                        RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, wheelDelta, _moveModifers);
-                        break;
-                    case Curses.Event.Button2Pressed:
-                        _moveModifers = rawInputModifiers | RawInputModifiers.MiddleMouseButton;
-                        RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, wheelDelta, _moveModifers);
-                        break;
-                    case Curses.Event.Button3Pressed:
-                        _moveModifers = rawInputModifiers | RawInputModifiers.RightMouseButton;
-                        RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, wheelDelta,
-                            rawInputModifiers | _moveModifers);
+                        RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, null, rawInputModifiers | RawInputModifiers.LeftMouseButton);
                         break;
                     case Curses.Event.Button1Released:
-                        _moveModifers = RawInputModifiers.None;
-                        RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, wheelDelta,
-                            RawInputModifiers.None);
+                        RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, null, rawInputModifiers | RawInputModifiers.LeftMouseButton);
+                        break;
+                    case Curses.Event.Button2Pressed:
+                        RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, null, rawInputModifiers | RawInputModifiers.MiddleMouseButton);
                         break;
                     case Curses.Event.Button2Released:
-                        _moveModifers = RawInputModifiers.None;
-                        RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, wheelDelta,
-                            RawInputModifiers.None);
+                        RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, null, rawInputModifiers | RawInputModifiers.MiddleMouseButton);
+                        break;
+                    case Curses.Event.Button3Pressed:
+                        RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null, rawInputModifiers | RawInputModifiers.RightMouseButton);
                         break;
                     case Curses.Event.Button3Released:
+                        RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, null, rawInputModifiers | RawInputModifiers.RightMouseButton);
+                        break;
+                    case Curses.Event.Button4Pressed:
+                        RaiseMouseEvent(RawPointerEventType.XButton1Down, point, null, rawInputModifiers | RawInputModifiers.XButton1MouseButton);
+                        break;
                     case Curses.Event.Button4Released:
-                        _moveModifers = RawInputModifiers.None;
-                        RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, wheelDelta,
-                            RawInputModifiers.None);
+                        RaiseMouseEvent(RawPointerEventType.XButton1Up, point, null, rawInputModifiers | RawInputModifiers.XButton1MouseButton);
                         break;
-
                     case Curses.Event.ReportMousePosition:
-                        RaiseMouseEvent(RawPointerEventType.Move, point, wheelDelta,
-                            rawInputModifiers | _moveModifers);
+                        if (point != _lastPoint)
+                        {
+                            _lastPoint = point;
+                            RaiseMouseEvent(RawPointerEventType.Move, point, null, rawInputModifiers);
+                        }
                         break;
-
                     case Curses.Event.ButtonWheeledDown:
-                    case Curses.Event.ButtonWheeledUp:
-                        RaiseMouseEvent(RawPointerEventType.Wheel, point, wheelDelta, rawInputModifiers);
+                        RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -velocity), rawInputModifiers);
                         break;
-
+                    case Curses.Event.ButtonWheeledUp:
+                        RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, velocity), rawInputModifiers);
+                        break;
+                    // These are never hit and frankly we don't want them, Avalonia only needs down/up/move/wheel events
+                    // case Curses.Event.Button1Clicked:
+                    // case Curses.Event.Button1DoubleClicked:
+                    // case Curses.Event.Button1TripleClicked:
+                    // case Curses.Event.Button2Clicked:
+                    // case Curses.Event.Button2DoubleClicked:
+                    // case Curses.Event.Button2TripleClicked:
+                    // case Curses.Event.Button3Clicked:
+                    // case Curses.Event.Button3DoubleClicked:
+                    // case Curses.Event.Button3TripleClicked:
+                    // case Curses.Event.Button4Clicked:
+                    // case Curses.Event.Button4DoubleClicked:
+                    // case Curses.Event.Button4TripleClicked:
                     default:
                         throw new NotImplementedException("Unknown mouse event");
                 }
-        }
-
-        // emit pairs of mouse click events (down/up)
-        private void RaiseMouseClickedEvent(RawPointerEventType down, RawPointerEventType up, int repeat, Point point,
-            RawInputModifiers rawInputModifiers)
-        {
-            _moveModifers = RawInputModifiers.None;
-            if (repeat < 1 || repeat > 3)
-                throw new ArgumentOutOfRangeException(nameof(repeat), "Only repeat up to 1-3 times");
-
-            for (int i = 0; i < repeat; i++)
-            {
-                RaiseMouseEvent(down, point, null, rawInputModifiers);
-                Thread.Yield();
-                RaiseMouseEvent(up, point, null, rawInputModifiers);
-                Thread.Yield();
-            }
         }
 
         private static Key MapCursesKey(int cursesKey)
