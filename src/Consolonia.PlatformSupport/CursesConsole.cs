@@ -101,8 +101,6 @@ namespace Consolonia.PlatformSupport
                 (Curses.Event.Button4Released, RawInputModifiers.XButton1MouseButton)
             ]);
 
-        private RawInputModifiers _moveModifers = RawInputModifiers.None;
-
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
         private readonly bool _monitorMouse;
@@ -113,6 +111,8 @@ namespace Consolonia.PlatformSupport
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
         private Point _lastPoint;
+
+        private RawInputModifiers _moveModifers = RawInputModifiers.None;
 
         private bool _supportsMouse;
 
@@ -583,10 +583,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                    {
-                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                        break;
-                    }
+                {
+                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    break;
+                }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
@@ -617,7 +617,7 @@ namespace Consolonia.PlatformSupport
             const double velocity = 1;
 
             var point = new Point(ev.X, ev.Y);
-            var modifiers = MouseModifiersFlagTranslator.Translate(ev.ButtonState);
+            RawInputModifiers modifiers = MouseModifiersFlagTranslator.Translate(ev.ButtonState);
 
             if (ev.ButtonState.HasFlag(Curses.Event.Button1Pressed))
             {
@@ -651,7 +651,7 @@ namespace Consolonia.PlatformSupport
             {
                 _moveModifers = modifiers;
                 RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null,
-                                    modifiers);
+                    modifiers);
             }
 
             if (ev.ButtonState.HasFlag(Curses.Event.Button3Released))
@@ -676,7 +676,6 @@ namespace Consolonia.PlatformSupport
             }
 
             if (ev.ButtonState.HasFlag(Curses.Event.ReportMousePosition))
-            {
                 if (point != _lastPoint)
                 {
                     _lastPoint = point;
@@ -685,7 +684,6 @@ namespace Consolonia.PlatformSupport
                     RaiseMouseEvent(RawPointerEventType.Move, point, null,
                         _moveModifers | modifiers);
                 }
-            }
 
             if (ev.ButtonState.HasFlag(Curses.Event.ButtonWheeledDown))
                 RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -velocity),
