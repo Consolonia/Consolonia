@@ -10,6 +10,7 @@ using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
+using Consolonia.Core.InternalHelpers;
 
 namespace Consolonia.PlatformSupport
 {
@@ -19,6 +20,22 @@ namespace Consolonia.PlatformSupport
     /// </summary>
     public class GpmConsole : CursesConsole
     {
+
+        private static readonly FlagTranslator<GpmModifiers, RawInputModifiers>
+            GpmModifiersFlagTranslator = new([
+                (GpmModifiers.Shift, RawInputModifiers.Shift),
+                (GpmModifiers.Alt, RawInputModifiers.Alt),
+                (GpmModifiers.Control, RawInputModifiers.Control),
+            ]);
+
+        private static readonly FlagTranslator<GpmButtons, RawInputModifiers>
+            GpmButtonsFlagTranslator = new([
+                (GpmButtons.Left, RawInputModifiers.LeftMouseButton),
+                (GpmButtons.Middle, RawInputModifiers.MiddleMouseButton),
+                (GpmButtons.Right, RawInputModifiers.RightMouseButton),
+                (GpmButtons.Fourth, RawInputModifiers.XButton1MouseButton),
+            ]);
+
         private readonly CancellationTokenSource _gpmCancellation;
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
@@ -178,24 +195,8 @@ namespace Consolonia.PlatformSupport
             var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
             // Get combined modifiers (tracked keyboard + GPM)
-            var modifiers = RawInputModifiers.None;
-
-            // Add GPM-reported modifiers (in case GPM does report them)
-            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Shift))
-                modifiers |= RawInputModifiers.Shift;
-            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Control))
-                modifiers |= RawInputModifiers.Control;
-            if (gpmEvent.Modifiers.HasFlag(GpmModifiers.Alt))
-                modifiers |= RawInputModifiers.Alt;
-
-            // Add button state to modifiers for regular mouse events
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
-                modifiers |= RawInputModifiers.LeftMouseButton;
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
-                modifiers |= RawInputModifiers.MiddleMouseButton;
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
-                modifiers |= RawInputModifiers.RightMouseButton;
-
+            var modifiers = GpmModifiersFlagTranslator.Translate(gpmEvent.Modifiers)
+                | GpmButtonsFlagTranslator.Translate(gpmEvent.Buttons);
 
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
