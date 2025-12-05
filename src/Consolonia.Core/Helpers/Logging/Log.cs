@@ -4,11 +4,11 @@ using Avalonia.Logging;
 
 namespace Consolonia.Core.Helpers.Logging
 {
-    internal static class Log
+    public static class Log
     {
         public static ParametrizedLogger Create(LogCategory category, LogEventLevel level)
         {
-            string areaName = "Consolonia." + category;
+            string areaName = LogExtensions.GetAreaName(category);
             ParametrizedLogger? parametrizedLogger = Logger.TryGet(level, areaName);
             return parametrizedLogger != null
                 ? (ParametrizedLogger)parametrizedLogger!
@@ -25,7 +25,7 @@ namespace Consolonia.Core.Helpers.Logging
             [CallerFilePath] string sourcePath = null)
         {
             string sourceName = Path.GetFileName(sourcePath ?? "default");
-            logger.Log(sourceName, message);
+            logger.Log(sourceName, "{Raw}", message); // using template because our message contains placeholders
         }
 
         public static void Log2<T>(this ParametrizedLogger logger, string messageTemplate, T parameter,
