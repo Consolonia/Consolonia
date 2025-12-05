@@ -8,7 +8,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -569,10 +568,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                    {
-                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                        break;
-                    }
+                {
+                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    break;
+                }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
@@ -614,28 +613,36 @@ namespace Consolonia.PlatformSupport
                         // we ignore these, as they are picked up by input modifiers
                         break;
                     case Curses.Event.Button1Pressed:
-                        RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, null, rawInputModifiers | RawInputModifiers.LeftMouseButton);
+                        RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, null,
+                            rawInputModifiers | RawInputModifiers.LeftMouseButton);
                         break;
                     case Curses.Event.Button1Released:
-                        RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, null, rawInputModifiers | RawInputModifiers.LeftMouseButton);
+                        RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, null,
+                            rawInputModifiers | RawInputModifiers.LeftMouseButton);
                         break;
                     case Curses.Event.Button2Pressed:
-                        RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, null, rawInputModifiers | RawInputModifiers.MiddleMouseButton);
+                        RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, null,
+                            rawInputModifiers | RawInputModifiers.MiddleMouseButton);
                         break;
                     case Curses.Event.Button2Released:
-                        RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, null, rawInputModifiers | RawInputModifiers.MiddleMouseButton);
+                        RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, null,
+                            rawInputModifiers | RawInputModifiers.MiddleMouseButton);
                         break;
                     case Curses.Event.Button3Pressed:
-                        RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null, rawInputModifiers | RawInputModifiers.RightMouseButton);
+                        RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null,
+                            rawInputModifiers | RawInputModifiers.RightMouseButton);
                         break;
                     case Curses.Event.Button3Released:
-                        RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, null, rawInputModifiers | RawInputModifiers.RightMouseButton);
+                        RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, null,
+                            rawInputModifiers | RawInputModifiers.RightMouseButton);
                         break;
                     case Curses.Event.Button4Pressed:
-                        RaiseMouseEvent(RawPointerEventType.XButton1Down, point, null, rawInputModifiers | RawInputModifiers.XButton1MouseButton);
+                        RaiseMouseEvent(RawPointerEventType.XButton1Down, point, null,
+                            rawInputModifiers | RawInputModifiers.XButton1MouseButton);
                         break;
                     case Curses.Event.Button4Released:
-                        RaiseMouseEvent(RawPointerEventType.XButton1Up, point, null, rawInputModifiers | RawInputModifiers.XButton1MouseButton);
+                        RaiseMouseEvent(RawPointerEventType.XButton1Up, point, null,
+                            rawInputModifiers | RawInputModifiers.XButton1MouseButton);
                         break;
                     case Curses.Event.ReportMousePosition:
                         if (point != _lastPoint)
@@ -643,6 +650,7 @@ namespace Consolonia.PlatformSupport
                             _lastPoint = point;
                             RaiseMouseEvent(RawPointerEventType.Move, point, null, rawInputModifiers);
                         }
+
                         break;
                     case Curses.Event.ButtonWheeledDown:
                         RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -velocity), rawInputModifiers);

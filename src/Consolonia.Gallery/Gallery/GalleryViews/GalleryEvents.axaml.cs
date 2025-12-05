@@ -169,8 +169,9 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         public PointerEventViewModel(PointerEventArgs e, PointerPoint point, [CallerMemberName] string name = null)
         {
             Name = name;
-            var button = (e is PointerReleasedEventArgs pre ? pre.InitialPressMouseButton : MouseButton.None);
-            Summary = $"[{point.Position.X},{point.Position.Y}] {e.Properties.PointerUpdateKind} {name} ({e.KeyModifiers.ToString()}) ";
+            MouseButton button = e is PointerReleasedEventArgs pre ? pre.InitialPressMouseButton : MouseButton.None;
+            Summary =
+                $"[{point.Position.X},{point.Position.Y}] {e.Properties.PointerUpdateKind} {name} ({e.KeyModifiers.ToString()}) ";
             Details =
                 $"""
                  Kind: {e.Properties.PointerUpdateKind}
