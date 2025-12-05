@@ -28,7 +28,7 @@ namespace Consolonia.PlatformSupport
 {
     public class CursesConsole : ConsoleBase
     {
-        private bool _supportMouse = true;
+        private bool _supportMouse;
 
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
