@@ -35,7 +35,7 @@ namespace Consolonia.PlatformSupport
         Left = 4,
         Fourth = 8,
         WheelUp = 16,
-        WheelDown = 32 
+        WheelDown = 32
     }
 
     /// <summary>
@@ -70,15 +70,15 @@ namespace Consolonia.PlatformSupport
     internal struct GpmEvent
     {
         public GpmButtons Buttons;
-        public GpmModifiers Modifiers; 
-        public ushort VirtualConsole; 
-        public short DeltaX; 
-        public short DeltaY; 
-        public short X; 
-        public short Y; 
-        public GpmEventType Type; 
-        public int Clicks; 
-        public GpmMargin Margin; 
+        public GpmModifiers Modifiers;
+        public ushort VirtualConsole;
+        public short DeltaX;
+        public short DeltaY;
+        public short X;
+        public short Y;
+        public GpmEventType Type;
+        public int Clicks;
+        public GpmMargin Margin;
 
         public string Dump()
         {

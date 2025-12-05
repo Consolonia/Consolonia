@@ -147,10 +147,10 @@ namespace Consolonia.PlatformSupport
             {
                 // Create a list with a single socket for the GPM file descriptor
                 var checkRead = new List<Socket>();
-                
+
                 // Wrap the file descriptor in a Socket using the SafeSocketHandle constructor
-                var gpmSocket = new Socket(new SafeSocketHandle((IntPtr)_gpmFd, ownsHandle: false));
-                
+                var gpmSocket = new Socket(new SafeSocketHandle(_gpmFd, false));
+
                 checkRead.Add(gpmSocket);
 
                 // Convert timeout to microseconds for Socket.Select
