@@ -141,7 +141,7 @@ namespace Consolonia.Core.Drawing
                             // floating cursor tracking effect 
                             // if we are drawing a " " and the pixel underneath is not wide char
                             // then we lift the character from the underlying pixel and invert it
-                            var cursorChar = pixel.Foreground.Symbol.Character != '\0'
+                            char cursorChar = pixel.Foreground.Symbol.Character != '\0'
                                 ? pixel.Foreground.Symbol.Character
                                 : ' ';
                             pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
