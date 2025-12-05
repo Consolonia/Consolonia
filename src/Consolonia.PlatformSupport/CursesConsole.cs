@@ -100,7 +100,7 @@ namespace Consolonia.PlatformSupport
 
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
-        private RawInputModifiers _moveModifers = RawInputModifiers.None;
+        private RawInputModifiers _moveModifers;
 
         public CursesConsole()
             : this(true)
