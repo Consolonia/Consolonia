@@ -55,6 +55,7 @@ namespace Consolonia.PlatformSupport
         private readonly CancellationToken _gpmToken;
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
+        private Socket _socket;
         private bool _gpmInitialized;
 
         public GpmConsole()
@@ -81,6 +82,9 @@ namespace Consolonia.PlatformSupport
 
                 _gpmFd = Gpm.Open(ref _gpmConnection, 0);
                 if (_gpmFd < 0) return;
+
+                // Wrap the file descriptor in a Socket using the SafeSocketHandle constructor
+                _socket = new Socket(new SafeSocketHandle(_gpmFd, false));
 
                 // Hide the GPM hardware cursor (we draw our own in software)
                 try
@@ -180,18 +184,16 @@ namespace Consolonia.PlatformSupport
 
             try
             {
-                // Create a list with a single socket for the GPM file descriptor
-                var checkRead = new List<Socket>();
-
-                // Wrap the file descriptor in a Socket using the SafeSocketHandle constructor
-                var gpmSocket = new Socket(new SafeSocketHandle(_gpmFd, false));
-
-                checkRead.Add(gpmSocket);
-
                 // Convert timeout to microseconds for Socket.Select
                 int timeoutMicroseconds = timeoutMs * 1000;
 
                 // Call Socket.Select
+                // Create a list with a single socket for the GPM file descriptor
+                var checkRead = new List<Socket>
+                {
+                    _socket
+                };
+
                 Socket.Select(checkRead, null, null, timeoutMicroseconds);
 
                 // If the socket is still in the list, data is available
@@ -233,6 +235,9 @@ namespace Consolonia.PlatformSupport
             if (disposing && _gpmInitialized)
             {
                 _gpmCancellation?.Cancel();
+
+                _socket?.Dispose();
+                _socket = null;
 
                 if (_gpmFd >= 0)
                 {
