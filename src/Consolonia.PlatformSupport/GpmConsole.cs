@@ -39,7 +39,7 @@ namespace Consolonia.PlatformSupport
             GpmButtonsToRawPointerEventDownType = new([
                 (GpmButtons.Left, RawPointerEventType.LeftButtonDown),
                 (GpmButtons.Middle, RawPointerEventType.MiddleButtonDown),
-                (GpmButtons.Right,RawPointerEventType.RightButtonDown),
+                (GpmButtons.Right, RawPointerEventType.RightButtonDown),
                 (GpmButtons.Fourth, RawPointerEventType.XButton1Down)
             ]);
 
@@ -47,7 +47,7 @@ namespace Consolonia.PlatformSupport
             GpmButtonsToRawPointerEventUpType = new([
                 (GpmButtons.Left, RawPointerEventType.LeftButtonUp),
                 (GpmButtons.Middle, RawPointerEventType.MiddleButtonUp),
-                (GpmButtons.Right,RawPointerEventType.RightButtonUp),
+                (GpmButtons.Right, RawPointerEventType.RightButtonUp),
                 (GpmButtons.Fourth, RawPointerEventType.XButton1Up)
             ]);
 
@@ -221,11 +221,13 @@ namespace Consolonia.PlatformSupport
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
             if (gpmEvent.WheelDeltaX != 0 || gpmEvent.WheelDeltaY != 0)
-                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(gpmEvent.WheelDeltaX, gpmEvent.WheelDeltaY), modifiers);
+                RaiseMouseEvent(RawPointerEventType.Wheel, point,
+                    new Vector(gpmEvent.WheelDeltaX, gpmEvent.WheelDeltaY), modifiers);
             else if (gpmEvent.Type.HasFlag(GpmEventType.Move) || gpmEvent.Type.HasFlag(GpmEventType.Drag))
                 RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers);
             else if (gpmEvent.Type.HasFlag(GpmEventType.Down))
-                RaiseMouseEvent(GpmButtonsToRawPointerEventDownType.Translate(gpmEvent.Buttons), point, null, modifiers);
+                RaiseMouseEvent(GpmButtonsToRawPointerEventDownType.Translate(gpmEvent.Buttons), point, null,
+                    modifiers);
             else if (gpmEvent.Type.HasFlag(GpmEventType.Up))
                 RaiseMouseEvent(GpmButtonsToRawPointerEventUpType.Translate(gpmEvent.Buttons), point, null, modifiers);
         }
