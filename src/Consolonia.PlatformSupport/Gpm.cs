@@ -9,7 +9,7 @@ namespace Consolonia.PlatformSupport
     ///     GPM event types
     /// </summary>
     [Flags]
-    internal enum GpmEventType 
+    internal enum GpmEventType
     {
         Move = 1,
         Drag = 2,
@@ -54,7 +54,7 @@ namespace Consolonia.PlatformSupport
     ///     GPM margin values
     /// </summary>
     [Flags]
-    internal enum GpmMargin 
+    internal enum GpmMargin
     {
         Top = 1,
         Bottom = 2,
