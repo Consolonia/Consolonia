@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Media;
 using Consolonia.Core.Infrastructure;
 
@@ -7,30 +9,57 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
 {
     public class EgaConsoleColorMode : IConsoleColorMode
     {
-        private static readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] ConsoleColorMap =
-        [
-            (ConsoleColor.Black, (0, 0, 0)),
-            (ConsoleColor.DarkBlue, (0, 0, 128)),
-            (ConsoleColor.DarkGreen, (0, 128, 0)),
-            (ConsoleColor.DarkCyan, (0, 128, 128)),
-            (ConsoleColor.DarkRed, (128, 0, 0)),
-            (ConsoleColor.DarkMagenta, (128, 0, 128)),
-            (ConsoleColor.DarkYellow, (128, 128, 0)),
-            (ConsoleColor.Gray, (192, 192, 192)),
-            (ConsoleColor.DarkGray, (128, 128, 128)),
-            (ConsoleColor.Blue, (0, 0, 255)),
-            (ConsoleColor.Green, (0, 255, 0)),
-            (ConsoleColor.Cyan, (0, 255, 255)),
-            (ConsoleColor.Red, (255, 0, 0)),
-            (ConsoleColor.Magenta, (255, 0, 255)),
-            (ConsoleColor.Yellow, (255, 255, 0)),
-            (ConsoleColor.White, (255, 255, 255))
-        ];
-
-        public Color Blend(Color color1, Color color2)
+        public static readonly Lazy<EgaConsoleColorMode> Instance = new(() =>
         {
-            (ConsoleColor consoleColor1, EgaColorMode mode1) = ConvertToConsoleColorMode(color1);
-            (ConsoleColor consoleColor2, EgaColorMode mode2) = ConvertToConsoleColorMode(color2);
+            try
+            {
+                return (EgaConsoleColorMode)AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>();
+            }
+            catch (InvalidCastException exception)
+            {
+                throw new ConsoloniaException(
+                    "EgaConsoleColorMode is not supported on this platform. ",
+                    exception);
+            }
+        });
+
+        private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _backgroundConsoleColorMap;
+        private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _consoleColorMap;
+        private readonly bool _supportBrightBackground;
+
+        public EgaConsoleColorMode(bool supportBrightBackground)
+        {
+            _supportBrightBackground = supportBrightBackground;
+            _consoleColorMap =
+            [
+                (ConsoleColor.Black, (0, 0, 0)),
+                (ConsoleColor.DarkBlue, (0, 0, 128)),
+                (ConsoleColor.DarkGreen, (0, 128, 0)),
+                (ConsoleColor.DarkCyan, (0, 128, 128)),
+                (ConsoleColor.DarkRed, (128, 0, 0)),
+                (ConsoleColor.DarkMagenta, (128, 0, 128)),
+                (ConsoleColor.DarkYellow, (128, 128, 0)),
+                (ConsoleColor.Gray, (192, 192, 192)),
+
+                // 4th bit further
+                (ConsoleColor.DarkGray, (128, 128, 128)),
+                (ConsoleColor.Blue, (0, 0, 255)),
+                (ConsoleColor.Green, (0, 255, 0)),
+                (ConsoleColor.Cyan, (0, 255, 255)),
+                (ConsoleColor.Red, (255, 0, 0)),
+                (ConsoleColor.Magenta, (255, 0, 255)),
+                (ConsoleColor.Yellow, (255, 255, 0)),
+                (ConsoleColor.White, (255, 255, 255))
+            ];
+
+            _backgroundConsoleColorMap = supportBrightBackground ? _consoleColorMap : [.._consoleColorMap.Take(8)];
+        }
+
+        /// <inheritdoc />
+        public Color Blend(Color color1, Color color2, bool isTargetForeground)
+        {
+            (ConsoleColor consoleColor1, EgaColorMode mode1) = ConvertToConsoleColorMode(color1, isTargetForeground);
+            (ConsoleColor consoleColor2, EgaColorMode mode2) = ConvertToConsoleColorMode(color2, true);
 
             switch (mode2)
             {
@@ -39,36 +68,39 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
 
                 case EgaColorMode.Shaded when mode1 == EgaColorMode.Shaded:
                 {
-                    ConsoleColor doubleShadedColor = Shade(Shade(consoleColor1));
-                    return ConvertToAvaloniaColor(doubleShadedColor);
+                    ConsoleColor doubleShadedColor =
+                        Shade(Shade(consoleColor1, isTargetForeground), isTargetForeground);
+                    return ConvertToAvaloniaColor(doubleShadedColor, isTargetForeground);
                 }
                 case EgaColorMode.Shaded:
                 {
-                    ConsoleColor shadedColor = Shade(consoleColor1);
-                    return ConvertToAvaloniaColor(shadedColor);
+                    ConsoleColor shadedColor = Shade(consoleColor1, isTargetForeground);
+                    return ConvertToAvaloniaColor(shadedColor, isTargetForeground);
                 }
                 case EgaColorMode.Colored:
+                    return ConvertToAvaloniaColor(consoleColor2, isTargetForeground);
                 default:
-                    return ConvertToAvaloniaColor(consoleColor2);
+                    throw new ArgumentOutOfRangeException(nameof(color2));
             }
         }
 
+        /// <inheritdoc />
         public (object background, object foreground) MapColors(Color background, Color foreground, FontWeight? weight)
         {
-            (ConsoleColor backgroundConsoleColor, EgaColorMode mode) = ConvertToConsoleColorMode(background);
+            (ConsoleColor backgroundConsoleColor, EgaColorMode mode) = ConvertToConsoleColorMode(background, false);
             if (mode is not EgaColorMode.Colored)
                 return ConsoloniaPlatform.RaiseNotSupported<(object background, object foreground)>(
                     NotSupportedRequestCode.BackgroundWasNotColoredWhileMapping, this, background, foreground, weight);
 
-            (ConsoleColor foregroundConsoleColor, _) = ConvertToConsoleColorMode(foreground);
+            (ConsoleColor foregroundConsoleColor, _) = ConvertToConsoleColorMode(foreground, true);
             //todo: if mode is transparent, don't print foreground. if shaded - shade it
 
             return (backgroundConsoleColor, foregroundConsoleColor);
         }
 
-        public static (ConsoleColor, EgaColorMode) ConvertToConsoleColorMode(Color color)
+        public (ConsoleColor, EgaColorMode) ConvertToConsoleColorMode(Color color, bool isForeground)
         {
-            ConsoleColor consoleColor = MapToConsoleColor(color);
+            ConsoleColor consoleColor = MapToConsoleColor(color, isForeground);
 
             EgaColorMode mode = color.A switch
             {
@@ -80,19 +112,24 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             return (consoleColor, mode);
         }
 
-        private static ConsoleColor MapToConsoleColor(Color color)
+        private ConsoleColor MapToConsoleColor(Color color, bool isForeground)
         {
             int r = color.R, g = color.G, b = color.B;
 
             // Find the nearest ConsoleColor by RGB distance
-            return ConsoleColorMap
+            return GetPalette(isForeground)
                 .OrderBy(c => Math.Pow(c.Rgb.R - r, 2) + Math.Pow(c.Rgb.G - g, 2) + Math.Pow(c.Rgb.B - b, 2))
                 .First().Color;
         }
 
-        private static ConsoleColor Shade(ConsoleColor color)
+        private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground)
         {
-            return color switch
+            return isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
+        }
+
+        private ConsoleColor Shade(ConsoleColor color, bool isForeground)
+        {
+            ConsoleColor fullScaleColor = color switch
             {
                 ConsoleColor.White => ConsoleColor.Gray,
                 ConsoleColor.Gray => ConsoleColor.DarkGray,
@@ -104,9 +141,26 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                 ConsoleColor.Yellow => ConsoleColor.DarkYellow,
                 _ => ConsoleColor.Black
             };
+
+            if (!_supportBrightBackground)
+            {
+                if (isForeground)
+                {
+                    // background becomes black very fast in this scenario, thus we are saturating foreground to avoid "everything is black"
+                    if (fullScaleColor == ConsoleColor.Black)
+                        fullScaleColor = ConsoleColor.DarkGray;
+                }
+                else
+                {
+                    if (fullScaleColor == ConsoleColor.DarkGray)
+                        fullScaleColor = ConsoleColor.Black;
+                }
+            }
+
+            return fullScaleColor;
         }
 
-        public static Color ConvertToAvaloniaColor(ConsoleColor consoleColor,
+        public Color ConvertToAvaloniaColor(ConsoleColor consoleColor, bool isForeground,
             EgaColorMode mode = EgaColorMode.Colored)
         {
             switch (mode)
@@ -116,7 +170,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                 case EgaColorMode.Shaded:
                     return Color.FromArgb(127, 0, 0, 0);
                 case EgaColorMode.Colored:
-                    (ConsoleColor _, (int R, int G, int B) rgb) = ConsoleColorMap.First(c => c.Color == consoleColor);
+                    (ConsoleColor _, (int R, int G, int B) rgb) =
+                        GetPalette(isForeground).First(c => c.Color == consoleColor);
                     return Color.FromRgb((byte)rgb.R, (byte)rgb.G, (byte)rgb.B);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);

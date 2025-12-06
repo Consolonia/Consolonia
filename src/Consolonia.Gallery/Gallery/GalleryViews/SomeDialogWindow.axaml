@@ -26,7 +26,9 @@ _____/          :--'
 
 Bill Ames
 </TextBlock>
-            <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal"
+                        Margin="1"
+                        Spacing="1">
                 <Button Content="One More"
                         Name="OneMoreButton"
                         HorizontalAlignment="Right"

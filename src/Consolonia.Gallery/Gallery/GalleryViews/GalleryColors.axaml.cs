@@ -102,7 +102,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             return Enum.GetValues<ConsoleColor>()
                 .Select(c => new ConsoleColorItem
                 {
-                    Brush = new SolidColorBrush(EgaConsoleColorMode.ConvertToAvaloniaColor(c)),
+                    Brush = new SolidColorBrush(new EgaConsoleColorMode(true).ConvertToAvaloniaColor(c, true)),
                     Name = c.ToString()
                 })
                 .ToArray();

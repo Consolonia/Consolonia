@@ -10,7 +10,7 @@
                              Color="{consolonia:EgaColor White}" />
             <!--Main content background.-->
             <SolidColorBrush x:Key="ThemeBackgroundBrush"
-                             Color="{consolonia:EgaColor DarkGray}" />
+                             Color="#404040" />
             <!--Alternative to main background. Must fit same foreground.-->
             <SolidColorBrush x:Key="ThemeAlternativeBackgroundBrush"
                              Color="{consolonia:EgaColor DarkBlue}" />
