@@ -55,8 +55,8 @@ namespace Consolonia.PlatformSupport
         private readonly CancellationToken _gpmToken;
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
-        private Socket _socket;
         private bool _gpmInitialized;
+        private Socket _socket;
 
         public GpmConsole()
             : base(false)
