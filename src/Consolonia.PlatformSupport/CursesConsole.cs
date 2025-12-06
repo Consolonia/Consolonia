@@ -110,8 +110,6 @@ namespace Consolonia.PlatformSupport
 
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
-        private Point _lastPoint;
-
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
 
         private bool _supportsMouse;
@@ -676,14 +674,10 @@ namespace Consolonia.PlatformSupport
             }
 
             if (ev.ButtonState.HasFlag(Curses.Event.ReportMousePosition))
-                if (point != _lastPoint)
-                {
-                    _lastPoint = point;
-                    // MouseMove events carry the button state from the last button pressed via _moveModifiers
-                    // this is how click drag gets reported
-                    RaiseMouseEvent(RawPointerEventType.Move, point, null,
-                        _moveModifers | modifiers);
-                }
+                // MouseMove events carry the button state from the last button pressed via _moveModifiers
+                // this is how click drag gets reported
+                RaiseMouseEvent(RawPointerEventType.Move, point, null,
+                    _moveModifers | modifiers);
 
             if (ev.ButtonState.HasFlag(Curses.Event.ButtonWheeledDown))
                 RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -velocity),
