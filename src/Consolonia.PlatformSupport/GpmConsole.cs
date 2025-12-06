@@ -21,18 +21,34 @@ namespace Consolonia.PlatformSupport
     public class GpmConsole : CursesConsole
     {
         private static readonly FlagTranslator<GpmModifiers, RawInputModifiers>
-            GpmModifiersFlagTranslator = new([
+            GpmModifiersToRawInputModifiers = new([
                 (GpmModifiers.Shift, RawInputModifiers.Shift),
                 (GpmModifiers.Alt, RawInputModifiers.Alt),
                 (GpmModifiers.Control, RawInputModifiers.Control)
             ]);
 
         private static readonly FlagTranslator<GpmButtons, RawInputModifiers>
-            GpmButtonsFlagTranslator = new([
+            GpmButtonsToRawInputModifiers = new([
                 (GpmButtons.Left, RawInputModifiers.LeftMouseButton),
                 (GpmButtons.Middle, RawInputModifiers.MiddleMouseButton),
                 (GpmButtons.Right, RawInputModifiers.RightMouseButton),
                 (GpmButtons.Fourth, RawInputModifiers.XButton1MouseButton)
+            ]);
+
+        private static readonly FlagTranslator<GpmButtons, RawPointerEventType>
+            GpmButtonsToRawPointerEventDownType = new([
+                (GpmButtons.Left, RawPointerEventType.LeftButtonDown),
+                (GpmButtons.Middle, RawPointerEventType.MiddleButtonDown),
+                (GpmButtons.Right,RawPointerEventType.RightButtonDown),
+                (GpmButtons.Fourth, RawPointerEventType.XButton1Down)
+            ]);
+
+        private static readonly FlagTranslator<GpmButtons, RawPointerEventType>
+            GpmButtonsToRawPointerEventUpType = new([
+                (GpmButtons.Left, RawPointerEventType.LeftButtonUp),
+                (GpmButtons.Middle, RawPointerEventType.MiddleButtonUp),
+                (GpmButtons.Right,RawPointerEventType.RightButtonUp),
+                (GpmButtons.Fourth, RawPointerEventType.XButton1Up)
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
@@ -197,66 +213,19 @@ namespace Consolonia.PlatformSupport
             var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
             // Get combined modifiers (tracked keyboard + GPM)
-            RawInputModifiers modifiers = GpmModifiersFlagTranslator.Translate(gpmEvent.Modifiers)
-                                          | GpmButtonsFlagTranslator.Translate(gpmEvent.Buttons);
+            RawInputModifiers modifiers = GpmModifiersToRawInputModifiers.Translate(gpmEvent.Modifiers)
+                                          | GpmButtonsToRawInputModifiers.Translate(gpmEvent.Buttons);
 
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
-            if (gpmEvent.DeltaX == 0 && gpmEvent.DeltaY == 0)
-            {
-                // Pattern 1: buttons=0x18 (B_FOURTH+B_UP), type=MFLAG = scroll UP
-                if (gpmEvent.Type.HasFlag(GpmEventType.MFlag) &&
-                    gpmEvent.Buttons.HasFlag(GpmButtons.WheelUp))
-                {
-                    // Debug.WriteLine("GPM: Wheel UP detected (MFLAG pattern)");
-                    RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, 1), modifiers);
-                    return;
-                }
-
-                // Pattern 2: buttons=0, type=MOVE = scroll DOWN
-                if (gpmEvent.Type == GpmEventType.Move &&
-                    gpmEvent.Buttons == GpmButtons.None)
-                {
-                    // Debug.WriteLine("GPM: Wheel DOWN detected (MOVE+no buttons pattern)");
-                    RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -1), modifiers);
-                    return;
-                }
-            }
-
-            if (gpmEvent.Type.HasFlag(GpmEventType.Move) ||
-                gpmEvent.Type.HasFlag(GpmEventType.Drag))
+            if (gpmEvent.WheelDeltaX != 0 || gpmEvent.WheelDeltaY != 0)
+                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(gpmEvent.WheelDeltaX, gpmEvent.WheelDeltaY), modifiers);
+            else if (gpmEvent.Type.HasFlag(GpmEventType.Move) || gpmEvent.Type.HasFlag(GpmEventType.Drag))
                 RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers);
             else if (gpmEvent.Type.HasFlag(GpmEventType.Down))
-                //Debug.WriteLine($"GPM: Button DOWN {buttons} detected");
-                ProcessButtonDown(gpmEvent, point, modifiers);
+                RaiseMouseEvent(GpmButtonsToRawPointerEventDownType.Translate(gpmEvent.Buttons), point, null, modifiers);
             else if (gpmEvent.Type.HasFlag(GpmEventType.Up))
-                //Debug.WriteLine($"GPM: Button UP {buttons} detected");
-                ProcessButtonUp(gpmEvent, point, modifiers);
-        }
-
-        private void ProcessButtonDown(GpmEvent gpmEvent, Point point, RawInputModifiers modifiers)
-        {
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
-                RaiseMouseEvent(RawPointerEventType.LeftButtonDown, point, null, modifiers);
-
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
-                RaiseMouseEvent(RawPointerEventType.MiddleButtonDown, point, null, modifiers);
-
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
-                RaiseMouseEvent(RawPointerEventType.RightButtonDown, point, null, modifiers);
-        }
-
-        private void ProcessButtonUp(GpmEvent gpmEvent, Point point, RawInputModifiers modifiers)
-        {
-            // Check for transitions from pressed to released
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Left))
-                RaiseMouseEvent(RawPointerEventType.LeftButtonUp, point, null, modifiers);
-
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Middle))
-                RaiseMouseEvent(RawPointerEventType.MiddleButtonUp, point, null, modifiers);
-
-            if (gpmEvent.Buttons.HasFlag(GpmButtons.Right))
-                RaiseMouseEvent(RawPointerEventType.RightButtonUp, point, null, modifiers);
+                RaiseMouseEvent(GpmButtonsToRawPointerEventUpType.Translate(gpmEvent.Buttons), point, null, modifiers);
         }
 
         protected override void Dispose(bool disposing)

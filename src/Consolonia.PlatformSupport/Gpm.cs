@@ -9,7 +9,7 @@ namespace Consolonia.PlatformSupport
     ///     GPM event types
     /// </summary>
     [Flags]
-    internal enum GpmEventType : ushort
+    internal enum GpmEventType 
     {
         Move = 1,
         Drag = 2,
@@ -54,7 +54,7 @@ namespace Consolonia.PlatformSupport
     ///     GPM margin values
     /// </summary>
     [Flags]
-    internal enum GpmMargin : ushort
+    internal enum GpmMargin 
     {
         Top = 1,
         Bottom = 2,
@@ -79,11 +79,13 @@ namespace Consolonia.PlatformSupport
         public GpmEventType Type;
         public int Clicks;
         public GpmMargin Margin;
+        public short WheelDeltaX;
+        public short WheelDeltaY;
 
         public string Dump()
         {
             return
-                $"Type: {DecodeType(),-30} Buttons: {DecodeButtons(),-15} Mods: {DecodeModifiers(),-15} Pos: [{X,3},{Y,3}] Δ: ({DeltaX,3},{DeltaY,3})";
+                $"Type: {DecodeType(),-30} Buttons: {DecodeButtons(),-15} Mods: {DecodeModifiers(),-15} Pos: [{X,3},{Y,3}] Δ: ({DeltaX,3},{DeltaY,3}) Clicks: {Clicks,-2} Margin: {Margin} WheelΔ: ({WheelDeltaX,3},{WheelDeltaY,3})";
         }
 
         private string DecodeType()
