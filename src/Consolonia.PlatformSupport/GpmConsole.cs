@@ -36,6 +36,7 @@ namespace Consolonia.PlatformSupport
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
+        private readonly CancellationToken _gpmToken;
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
         private bool _gpmInitialized;
@@ -44,6 +45,7 @@ namespace Consolonia.PlatformSupport
             : base(false)
         {
             _gpmCancellation = new CancellationTokenSource();
+            _gpmToken = _gpmCancellation.Token;
             InitializeGpm();
         }
 
@@ -76,7 +78,7 @@ namespace Consolonia.PlatformSupport
                 }
 
                 _gpmInitialized = true;
-                Task.Run(GpmEventLoop, _gpmCancellation.Token);
+                Task.Run(GpmEventLoop, _gpmToken);
             }
             catch (DllNotFoundException)
             {
@@ -90,7 +92,7 @@ namespace Consolonia.PlatformSupport
         {
             await Helper.WaitDispatcherInitialized();
 
-            while (!_gpmCancellation.Token.IsCancellationRequested && !Disposed)
+            while (!_gpmToken.IsCancellationRequested && !Disposed)
                 try
                 {
                     // Check for pause
@@ -152,6 +154,7 @@ namespace Consolonia.PlatformSupport
                     Dispatcher.UIThread.Post(
                         () => throw new ConsoloniaException("Exception in GPM event processing loop", ex),
                         DispatcherPriority.MaxValue);
+                    break;
                 }
         }
 
