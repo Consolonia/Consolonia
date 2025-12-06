@@ -20,11 +20,6 @@ namespace Consolonia
 {
     public static class ApplicationStartup
     {
-        public static void StartConsolonia<TApp>(params string[] args) where TApp : Application, new()
-        {
-            StartConsolonia<TApp>(new DefaultNetConsole(), new EgaConsoleColorMode(), args);
-        }
-
         public static void StartConsolonia<TApp>(IConsole console, IConsoleColorMode consoleColorMode,
             params string[] args) where TApp : Application, new()
         {
@@ -36,7 +31,12 @@ namespace Consolonia
 
         public static AppBuilder UseStandardConsole(this AppBuilder builder)
         {
-            return builder.UseConsole(new DefaultNetConsole()).UseConsoleColorMode(new EgaConsoleColorMode());
+            return builder.UseConsole(new DefaultNetConsole());
+        }
+
+        public static AppBuilder UseEgaConsoleColorMode(this AppBuilder builder, bool supportBrightBackground)
+        {
+            return builder.UseConsoleColorMode(new EgaConsoleColorMode(supportBrightBackground));
         }
 
         public static AppBuilder UseConsole(this AppBuilder builder, IConsole console)

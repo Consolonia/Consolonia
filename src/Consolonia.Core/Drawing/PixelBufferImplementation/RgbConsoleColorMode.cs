@@ -5,7 +5,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 {
     public class RgbConsoleColorMode : IConsoleColorMode
     {
-        public Color Blend(Color color1, Color color2)
+        /// <inheritdoc />
+        public Color Blend(Color color1, Color color2, bool isTargetForeground)
         {
             // Early exit for common cases
             if (color2.A == 0) return color1; // Fully transparent foreground
@@ -38,6 +39,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Color.FromArgb(a, r, g, b);
         }
 
+        /// <inheritdoc />
         public (object background, object foreground) MapColors(Color background, Color foreground, FontWeight? weight)
         {
             foreground = weight switch

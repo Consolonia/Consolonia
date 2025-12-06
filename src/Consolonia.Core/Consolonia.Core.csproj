@@ -18,4 +18,13 @@
         <ProjectReference Include="..\Consolonia.Controls\Consolonia.Controls.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Update="Drawing\DrawingContextImpl.Bitmaps.cs">
+        <DependentUpon>DrawingContextImpl.cs</DependentUpon>
+      </Compile>
+      <Compile Update="Drawing\DrawingContextImpl.Boxes.cs">
+        <DependentUpon>DrawingContextImpl.cs</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
 </Project>
