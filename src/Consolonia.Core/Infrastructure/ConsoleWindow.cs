@@ -482,7 +482,7 @@ namespace Consolonia.Core.Infrastructure
         {
             return _cursorType switch
             {
-                StandardCursorType.Arrow => string.Empty,
+                StandardCursorType.Arrow => " ",
                 StandardCursorType.Cross => "+",
                 StandardCursorType.Hand => "@",
                 StandardCursorType.Help => "?",
@@ -497,10 +497,10 @@ namespace Consolonia.Core.Infrastructure
                 StandardCursorType.BottomSide => "v",
                 StandardCursorType.LeftSide => "<",
                 StandardCursorType.RightSide => ">",
-                StandardCursorType.TopLeftCorner => @"\\",
+                StandardCursorType.TopLeftCorner => @"\",
                 StandardCursorType.TopRightCorner => "/",
                 StandardCursorType.BottomLeftCorner => "/",
-                StandardCursorType.BottomRightCorner => @"\\",
+                StandardCursorType.BottomRightCorner => @"\",
                 StandardCursorType.DragCopy => "+",
                 StandardCursorType.DragLink => "@",
                 StandardCursorType.DragMove => ">",

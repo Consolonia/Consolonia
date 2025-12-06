@@ -135,9 +135,31 @@ namespace Consolonia.Core.Drawing
                     if (!_consoleCursor.IsEmpty() &&
                         _consoleCursor.Coordinate.Y == y &&
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
-                        pixel = pixel.Blend(new Pixel(new PixelForeground(
-                            new Symbol(_consoleCursor.Type[x - _consoleCursor.Coordinate.X], 1),
-                            GetInvertColor(pixel.Background.Color))));
+                    {
+                        if (_consoleCursor.Type == " " && pixel.Width == 1)
+                        {
+                            // floating cursor tracking effect 
+                            // if we are drawing a " " and the pixel underneath is not wide char
+                            // then we lift the character from the underlying pixel and invert it
+                            char cursorChar = pixel.Foreground.Symbol.Character != '\0'
+                                ? pixel.Foreground.Symbol.Character
+                                : ' ';
+                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
+                                new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                        }
+                        else
+                        {
+                            char cursorChar = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
+                            // simply draw the mouse cursor character in the current pixel colors.
+                            Color foreground = pixel.Foreground.Color != Colors.Transparent
+                                ? pixel.Foreground.Color
+                                : GetContrastColor(pixel.Background.Color);
+                            pixel = new Pixel(
+                                new PixelForeground(new Symbol(cursorChar, 1), foreground,
+                                    pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
+                                pixel.Background, pixel.CaretStyle);
+                        }
+                    }
 
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
@@ -203,11 +225,26 @@ namespace Consolonia.Core.Drawing
             }
         }
 
-        private static Color GetInvertColor(Color color)
+
+        private static Color GetContrastColor(Color color)
         {
-            return Color.FromRgb((byte)(255 - color.R),
-                (byte)(255 - color.G),
-                (byte)(255 - color.B));
+            // Calculate relative luminance using the formula from WCAG 2.0
+            // https://www.w3.org/TR/WCAG20/#relativeluminancedef
+            double r = color.R / 255.0;
+            double g = color.G / 255.0;
+            double b = color.B / 255.0;
+
+            r = r <= 0.03928 ? r / 12.92 : Math.Pow((r + 0.055) / 1.055, 2.4);
+            g = g <= 0.03928 ? g / 12.92 : Math.Pow((g + 0.055) / 1.055, 2.4);
+            b = b <= 0.03928 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
+            double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+            // Choose black or white based on which provides better contrast
+            // White luminance = 1.0, Black luminance = 0.0
+            double contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05);
+            double contrastWithBlack = (luminance + 0.05) / (0.0 + 0.05);
+            Color result = contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
+            return result;
         }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
