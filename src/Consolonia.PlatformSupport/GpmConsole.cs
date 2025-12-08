@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
@@ -11,6 +12,7 @@ using Avalonia.Threading;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
+using Consolonia.Core.Text;
 
 namespace Consolonia.PlatformSupport
 {
@@ -18,7 +20,7 @@ namespace Consolonia.PlatformSupport
     ///     Console implementation with GPM (General Purpose Mouse) support for TTY environments
     ///     This wraps CursesConsole and adds libgpm mouse input handling
     /// </summary>
-    public class GpmConsole : CursesConsole
+    public class GpmMonitor : IDisposable
     {
         private static readonly FlagTranslator<GpmModifiers, RawInputModifiers>
             GpmModifiersToRawInputModifiers = new([
@@ -32,7 +34,6 @@ namespace Consolonia.PlatformSupport
                 (GpmButtons.Left, RawInputModifiers.LeftMouseButton),
                 (GpmButtons.Middle, RawInputModifiers.MiddleMouseButton),
                 (GpmButtons.Right, RawInputModifiers.RightMouseButton),
-                (GpmButtons.Fourth, RawInputModifiers.XButton1MouseButton)
             ]);
 
         private static readonly FlagTranslator<GpmButtons, RawPointerEventType>
@@ -40,7 +41,6 @@ namespace Consolonia.PlatformSupport
                 (GpmButtons.Left, RawPointerEventType.LeftButtonDown),
                 (GpmButtons.Middle, RawPointerEventType.MiddleButtonDown),
                 (GpmButtons.Right, RawPointerEventType.RightButtonDown),
-                (GpmButtons.Fourth, RawPointerEventType.XButton1Down)
             ]);
 
         private static readonly FlagTranslator<GpmButtons, RawPointerEventType>
@@ -48,7 +48,6 @@ namespace Consolonia.PlatformSupport
                 (GpmButtons.Left, RawPointerEventType.LeftButtonUp),
                 (GpmButtons.Middle, RawPointerEventType.MiddleButtonUp),
                 (GpmButtons.Right, RawPointerEventType.RightButtonUp),
-                (GpmButtons.Fourth, RawPointerEventType.XButton1Up)
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
@@ -56,156 +55,101 @@ namespace Consolonia.PlatformSupport
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
         private bool _gpmInitialized;
-        private Socket _socket;
+        private readonly Channel<GpmEvent> _eventChannel =
+            Channel.CreateUnbounded<GpmEvent>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true,
+                AllowSynchronousContinuations = true
+            });
 
-        public GpmConsole()
-            : base(false)
+        private Task _pumpTask;
+        private Task _drainTask;
+
+        public GpmMonitor()
         {
             _gpmCancellation = new CancellationTokenSource();
             _gpmToken = _gpmCancellation.Token;
             InitializeGpm();
         }
 
+        public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
+
+        protected bool Disposed { get; private set; }
 
         private void InitializeGpm()
         {
+            // Set up GPM connection
+            _gpmConnection = new GpmConnect
+            {
+                EventMask = 0xffff, // Receive all events
+                DefaultMask = 0, // Explicitly disable all default handling
+                MinMod = 0, // Accept events with no modifiers or more
+                MaxMod = 0xffff // Accept events with any/all modifiers (0xFFFF or ~0)
+            };
+
+            _gpmFd = Gpm.Open(ref _gpmConnection, 0);
+            if (_gpmFd < 0) return;
+
+            // Hide the GPM hardware cursor (we draw our own in software)
             try
             {
-                // Set up GPM connection
-                _gpmConnection = new GpmConnect
-                {
-                    EventMask = 0xffff, // Receive all events
-                    DefaultMask = 0, // Explicitly disable all default handling
-                    MinMod = 0, // Accept events with no modifiers or more
-                    MaxMod = 0xffff // Accept events with any/all modifiers (0xFFFF or ~0)
-                };
-
-                _gpmFd = Gpm.Open(ref _gpmConnection, 0);
-                if (_gpmFd < 0) return;
-
-                // Wrap the file descriptor in a Socket using the SafeSocketHandle constructor
-                _socket = new Socket(new SafeSocketHandle(_gpmFd, false));
-
-                // Hide the GPM hardware cursor (we draw our own in software)
-                try
-                {
-                    _ = Gpm.DrawPointer(-1, -1, 0);
-                }
-                catch (EntryPointNotFoundException)
-                {
-                    // Function not available, cursor will remain visible
-                    Debug.WriteLine("Gpm_DrawPointer not available, GPM cursor will be visible");
-                }
-
-                _gpmInitialized = true;
-                Task.Run(GpmEventLoop, _gpmToken);
-            }
-            catch (DllNotFoundException)
-            {
+                _ = Gpm.DrawPointer(-1, -1, 0);
             }
             catch (EntryPointNotFoundException)
             {
+                // Function not available, cursor will remain visible
+                Debug.WriteLine("Gpm_DrawPointer not available, GPM cursor will be visible");
             }
+
+            _gpmInitialized = true;
+            _pumpTask = PumpGpmEventsAsync(_gpmToken);
+            _drainTask = DrainEventsAsync(_gpmToken);
         }
 
-        private async Task GpmEventLoop()
+        private async Task PumpGpmEventsAsync(CancellationToken cancellationToken)
         {
             await Helper.WaitDispatcherInitialized();
 
-            while (!_gpmToken.IsCancellationRequested && !Disposed)
-                try
+            while (!cancellationToken.IsCancellationRequested && !Disposed)
+            {
+                if (Gpm.GetEvent(out var gpmEvent) > 0)
                 {
-                    // Check for pause
-                    Task pauseTask = PauseTask;
-                    if (pauseTask != null)
-                    {
-                        await pauseTask;
-                        continue;
-                    }
+                    //Console.WriteLine($"{Esc.SetCursorPosition(10, 0)}{Esc.Background(Avalonia.Media.Colors.Black)}{Esc.Foreground(Avalonia.Media.Colors.White)}GPM Event: {gpmEvent.Dump()}");
 
-                    // Use select to wait for GPM events with timeout
-                    int result = WaitForGpmEvent(1000); // 1000ms timeout
-
-                    if (result > 0)
-                    {
-                        // Process ALL available events in one batch
-                        // This reduces the overhead of DispatchInputAsync calls
-                        var events = new List<GpmEvent>();
-
-                        // Read first event (we know it's available from select)
-                        int eventResult = Gpm.GetEvent(out GpmEvent gpmEvent);
-                        if (eventResult > 0)
-                        {
-                            events.Add(gpmEvent);
-
-                            // Console.WriteLine(gpmEvent.Dump());
-                            // Keep reading while events are available (non-blocking)
-                            // Use select with 0 timeout to check if more events are ready
-                            while (WaitForGpmEvent(0) > 0)
-                            {
-                                eventResult = Gpm.GetEvent(out gpmEvent);
-                                if (eventResult > 0)
-                                    events.Add(gpmEvent);
-                                // Console.WriteLine(gpmEvent.Dump());
-                                else
-                                    break;
-
-                                // Safety limit to prevent infinite loop
-                                if (events.Count >= 100)
-                                    break;
-                            }
-
-                            // Process all events in one dispatcher call
-                            if (events.Count > 0)
-                                await DispatchInputAsync(() =>
-                                {
-                                    foreach (GpmEvent ev in events)
-                                        ProcessGpmEvent(ev);
-                                });
-                        }
-                    }
+                    // Use TryWrite first to avoid async/await overhead when possible
+                    if (!_eventChannel.Writer.TryWrite(gpmEvent))
+                        await _eventChannel.Writer.WriteAsync(gpmEvent, _gpmToken);
                 }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    Dispatcher.UIThread.Post(
-                        () => throw new ConsoloniaException("Exception in GPM event processing loop", ex),
-                        DispatcherPriority.MaxValue);
-                    break;
-                }
+            }
+
+            _eventChannel.Writer.TryComplete();
         }
 
-        private int WaitForGpmEvent(int timeoutMs)
+        private async Task DrainEventsAsync(CancellationToken cancellationToken)
         {
-            if (_gpmFd < 0) return -1;
+            await Helper.WaitDispatcherInitialized();
 
-            try
+            var batch = new List<GpmEvent>(32);
+
+            await foreach (var first in _eventChannel.Reader.ReadAllAsync(cancellationToken))
             {
-                // Convert timeout to microseconds for Socket.Select
-                int timeoutMicroseconds = timeoutMs * 1000;
+                // readallasync returns an enumeration of a block of events,
+                //  we batch process them to reduce dispatcher posts
+                batch.Add(first);
 
-                // Call Socket.Select
-                // Create a list with a single socket for the GPM file descriptor
-                var checkRead = new List<Socket>
-                {
-                    _socket
-                };
+                while (_eventChannel.Reader.TryRead(out var next))
+                    batch.Add(next);
 
-                Socket.Select(checkRead, null, null, timeoutMicroseconds);
+                var toDispatch = batch.ToArray();
+                batch.Clear();
 
-                // If the socket is still in the list, data is available
-                return checkRead.Count > 0 ? 1 : 0;
-            }
-            catch (SocketException)
-            {
-                return -1;
-            }
-            catch (ObjectDisposedException)
-            {
-                return -1;
+                Dispatcher.UIThread.Post(() =>
+                    {
+                        foreach (var evt in toDispatch)
+                            ProcessGpmEvent(evt);
+                    },
+                    DispatcherPriority.Input);
             }
         }
 
@@ -232,15 +176,22 @@ namespace Consolonia.PlatformSupport
                 RaiseMouseEvent(GpmButtonsToRawPointerEventUpType.Translate(gpmEvent.Buttons), point, null, modifiers);
         }
 
-        protected override void Dispose(bool disposing)
+
+        protected void RaiseMouseEvent(RawPointerEventType eventType, Point point, Vector? wheelDelta,
+            RawInputModifiers modifiers)
+        {
+            // System.Diagnostics.Debug.WriteLine($"Mouse event: {eventType} [{point}] {wheelDelta} {modifiers}");
+            MouseEvent?.Invoke(eventType, point, wheelDelta, modifiers);
+        }
+
+        protected virtual void Dispose(bool disposing)
         {
             if (disposing && _gpmInitialized)
             {
-                _gpmCancellation?.Cancel();
-
-                _socket?.Dispose();
-                _socket = null;
-
+                _gpmCancellation.Cancel();
+                _eventChannel.Writer.TryComplete();
+                try { _pumpTask?.Wait(); } catch (TaskCanceledException) { /* ignored */ }
+                try { _drainTask?.Wait(); } catch (TaskCanceledException) { /* ignored */ }
                 if (_gpmFd >= 0)
                 {
                     _ = Gpm.Close();
@@ -249,8 +200,17 @@ namespace Consolonia.PlatformSupport
 
                 _gpmCancellation?.Dispose();
             }
-
-            base.Dispose(disposing);
         }
+
+        public void Dispose()
+        {
+#pragma warning disable CA1063 // Implement IDisposable Correctly
+#pragma warning disable CA1303 // Do not pass literals as localized parameters
+            Dispose(true);
+            GC.SuppressFinalize(this);
+#pragma warning restore CA1063 // Implement IDisposable Correctly
+#pragma warning restore CA1303 // Do not pass literals as localized parameters
+        }
+
     }
 }

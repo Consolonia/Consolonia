@@ -24,7 +24,6 @@ namespace Consolonia.PlatformSupport
 
     /// <summary>
     ///     GPM mouse button identifiers
-    ///     Note: These match the gpm.h definitions exactly
     /// </summary>
     [Flags]
     internal enum GpmButtons : byte // Changed to byte since buttons field is byte
