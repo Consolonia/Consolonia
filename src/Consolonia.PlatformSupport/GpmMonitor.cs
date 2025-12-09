@@ -27,21 +27,21 @@ namespace Consolonia.PlatformSupport
             GpmButtonsToRawInputModifiers = new([
                 (GpmButtons.Left, RawInputModifiers.LeftMouseButton),
                 (GpmButtons.Middle, RawInputModifiers.MiddleMouseButton),
-                (GpmButtons.Right, RawInputModifiers.RightMouseButton),
+                (GpmButtons.Right, RawInputModifiers.RightMouseButton)
             ]);
 
         private static readonly FlagTranslator<GpmButtons, RawPointerEventType>
             GpmButtonsToRawPointerEventDownType = new([
                 (GpmButtons.Left, RawPointerEventType.LeftButtonDown),
                 (GpmButtons.Middle, RawPointerEventType.MiddleButtonDown),
-                (GpmButtons.Right, RawPointerEventType.RightButtonDown),
+                (GpmButtons.Right, RawPointerEventType.RightButtonDown)
             ]);
 
         private static readonly FlagTranslator<GpmButtons, RawPointerEventType>
             GpmButtonsToRawPointerEventUpType = new([
                 (GpmButtons.Left, RawPointerEventType.LeftButtonUp),
                 (GpmButtons.Middle, RawPointerEventType.MiddleButtonUp),
-                (GpmButtons.Right, RawPointerEventType.RightButtonUp),
+                (GpmButtons.Right, RawPointerEventType.RightButtonUp)
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
@@ -57,6 +57,16 @@ namespace Consolonia.PlatformSupport
             _gpmCancellation = new CancellationTokenSource();
             _gpmToken = _gpmCancellation.Token;
             InitializeGpm();
+        }
+
+        public void Dispose()
+        {
+#pragma warning disable CA1063 // Implement IDisposable Correctly
+#pragma warning disable CA1303 // Do not pass literals as localized parameters
+            Dispose(true);
+            GC.SuppressFinalize(this);
+#pragma warning restore CA1063 // Implement IDisposable Correctly
+#pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
@@ -95,12 +105,8 @@ namespace Consolonia.PlatformSupport
             await Helper.WaitDispatcherInitialized();
 
             while (!cancellationToken.IsCancellationRequested)
-            {
-                if (Gpm.GetEvent(out var gpmEvent) > 0)
-                {
+                if (Gpm.GetEvent(out GpmEvent gpmEvent) > 0)
                     ProcessGpmEvent(gpmEvent);
-                }
-            }
         }
 
 
@@ -133,13 +139,8 @@ namespace Consolonia.PlatformSupport
         {
             // System.Diagnostics.Debug.WriteLine($"Mouse event: {eventType} [{point}] {wheelDelta} {modifiers}");
             if (MouseEvent != null)
-            {
-                Dispatcher.UIThread.Invoke(() =>
-                    {
-                        MouseEvent?.Invoke(eventType, point, wheelDelta, modifiers);
-                    },
+                Dispatcher.UIThread.Invoke(() => { MouseEvent?.Invoke(eventType, point, wheelDelta, modifiers); },
                     DispatcherPriority.Input);
-            }
         }
 
         protected virtual void Dispose(bool disposing)
@@ -147,7 +148,15 @@ namespace Consolonia.PlatformSupport
             if (disposing && _gpmInitialized)
             {
                 _gpmCancellation.Cancel();
-                try { _pumpTask?.Wait(); } catch (TaskCanceledException) { /* ignored */ }
+                try
+                {
+                    _pumpTask?.Wait();
+                }
+                catch (TaskCanceledException)
+                {
+                    /* ignored */
+                }
+
                 if (_gpmFd >= 0)
                 {
                     _ = Gpm.Close();
@@ -157,16 +166,5 @@ namespace Consolonia.PlatformSupport
                 _gpmCancellation?.Dispose();
             }
         }
-
-        public void Dispose()
-        {
-#pragma warning disable CA1063 // Implement IDisposable Correctly
-#pragma warning disable CA1303 // Do not pass literals as localized parameters
-            Dispose(true);
-            GC.SuppressFinalize(this);
-#pragma warning restore CA1063 // Implement IDisposable Correctly
-#pragma warning restore CA1303 // Do not pass literals as localized parameters
-        }
-
     }
 }
