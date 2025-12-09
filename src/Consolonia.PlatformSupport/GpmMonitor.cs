@@ -20,7 +20,7 @@ namespace Consolonia.PlatformSupport
     ///     Console implementation with GPM (General Purpose Mouse) support for TTY environments
     ///     This wraps CursesConsole and adds libgpm mouse input handling
     /// </summary>
-    public class GpmMonitor : IDisposable
+    internal class GpmMonitor : IDisposable
     {
         private static readonly FlagTranslator<GpmModifiers, RawInputModifiers>
             GpmModifiersToRawInputModifiers = new([
