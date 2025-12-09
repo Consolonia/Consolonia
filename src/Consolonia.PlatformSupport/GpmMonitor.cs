@@ -55,16 +55,8 @@ namespace Consolonia.PlatformSupport
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
         private bool _gpmInitialized;
-        private readonly Channel<GpmEvent> _eventChannel =
-            Channel.CreateUnbounded<GpmEvent>(new UnboundedChannelOptions
-            {
-                SingleReader = true,
-                SingleWriter = true,
-                AllowSynchronousContinuations = true
-            });
 
         private Task _pumpTask;
-        private Task _drainTask;
 
         public GpmMonitor()
         {
@@ -104,7 +96,6 @@ namespace Consolonia.PlatformSupport
 
             _gpmInitialized = true;
             _pumpTask = PumpGpmEventsAsync(_gpmToken);
-            _drainTask = DrainEventsAsync(_gpmToken);
         }
 
         private async Task PumpGpmEventsAsync(CancellationToken cancellationToken)
@@ -115,25 +106,13 @@ namespace Consolonia.PlatformSupport
             {
                 if (Gpm.GetEvent(out var gpmEvent) > 0)
                 {
-                    //Console.WriteLine($"{Esc.SetCursorPosition(10, 0)}{Esc.Background(Avalonia.Media.Colors.Black)}{Esc.Foreground(Avalonia.Media.Colors.White)}GPM Event: {gpmEvent.Dump()}");
-                    await _eventChannel.Writer.WriteAsync(gpmEvent, _gpmToken);
+                    Dispatcher.UIThread.Invoke(() => ProcessGpmEvent(gpmEvent),
+                        DispatcherPriority.Input,
+                        cancellationToken);
                 }
             }
-
-            _eventChannel.Writer.TryComplete();
         }
 
-        private async Task DrainEventsAsync(CancellationToken cancellationToken)
-        {
-            await Helper.WaitDispatcherInitialized();
-
-            await foreach (var evt in _eventChannel.Reader.ReadAllAsync(cancellationToken))
-            {
-                Dispatcher.UIThread.Invoke(() => ProcessGpmEvent(evt),
-                    DispatcherPriority.Input,
-                    cancellationToken);
-            }
-        }
 
         private void ProcessGpmEvent(GpmEvent gpmEvent)
         {
@@ -171,9 +150,7 @@ namespace Consolonia.PlatformSupport
             if (disposing && _gpmInitialized)
             {
                 _gpmCancellation.Cancel();
-                _eventChannel.Writer.TryComplete();
                 try { _pumpTask?.Wait(); } catch (TaskCanceledException) { /* ignored */ }
-                try { _drainTask?.Wait(); } catch (TaskCanceledException) { /* ignored */ }
                 if (_gpmFd >= 0)
                 {
                     _ = Gpm.Close();
