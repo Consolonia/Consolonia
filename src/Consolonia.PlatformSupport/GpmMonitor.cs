@@ -17,8 +17,7 @@ using Consolonia.Core.Text;
 namespace Consolonia.PlatformSupport
 {
     /// <summary>
-    ///     Console implementation with GPM (General Purpose Mouse) support for TTY environments
-    ///     This wraps CursesConsole and adds libgpm mouse input handling
+    ///     implementation with GPM (General Purpose Mouse) support for TTY environments
     /// </summary>
     internal class GpmMonitor : IDisposable
     {
