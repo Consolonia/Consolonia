@@ -106,9 +106,7 @@ namespace Consolonia.PlatformSupport
             {
                 if (Gpm.GetEvent(out var gpmEvent) > 0)
                 {
-                    Dispatcher.UIThread.Invoke(() => ProcessGpmEvent(gpmEvent),
-                        DispatcherPriority.Input,
-                        cancellationToken);
+                    ProcessGpmEvent(gpmEvent);
                 }
             }
         }
@@ -142,7 +140,14 @@ namespace Consolonia.PlatformSupport
             RawInputModifiers modifiers)
         {
             // System.Diagnostics.Debug.WriteLine($"Mouse event: {eventType} [{point}] {wheelDelta} {modifiers}");
-            MouseEvent?.Invoke(eventType, point, wheelDelta, modifiers);
+            if (MouseEvent != null)
+            {
+                Dispatcher.UIThread.Invoke(() =>
+                    {
+                        MouseEvent?.Invoke(eventType, point, wheelDelta, modifiers);
+                    },
+                    DispatcherPriority.Input);
+            }
         }
 
         protected virtual void Dispose(bool disposing)
