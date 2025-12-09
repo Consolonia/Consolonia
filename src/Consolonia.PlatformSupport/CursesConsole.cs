@@ -144,6 +144,7 @@ namespace Consolonia.PlatformSupport
 
         private GpmMonitor _gpmMonitor;
 
+        // ReSharper disable UnusedMember.Local
         [Flags]
         private enum EventClass
         {
@@ -154,6 +155,7 @@ namespace Consolonia.PlatformSupport
             Wheel = 8,
             All = Move | ButtonDown | ButtonUp | Wheel
         }
+        // ReSharper enable UnusedMember.Local
 
         public CursesConsole()
             : base(new AnsiConsoleOutput())

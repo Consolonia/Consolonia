@@ -1,18 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Core.Helpers;
-using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
-using Consolonia.Core.Text;
 
 namespace Consolonia.PlatformSupport
 {
@@ -66,8 +61,6 @@ namespace Consolonia.PlatformSupport
 
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
 
-        protected bool Disposed { get; private set; }
-
         private void InitializeGpm()
         {
             // Set up GPM connection
@@ -101,7 +94,7 @@ namespace Consolonia.PlatformSupport
         {
             await Helper.WaitDispatcherInitialized();
 
-            while (!cancellationToken.IsCancellationRequested && !Disposed)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 if (Gpm.GetEvent(out var gpmEvent) > 0)
                 {
