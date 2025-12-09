@@ -116,10 +116,7 @@ namespace Consolonia.PlatformSupport
                 if (Gpm.GetEvent(out var gpmEvent) > 0)
                 {
                     //Console.WriteLine($"{Esc.SetCursorPosition(10, 0)}{Esc.Background(Avalonia.Media.Colors.Black)}{Esc.Foreground(Avalonia.Media.Colors.White)}GPM Event: {gpmEvent.Dump()}");
-
-                    // Use TryWrite first to avoid async/await overhead when possible
-                    if (!_eventChannel.Writer.TryWrite(gpmEvent))
-                        await _eventChannel.Writer.WriteAsync(gpmEvent, _gpmToken);
+                    await _eventChannel.Writer.WriteAsync(gpmEvent, _gpmToken);
                 }
             }
 
@@ -130,26 +127,11 @@ namespace Consolonia.PlatformSupport
         {
             await Helper.WaitDispatcherInitialized();
 
-            var batch = new List<GpmEvent>(32);
-
-            await foreach (var first in _eventChannel.Reader.ReadAllAsync(cancellationToken))
+            await foreach (var evt in _eventChannel.Reader.ReadAllAsync(cancellationToken))
             {
-                // readallasync returns an enumeration of a block of events,
-                //  we batch process them to reduce dispatcher posts
-                batch.Add(first);
-
-                while (_eventChannel.Reader.TryRead(out var next))
-                    batch.Add(next);
-
-                var toDispatch = batch.ToArray();
-                batch.Clear();
-
-                Dispatcher.UIThread.Post(() =>
-                    {
-                        foreach (var evt in toDispatch)
-                            ProcessGpmEvent(evt);
-                    },
-                    DispatcherPriority.Input);
+                Dispatcher.UIThread.Invoke(() => ProcessGpmEvent(evt),
+                    DispatcherPriority.Input,
+                    cancellationToken);
             }
         }
 
@@ -160,7 +142,7 @@ namespace Consolonia.PlatformSupport
 
             // Get combined modifiers (tracked keyboard + GPM)
             RawInputModifiers modifiers = GpmModifiersToRawInputModifiers.Translate(gpmEvent.Modifiers)
-                                          | GpmButtonsToRawInputModifiers.Translate(gpmEvent.Buttons);
+                                          GpmButtonsToRawInputModifiers.Translate(gpmEvent.Buttons);
 
             // Handle wheel events - GPM can report wheel in multiple ways
             // Wheel events have dx=0, dy=0 (no movement) and specific type patterns
