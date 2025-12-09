@@ -141,7 +141,7 @@ namespace Consolonia.PlatformSupport
             var point = new Point(gpmEvent.X - 1, gpmEvent.Y - 1);
 
             // Get combined modifiers (tracked keyboard + GPM)
-            RawInputModifiers modifiers = GpmModifiersToRawInputModifiers.Translate(gpmEvent.Modifiers)
+            RawInputModifiers modifiers = GpmModifiersToRawInputModifiers.Translate(gpmEvent.Modifiers) |
                                           GpmButtonsToRawInputModifiers.Translate(gpmEvent.Buttons);
 
             // Handle wheel events - GPM can report wheel in multiple ways
