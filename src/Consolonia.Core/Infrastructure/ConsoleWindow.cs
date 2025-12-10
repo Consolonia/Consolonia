@@ -55,7 +55,7 @@ namespace Consolonia.Core.Infrastructure
             Console.MouseEvent += ConsoleOnMouseEvent;
             Console.FocusEvent += ConsoleOnFocusEvent;
             Handle = null!;
-            _accessKeysAlwaysOn = !Console.SupportsAltSolo;
+            _accessKeysAlwaysOn = !Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsAltSolo);
             if (_accessKeysAlwaysOn)
                 _accessKeysAlwaysOnDisposable =
                     AccessText.ShowAccessKeyProperty.Changed.SubscribeAction(OnShowAccessKeyPropertyChanged);
@@ -482,7 +482,7 @@ namespace Consolonia.Core.Infrastructure
         {
             return _cursorType switch
             {
-                StandardCursorType.Arrow => Console.ShowMouseCursor ? " " : string.Empty,
+                StandardCursorType.Arrow => Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor) ? string.Empty : " ",
                 StandardCursorType.Cross => "+",
                 StandardCursorType.Hand => "@",
                 StandardCursorType.Help => "?",

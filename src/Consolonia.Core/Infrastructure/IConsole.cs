@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Consolonia.Controls;
 
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedMemberInSuper.Global
@@ -14,26 +15,6 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     public interface IConsole : IConsoleOutput
     {
-        /// <summary>
-        ///     Does this support detection of Alt key by itself
-        /// </summary>
-        bool SupportsAltSolo { get; }
-
-        /// <summary>
-        ///     Does this support mouse input
-        /// </summary>
-        bool SupportsMouse { get; }
-
-        /// <summary>
-        ///     Does this support mouse move input
-        /// </summary>
-        bool SupportsMouseMove { get; }
-
-        /// <summary>
-        ///     Indicates whether the console should render it's own mouse cursor
-        /// </summary>
-        bool ShowMouseCursor { get; }
-
         event Action Resized;
 
         event Action<Key, char, RawInputModifiers, bool, ulong, bool> KeyEvent;

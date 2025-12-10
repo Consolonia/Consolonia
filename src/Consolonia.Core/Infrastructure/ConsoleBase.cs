@@ -29,6 +29,7 @@ namespace Consolonia.Core.Infrastructure
             Console.TreatControlCAsInput = true;
 
             _consoleOutput = consoleOutput;
+            Capabilities |= consoleOutput.Capabilities;
 
             Size = consoleOutput.Size;
         }
@@ -78,10 +79,6 @@ namespace Consolonia.Core.Infrastructure
 
         #region IConsoleInput
 
-        public abstract bool SupportsMouse { get; }
-
-        public abstract bool SupportsMouseMove { get; }
-
         public event Action<Key, char, RawInputModifiers, bool, ulong, bool> KeyEvent;
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
         public event Action<bool> FocusEvent;
@@ -128,12 +125,10 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        public virtual bool SupportsComplexEmoji => _consoleOutput.SupportsComplexEmoji;
 
-        public abstract bool SupportsAltSolo { get; }
+        public ConsoleCapabilities Capabilities { get; protected set; }
 
-        public abstract bool ShowMouseCursor { get; }
-
+        public ConsoleCapabilities Capabilitites => throw new NotImplementedException();
 
         public event Action Resized;
 

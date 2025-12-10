@@ -49,16 +49,6 @@ namespace Consolonia.Core.Infrastructure
             (ConsoleModifiers.Shift, RawInputModifiers.Shift), (ConsoleModifiers.Alt, RawInputModifiers.Alt)
         ]);
 
-        public override bool SupportsAltSolo => false;
-
-        public override bool SupportsMouse => false;
-
-        public override bool SupportsMouseMove => false;
-
-        // NOTE: we default to true because we determining GUI mouse 
-        // requires platform specific code.
-        public override bool ShowMouseCursor => true;
-
         public DefaultNetConsole()
             : base(new DefaultNetConsoleOutput())
         {

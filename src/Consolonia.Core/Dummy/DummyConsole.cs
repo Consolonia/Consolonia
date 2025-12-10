@@ -15,14 +15,6 @@ namespace Consolonia.Core.Dummy
             : base(new DummyConsoleOutput(width, height))
         {
         }
-
-        public override bool SupportsAltSolo => false;
-
-        public override bool SupportsMouse => false;
-
-        public override bool SupportsMouseMove => false;
-
-        public override bool ShowMouseCursor => false;
     }
 
     public class DummyConsoleOutput : IConsoleOutput
@@ -37,19 +29,18 @@ namespace Consolonia.Core.Dummy
 
         public DummyConsoleOutput(ushort width, ushort height)
         {
+            Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
             Size = new PixelBufferSize(width, height);
         }
 
         public PixelBufferSize Size { get; set; }
 
-        public bool SupportsComplexEmoji => true;
-
+        public ConsoleCapabilities Capabilities { get; protected set; }
 
         public PixelBufferCoordinate GetCaretPosition()
         {
             return _caretPosition;
         }
-
 
         public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {

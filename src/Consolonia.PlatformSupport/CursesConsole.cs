@@ -16,6 +16,7 @@ using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Logging;
 using Avalonia.Threading;
+using Consolonia.Controls;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Helpers.InputProcessing;
 using Consolonia.Core.Helpers.Logging;
@@ -140,12 +141,6 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
 
-        private bool _showMouseCursor;
-
-        private bool _supportsMouse;
-
-        private bool _supportsMouseMove;
-
         // ReSharper disable UnusedMember.Local
         [Flags]
         private enum EventClass
@@ -167,11 +162,6 @@ namespace Consolonia.PlatformSupport
             StartSizeCheckTimerAsync(2500);
             StartEventLoop();
         }
-
-        public override bool SupportsAltSolo => false;
-        public override bool SupportsMouse => _supportsMouse;
-        public override bool SupportsMouseMove => _supportsMouseMove;
-        public override bool ShowMouseCursor => _showMouseCursor;
 
         private void StartEventLoop()
         {
@@ -274,17 +264,21 @@ namespace Consolonia.PlatformSupport
             bool dumbTerminals = term.StartsWith("linux", StringComparison.OrdinalIgnoreCase) ||
                                  term.StartsWith("vt100", StringComparison.OrdinalIgnoreCase) ||
                                  term.Equals("dumb", StringComparison.OrdinalIgnoreCase);
-            _supportsMouse = mouseMask != 0;
-            _supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
+
+            if (mouseMask != 0)
+                Capabilities |= ConsoleCapabilities.SupportsMouse;
+
+            var supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
                                  DoesCursesActuallySupportMouseMove() &&
                                  !dumbTerminals;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
 
             // DISPLAY will have for X11/Wayland virtual terminal GUI Sessions.
-            _showMouseCursor = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
+                Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
 
-            if (_supportsMouseMove)
+            if (supportsMouseMove)
             {
                 // old ncurses messes up with this
                 WriteText(Esc.EnableAllMouseEvents);
@@ -300,7 +294,7 @@ namespace Consolonia.PlatformSupport
                     // use GPM to get mouse move events
                     _gpmMonitor = new GpmMonitor();
                     _gpmMonitor.MouseEvent += RaiseMouseEvent;
-                    _supportsMouseMove = true;
+                    supportsMouseMove = true;
                 }
                 catch (DllNotFoundException)
                 {
@@ -311,6 +305,9 @@ namespace Consolonia.PlatformSupport
                     // ignore
                 }
             }
+
+            if (supportsMouseMove)
+                Capabilities |= ConsoleCapabilities.SupportsMouseMove;
 
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableBracketedPasteMode);

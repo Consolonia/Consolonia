@@ -18,8 +18,8 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
         static SelectTextWithPointerUpExtension()
         {
             var console = AvaloniaLocator.Current.GetService<IConsole>();
-            bool supportsMouse = console.SupportsMouse;
-            bool supportsMouseMove = console.SupportsMouseMove;
+            bool supportsMouse = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouse);
+            bool supportsMouseMove = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove);
             if (!supportsMouse || supportsMouseMove)
                 return;
 

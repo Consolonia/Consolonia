@@ -31,9 +31,7 @@ namespace Consolonia.Core.Infrastructure
         private TextDecorationLocation? _lastTextDecoration;
         private FontWeight? _lastWeight;
 
-        private bool? _supportsComplexEmoji;
-
-        public bool SupportsComplexEmoji => _supportsComplexEmoji ?? false;
+        public ConsoleCapabilities Capabilities { get; protected set; }
 
         public PixelBufferSize Size { get; set; }
 
@@ -198,7 +196,8 @@ namespace Consolonia.Core.Infrastructure
             (int left, _) = Console.GetCursorPosition();
             Console.Write(TestEmoji);
             (int left2, _) = Console.GetCursorPosition();
-            _supportsComplexEmoji = left2 - left == 2;
+            if (left2 - left == 2)
+                Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
             ClearScreen();
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
