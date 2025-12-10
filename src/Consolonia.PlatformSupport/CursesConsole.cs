@@ -140,11 +140,11 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
 
+        private bool _showMouseCursor;
+
         private bool _supportsMouse;
 
         private bool _supportsMouseMove;
-
-        private bool _showMouseCursor;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -280,7 +280,7 @@ namespace Consolonia.PlatformSupport
                                  !dumbTerminals;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
-            
+
             // DISPLAY env will be set for X11/Wayland virtual terminal GUI Sessions.
             _showMouseCursor = false; // string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
 

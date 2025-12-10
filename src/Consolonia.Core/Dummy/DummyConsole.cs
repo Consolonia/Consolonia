@@ -23,7 +23,6 @@ namespace Consolonia.Core.Dummy
         public override bool SupportsMouseMove => false;
 
         public override bool ShowMouseCursor => false;
-
     }
 
     public class DummyConsoleOutput : IConsoleOutput

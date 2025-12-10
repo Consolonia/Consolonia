@@ -57,7 +57,7 @@ namespace Consolonia.Core.Infrastructure
 
         // NOTE: we default to true because we determining GUI mouse 
         // requires platform specific code.
-        public override bool ShowMouseCursor => true; 
+        public override bool ShowMouseCursor => true;
 
         public DefaultNetConsole()
             : base(new DefaultNetConsoleOutput())
