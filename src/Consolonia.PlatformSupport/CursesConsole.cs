@@ -281,8 +281,8 @@ namespace Consolonia.PlatformSupport
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             
-            // DISPLAY env will be set for X11/Wayland virtual terminal GUI Sessions.
-            _showMouseCursor = false; // string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
+            // DISPLAY will have for X11/Wayland virtual terminal GUI Sessions.
+            _showMouseCursor = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
 
             if (_supportsMouseMove)
             {
@@ -292,11 +292,11 @@ namespace Consolonia.PlatformSupport
             }
             else
             {
-                // reset mousemask or we compete for events.
-                Curses.mousemask(0, out _);
-
                 try
                 {
+                    // reset mousemask or we compete for events.
+                    Curses.mousemask(0, out _);
+
                     // use GPM to get mouse move events
                     _gpmMonitor = new GpmMonitor();
                     _gpmMonitor.MouseEvent += RaiseMouseEvent;

@@ -85,17 +85,6 @@ namespace Consolonia.PlatformSupport
             _gpmFd = Gpm.Open(ref _gpmConnection, 0);
             if (_gpmFd < 0) return;
 
-            // Hide the GPM hardware cursor (we draw our own in software)
-            try
-            {
-                _ = Gpm.DrawPointer(-1, -1, 0);
-            }
-            catch (EntryPointNotFoundException)
-            {
-                // Function not available, cursor will remain visible
-                Debug.WriteLine("Gpm_DrawPointer not available, GPM cursor will be visible");
-            }
-
             _gpmInitialized = true;
             _pumpTask = PumpGpmEventsAsync(_gpmToken);
         }
