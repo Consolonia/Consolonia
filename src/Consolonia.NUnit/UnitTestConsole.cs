@@ -32,6 +32,7 @@ namespace Consolonia.NUnit
         public bool SupportsAltSolo => true;
         public bool SupportsMouse => false;
         public bool SupportsMouseMove => false;
+        public bool ShowMouseCursor => false;
 
         public void SetTitle(string title)
         {

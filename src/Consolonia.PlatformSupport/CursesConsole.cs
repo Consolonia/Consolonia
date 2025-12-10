@@ -142,6 +142,8 @@ namespace Consolonia.PlatformSupport
 
         private bool _supportsMouseMove;
 
+        private bool _showMouseCursor;
+
         private GpmMonitor _gpmMonitor;
 
         // ReSharper disable UnusedMember.Local
@@ -169,7 +171,7 @@ namespace Consolonia.PlatformSupport
         public override bool SupportsAltSolo => false;
         public override bool SupportsMouse => _supportsMouse;
         public override bool SupportsMouseMove => _supportsMouseMove;
-
+        public override bool ShowMouseCursor => _showMouseCursor;
 
         private void StartEventLoop()
         {
@@ -278,6 +280,9 @@ namespace Consolonia.PlatformSupport
                                 !dumbTerminals;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
+            
+            // DISPLAY env will be set for X11/Wayland virtual terminal GUI Sessions.
+            _showMouseCursor = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
 
             if (_supportsMouseMove)
             {

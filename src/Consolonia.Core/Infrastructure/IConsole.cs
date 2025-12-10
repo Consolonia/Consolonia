@@ -29,6 +29,11 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         bool SupportsMouseMove { get; }
 
+        /// <summary>
+        ///     Indicates whether the console should render it's own mouse cursor
+        /// </summary>
+        bool ShowMouseCursor { get; }
+
         event Action Resized;
 
         event Action<Key, char, RawInputModifiers, bool, ulong, bool> KeyEvent;
