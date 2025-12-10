@@ -134,6 +134,8 @@ namespace Consolonia.PlatformSupport
 
         private Curses.Window _cursesWindow;
 
+        private GpmMonitor _gpmMonitor;
+
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
@@ -143,8 +145,6 @@ namespace Consolonia.PlatformSupport
         private bool _supportsMouseMove;
 
         private bool _showMouseCursor;
-
-        private GpmMonitor _gpmMonitor;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -270,19 +270,19 @@ namespace Consolonia.PlatformSupport
                 Curses.Event.ReportMousePosition,
                 out Curses.Event _);
 
-            var term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
+            string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
             bool dumbTerminals = term.StartsWith("linux", StringComparison.OrdinalIgnoreCase) ||
                                  term.StartsWith("vt100", StringComparison.OrdinalIgnoreCase) ||
                                  term.Equals("dumb", StringComparison.OrdinalIgnoreCase);
             _supportsMouse = mouseMask != 0;
             _supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
-                                DoesCursesActuallySupportMouseMove() &&
-                                !dumbTerminals;
+                                 DoesCursesActuallySupportMouseMove() &&
+                                 !dumbTerminals;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
             
             // DISPLAY env will be set for X11/Wayland virtual terminal GUI Sessions.
-            _showMouseCursor = string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
+            _showMouseCursor = false; // string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"));
 
             if (_supportsMouseMove)
             {
@@ -638,10 +638,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                    {
-                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                        break;
-                    }
+                {
+                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    break;
+                }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
@@ -670,10 +670,8 @@ namespace Consolonia.PlatformSupport
         private void HandleMouseInput(Curses.MouseEvent ev)
         {
             if (_gpmMonitor != null)
-            {
                 // when GPM is used, we should ignore all mouse events from curses
                 return;
-            }
 
             const double velocity = 1;
 
@@ -682,27 +680,28 @@ namespace Consolonia.PlatformSupport
             RawPointerEventType rawPointerEventType = RawPointerEventTypeFlagTranslator.Translate(ev.ButtonState);
 
             //stop monitor event type we are getting from curses
-            var eventClass = EventClassFlagTranslator.Translate(rawPointerEventType, true);
+            EventClass eventClass = EventClassFlagTranslator.Translate(rawPointerEventType, true);
             if (eventClass == EventClass.ButtonDown)
-            {
                 _moveModifers = modifiers;
-            }
-            else if (eventClass == EventClass.ButtonUp)
-            {
-                _moveModifers = RawInputModifiers.None;
-            }
+            else if (eventClass == EventClass.ButtonUp) _moveModifers = RawInputModifiers.None;
 
             if (ev.ButtonState.HasFlag(Curses.Event.ButtonWheeledDown))
+            {
                 RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, -velocity),
                     modifiers);
+            }
             else if (ev.ButtonState.HasFlag(Curses.Event.ButtonWheeledUp))
+            {
                 RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, velocity),
-                     modifiers);
+                    modifiers);
+            }
             else if (rawPointerEventType == RawPointerEventType.Move)
+            {
                 RaiseMouseEvent(RawPointerEventType.Move, point, null,
                     _moveModifers | modifiers);
+            }
             else if (rawPointerEventType == RawPointerEventType.XButton1Down ||
-                    rawPointerEventType == RawPointerEventType.XButton1Up)
+                     rawPointerEventType == RawPointerEventType.XButton1Up)
             {
                 // ignore
             }
