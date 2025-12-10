@@ -638,10 +638,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                    {
-                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                        break;
-                    }
+                {
+                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    break;
+                }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
