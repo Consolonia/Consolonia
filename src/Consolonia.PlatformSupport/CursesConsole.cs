@@ -266,7 +266,7 @@ namespace Consolonia.PlatformSupport
                                  term.Equals("dumb", StringComparison.OrdinalIgnoreCase);
 
             if (mouseMask != 0)
-                Capabilities |= ConsoleCapabilities.SupportsMouse;
+                Capabilities |= ConsoleCapabilities.SupportsMouseButtons;
 
             bool supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
                                      DoesCursesActuallySupportMouseMove() &&

@@ -8,29 +8,29 @@ namespace Consolonia.Controls
         None = 0,
 
         /// <summary>
-        ///     Supports detection of Alt key by itself
+        ///     Console supports mouse input buttons
         /// </summary>
-        SupportsAltSolo = 0x01,
-
-        /// <summary>
-        ///     Console supports general mouse input
-        /// </summary>
-        SupportsMouse = 0x02,
+        SupportsMouseButtons = 0x01,
 
         /// <summary>
         ///     Console supports mouse move input
         /// </summary>
-        SupportsMouseMove = 0x04,
+        SupportsMouseMove = SupportsMouseButtons | 0x02,
 
         /// <summary>
         ///     Console environment supports mouse cursor (for example GUI terminal emulator has GUI cursor)
         /// </summary>
-        SupportsMouseCursor = 0x08,
+        SupportsMouseCursor = SupportsMouseMove | 0x04,
+
+        /// <summary>
+        ///     Supports detection of Alt key by itself
+        /// </summary>
+        SupportsAltSolo = 0x10,
 
         /// <summary>
         ///     Supports complex composite emoji rendering
         /// </summary>
-        SupportsComplexEmoji = 0x10
+        SupportsComplexEmoji = 0x20,
     }
 
     public interface IConsoleCapabilities

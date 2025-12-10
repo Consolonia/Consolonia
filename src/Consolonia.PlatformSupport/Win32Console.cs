@@ -79,15 +79,15 @@ namespace Consolonia.PlatformSupport
         {
             _windowsConsole = new WindowsConsole();
 
+            // ReSharper disable VirtualMemberCallInConstructor
+            PrepareConsole();
+            
             // we will have a consolewindow if we are running in GUI context.
-            Capabilities |= ConsoleCapabilities.SupportsMouse |
+            Capabilities |= ConsoleCapabilities.SupportsMouseButtons |
                             ConsoleCapabilities.SupportsMouseMove |
                             ConsoleCapabilities.SupportsAltSolo;
             if (GetConsoleWindow() != IntPtr.Zero)
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
-
-            // ReSharper disable VirtualMemberCallInConstructor
-            PrepareConsole();
 
             StartEventLoop();
         }

@@ -29,7 +29,6 @@ namespace Consolonia.Core.Infrastructure
             Console.TreatControlCAsInput = true;
 
             _consoleOutput = consoleOutput;
-            Capabilities |= consoleOutput.Capabilities;
 
             Size = consoleOutput.Size;
         }
@@ -148,6 +147,7 @@ namespace Consolonia.Core.Infrastructure
         public virtual void PrepareConsole()
         {
             _consoleOutput.PrepareConsole();
+            Capabilities |= _consoleOutput.Capabilities;
         }
 
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)

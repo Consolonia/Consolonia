@@ -18,7 +18,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
         static SelectTextWithPointerUpExtension()
         {
             var console = AvaloniaLocator.Current.GetService<IConsole>();
-            bool supportsMouse = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouse);
+            bool supportsMouse = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseButtons);
             bool supportsMouseMove = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove);
             
             // if we don't have mouse we can't do any kind of selection
