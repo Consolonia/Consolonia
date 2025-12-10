@@ -128,8 +128,6 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
-        public ConsoleCapabilities Capabilitites => throw new NotImplementedException();
-
         public event Action Resized;
 
         public virtual void ClearScreen()
