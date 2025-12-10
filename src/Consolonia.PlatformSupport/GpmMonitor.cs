@@ -55,7 +55,21 @@ namespace Consolonia.PlatformSupport
         {
             _gpmCancellation = new CancellationTokenSource();
             _gpmToken = _gpmCancellation.Token;
-            InitializeGpm();
+            // Set up GPM connection
+            _gpmConnection = new GpmConnect
+            {
+                EventMask = 0xffff, // Receive all events
+                DefaultMask = 0, // Explicitly disable all default handling
+                MinMod = 0, // Accept events with no modifiers or more
+                MaxMod = 0xffff // Accept events with any/all modifiers (0xFFFF or ~0)
+            };
+
+            _gpmFd = Gpm.Open(ref _gpmConnection, 0);
+            if (_gpmFd < 0) 
+                throw new InvalidOperationException("Failed to open GPM connection");
+
+            _gpmInitialized = true;
+            _pumpTask = PumpGpmEventsAsync(_gpmToken);
         }
 
         public void Dispose()
@@ -69,24 +83,6 @@ namespace Consolonia.PlatformSupport
         }
 
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
-
-        private void InitializeGpm()
-        {
-            // Set up GPM connection
-            _gpmConnection = new GpmConnect
-            {
-                EventMask = 0xffff, // Receive all events
-                DefaultMask = 0, // Explicitly disable all default handling
-                MinMod = 0, // Accept events with no modifiers or more
-                MaxMod = 0xffff // Accept events with any/all modifiers (0xFFFF or ~0)
-            };
-
-            _gpmFd = Gpm.Open(ref _gpmConnection, 0);
-            if (_gpmFd < 0) return;
-
-            _gpmInitialized = true;
-            _pumpTask = PumpGpmEventsAsync(_gpmToken);
-        }
 
         private async Task PumpGpmEventsAsync(CancellationToken cancellationToken)
         {

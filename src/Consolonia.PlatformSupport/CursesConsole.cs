@@ -304,6 +304,10 @@ namespace Consolonia.PlatformSupport
                 {
                     // ignore
                 }
+                catch (InvalidOperationException)
+                {
+                    // ignore
+                }
             }
 
             if (supportsMouseMove)
