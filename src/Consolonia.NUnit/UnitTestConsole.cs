@@ -20,8 +20,8 @@ namespace Consolonia.NUnit
         {
             Size = size;
             PixelBuffer = new PixelBuffer(size.Width, size.Height);
-            Capabilities |= ConsoleCapabilities.SupportsComplexEmoji |
-                            ConsoleCapabilities.SupportsAltSolo;
+            Capabilities = ConsoleCapabilities.SupportsComplexEmoji |
+                           ConsoleCapabilities.SupportsAltSolo;
         }
 
         // ReSharper disable once MemberCanBePrivate.Global
