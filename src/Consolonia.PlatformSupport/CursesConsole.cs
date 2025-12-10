@@ -140,11 +140,11 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
 
+        private bool _showMouseCursor;
+
         private bool _supportsMouse;
 
         private bool _supportsMouseMove;
-
-        private bool _showMouseCursor;
 
         // ReSharper disable UnusedMember.Local
         [Flags]

@@ -68,10 +68,10 @@ namespace Consolonia.PlatformSupport
                 (MOUSE_BUTTON_STATE.FROM_LEFT_4TH_BUTTON_PRESSED, RawPointerEventType.XButton2Up)
             ]);
 
+        private readonly bool _showMouseCursor;
+
 
         private readonly WindowsConsole _windowsConsole;
-
-        private bool _showMouseCursor;
 
         private MOUSE_BUTTON_STATE _mouseButtonsState = MOUSE_BUTTON_STATE.NONE;
 
@@ -290,60 +290,60 @@ namespace Consolonia.PlatformSupport
                 // Win32 maps MOUSE_DOWN/DRAG => as MOVED|DOUBLE_CLICK 
                 // Avalonia wants it to just be MOUSE_DOWN, and then subsequent MOUSE_MOVE events
                 case MOUSE_EVENT_FLAG.NONE:
-                    {
-                        bool emitted = false;
-                        foreach (MOUSE_BUTTON_STATE flag in Enum.GetValues<MOUSE_BUTTON_STATE>())
-                            if (!_mouseButtonsState.HasFlag(flag) && mouseEvent.dwButtonState.HasFlag(flag))
-                            {
-                                // If we went from flag off to flag on
-                                RawPointerEventType buttonDownEventType =
-                                    MouseButtonDownEventTypeTranslator.Translate(flag);
-#pragma warning disable IDE0034
-                                // Simplify 'default' expression
-                                if (buttonDownEventType != default)
-                                {
-                                    RaiseMouseEvent(buttonDownEventType,
-                                        point,
-                                        null,
-                                        inputModifiers);
-                                    _mouseButtonsState = mouseEvent.dwButtonState;
-                                    emitted = true;
-                                    break;
-                                }
-#pragma warning restore IDE0034
-                                // Simplify 'default' expression
-                            }
-
-                            else if (_mouseButtonsState.HasFlag(flag) && !mouseEvent.dwButtonState.HasFlag(flag))
-                            {
-                                // If we went from flag On to flag off
-                                RawPointerEventType buttonEventType = MouseButtonUpEventTypeTranslator.Translate(flag);
-#pragma warning disable IDE0034
-                                // Simplify 'default' expression
-                                if (buttonEventType != default)
-                                {
-                                    RaiseMouseEvent(buttonEventType,
-                                        point,
-                                        null,
-                                        inputModifiers);
-                                    _mouseButtonsState = mouseEvent.dwButtonState;
-                                    emitted = true;
-                                    break;
-                                }
-#pragma warning restore IDE0034
-                                // Simplify 'default' expression
-                            }
-
-                        if (!emitted)
+                {
+                    bool emitted = false;
+                    foreach (MOUSE_BUTTON_STATE flag in Enum.GetValues<MOUSE_BUTTON_STATE>())
+                        if (!_mouseButtonsState.HasFlag(flag) && mouseEvent.dwButtonState.HasFlag(flag))
                         {
-                            // If we didn't emit any button up/down transition events, emit a move event
-                            RaiseMouseEvent(eventType,
-                                point,
-                                wheelDelta,
-                                inputModifiers);
-                            _mouseButtonsState = mouseEvent.dwButtonState;
+                            // If we went from flag off to flag on
+                            RawPointerEventType buttonDownEventType =
+                                MouseButtonDownEventTypeTranslator.Translate(flag);
+#pragma warning disable IDE0034
+                            // Simplify 'default' expression
+                            if (buttonDownEventType != default)
+                            {
+                                RaiseMouseEvent(buttonDownEventType,
+                                    point,
+                                    null,
+                                    inputModifiers);
+                                _mouseButtonsState = mouseEvent.dwButtonState;
+                                emitted = true;
+                                break;
+                            }
+#pragma warning restore IDE0034
+                            // Simplify 'default' expression
                         }
+
+                        else if (_mouseButtonsState.HasFlag(flag) && !mouseEvent.dwButtonState.HasFlag(flag))
+                        {
+                            // If we went from flag On to flag off
+                            RawPointerEventType buttonEventType = MouseButtonUpEventTypeTranslator.Translate(flag);
+#pragma warning disable IDE0034
+                            // Simplify 'default' expression
+                            if (buttonEventType != default)
+                            {
+                                RaiseMouseEvent(buttonEventType,
+                                    point,
+                                    null,
+                                    inputModifiers);
+                                _mouseButtonsState = mouseEvent.dwButtonState;
+                                emitted = true;
+                                break;
+                            }
+#pragma warning restore IDE0034
+                            // Simplify 'default' expression
+                        }
+
+                    if (!emitted)
+                    {
+                        // If we didn't emit any button up/down transition events, emit a move event
+                        RaiseMouseEvent(eventType,
+                            point,
+                            wheelDelta,
+                            inputModifiers);
+                        _mouseButtonsState = mouseEvent.dwButtonState;
                     }
+                }
                     break;
 
                 case MOUSE_EVENT_FLAG.MOUSE_WHEELED:

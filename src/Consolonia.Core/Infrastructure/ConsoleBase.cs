@@ -132,7 +132,7 @@ namespace Consolonia.Core.Infrastructure
 
         public abstract bool SupportsAltSolo { get; }
 
-        public abstract bool ShowMouseCursor {get; }
+        public abstract bool ShowMouseCursor { get; }
 
 
         public event Action Resized;
