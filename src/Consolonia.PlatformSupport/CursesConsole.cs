@@ -275,7 +275,7 @@ namespace Consolonia.PlatformSupport
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
 
             // DISPLAY will have for X11/Wayland virtual terminal GUI Sessions.
-            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
 
             if (supportsMouseMove)
