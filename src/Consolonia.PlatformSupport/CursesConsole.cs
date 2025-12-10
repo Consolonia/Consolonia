@@ -638,10 +638,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                {
-                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                    break;
-                }
+                    {
+                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                        break;
+                    }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)
@@ -791,7 +791,16 @@ namespace Consolonia.PlatformSupport
         protected override void Dispose(bool disposing)
         {
             if (disposing)
+            {
                 _inputBuffer.Dispose();
+
+                if (_gpmMonitor != null)
+                {
+                    _gpmMonitor.MouseEvent -= RaiseMouseEvent;
+                    _gpmMonitor.Dispose();
+                    _gpmMonitor = null;
+                }
+            }
 
             base.Dispose(disposing);
         }
