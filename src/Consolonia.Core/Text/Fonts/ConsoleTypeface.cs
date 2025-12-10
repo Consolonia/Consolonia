@@ -159,7 +159,7 @@ namespace Consolonia.Core.Text.Fonts
 
             var console = AvaloniaLocator.Current.GetRequiredService<IConsoleOutput>();
 
-            IReadOnlyList<Grapheme> graphemes = Grapheme.Parse(text.Span.ToString(), 
+            IReadOnlyList<Grapheme> graphemes = Grapheme.Parse(text.Span.ToString(),
                 console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
 
             var shapedBuffer = new ShapedBuffer(text, graphemes.Count,

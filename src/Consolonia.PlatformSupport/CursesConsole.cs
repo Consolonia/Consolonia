@@ -268,9 +268,9 @@ namespace Consolonia.PlatformSupport
             if (mouseMask != 0)
                 Capabilities |= ConsoleCapabilities.SupportsMouse;
 
-            var supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
-                                 DoesCursesActuallySupportMouseMove() &&
-                                 !dumbTerminals;
+            bool supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
+                                     DoesCursesActuallySupportMouseMove() &&
+                                     !dumbTerminals;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
 

@@ -482,7 +482,9 @@ namespace Consolonia.Core.Infrastructure
         {
             return _cursorType switch
             {
-                StandardCursorType.Arrow => Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor) ? string.Empty : " ",
+                StandardCursorType.Arrow => Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor)
+                    ? string.Empty
+                    : " ",
                 StandardCursorType.Cross => "+",
                 StandardCursorType.Hand => "@",
                 StandardCursorType.Help => "?",

@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
-using Consolonia.Controls;
 
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedMemberInSuper.Global
