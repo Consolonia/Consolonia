@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json;
 using Avalonia;
-using Avalonia.Media;                                                        r
+using Avalonia.Media;                                                        
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
