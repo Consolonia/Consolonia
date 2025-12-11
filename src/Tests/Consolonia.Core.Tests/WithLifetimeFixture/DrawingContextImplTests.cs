@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
+using Consolonia.Controls;
 using Consolonia.Controls.Brushes;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -18,6 +19,12 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
     [TestFixture]
     public class DrawingContextImplTests
     {
+        [SetUp]
+        public void Setup()
+        {
+            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities() { Capabilities=ConsoleCapabilities.SupportsComplexEmoji});
+        }
+
         [Test]
         public void BufferInitialized()
         {

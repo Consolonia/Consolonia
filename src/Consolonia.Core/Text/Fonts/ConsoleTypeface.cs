@@ -157,7 +157,7 @@ namespace Consolonia.Core.Text.Fonts
                 throw new ArgumentException("TextShaperOptions.Typeface must be of type ConsoleTypeface.",
                     nameof(options));
 
-            var console = AvaloniaLocator.Current.GetRequiredService<IConsoleOutput>();
+            var console = AvaloniaLocator.Current.GetRequiredService<IConsoleCapabilities>();
 
             IReadOnlyList<Grapheme> graphemes = Grapheme.Parse(text.Span.ToString(),
                 console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));

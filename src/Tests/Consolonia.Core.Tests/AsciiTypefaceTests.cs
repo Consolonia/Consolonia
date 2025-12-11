@@ -1,6 +1,8 @@
 using System;
+using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
+using Consolonia.Controls;
 using Consolonia.Core.Text.Fonts;
 using NUnit.Framework;
 
@@ -9,6 +11,12 @@ namespace Consolonia.Core.Tests
     [TestFixture]
     public class AsciiArtTypefaceTests
     {
+        [SetUp]
+        public void Setup()
+        {
+            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities() { Capabilities=ConsoleCapabilities.SupportsComplexEmoji});
+        }
+
         [Test]
         public void ConstructorWithFamilyNameCreatesTypeface()
         {
