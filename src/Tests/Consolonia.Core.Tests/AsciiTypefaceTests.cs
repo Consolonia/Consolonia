@@ -14,7 +14,8 @@ namespace Consolonia.Core.Tests
         [SetUp]
         public void Setup()
         {
-            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities() { Capabilities=ConsoleCapabilities.SupportsComplexEmoji});
+            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
+                { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
         }
 
         [Test]

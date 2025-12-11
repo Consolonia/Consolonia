@@ -8,7 +8,6 @@ using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
-using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Text.Fonts
 {

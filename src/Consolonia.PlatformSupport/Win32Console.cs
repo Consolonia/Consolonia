@@ -81,7 +81,7 @@ namespace Consolonia.PlatformSupport
 
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
-            
+
             // we will have a consolewindow if we are running in GUI context.
             Capabilities |= ConsoleCapabilities.SupportsMouseButtons |
                             ConsoleCapabilities.SupportsMouseMove |

@@ -22,7 +22,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [SetUp]
         public void Setup()
         {
-            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities() { Capabilities=ConsoleCapabilities.SupportsComplexEmoji});
+            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
+                { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
         }
 
         [Test]

@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json;
 using Avalonia;
-using Avalonia.Media;                                                        
+using Avalonia.Media;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
@@ -14,7 +14,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [SetUp]
         public void Setup()
         {
-            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities() { Capabilities=ConsoleCapabilities.SupportsComplexEmoji});
+            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
+                { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
         }
 
         private static PixelBuffer CreateBuffer()

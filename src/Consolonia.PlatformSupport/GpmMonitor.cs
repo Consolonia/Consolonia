@@ -44,10 +44,10 @@ namespace Consolonia.PlatformSupport
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
-        private int _gpmFd;
-        private bool _gpmInitialized;
+        private readonly bool _gpmInitialized;
 
-        private Task _pumpTask;
+        private readonly Task _pumpTask;
+        private int _gpmFd;
 
         public GpmMonitor()
         {
@@ -62,7 +62,7 @@ namespace Consolonia.PlatformSupport
             };
 
             _gpmFd = Gpm.Open(ref gpmConnection, 0);
-            if (_gpmFd < 0) 
+            if (_gpmFd < 0)
                 throw new InvalidOperationException("Failed to open GPM connection");
 
             _gpmInitialized = true;
