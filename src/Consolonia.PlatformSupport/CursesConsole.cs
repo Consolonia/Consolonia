@@ -262,18 +262,15 @@ namespace Consolonia.PlatformSupport
 
             string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
             var terminalPath = Curses.TtyName(1);
-            var istty = terminalPath.StartsWith("/dev/tty", StringComparison.OrdinalIgnoreCase);
-            bool dumbTerminals =  istty||
-                                 term.StartsWith("linux", StringComparison.OrdinalIgnoreCase) ||
-                                 term.StartsWith("vt100", StringComparison.OrdinalIgnoreCase) ||
-                                 term.Equals("dumb", StringComparison.OrdinalIgnoreCase);
+            var istty = terminalPath.StartsWith("/dev/tty", StringComparison.OrdinalIgnoreCase) ||
+                                 term.StartsWith("linux", StringComparison.OrdinalIgnoreCase);
 
             if (mouseMask != 0)
                 Capabilities |= ConsoleCapabilities.SupportsMouseButtons;
 
             bool supportsMouseMove = mouseMask.HasFlag(Curses.Event.ReportMousePosition) &&
                                      DoesCursesActuallySupportMouseMove() &&
-                                     !dumbTerminals;
+                                     !istty;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
 
