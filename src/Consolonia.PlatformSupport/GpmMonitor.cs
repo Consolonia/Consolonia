@@ -44,7 +44,6 @@ namespace Consolonia.PlatformSupport
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
-        private readonly CancellationToken _gpmToken;
         private GpmConnect _gpmConnection;
         private int _gpmFd = -1;
         private bool _gpmInitialized;
@@ -54,7 +53,6 @@ namespace Consolonia.PlatformSupport
         public GpmMonitor()
         {
             _gpmCancellation = new CancellationTokenSource();
-            _gpmToken = _gpmCancellation.Token;
             // Set up GPM connection
             _gpmConnection = new GpmConnect
             {
@@ -69,7 +67,7 @@ namespace Consolonia.PlatformSupport
                 throw new InvalidOperationException("Failed to open GPM connection");
 
             _gpmInitialized = true;
-            _pumpTask = PumpGpmEventsAsync(_gpmToken);
+            _pumpTask = PumpGpmEventsAsync(_gpmCancellation.Token);
         }
 
         public void Dispose()
