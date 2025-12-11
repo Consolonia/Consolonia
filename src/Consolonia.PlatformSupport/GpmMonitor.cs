@@ -74,12 +74,8 @@ namespace Consolonia.PlatformSupport
 
         public void Dispose()
         {
-#pragma warning disable CA1063 // Implement IDisposable Correctly
-#pragma warning disable CA1303 // Do not pass literals as localized parameters
             Dispose(true);
             GC.SuppressFinalize(this);
-#pragma warning restore CA1063 // Implement IDisposable Correctly
-#pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;

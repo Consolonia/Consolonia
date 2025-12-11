@@ -261,7 +261,10 @@ namespace Consolonia.PlatformSupport
                 out Curses.Event _);
 
             string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
-            bool dumbTerminals = term.StartsWith("linux", StringComparison.OrdinalIgnoreCase) ||
+            var terminalPath = Curses.TtyName(1);
+            var istty = terminalPath.StartsWith("/dev/tty", StringComparison.OrdinalIgnoreCase);
+            bool dumbTerminals =  istty||
+                                 term.StartsWith("linux", StringComparison.OrdinalIgnoreCase) ||
                                  term.StartsWith("vt100", StringComparison.OrdinalIgnoreCase) ||
                                  term.Equals("dumb", StringComparison.OrdinalIgnoreCase);
 
@@ -273,10 +276,6 @@ namespace Consolonia.PlatformSupport
                                      !dumbTerminals;
 
             Curses.mouseinterval(0); // if we don't do this mouse events are dropped
-
-            // DISPLAY will have for X11/Wayland virtual terminal GUI Sessions.
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
-                Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
 
             if (supportsMouseMove)
             {
@@ -311,7 +310,14 @@ namespace Consolonia.PlatformSupport
             }
 
             if (supportsMouseMove)
+            {
                 Capabilities |= ConsoleCapabilities.SupportsMouseMove;
+
+                // DISPLAY will have for X11/Wayland virtual terminal GUI Sessions.
+                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) ||
+                    !istty)
+                    Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
+            }
 
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableBracketedPasteMode);

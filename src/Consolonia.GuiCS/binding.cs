@@ -79,10 +79,19 @@ namespace Unix.Terminal {
 		[DllImport ("libc")]
 		public extern static int setlocale (int cate, [MarshalAs (UnmanagedType.LPStr)] string locale);
 
-		//[DllImport ("libc")]
-		//public extern static int ioctl (int fd, int cmd, out winsize argp);
+        [DllImport("libc", CharSet = CharSet.Ansi)]
+        public static extern IntPtr ttyname(int fd);
 
-		static void LoadMethods ()
+		public static string TtyName (int fd)
+		{
+			IntPtr namePtr = ttyname(fd);
+			return Marshal.PtrToStringAnsi(namePtr);
+		}
+
+            //[DllImport ("libc")]
+            //public extern static int ioctl (int fd, int cmd, out winsize argp);
+
+        static void LoadMethods ()
 		{
 			var libs = UnmanagedLibrary.IsMacOSPlatform ? new string [] { "libncurses.dylib" } : new string [] { "libncursesw.so.6", "libncursesw.so.5" };
 			curses_library = new UnmanagedLibrary (libs, false);
