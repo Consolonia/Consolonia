@@ -45,7 +45,7 @@ namespace Consolonia.PlatformSupport
 
         private readonly CancellationTokenSource _gpmCancellation;
         private GpmConnect _gpmConnection;
-        private int _gpmFd = -1;
+        private int _gpmFd;
         private bool _gpmInitialized;
 
         private Task _pumpTask;
