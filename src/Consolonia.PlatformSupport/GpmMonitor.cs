@@ -44,7 +44,6 @@ namespace Consolonia.PlatformSupport
             ]);
 
         private readonly CancellationTokenSource _gpmCancellation;
-        private GpmConnect _gpmConnection;
         private int _gpmFd;
         private bool _gpmInitialized;
 
@@ -54,7 +53,7 @@ namespace Consolonia.PlatformSupport
         {
             _gpmCancellation = new CancellationTokenSource();
             // Set up GPM connection
-            _gpmConnection = new GpmConnect
+            var gpmConnection = new GpmConnect
             {
                 EventMask = 0xffff, // Receive all events
                 DefaultMask = 0, // Explicitly disable all default handling
@@ -62,7 +61,7 @@ namespace Consolonia.PlatformSupport
                 MaxMod = 0xffff // Accept events with any/all modifiers (0xFFFF or ~0)
             };
 
-            _gpmFd = Gpm.Open(ref _gpmConnection, 0);
+            _gpmFd = Gpm.Open(ref gpmConnection, 0);
             if (_gpmFd < 0) 
                 throw new InvalidOperationException("Failed to open GPM connection");
 
