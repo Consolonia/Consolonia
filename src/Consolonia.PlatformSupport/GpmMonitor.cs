@@ -130,7 +130,7 @@ namespace Consolonia.PlatformSupport
                 {
                     _pumpTask?.Wait();
                 }
-                catch (TaskCanceledException)
+                catch (Exception ex) when (ex is TaskCanceledException or AggregateException)
                 {
                     /* ignored */
                 }
