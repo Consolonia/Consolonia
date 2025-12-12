@@ -49,6 +49,10 @@ namespace Consolonia.PlatformSupport
         private readonly Task _pumpTask;
         private int _gpmFd;
 
+        /// <summary>
+        /// Initialize GPM Monitor, throws InvalidOperationException on failure to connect.
+        /// </summary>
+        /// <exception cref="InvalidOperationException"></exception>
         public GpmMonitor()
         {
             _gpmCancellation = new CancellationTokenSource();
@@ -69,12 +73,18 @@ namespace Consolonia.PlatformSupport
             _pumpTask = PumpGpmEventsAsync(_gpmCancellation.Token);
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>Raised when a GPM mouse event is received (invoked on the UI thread).</summary>
+        /// <param name="eventType">Pointer event type.</param>
+        /// <param name="point">Pointer position in console coordinates (0-based).</param>
+        /// <param name="wheelDelta">Wheel delta when <paramref name="eventType"/> is Wheel; otherwise null.</param>
+        /// <param name="modifiers">Keyboard/buttons modifier state.</param>
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
 
         private async Task PumpGpmEventsAsync(CancellationToken cancellationToken)
