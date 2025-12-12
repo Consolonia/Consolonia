@@ -80,11 +80,15 @@ namespace Consolonia.PlatformSupport
             GC.SuppressFinalize(this);
         }
 
-        /// <summary>Raised when a GPM mouse event is received (invoked on the UI thread).</summary>
-        /// <param name="eventType">Pointer event type.</param>
-        /// <param name="point">Pointer position in console coordinates (0-based).</param>
-        /// <param name="wheelDelta">Wheel delta when <paramref name="eventType"/> is Wheel; otherwise null.</param>
-        /// <param name="modifiers">Keyboard/buttons modifier state.</param>
+        /// <summary>
+        /// Raised when a GPM mouse event is received (invoked on the UI thread).
+        /// </summary>
+        /// <remarks>
+        /// * eventType - Pointer event type.
+        /// * point - Pointer position in console coordinates (0-based).
+        /// * wheelDelta - Wheel delta 
+        /// * modifiers - Keyboard/buttons modifier state
+        /// </remarks>
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
 
         private async Task PumpGpmEventsAsync(CancellationToken cancellationToken)
