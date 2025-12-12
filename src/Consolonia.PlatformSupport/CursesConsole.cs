@@ -283,7 +283,7 @@ namespace Consolonia.PlatformSupport
 
         private bool TryEnableMouseButtonSupport()
         {
-            var mask = Curses.mousemask(BasicMouseEvents, out _);
+            Curses.Event mask = Curses.mousemask(BasicMouseEvents, out _);
             if (mask.HasFlag(Curses.Event.Button1Pressed) && mask.HasFlag(Curses.Event.Button1Released))
             {
                 Capabilities |= ConsoleCapabilities.SupportsMouseButtons;

@@ -131,7 +131,7 @@ namespace Consolonia.PlatformSupport
                     _ = Gpm.Close();
                     _gpmFd = -1;
                 }
-                
+
                 try
                 {
                     _pumpTask?.Wait();
