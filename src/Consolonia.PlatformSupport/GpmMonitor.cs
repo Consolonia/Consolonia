@@ -50,7 +50,7 @@ namespace Consolonia.PlatformSupport
         private int _gpmFd;
 
         /// <summary>
-        /// Initialize GPM Monitor, throws InvalidOperationException on failure to connect.
+        ///     Initialize GPM Monitor, throws InvalidOperationException on failure to connect.
         /// </summary>
         /// <exception cref="InvalidOperationException"></exception>
         public GpmMonitor()
@@ -73,7 +73,7 @@ namespace Consolonia.PlatformSupport
             _pumpTask = PumpGpmEventsAsync(_gpmCancellation.Token);
         }
 
-        /// <inheritdoc/>
+        /// <inheritdoc />
         public void Dispose()
         {
             Dispose(true);
@@ -81,13 +81,13 @@ namespace Consolonia.PlatformSupport
         }
 
         /// <summary>
-        /// Raised when a GPM mouse event is received (invoked on the UI thread).
+        ///     Raised when a GPM mouse event is received (invoked on the UI thread).
         /// </summary>
         /// <remarks>
-        /// * eventType - Pointer event type.
-        /// * point - Pointer position in console coordinates (0-based).
-        /// * wheelDelta - Wheel delta 
-        /// * modifiers - Keyboard/buttons modifier state
+        ///     * eventType - Pointer event type.
+        ///     * point - Pointer position in console coordinates (0-based).
+        ///     * wheelDelta - Wheel delta
+        ///     * modifiers - Keyboard/buttons modifier state
         /// </remarks>
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
 
