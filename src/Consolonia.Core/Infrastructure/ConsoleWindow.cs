@@ -511,11 +511,9 @@ namespace Consolonia.Core.Infrastructure
 
         private string GetDefaultCursor()
         {
-            if (Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor))
-                return string.Empty;
-            if (Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove))
+            if (Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove) &&
+                !Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor))
                 return " ";
-            // we don't have any mouse positioning information so we can't show a cursor
             return string.Empty;
         }
 
