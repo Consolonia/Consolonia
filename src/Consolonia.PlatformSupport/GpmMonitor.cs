@@ -126,6 +126,13 @@ namespace Consolonia.PlatformSupport
             if (disposing && _gpmInitialized)
             {
                 _gpmCancellation.Cancel();
+
+                if (_gpmFd >= 0)
+                {
+                    _ = Gpm.Close();
+                    _gpmFd = -1;
+                }
+                
                 try
                 {
                     _pumpTask?.Wait();
@@ -133,12 +140,6 @@ namespace Consolonia.PlatformSupport
                 catch (Exception ex) when (ex is TaskCanceledException or AggregateException)
                 {
                     /* ignored */
-                }
-
-                if (_gpmFd >= 0)
-                {
-                    _ = Gpm.Close();
-                    _gpmFd = -1;
                 }
 
                 _gpmCancellation?.Dispose();

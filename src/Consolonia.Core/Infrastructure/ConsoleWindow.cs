@@ -482,9 +482,7 @@ namespace Consolonia.Core.Infrastructure
         {
             return _cursorType switch
             {
-                StandardCursorType.Arrow => Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor)
-                    ? string.Empty
-                    : " ",
+                StandardCursorType.Arrow => GetDefaultCursor(),
                 StandardCursorType.Cross => "+",
                 StandardCursorType.Hand => "@",
                 StandardCursorType.Help => "?",
@@ -510,6 +508,17 @@ namespace Consolonia.Core.Infrastructure
                 _ => " "
             };
         }
+
+        private string GetDefaultCursor()
+        {
+            if (Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor))
+                return string.Empty;
+            if (Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove))
+                return " ";
+            // we don't have any mouse positioning information so we can't show a cursor
+            return string.Empty;
+        }
+
 
         protected virtual void OnCursorChanged(ConsoleCursor obj)
         {

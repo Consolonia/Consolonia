@@ -249,6 +249,7 @@ namespace Consolonia.PlatformSupport
             Curses.noecho();
             _cursesWindow.keypad(true);
             Curses.cbreak();
+            Curses.mouseinterval(0);
 
             if (TryEnableMouseButtonSupport())
             {
@@ -286,10 +287,9 @@ namespace Consolonia.PlatformSupport
         private bool TryEnableMouseButtonSupport()
         {
             var mask = Curses.mousemask(BasicMouseEvents, out _);
-            if (mask != 0)
+            if (mask.HasFlag(Curses.Event.Button1Pressed) && mask.HasFlag(Curses.Event.Button1Released))
             {
                 Capabilities |= ConsoleCapabilities.SupportsMouseButtons;
-                Curses.mouseinterval(0);
                 WriteText(Esc.EnableMouseButtons);
                 return true;
             }
@@ -322,6 +322,7 @@ namespace Consolonia.PlatformSupport
                 var gpmMonitor = new GpmMonitor();
                 gpmMonitor.MouseEvent += RaiseMouseEvent;
                 _gpmMonitor = gpmMonitor;
+                Capabilities |= ConsoleCapabilities.SupportsMouseMove;
                 DetectSupportsMouseCursor();
             }
             catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or InvalidOperationException)
