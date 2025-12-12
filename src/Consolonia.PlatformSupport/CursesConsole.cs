@@ -252,16 +252,12 @@ namespace Consolonia.PlatformSupport
             Curses.mouseinterval(0);
 
             if (TryEnableMouseButtonSupport())
-            {
                 // if we can do basic mouse, let's try mouse move
                 if (!TryEnableMouseMoveSupport())
-                {
                     // if we can't do extended, try GPM
                     if (!TryEnableGpmMouseSupport())
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
-                }
-            }
 
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableBracketedPasteMode);
@@ -270,11 +266,12 @@ namespace Consolonia.PlatformSupport
         }
 
         private const Curses.Event BasicMouseEvents = Curses.Event.Button1Pressed | Curses.Event.Button1Released |
-                                             Curses.Event.Button2Pressed | Curses.Event.Button2Released |
-                                             Curses.Event.Button3Pressed | Curses.Event.Button3Released |
-                                             Curses.Event.Button4Pressed | Curses.Event.Button4Released |
-                                             Curses.Event.ButtonWheeledUp | Curses.Event.ButtonWheeledDown |
-                                             Curses.Event.ButtonShift | Curses.Event.ButtonCtrl | Curses.Event.ButtonAlt;
+                                                      Curses.Event.Button2Pressed | Curses.Event.Button2Released |
+                                                      Curses.Event.Button3Pressed | Curses.Event.Button3Released |
+                                                      Curses.Event.Button4Pressed | Curses.Event.Button4Released |
+                                                      Curses.Event.ButtonWheeledUp | Curses.Event.ButtonWheeledDown |
+                                                      Curses.Event.ButtonShift | Curses.Event.ButtonCtrl |
+                                                      Curses.Event.ButtonAlt;
 
         private static bool IsTtyTerminal()
         {
@@ -293,6 +290,7 @@ namespace Consolonia.PlatformSupport
                 WriteText(Esc.EnableMouseButtons);
                 return true;
             }
+
             return false;
         }
 
@@ -301,7 +299,7 @@ namespace Consolonia.PlatformSupport
             if (IsTtyTerminal() || !DoesCursesActuallySupportMouseMove())
                 return false;
 
-            var mousemask = Curses.mousemask(BasicMouseEvents | Curses.Event.ReportMousePosition, out _);
+            Curses.Event mousemask = Curses.mousemask(BasicMouseEvents | Curses.Event.ReportMousePosition, out _);
             if (mousemask.HasFlag(Curses.Event.ReportMousePosition))
             {
                 WriteText(Esc.EnableAllMouseEvents);
@@ -311,6 +309,7 @@ namespace Consolonia.PlatformSupport
                 DetectSupportsMouseCursor();
                 return true;
             }
+
             return false;
         }
 
@@ -325,9 +324,11 @@ namespace Consolonia.PlatformSupport
                 Capabilities |= ConsoleCapabilities.SupportsMouseMove;
                 DetectSupportsMouseCursor();
             }
-            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or InvalidOperationException)
+            catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException
+                                           or InvalidOperationException)
             {
             }
+
             return _gpmMonitor != null;
         }
 
@@ -336,9 +337,7 @@ namespace Consolonia.PlatformSupport
             bool isTty = IsTtyTerminal();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) ||
                 !isTty)
-            {
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
-            }
         }
 
 
@@ -662,10 +661,10 @@ namespace Consolonia.PlatformSupport
                     when
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
-                    {
-                        bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
-                        break;
-                    }
+                {
+                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    break;
+                }
             }
 
             if (((uint)keyValue & (uint)Key.CharMask) > 27)

@@ -3,7 +3,6 @@ using Avalonia;
 using Avalonia.Media;
 using Consolonia.Controls;
 using Consolonia.Core.Helpers;
-using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text.Fonts;
 using NUnit.Framework;
 
@@ -20,7 +19,8 @@ namespace Consolonia.Core.Tests
         [SetUp]
         public void Setup()
         {
-            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities() { Capabilities=ConsoleCapabilities.SupportsComplexEmoji});
+            AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
+                { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
             _typeface = new AsciiArtTypeface("TestFont")
             {
                 Hardblank = '$',

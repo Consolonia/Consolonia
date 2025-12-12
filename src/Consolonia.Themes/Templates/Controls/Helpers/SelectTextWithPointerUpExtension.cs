@@ -20,14 +20,14 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
             var console = AvaloniaLocator.Current.GetService<IConsole>();
             bool supportsMouse = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseButtons);
             bool supportsMouseMove = console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove);
-            
+
             // if we don't have mouse we can't do any kind of selection
             if (!supportsMouse)
                 return;
-            
+
             // if we have mouse move, we can do normal selection
             if (supportsMouseMove)
-                return; 
+                return;
 
             SelectOnMouseLeftUpProperty.Changed.SubscribeAction(OnPropertyChanged);
         }
