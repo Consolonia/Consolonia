@@ -199,8 +199,9 @@ namespace Consolonia.Core.Infrastructure
             if (left2 - left == 2)
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
-            ClearScreen();
             BlackColorTTYWorkaround();
+            
+            ClearScreen();
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
