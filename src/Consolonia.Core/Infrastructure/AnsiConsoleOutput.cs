@@ -204,30 +204,6 @@ namespace Consolonia.Core.Infrastructure
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
-        /// <summary>
-        /// In TTY
-        /// When the first foreground is black
-        /// We write it black
-        /// But it's gray 
-        /// </summary>
-        private void BlackColorTTYWorkaround()
-        {
-            const ConsoleColor anotherColor = ConsoleColor.Cyan;
-            
-            // Switch to another color makes tty behave correctly after
-            WriteText(Esc.Foreground(anotherColor));
-            WriteText(Esc.Background(anotherColor));
-            
-            // we have to write something, otherwise it does not work
-            WriteText(" ");
-            
-            // Switching back to black (further we are painting the screen and do other drawings during initialization)
-            WriteText(Esc.Foreground(ConsoleColor.Black));
-            WriteText(Esc.Background(ConsoleColor.Black));
-            Flush();
-            //todo: low: we can not simply test the presence of this bug (if it even exists), thus come back to this later
-        }
-
         public void RestoreConsole()
         {
             WriteText(Esc.DisableAlternateBuffer);
@@ -281,6 +257,30 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        /// <summary>
+        ///     In TTY
+        ///     When the first foreground is black
+        ///     We write it black
+        ///     But it's gray
+        /// </summary>
+        private void BlackColorTTYWorkaround()
+        {
+            const ConsoleColor anotherColor = ConsoleColor.Cyan;
+
+            // Switch to another color makes tty behave correctly after
+            WriteText(Esc.Foreground(anotherColor));
+            WriteText(Esc.Background(anotherColor));
+
+            // we have to write something, otherwise it does not work
+            WriteText(" ");
+
+            // Switching back to black (further we are painting the screen and do other drawings during initialization)
+            WriteText(Esc.Foreground(ConsoleColor.Black));
+            WriteText(Esc.Background(ConsoleColor.Black));
+            Flush();
+            //todo: low: we can not simply test the presence of this bug (if it even exists), thus come back to this later
         }
 
         private void SetCaretPositionInternal(PixelBufferCoordinate bufferPoint)
