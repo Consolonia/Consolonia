@@ -7,7 +7,7 @@
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryAnimations">
     <UserControl.Styles>
         <Styles>
-            <Style Selector="ScrollViewer">
+            <Style Selector="Panel.background_animation">
                 <Style.Animations>
                     <Animation Duration="0:0:1"
                                IterationCount="Infinite"
@@ -151,6 +151,13 @@
                     </Border.Styles>
                 </Border>
             </Panel>
+
+            <Panel Width="7"
+                   Height="7"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Top"
+                   Margin="2"
+                   Classes="background_animation" />
 
             <Button Content="Pause IO for 5 seconds"
                     Click="PauseButton_OnClick"
