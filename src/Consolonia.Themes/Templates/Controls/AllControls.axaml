@@ -3,7 +3,8 @@
     <Styles.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="avares://Consolonia.Controls.DataGrid/Themes/Templates/Controls/DataGrid.axaml" />
+                <ResourceInclude
+                    Source="avares://Consolonia.Controls.DataGrid/Themes/Templates/Controls/DataGrid.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/AutoCompleteBox.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/BorderPanel.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/Button.axaml" />
