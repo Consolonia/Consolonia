@@ -52,7 +52,7 @@ xmlns:console="https://github.com/consolonia"
 ## Example
 ```xaml
 <DataGrid AutoGenerateColumns="False"
-          Items="{Binding People}"
+          ItemsSource="{Binding People}"
           HeadersVisibility="Column"
           CanUserSortColumns="True">
   <DataGrid.Columns>
