@@ -3,15 +3,14 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryImage"
-             XYFocus.NavigationModes="Keyboard">
+             x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryImage">
     <Grid Grid.RowDefinitions="Auto *">
         <Button Grid.Row="0"
+                HorizontalAlignment="Center" 
+                Margin="1"
                 Content="Open Image..."
-                Click="Button_Click"
-                Focusable="False"
-                KeyboardNavigation.IsTabStop="False" />
-        <ScrollViewer Grid.Row="1">
+                Click="Button_Click"/>
+        <ScrollViewer Grid.Row="1" XYFocus.NavigationModes="Keyboard">
             <StackPanel>
                 <Image x:Name="BigImage"
                        IsVisible="false" />
