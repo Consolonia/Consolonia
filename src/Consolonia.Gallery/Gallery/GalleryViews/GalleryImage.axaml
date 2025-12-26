@@ -6,11 +6,12 @@
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryImage">
     <Grid Grid.RowDefinitions="Auto *">
         <Button Grid.Row="0"
-                HorizontalAlignment="Center" 
+                HorizontalAlignment="Center"
                 Margin="1"
                 Content="Open Image..."
-                Click="Button_Click"/>
-        <ScrollViewer Grid.Row="1" XYFocus.NavigationModes="Keyboard">
+                Click="Button_Click" />
+        <ScrollViewer Grid.Row="1"
+                      XYFocus.NavigationModes="Keyboard">
             <StackPanel>
                 <Image x:Name="BigImage"
                        IsVisible="false" />
