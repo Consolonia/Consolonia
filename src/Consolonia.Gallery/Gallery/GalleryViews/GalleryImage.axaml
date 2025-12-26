@@ -21,14 +21,20 @@
                     <WrapPanel.Styles>
                         <!-- Make thumbnails focusable and tab-stoppable for XY navigation on a focusable container -->
                         <Style Selector="WrapPanel > Border.thumbnail">
-                            <Setter Property="Focusable" Value="True" />
-                            <Setter Property="KeyboardNavigation.IsTabStop" Value="True" />
-                            <Setter Property="BorderThickness" Value="0" />
-                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Focusable"
+                                    Value="True" />
+                            <Setter Property="KeyboardNavigation.IsTabStop"
+                                    Value="True" />
+                            <Setter Property="BorderThickness"
+                                    Value="0" />
+                            <Setter Property="Padding"
+                                    Value="0" />
                         </Style>
                         <Style Selector="WrapPanel > Border.thumbnail:focus">
-                            <Setter Property="BorderThickness" Value="1" />
-                            <Setter Property="BorderBrush" Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                            <Setter Property="BorderThickness"
+                                    Value="1" />
+                            <Setter Property="BorderBrush"
+                                    Value="{DynamicResource ThemeActionBackgroundBrush}" />
                         </Style>
                     </WrapPanel.Styles>
                     <Border Classes="thumbnail">

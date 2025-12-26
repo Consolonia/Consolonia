@@ -10,12 +10,16 @@
             <StackPanel.Styles>
                 <!-- Make section headers focusable by class, not by width -->
                 <Style Selector="TextBlock.icon-header">
-                    <Setter Property="Width" Value="20" />
-                    <Setter Property="Focusable" Value="True" />
-                    <Setter Property="KeyboardNavigation.IsTabStop" Value="True" />
+                    <Setter Property="Width"
+                            Value="20" />
+                    <Setter Property="Focusable"
+                            Value="True" />
+                    <Setter Property="KeyboardNavigation.IsTabStop"
+                            Value="True" />
                 </Style>
                 <Style Selector="TextBlock.icon-header:focus">
-                    <Setter Property="Foreground" Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource ThemeActionBackgroundBrush}" />
                 </Style>
             </StackPanel.Styles>
             <!-- Navigation & UI -->
