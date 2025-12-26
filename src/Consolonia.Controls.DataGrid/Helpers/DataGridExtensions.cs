@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 
-namespace Consolonia.Themes.Templates.Controls.Helpers
+namespace Consolonia.Controls.DataGrid.Helpers
 {
     public static class DataGridExtensions
     {

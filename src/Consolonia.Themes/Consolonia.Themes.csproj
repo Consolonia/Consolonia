@@ -11,6 +11,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
-    </ItemGroup>
+    <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
+    <ProjectReference Include="..\Consolonia.Controls.DataGrid\Consolonia.Controls.DataGrid.csproj" />
+  </ItemGroup>
 </Project>

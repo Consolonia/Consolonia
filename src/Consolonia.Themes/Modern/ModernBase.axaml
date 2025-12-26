@@ -80,7 +80,7 @@
     <StyleInclude Source="/Modern/Controls/BorderPanel.axaml" />
     <StyleInclude Source="/Modern/Controls/ConsoloniaAccessRun.axaml" />
     <StyleInclude Source="/Modern/Controls/Button.axaml" />
-    <StyleInclude Source="/Modern/Controls/DataGridRow.axaml" />
+    <StyleInclude Source="avares://Consolonia.Controls.DataGrid/Themes/Modern/Controls/DataGridRow.axaml" />
     <StyleInclude Source="/Modern/Controls/TextBox.axaml" />
     <StyleInclude Source="/Modern/Controls/ToggleButton.axaml" />
     <StyleInclude Source="/Modern/Controls/ComboBox.axaml" />
