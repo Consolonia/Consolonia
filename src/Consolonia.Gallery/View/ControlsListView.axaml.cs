@@ -9,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Consolonia.Gallery.Gallery;
 using Consolonia.Themes;
@@ -103,6 +104,21 @@ namespace Consolonia.Gallery.View
             var selectedItem = GalleryGrid.SelectedItem as GalleryItem;
             string xamlFile = $"{selectedItem.Type.Name}.axaml";
             await ShowCode(xamlFile);
+
+            await RefocusList();
+        }
+
+        private async Task RefocusList()
+        {
+            // F393122D-9623-4535-A87A-F031C2769386
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (GalleryGrid.SelectedIndex < 0 && GalleryGrid.ItemCount > 0)
+                    GalleryGrid.SelectedIndex = 0;
+
+                if (GalleryGrid.SelectedIndex >= 0 && GalleryGrid.ContainerFromIndex(GalleryGrid.SelectedIndex) is
+                        { } c) c.Focus();
+            }, DispatcherPriority.Input);
         }
 
         private async void OnShowCodeBehind(object sender, RoutedEventArgs e)
@@ -110,6 +126,8 @@ namespace Consolonia.Gallery.View
             var selectedItem = GalleryGrid.SelectedItem as GalleryItem;
             string xamlFile = $"{selectedItem.Type.Name}.axaml.cs";
             await ShowCode(xamlFile);
+
+            await RefocusList();
         }
 
         private static async Task ShowCode(string xamlFile)
