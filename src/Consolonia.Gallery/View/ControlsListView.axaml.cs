@@ -104,7 +104,7 @@ namespace Consolonia.Gallery.View
             var selectedItem = GalleryGrid.SelectedItem as GalleryItem;
             string xamlFile = $"{selectedItem.Type.Name}.axaml";
             await ShowCode(xamlFile);
-            
+
             await RefocusList();
         }
 
@@ -115,11 +115,9 @@ namespace Consolonia.Gallery.View
             {
                 if (GalleryGrid.SelectedIndex < 0 && GalleryGrid.ItemCount > 0)
                     GalleryGrid.SelectedIndex = 0;
-                
-                if (GalleryGrid.SelectedIndex >= 0 && GalleryGrid.ContainerFromIndex(GalleryGrid.SelectedIndex) is { } c)
-                {
-                    c.Focus();
-                }
+
+                if (GalleryGrid.SelectedIndex >= 0 && GalleryGrid.ContainerFromIndex(GalleryGrid.SelectedIndex) is
+                        { } c) c.Focus();
             }, DispatcherPriority.Input);
         }
 
@@ -129,7 +127,7 @@ namespace Consolonia.Gallery.View
             string xamlFile = $"{selectedItem.Type.Name}.axaml.cs";
             await ShowCode(xamlFile);
 
-            await RefocusList(); 
+            await RefocusList();
         }
 
         private static async Task ShowCode(string xamlFile)
