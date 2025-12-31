@@ -609,6 +609,27 @@ namespace Consolonia.PlatformSupport
             }
         }
 
+        internal static Key TranslateCharKey(int wch)
+        {
+            // Match the logic in `ProcessKeyInternal` but without side effects.
+            if (wch == Curses.KeyTab)
+                return MapCursesKey(wch);
+
+            // NUL => Ctrl+Space
+            if (wch == 0)
+                return Key.CtrlMask | Key.Space;
+
+            // Control codes 1-26 => Ctrl+A..Ctrl+Z.
+            if (wch is >= 1 and <= 26)
+                return Key.CtrlMask | (Key)(wch + 64);
+
+            // DEL => often sent as Backspace by terminals.
+            if (wch == 127)
+                return Key.Backspace;
+
+            return (Key)wch;
+        }
+
         private void ProcessKeyInternal(int wch)
         {
             Key k;
@@ -620,14 +641,25 @@ namespace Consolonia.PlatformSupport
             {
                 // Unfortunately there are no way to differentiate Ctrl+alfa and Ctrl+Shift+alfa.
                 k = (Key)wch;
+
+                // NUL => Ctrl+Space
                 if (wch == 0)
                 {
                     k = Key.CtrlMask | Key.Space;
                 }
-                else if (wch >= (uint)Key.A - 64 && wch <= (uint)Key.Z - 64)
+                // Control codes 1-26 => Ctrl+A..Ctrl+Z.
+                // Keep them as Ctrl-modified letters so they don't get normalized to Enter/Tab.
+                else if (wch >= 1 && wch <= 26)
                 {
-                    if ((Key)(wch + 64) != Key.J) k = Key.CtrlMask | (Key)(wch + 64);
+                    var letter = (Key)(wch + 64); // 1->A, 9->I, 10->J, 13->M, ...
+                    k = Key.CtrlMask | letter;
                 }
+                // DEL => often sent as Backspace by terminals, but sometimes as 127.
+                else if (wch == 127)
+                {
+                    k = Key.Backspace;
+                }
+                // Uppercase letters should set shift modifier.
                 else if (wch >= (uint)Key.A && wch <= (uint)Key.Z)
                 {
                     _keyModifiers.Shift = true;
