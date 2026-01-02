@@ -223,6 +223,11 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.Flush();
         }
 
+        public virtual IConsoleDeviceRenderer CreateConsoleRenderer(ConsoleWindowImpl consoleWindowImpl)
+        {
+            return new ConsoleOutputRenderer(consoleWindowImpl, this._consoleOutput);
+        }
+
         #endregion
     }
 }

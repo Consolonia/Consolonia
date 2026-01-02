@@ -9,6 +9,11 @@ using Avalonia.Input.Raw;
 
 namespace Consolonia.Core.Infrastructure
 {
+    public interface IConsoleDeviceRenderer
+    {
+        void RenderToDevice();
+    }   
+
     /// <summary>
     ///     IConsole is made up of IConsoleInput and IConsoleOutput
     /// </summary>
@@ -23,5 +28,12 @@ namespace Consolonia.Core.Infrastructure
         event Action<bool> FocusEvent;
 
         void PauseIO(Task task);
+
+        /// <summary>
+        ///  Create Device Renderer for this console 
+        /// </summary>
+        /// <param name="consoleWindowImpl"></param>
+        /// <returns></returns>
+        IConsoleDeviceRenderer CreateConsoleRenderer(ConsoleWindowImpl consoleWindowImpl);
     }
 }

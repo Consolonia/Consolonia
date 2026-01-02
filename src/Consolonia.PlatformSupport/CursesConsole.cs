@@ -242,6 +242,16 @@ namespace Consolonia.PlatformSupport
             return [.. _rowInputBuffer];
         }
 
+        public override IConsoleDeviceRenderer CreateConsoleRenderer(ConsoleWindowImpl consoleWindowImpl)
+        {
+            if (IsTtyTerminal())
+            {
+                return new TtyDeviceRenderer(consoleWindowImpl);
+            }
+            // just use the normal IConsoleOutput based renderer.
+            return base.CreateConsoleRenderer(consoleWindowImpl);
+        }
+
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
