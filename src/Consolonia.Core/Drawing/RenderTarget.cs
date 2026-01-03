@@ -109,6 +109,7 @@ namespace Consolonia.Core.Drawing
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice()
         {
+            _renderPending = false;
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
@@ -274,9 +275,12 @@ namespace Consolonia.Core.Drawing
                 // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
                 DispatcherTimer.RunOnce(() =>
                 {
-                    _renderPending = false;
-                    RenderToDevice();
-                }, TimeSpan.FromMilliseconds(16), DispatcherPriority.Render);
+                    if (_renderPending)
+                    {
+                        _renderPending = false;
+                        RenderToDevice();
+                    }
+                }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
             }
         }
     }
