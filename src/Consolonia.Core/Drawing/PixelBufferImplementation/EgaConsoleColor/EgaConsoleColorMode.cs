@@ -119,7 +119,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             int g = color.G;
             int b = color.B;
 
-            var palette = isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
+            var palette = GetPalette(isForeground);
 
             ConsoleColor bestColor = palette[0].Color;
             int bestDistance = int.MaxValue;
@@ -146,7 +146,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             return bestColor;
         }
 
-        private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground)
+        private (ConsoleColor Color, (int R, int G, int B) Rgb)[] GetPalette(bool isForeground)
         {
             return isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
         }
@@ -195,7 +195,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                     return Color.FromArgb(127, 0, 0, 0);
                 case EgaColorMode.Colored:
                     {
-                        var palette = isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
+                        var palette = GetPalette(isForeground);
 
                         for (int i = 0; i < palette.Length; i++)
                         {
