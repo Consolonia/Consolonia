@@ -1,12 +1,12 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -98,8 +98,8 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-                for (ushort x = 0; x < width; x++)
-                    cache[x, y] = Pixel.Empty;
+            for (ushort x = 0; x < width; x++)
+                cache[x, y] = Pixel.Empty;
 
             return cache;
         }
@@ -107,6 +107,7 @@ namespace Consolonia.Core.Drawing
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice()
         {
+            Stopwatch stopwatch = Stopwatch.StartNew();
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
@@ -214,6 +215,8 @@ namespace Consolonia.Core.Drawing
             }
 
             _console.Flush();
+            stopwatch.Stop();
+            Debug.WriteLine($"RenderToDevice took {stopwatch.ElapsedMilliseconds} ms");
 
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
