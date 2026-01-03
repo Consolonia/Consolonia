@@ -109,7 +109,9 @@ namespace Consolonia.Core.Drawing
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice()
         {
+#if DEBUG
             var stopwatch = Stopwatch.StartNew();
+#endif
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
@@ -217,9 +219,10 @@ namespace Consolonia.Core.Drawing
             }
 
             _console.Flush();
+#if DEBUG
             stopwatch.Stop();
             Debug.WriteLine($"RenderToDevice took {stopwatch.ElapsedMilliseconds} ms");
-
+#endif
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
                 _console.SetCaretPosition((PixelBufferCoordinate)caretPosition);
