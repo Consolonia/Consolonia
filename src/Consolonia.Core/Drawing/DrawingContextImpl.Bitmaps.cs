@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Dummy;
 
@@ -115,7 +116,7 @@ namespace Consolonia.Core.Drawing
             return pixel;
         }
 
-        private static char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
+        private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
         {
             char character = GetColorsPattern(colors) switch
             {
@@ -244,12 +245,28 @@ namespace Consolonia.Core.Drawing
         /// <param name="colors"></param>
         /// <returns>T or F for each color as a string</returns>
         /// <exception cref="ArgumentException"></exception>
-        private static byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
+        private byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
         {
             if (colors.Length != 4) throw new ArgumentException("Array must contain exactly 4 colors.");
 
+            if (!_consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
+            {
+                BgraColor topRowColor = Average(colors[0], colors[1]);
+                BgraColor bottomRowColor = Average(colors[2], colors[3]);
+
+                if (colors[0].A == 0 && colors[1].A == 0 && colors[2].A == 0 && colors[3].A == 0)
+                    return 0b0000;
+
+                if (ColorEquals(topRowColor, bottomRowColor))
+                    return topRowColor.A == 0 ? (byte)0b0000 : (byte)0b1111;
+
+                double topBr = GetColorBrightness(topRowColor);
+                double bottomBr = GetColorBrightness(bottomRowColor);
+                return (byte)(topBr >= bottomBr ? 0b1100 : 0b0011);
+            }
+
             // Initial guess: two clusters with the first two colors as centers
-            Span<BgraColor> clusterCenters = stackalloc BgraColor[2] { colors[0], colors[1] };
+            Span<BgraColor> clusterCenters = [colors[0], colors[1]];
             Span<BgraColor> newClusterCenters = stackalloc BgraColor[2];
             Span<int> clusters = stackalloc int[4];
 
@@ -321,6 +338,15 @@ namespace Consolonia.Core.Drawing
                  (clusters[1] == higherCluster ? 0b0100 : 0) |
                  (clusters[2] == higherCluster ? 0b0010 : 0) |
                  (clusters[3] == higherCluster ? 0b0001 : 0));
+        }
+
+        private static BgraColor Average(in BgraColor a, in BgraColor b)
+        {
+            return new BgraColor(
+                (byte)((a.B + b.B) / 2),
+                (byte)((a.G + b.G) / 2),
+                (byte)((a.R + b.R) / 2),
+                (byte)((a.A + b.A) / 2));
         }
 
         private static bool ColorEquals(BgraColor c1, BgraColor c2)
