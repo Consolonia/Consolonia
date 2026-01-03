@@ -6,7 +6,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -25,6 +24,8 @@ namespace Consolonia.Core.Drawing
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache;
         private ConsoleCursor _consoleCursor;
+
+        private bool _renderPending;
 
         internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
@@ -98,8 +99,8 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-                for (ushort x = 0; x < width; x++)
-                    cache[x, y] = Pixel.Empty;
+            for (ushort x = 0; x < width; x++)
+                cache[x, y] = Pixel.Empty;
 
             return cache;
         }
@@ -249,8 +250,6 @@ namespace Consolonia.Core.Drawing
             return result;
         }
 
-        private bool _renderPending;
-
         private void OnCursorChanged(ConsoleCursor consoleCursor)
         {
             if (_consoleCursor.CompareTo(consoleCursor) == 0)
@@ -270,7 +269,7 @@ namespace Consolonia.Core.Drawing
             if (!_renderPending)
             {
                 _renderPending = true;
-                
+
                 // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
                 DispatcherTimer.RunOnce(() =>
                 {
