@@ -25,7 +25,7 @@ namespace Consolonia.Gallery
                     argument.EndsWith(TurboVisionProgramParameter, StringComparison.OrdinalIgnoreCase)))
                 Styles.Add(new ModernTheme());
             else
-                Styles.Add(new TurboVisionTheme());
+                Styles.Add(new TurboVisionCompatibleTheme());
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 desktop.MainWindow = new MainWindow(); // designer runs as classic desktop

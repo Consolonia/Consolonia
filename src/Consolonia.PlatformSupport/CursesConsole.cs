@@ -246,7 +246,7 @@ namespace Consolonia.PlatformSupport
         {
             if (IsTtyTerminal())
             {
-                return new TtyDeviceRenderer(consoleWindowImpl);
+                return new TtyDeviceRenderer(consoleWindowImpl, this);
             }
             // just use the normal IConsoleOutput based renderer.
             return base.CreateConsoleRenderer(consoleWindowImpl);

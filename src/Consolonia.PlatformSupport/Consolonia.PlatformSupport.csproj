@@ -9,7 +9,6 @@
     <ItemGroup>
         <PackageReference Include="jinek.X11Clipboard.Fork" Version="1.0.0" />
         <PackageReference Include="Vanara.PInvoke.Kernel32" Version="4.0.4" />
-        <PackageReference Include="Mono.Posix.NETStandard" Version="5.20.1-preview" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Media;
@@ -22,7 +23,7 @@ namespace Consolonia.Core.Infrastructure
 
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache;
-        private ConsoleCursor _consoleCursor;
+        private ConsoleCursor _consoleCursor = new ConsoleCursor(new PixelBufferCoordinate((ushort)0, (ushort)0), String.Empty);
 
         internal ConsoleOutputRenderer(ConsoleWindowImpl consoleTopLevelImpl, IConsoleOutput consoleOutput)
         {
@@ -55,6 +56,8 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RenderToDevice()
         {
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
@@ -70,18 +73,6 @@ namespace Consolonia.Core.Infrastructure
                 {
                     Pixel pixel = pixelBuffer[x, y];
 
-                    if (pixel.IsCaret())
-                    {
-                        if (caretPosition != null)
-                            throw new InvalidOperationException("Caret is already shown");
-                        caretPosition = new PixelBufferCoordinate(x, y);
-                        caretStyle = pixel.CaretStyle;
-                    }
-
-                    if (!dirtyRegions.Contains(x, y, false))
-                        continue;
-
-                    // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (!_consoleCursor.IsEmpty() &&
                         _consoleCursor.Coordinate.Y == y &&
                         _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
@@ -95,7 +86,7 @@ namespace Consolonia.Core.Infrastructure
                                 ? pixel.Foreground.Symbol.Character
                                 : ' ';
                             pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
-                                new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                                new PixelBackground(pixel.Background.Color.GetContrastColor()));
                         }
                         else
                         {
@@ -103,7 +94,7 @@ namespace Consolonia.Core.Infrastructure
                             // simply draw the mouse cursor character in the current pixel colors.
                             Color foreground = pixel.Foreground.Color != Colors.Transparent
                                 ? pixel.Foreground.Color
-                                : GetContrastColor(pixel.Background.Color);
+                                : pixel.Background.Color.GetContrastColor();
                             pixel = new Pixel(
                                 new PixelForeground(new Symbol(cursorChar, 1), foreground,
                                     pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
@@ -111,10 +102,42 @@ namespace Consolonia.Core.Infrastructure
                         }
                     }
 
+
+                    // Handle wide glyphs similarly to ConsoleOutputDeviceRenderer.
+                    if (pixel.Width > 1)
+                    {
+                        isWide = true;
+
+                        // If the wide glyph would overlap non-empty continuation cells, render space instead.
+                        for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
+                        {
+                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
+                            {
+                                pixel = Pixel.Space;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (pixel.Width == 0 && !isWide)
+                        pixel = Pixel.Space;
+
+
+                    if (pixel.IsCaret())
+                    {
+                        if (caretPosition != null)
+                            throw new InvalidOperationException("Caret is already shown");
+                        caretPosition = new PixelBufferCoordinate(x, y);
+                        caretStyle = pixel.CaretStyle;
+                    }
+
+                    if (!dirtyRegions.Contains(x, y, false))
+                        continue;
+
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
-                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
+                            if (pixelBuffer.GetPixelForRendering((ushort)(x + i), y, _consoleCursor).Width != 0)
                             {
                                 pixel = new Pixel(
                                     new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
@@ -162,6 +185,9 @@ namespace Consolonia.Core.Infrastructure
             }
 
             _consoleOutput.Flush();
+            sw.Stop();
+            _consoleOutput.SetCaretPosition(new PixelBufferCoordinate(0, 0));
+            _consoleOutput.WriteText("RenderToDevice time: " + sw.ElapsedMilliseconds + " ms\n");
 
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
@@ -175,27 +201,6 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-
-        private static Color GetContrastColor(Color color)
-        {
-            // Calculate relative luminance using the formula from WCAG 2.0
-            // https://www.w3.org/TR/WCAG20/#relativeluminancedef
-            double r = color.R / 255.0;
-            double g = color.G / 255.0;
-            double b = color.B / 255.0;
-
-            r = r <= 0.03928 ? r / 12.92 : Math.Pow((r + 0.055) / 1.055, 2.4);
-            g = g <= 0.03928 ? g / 12.92 : Math.Pow((g + 0.055) / 1.055, 2.4);
-            b = b <= 0.03928 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
-            double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-            // Choose black or white based on which provides better contrast
-            // White luminance = 1.0, Black luminance = 0.0
-            double contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05);
-            double contrastWithBlack = (luminance + 0.05) / (0.0 + 0.05);
-            Color result = contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
-            return result;
-        }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
         {
