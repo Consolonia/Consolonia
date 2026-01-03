@@ -8,10 +8,9 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Dummy;
-using Consolonia.Controls;
-using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -30,7 +29,7 @@ namespace Consolonia.Core.Drawing
                 .ToPixelRect();
 
             var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
-            
+
             // Resize source to be target rect * 2 so we can map to quad pixels
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
             using IBitmapImpl resizedBitmap =
@@ -254,13 +253,13 @@ namespace Consolonia.Core.Drawing
             {
                 BgraColor topRowColor = Average(colors[0], colors[1]);
                 BgraColor bottomRowColor = Average(colors[2], colors[3]);
-                
+
                 if (colors[0].A == 0 && colors[1].A == 0 && colors[2].A == 0 && colors[3].A == 0)
                     return 0b0000;
 
                 if (ColorEquals(topRowColor, bottomRowColor))
                     return topRowColor.A == 0 ? (byte)0b0000 : (byte)0b1111;
-                
+
                 double topBr = GetColorBrightness(topRowColor);
                 double bottomBr = GetColorBrightness(bottomRowColor);
                 return (byte)(topBr >= bottomBr ? 0b1100 : 0b0011);
