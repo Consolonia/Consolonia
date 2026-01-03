@@ -26,6 +26,8 @@ namespace Consolonia.Core.Drawing
         private Pixel?[,] _cache;
         private ConsoleCursor _consoleCursor;
 
+        private bool _renderPending;
+
         internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
             _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
@@ -252,8 +254,6 @@ namespace Consolonia.Core.Drawing
             return result;
         }
 
-        private bool _renderPending;
-
         private void OnCursorChanged(ConsoleCursor consoleCursor)
         {
             if (_consoleCursor.CompareTo(consoleCursor) == 0)
@@ -273,7 +273,7 @@ namespace Consolonia.Core.Drawing
             if (!_renderPending)
             {
                 _renderPending = true;
-                
+
                 // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
                 DispatcherTimer.RunOnce(() =>
                 {
