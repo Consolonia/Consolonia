@@ -24,6 +24,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
         });
 
         private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _backgroundConsoleColorMap;
+
+        private readonly Dictionary<Color, ConsoleColor> _consoleColorCache = new();
         private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _consoleColorMap;
         private readonly bool _supportBrightBackground;
 
