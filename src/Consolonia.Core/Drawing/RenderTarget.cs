@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -23,6 +24,8 @@ namespace Consolonia.Core.Drawing
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache;
         private ConsoleCursor _consoleCursor;
+
+        private bool _renderPending;
 
         internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
@@ -105,6 +108,7 @@ namespace Consolonia.Core.Drawing
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice()
         {
+            _renderPending = false;
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
@@ -255,8 +259,6 @@ namespace Consolonia.Core.Drawing
             ConsoleCursor oldConsoleCursor = _consoleCursor;
             _consoleCursor = consoleCursor;
 
-            //todo: low excessive refresh, emptiness can be checked
-
             // Dirty rects expanded to handle potential wide char overlap
             var oldCursorRect = new PixelRect(oldConsoleCursor.Coordinate.X - 1,
                 oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
@@ -265,7 +267,20 @@ namespace Consolonia.Core.Drawing
             _consoleTopLevelImpl.DirtyRegions.AddRect(oldCursorRect);
             _consoleTopLevelImpl.DirtyRegions.AddRect(newCursorRect);
 
-            RenderToDevice();
+            if (!_renderPending)
+            {
+                _renderPending = true;
+
+                // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
+                DispatcherTimer.RunOnce(() =>
+                {
+                    if (_renderPending)
+                    {
+                        _renderPending = false;
+                        RenderToDevice();
+                    }
+                }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
+            }
         }
     }
 }
