@@ -244,10 +244,10 @@ namespace Consolonia.PlatformSupport
 
         public override IConsoleDeviceRenderer CreateConsoleRenderer(ConsoleWindowImpl consoleWindowImpl)
         {
-            if (IsTtyTerminal())
-            {
-                return new TtyDeviceRenderer(consoleWindowImpl, this);
-            }
+            // if (IsTtyTerminal())
+            // {
+            //     return new TtyDeviceRenderer(consoleWindowImpl, this);
+            //}
             // just use the normal IConsoleOutput based renderer.
             return base.CreateConsoleRenderer(consoleWindowImpl);
         }

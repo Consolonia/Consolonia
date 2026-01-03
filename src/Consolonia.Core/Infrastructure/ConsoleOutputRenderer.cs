@@ -137,7 +137,7 @@ namespace Consolonia.Core.Infrastructure
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
-                            if (pixelBuffer.GetPixelForRendering((ushort)(x + i), y, _consoleCursor).Width != 0)
+                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
                             {
                                 pixel = new Pixel(
                                     new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,

@@ -91,9 +91,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <param name="y"></param>
         /// <param name="consoleCursor"></param>
         /// <returns></returns>
-        public Pixel GetPixelForRendering(ushort x, ushort y, ConsoleCursor consoleCursor)
+        public void GetPixelForRendering(ushort x, ushort y, ConsoleCursor consoleCursor, out Pixel pixel)
         {
-            Pixel pixel = this[x, y];
+            pixel = this[x, y];
 
             if (!consoleCursor.IsEmpty() &&
                 consoleCursor.Coordinate.Y == y &&
@@ -144,8 +144,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
             if (pixel.Width == 0 && !isWide)
                 pixel = Pixel.Space;
-
-            return pixel;
         }
 
 

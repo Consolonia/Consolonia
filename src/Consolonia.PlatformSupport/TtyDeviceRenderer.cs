@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -31,12 +30,31 @@ namespace Consolonia.PlatformSupport
         // ioctl request code for GIO_UNIMAP (0x4B66)
         private const int GIO_UNIMAP = 0x4B66;
 
+        // File open flags
+        private const int O_RDWR = 2;
+
+        // lseek whence values
+        private const int SEEK_SET = 0;
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern int open([MarshalAs(UnmanagedType.LPStr)] string pathname, int flags);
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern int close(int fd);
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern long lseek(int fd, long offset, int whence);
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern nint write(int fd, IntPtr buf, nint count);
+
         private readonly object _sync = new();
         private readonly ConsoleWindowImpl _consoleWindowImpl;
         private readonly string _vcsaPath;
 
         private ConsoleCursor _consoleCursor;
-        private FileStream _fs;
+        private int _fd = -1;
+        private GCHandle _bufferHandle;
 
         private byte[] _screenBuffer;
         private int _bufferLength;
@@ -48,27 +66,48 @@ namespace Consolonia.PlatformSupport
             _consoleWindowImpl = consoleWindowImpl;
             _consoleWindowImpl.CursorChanged += OnCursorChanged;
 
+            _pixelCache = new Pixel[_consoleWindowImpl.PixelBuffer.Width, _consoleWindowImpl.PixelBuffer.Height];
+
             // Initialize the Unicode map from the console's font mapping
             InitializeUniMap();
 
             _vcsaPath = "/dev/vcsa";
 
-            _fs = new(_vcsaPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            _fd = open(_vcsaPath, O_RDWR);
+            if (_fd < 0)
+            {
+                int errno = Marshal.GetLastWin32Error();
+                throw new InvalidOperationException($"Failed to open {_vcsaPath}: errno {errno}");
+            }
 
             int cellCount = _consoleWindowImpl.PixelBuffer.Height * _consoleWindowImpl.PixelBuffer.Width;
             _bufferLength = (cellCount * 2);
             _screenBuffer = new byte[_bufferLength];
+
+            // Pin the buffer for the lifetime of this object
+            _bufferHandle = GCHandle.Alloc(_screenBuffer, GCHandleType.Pinned);
         }
 
         public void Dispose()
         {
             _consoleWindowImpl.CursorChanged -= OnCursorChanged;
 
-            if (_fs != null)
+            if (_bufferHandle.IsAllocated)
             {
-                _fs.Dispose();
-                _fs = null;
+                _bufferHandle.Free();
             }
+
+            if (_fd >= 0)
+            {
+                close(_fd);
+                _fd = -1;
+            }
+        }
+
+        private void WriteToDevice(int offset, int length)
+        {
+            lseek(_fd, 4 + offset, SEEK_SET);
+            write(_fd, _bufferHandle.AddrOfPinnedObject() + offset, length);
         }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
@@ -83,29 +122,29 @@ namespace Consolonia.PlatformSupport
                     oldPosition.Y >= 0 && oldPosition.Y < _consoleWindowImpl.PixelBuffer.Height)
                 {
                     // draw old pixel not highlighted
-                    var oldPixel = _consoleWindowImpl.PixelBuffer.GetPixelForRendering(oldPosition.X, oldPosition.Y, _consoleCursor);
+                    _consoleWindowImpl.PixelBuffer.GetPixelForRendering(oldPosition.X, oldPosition.Y, _consoleCursor, out Pixel oldPixel);
                     var iCell = (oldPosition.Y * _consoleWindowImpl.PixelBuffer.Width + oldPosition.X) * 2;
                     _screenBuffer[iCell] = (byte)EncodeChar(oldPixel);
                     _screenBuffer[iCell + 1] = EncodeAttr(oldPixel);
-                     _fs.Seek(4 + iCell, SeekOrigin.Begin);
-                     _fs.Write(_screenBuffer.AsSpan(iCell, 2));
+                    WriteToDevice(iCell, 2);
                 }
 
                 if (newPosition.X >= 0 && newPosition.X < _consoleWindowImpl.PixelBuffer.Width &&
                     newPosition.Y >= 0 && newPosition.Y < _consoleWindowImpl.PixelBuffer.Height)
                 {
                     // draw new pixel highlighted
-                    var newPixel = _consoleWindowImpl.PixelBuffer.GetPixelForRendering(newPosition.X, newPosition.Y, _consoleCursor);
+                    _consoleWindowImpl.PixelBuffer.GetPixelForRendering(newPosition.X, newPosition.Y, _consoleCursor, out Pixel newPixel);
                     var iCell = (newPosition.Y * _consoleWindowImpl.PixelBuffer.Width + newPosition.X) * 2;
                     _screenBuffer[iCell] = (byte)EncodeChar(newPixel);
                     _screenBuffer[iCell + 1] = EncodeAttr(newPixel);
-                     _fs.Seek(4 + iCell, SeekOrigin.Begin);
-                     _fs.Write(_screenBuffer.AsSpan(iCell, 2));
+                    WriteToDevice(iCell, 2);
                 }
-                 _fs.Flush(true);
             }
         }
-        private int counter = 0;
+
+
+        private Pixel[,] _pixelCache;
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RenderToDevice()
         {
@@ -125,31 +164,91 @@ namespace Consolonia.PlatformSupport
                 {
                     for (ushort x = 0; x < cols; x++)
                     {
-                        Pixel pixel = pixelBuffer.GetPixelForRendering(x, y, _consoleCursor);
-                        if (pixel.IsCaret())
+                        var oldPixel = _pixelCache[x, y];
+                        var pixel = pixelBuffer[x, y];
+                        if (!pixel.Equals(oldPixel))
                         {
-                            if (caretPosition != null)
-                                throw new InvalidOperationException("Caret is already shown");
-                            caretPosition = new PixelBufferCoordinate(x, y);
-                            caretStyle = pixel.CaretStyle;
-                        }
+                            if (!_consoleCursor.IsEmpty() &&
+                                _consoleCursor.Coordinate.Y == y &&
+                                _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
+                            {
+                                if (_consoleCursor.Type == " " && pixel.Width == 1)
+                                {
+                                    // floating cursor tracking effect 
+                                    // if we are drawing a " " and the pixel underneath is not wide char
+                                    // then we lift the character from the underlying pixel and invert it
+                                    char cursorChar = pixel.Foreground.Symbol.Character != '\0'
+                                        ? pixel.Foreground.Symbol.Character
+                                        : ' ';
+                                    pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
+                                        new PixelBackground(pixel.Background.Color.GetContrastColor()));
+                                }
+                                else
+                                {
+                                    char cursorChar = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
+                                    // simply draw the mouse cursor character in the current pixel colors.
+                                    Color foreground = pixel.Foreground.Color != Colors.Transparent
+                                        ? pixel.Foreground.Color
+                                        : pixel.Background.Color.GetContrastColor();
+                                    pixel = new Pixel(
+                                        new PixelForeground(new Symbol(cursorChar, 1), foreground,
+                                            pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
+                                        pixel.Background, pixel.CaretStyle);
+                                }
+                            }
 
-                        //Console.WriteLine($"'{pixel.Foreground.Symbol.GetText()}' FG: {pixel.Foreground.Color} BG: {pixel.Background.Color} => {attr}");
-                        _screenBuffer[iBuffer++] = EncodeChar(pixel);
-                        _screenBuffer[iBuffer++] = EncodeAttr(pixel);
+
+                            // Handle wide glyphs similarly to ConsoleOutputDeviceRenderer.
+                            bool isWide = false;
+                            if (pixel.Width > 1)
+                            {
+                                isWide = true;
+
+                                // If the wide glyph would overlap non-empty continuation cells, render space instead.
+                                for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
+                                {
+                                    if (pixelBuffer[(ushort)(x + i), y].Width != 0)
+                                    {
+                                        pixel = Pixel.Space;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (pixel.Width == 0 && !isWide)
+                                pixel = Pixel.Space;
+
+                            if (pixel.IsCaret())
+                            {
+                                if (caretPosition != null)
+                                    throw new InvalidOperationException("Caret is already shown");
+                                caretPosition = new PixelBufferCoordinate(x, y);
+                                caretStyle = pixel.CaretStyle;
+                            }
+
+                            _pixelCache[x, y] = pixel;
+                            //Console.WriteLine($"'{pixel.Foreground.Symbol.GetText()}' FG: {pixel.Foreground.Color} BG: {pixel.Background.Color} => {attr}");
+                            _screenBuffer[iBuffer++] = EncodeChar(pixel);
+                            _screenBuffer[iBuffer++] = EncodeAttr(pixel);
+                        }
+                        else
+                        {
+                            iBuffer += 2;
+                        }
                     }
                 }
-
-                // seek past header rows/cols to first cell
-                _fs.Seek(4, SeekOrigin.Begin);
-                _fs.Write(_screenBuffer);
-                _fs.Flush(true);
                 sw.Stop();
-                
-                _consoleOutput.Flush();
-                _consoleOutput.SetCaretPosition(new PixelBufferCoordinate(0, 0));
-                _consoleOutput.WriteText($"RenderToDevice time:{sw.ElapsedMilliseconds} ms\n");
-                _consoleOutput.Flush();
+                var swWrite = new Stopwatch();
+                swWrite.Start();
+                // Write entire buffer to device (past 4-byte header)
+                WriteToDevice(0, _bufferLength);
+                swWrite.Stop();
+
+                var message = $"RenderToBufferDevice time:{sw.ElapsedMilliseconds}    ms RenderToDevice Write time:{swWrite.ElapsedMilliseconds}   ";
+                 iBuffer=0;
+                for(int i=0;i<message.Length;i++, iBuffer++)
+                    _screenBuffer[iBuffer++] = EncodeChar(message[i]);
+                WriteToDevice(0, message.Length*2);
 
                 if (caretPosition != null && caretStyle != CaretStyle.None)
                 {
@@ -167,8 +266,11 @@ namespace Consolonia.PlatformSupport
 
         private byte EncodeChar(in Pixel pixel)
         {
-            char c = pixel.Foreground.Symbol.Character;
+            return EncodeChar(pixel.Foreground.Symbol.Character);
+        }
 
+        private byte EncodeChar(in Char c)
+        {
             // Handle null/empty as space
             if (c == '\0')
                 return (byte)' ';
@@ -241,59 +343,64 @@ namespace Consolonia.PlatformSupport
                     return;
 
                 // Open the console device for ioctl
-                using var ttyFs = new FileStream("/dev/tty", FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-                int fd = (int)ttyFs.SafeFileHandle.DangerousGetHandle();
-
-                // First, query the number of entries by passing 0 entries
-                // The ioctl will return -1 with ENOMEM (12) but set EntryCount to the required size
-                var desc = new UniMapDesc
-                {
-                    EntryCount = 0,
-                    Entries = IntPtr.Zero
-                };
-
-                ioctl(fd, GIO_UNIMAP, ref desc);
-                int requiredEntries = desc.EntryCount;
-                // If the count query didn't give us a count, we can't proceed
-                if (requiredEntries == 0)
+                int fd = open("/dev/tty", O_RDWR);
+                if (fd < 0)
                 {
                     _uniMapInitialized = true;
                     return;
                 }
 
-                var entries = new UniPair[requiredEntries];
-
-                // Pin the array to get a stable pointer for the ioctl call
-                var handle = GCHandle.Alloc(entries, GCHandleType.Pinned);
                 try
                 {
-                    desc = new UniMapDesc
+                    // First, query the number of entries by passing 0 entries
+                    // The ioctl will return -1 with ENOMEM (12) but set EntryCount to the required size
+                    var desc = new UniMapDesc
                     {
-                        EntryCount = (ushort)requiredEntries,
-                        Entries = handle.AddrOfPinnedObject()
+                        EntryCount = 0,
+                        Entries = IntPtr.Zero
                     };
 
-                    int result = ioctl(fd, GIO_UNIMAP, ref desc);
-                    if (result == 0)
+                    ioctl(fd, GIO_UNIMAP, ref desc);
+                    int requiredEntries = desc.EntryCount;
+                    // If the count query didn't give us a count, we can't proceed
+                    if (requiredEntries == 0)
                     {
-                        // Successfully got the unimap
-                        for (int i = 0; i < desc.EntryCount; i++)
+                        _uniMapInitialized = true;
+                        return;
+                    }
+
+                    var entries = new UniPair[requiredEntries];
+
+                    // Pin the array to get a stable pointer for the ioctl call
+                    var handle = GCHandle.Alloc(entries, GCHandleType.Pinned);
+                    try
+                    {
+                        desc = new UniMapDesc
                         {
-                            char unicode = (char)entries[i].Unicode;
-                            byte fontPos = (byte)entries[i].FontPos;
-                            UnicodeToTtyCharMap[unicode] = fontPos;
+                            EntryCount = (ushort)requiredEntries,
+                            Entries = handle.AddrOfPinnedObject()
+                        };
+
+                        int result = ioctl(fd, GIO_UNIMAP, ref desc);
+                        if (result == 0)
+                        {
+                            // Successfully got the unimap
+                            for (int i = 0; i < desc.EntryCount; i++)
+                            {
+                                char unicode = (char)entries[i].Unicode;
+                                byte fontPos = (byte)entries[i].FontPos;
+                                UnicodeToTtyCharMap[unicode] = fontPos;
+                            }
                         }
                     }
-                    else
+                    finally
                     {
-                        // ioctl failed; log error
-                        int errno = Marshal.GetLastWin32Error();
-                        Console.WriteLine($"GIO_UNIMAP ioctl failed with error code: {errno} {result}");
+                        handle.Free();
                     }
                 }
                 finally
                 {
-                    handle.Free();
+                    close(fd);
                 }
 
                 _uniMapInitialized = true;
