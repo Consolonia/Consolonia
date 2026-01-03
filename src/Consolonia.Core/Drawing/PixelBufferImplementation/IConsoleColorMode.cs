@@ -15,6 +15,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     Map standard avalonia colors to native platform colors supported by current color mode
         /// </summary>
-        (object background, object foreground) MapColors(Color background, Color foreground, FontWeight? weight);//todo: boxing of returned values!!
+        (object background, object foreground)
+            MapColors(Color background, Color foreground, FontWeight? weight); //todo: boxing of returned values!!
     }
 }
