@@ -112,14 +112,20 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             return (consoleColor, mode);
         }
 
+        private Dictionary<Color, ConsoleColor> _consoleColorCache = new();
+
         private ConsoleColor MapToConsoleColor(Color color, bool isForeground)
         {
+            if (_consoleColorCache.TryGetValue(color, out ConsoleColor cachedColor))
+                return cachedColor;
             int r = color.R, g = color.G, b = color.B;
 
             // Find the nearest ConsoleColor by RGB distance
-            return GetPalette(isForeground)
+            var consoleColor= GetPalette(isForeground)
                 .OrderBy(c => Math.Pow(c.Rgb.R - r, 2) + Math.Pow(c.Rgb.G - g, 2) + Math.Pow(c.Rgb.B - b, 2))
                 .First().Color;
+            _consoleColorCache[color] = consoleColor;
+            return consoleColor;
         }
 
         private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground)
