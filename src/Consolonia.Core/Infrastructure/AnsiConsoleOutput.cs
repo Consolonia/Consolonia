@@ -123,6 +123,12 @@ namespace Consolonia.Core.Infrastructure
                         pixel.Foreground.Weight);
                 if (pixel.Foreground.Color != _lastForeground)
                 {
+                    if (weight is not FontWeight.Bold
+                        and not FontWeight.Black
+                        and not FontWeight.SemiBold
+                        and not FontWeight.ExtraBold)
+                        DarkColorInSomeTerminalsRequiresSwitchToNormalWorkAround(mappedForeground);
+                    
                     WriteText(Esc.Foreground(mappedForeground));
                     _lastForeground = pixel.Foreground.Color;
                 }
@@ -160,6 +166,16 @@ namespace Consolonia.Core.Infrastructure
 
                 _headBufferPoint = position;
             }
+        }
+
+        /// <summary>
+        /// In some terminals, dark colors are not displayed correctly when written after bright colors.
+        /// Because bright colors switch terminal state to be bold internally
+        /// </summary>
+        private void DarkColorInSomeTerminalsRequiresSwitchToNormalWorkAround(object mappedForeground)
+        {
+            if (mappedForeground is < ConsoleColor.DarkGray)
+                WriteText(Esc.Normal);
         }
 
         public void Flush()
