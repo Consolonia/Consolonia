@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Media;
@@ -68,16 +67,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                     return color1;
 
                 case EgaColorMode.Shaded when mode1 == EgaColorMode.Shaded:
-                    {
-                        ConsoleColor doubleShadedColor =
-                            Shade(Shade(consoleColor1, isTargetForeground), isTargetForeground);
-                        return ConvertToAvaloniaColor(doubleShadedColor, isTargetForeground);
-                    }
+                {
+                    ConsoleColor doubleShadedColor =
+                        Shade(Shade(consoleColor1, isTargetForeground), isTargetForeground);
+                    return ConvertToAvaloniaColor(doubleShadedColor, isTargetForeground);
+                }
                 case EgaColorMode.Shaded:
-                    {
-                        ConsoleColor shadedColor = Shade(consoleColor1, isTargetForeground);
-                        return ConvertToAvaloniaColor(shadedColor, isTargetForeground);
-                    }
+                {
+                    ConsoleColor shadedColor = Shade(consoleColor1, isTargetForeground);
+                    return ConvertToAvaloniaColor(shadedColor, isTargetForeground);
+                }
                 case EgaColorMode.Colored:
                     return ConvertToAvaloniaColor(consoleColor2, isTargetForeground);
                 default:
@@ -119,19 +118,19 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             int g = color.G;
             int b = color.B;
 
-            var palette = isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
+            (ConsoleColor Color, (int R, int G, int B) Rgb)[] palette = GetPalette(isForeground);
 
             ConsoleColor bestColor = palette[0].Color;
             int bestDistance = int.MaxValue;
 
             for (int i = 0; i < palette.Length; i++)
             {
-                var entry = palette[i];
+                (ConsoleColor Color, (int R, int G, int B) Rgb) entry = palette[i];
                 int dr = entry.Rgb.R - r;
                 int dg = entry.Rgb.G - g;
                 int db = entry.Rgb.B - b;
 
-                int distance = (dr * dr) + (dg * dg) + (db * db);
+                int distance = dr * dr + dg * dg + db * db;
                 if (distance < bestDistance)
                 {
                     bestDistance = distance;
@@ -146,7 +145,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             return bestColor;
         }
 
-        private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground)
+        private (ConsoleColor Color, (int R, int G, int B) Rgb)[] GetPalette(bool isForeground)
         {
             return isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
         }
@@ -194,19 +193,19 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                 case EgaColorMode.Shaded:
                     return Color.FromArgb(127, 0, 0, 0);
                 case EgaColorMode.Colored:
+                {
+                    (ConsoleColor Color, (int R, int G, int B) Rgb)[] palette = GetPalette(isForeground);
+
+                    for (int i = 0; i < palette.Length; i++)
                     {
-                        var palette = isForeground ? _consoleColorMap : _backgroundConsoleColorMap;
-
-                        for (int i = 0; i < palette.Length; i++)
-                        {
-                            var entry = palette[i];
-                            if (entry.Color == consoleColor)
-                                return Color.FromRgb((byte)entry.Rgb.R, (byte)entry.Rgb.G, (byte)entry.Rgb.B);
-                        }
-
-                        throw new InvalidOperationException(
-                            $"Console color '{consoleColor}' was not found in the {(isForeground ? "foreground" : "background")} palette.");
+                        (ConsoleColor Color, (int R, int G, int B) Rgb) entry = palette[i];
+                        if (entry.Color == consoleColor)
+                            return Color.FromRgb((byte)entry.Rgb.R, (byte)entry.Rgb.G, (byte)entry.Rgb.B);
                     }
+
+                    throw new InvalidOperationException(
+                        $"Console color '{consoleColor}' was not found in the {(isForeground ? "foreground" : "background")} palette.");
+                }
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
