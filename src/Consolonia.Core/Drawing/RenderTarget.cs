@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -24,6 +25,13 @@ namespace Consolonia.Core.Drawing
         private Pixel?[,] _cache;
         private ConsoleCursor _consoleCursor;
 
+        private bool _renderPending;
+#if FPS
+        private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        private int _framesThisSecond;
+        private int _fps;
+        private TimeSpan _lastFpsUpdate;
+#endif
         internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
             _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
@@ -102,12 +110,27 @@ namespace Consolonia.Core.Drawing
             return cache;
         }
 
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice()
         {
+            _renderPending = false;
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
+#if FPS
+            var now = _stopwatch.Elapsed;
+            var elapsed = now - _lastFpsUpdate;
+
+            ++_framesThisSecond;
+
+            if (elapsed.TotalSeconds > 1)
+            {
+                _fps = (int)(_framesThisSecond / elapsed.TotalSeconds);
+                _framesThisSecond = 0;
+                _lastFpsUpdate = now;
+            }
+#endif
             _console.HideCaret();
 
             PixelBufferCoordinate? caretPosition = null;
@@ -212,6 +235,16 @@ namespace Consolonia.Core.Drawing
             }
 
             _console.Flush();
+#if FPS
+            var fps = $"FPS: {_fps: 000}";
+            for (ushort i = 0; i < fps.Length; i++)
+            {
+                var pixel =
+ new Pixel(new PixelForeground(new Symbol(fps[i]), Colors.White), new PixelBackground(Colors.Black));
+                _console.WritePixel(new PixelBufferCoordinate((ushort)(pixelBuffer.Width - fps.Length + i), (ushort)(pixelBuffer.Height - 1)), in pixel);
+            }
+            _console.Flush();
+#endif
 
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
@@ -255,8 +288,6 @@ namespace Consolonia.Core.Drawing
             ConsoleCursor oldConsoleCursor = _consoleCursor;
             _consoleCursor = consoleCursor;
 
-            //todo: low excessive refresh, emptiness can be checked
-
             // Dirty rects expanded to handle potential wide char overlap
             var oldCursorRect = new PixelRect(oldConsoleCursor.Coordinate.X - 1,
                 oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
@@ -265,7 +296,20 @@ namespace Consolonia.Core.Drawing
             _consoleTopLevelImpl.DirtyRegions.AddRect(oldCursorRect);
             _consoleTopLevelImpl.DirtyRegions.AddRect(newCursorRect);
 
-            RenderToDevice();
+            if (!_renderPending)
+            {
+                _renderPending = true;
+
+                // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
+                DispatcherTimer.RunOnce(() =>
+                {
+                    if (_renderPending)
+                    {
+                        _renderPending = false;
+                        RenderToDevice();
+                    }
+                }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
+            }
         }
     }
 }
