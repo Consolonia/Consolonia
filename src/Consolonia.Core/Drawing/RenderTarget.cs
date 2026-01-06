@@ -26,7 +26,12 @@ namespace Consolonia.Core.Drawing
         private ConsoleCursor _consoleCursor;
 
         private bool _renderPending;
-
+#if FPS
+        private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        private int _framesThisSecond;
+        private int _fps;
+        private TimeSpan _lastFpsUpdate;
+#endif
         internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
             _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
@@ -99,11 +104,12 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-            for (ushort x = 0; x < width; x++)
-                cache[x, y] = Pixel.Empty;
+                for (ushort x = 0; x < width; x++)
+                    cache[x, y] = Pixel.Empty;
 
             return cache;
         }
+
 
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice()
@@ -112,6 +118,19 @@ namespace Consolonia.Core.Drawing
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
 
+#if FPS
+            var now = _stopwatch.Elapsed;
+            var elapsed = now - _lastFpsUpdate;
+
+            ++_framesThisSecond;
+
+            if (elapsed.TotalSeconds > 1)
+            {
+                _fps = (int)(_framesThisSecond / elapsed.TotalSeconds);
+                _framesThisSecond = 0;
+                _lastFpsUpdate = now;
+            }
+#endif
             _console.HideCaret();
 
             PixelBufferCoordinate? caretPosition = null;
@@ -216,6 +235,15 @@ namespace Consolonia.Core.Drawing
             }
 
             _console.Flush();
+#if FPS
+            var fps = $"FPS: {_fps: 000}";
+            for (ushort i = 0; i < fps.Length; i++)
+            {
+                var pixel = new Pixel(new PixelForeground(new Symbol(fps[i]), Colors.White), new PixelBackground(Colors.Black));
+                _console.WritePixel(new PixelBufferCoordinate((ushort)(pixelBuffer.Width - fps.Length + i), (ushort)(pixelBuffer.Height - 1)), in pixel);
+            }
+            _console.Flush();
+#endif
 
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
