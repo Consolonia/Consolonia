@@ -1,6 +1,5 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:wm="using:Iciclecreek.Avalonia.WindowManager"
         xmlns:controls="https://github.com/consolonia">
     <Styles.Resources>
         <ResourceDictionary>
@@ -92,6 +91,6 @@
     <StyleInclude Source="/Modern/Controls/TreeViewItem.axaml" />
     <StyleInclude Source="/Modern/Controls/Menu.axaml" />
     <StyleInclude Source="/Modern/Controls/MenuItem.axaml" />
-    <wm:WindowManagerTheme />
 
+    <StyleInclude Source="avares://Consolonia.ManagedWindows/Themes/Base.axaml" />
 </Styles>

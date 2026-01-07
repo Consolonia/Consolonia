@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Core.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+    <PropertyGroup>
+        <Description>Adds support for ManagedWindow, MessageBox, and IStorageProvider/IStorageFile/IStorageFolder.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+        <PackageReference Include="DotNet.Glob" Version="3.1.3" />
+        <PackageReference Include="Iciclecreek.Avalonia.WindowManager" Version="3.0.9" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
+        <ProjectReference Include="..\Consolonia.Controls\Consolonia.Controls.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Infrastructure\" />
+      <Folder Include="Themes\Modern\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Controls\FolderPicker.axaml.cs">
+        <DependentUpon>FolderPicker.axaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Controls\FileSavePicker.axaml.cs">
+        <DependentUpon>FileSavePicker.axaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Controls\FileOpenPicker.axaml.cs">
+        <DependentUpon>FileOpenPicker.axaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+    </ItemGroup>
+
+</Project>

@@ -1,7 +1,8 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager"
-        xmlns:brushes="https://github.com/consolonia">
+        xmlns:brushes="https://github.com/consolonia"
+        xmlns:helpers="clr-namespace:Consolonia.Themes.Templates.Controls.Helpers">
     <Styles.Resources>
         <ControlTheme x:Key="{x:Type windowManager:ManagedWindow}"
                       TargetType="windowManager:ManagedWindow">
@@ -22,15 +23,15 @@
                     Value="{DynamicResource ThemeForegroundBrush}" />
 
             <!--keys of turbovision by chatGPT-->
-            <Setter Property="brushes:ManagedWindowExtensions.CloseWindowGesture"
+            <Setter Property="helpers:ManagedWindowExtensions.CloseWindowGesture"
                     Value="ALT+c" />
-            <Setter Property="brushes:ManagedWindowExtensions.MaximizeWindowGesture"
+            <Setter Property="helpers:ManagedWindowExtensions.MaximizeWindowGesture"
                     Value="ALT+r" />
-            <Setter Property="brushes:ManagedWindowExtensions.RestoreWindowGesture"
+            <Setter Property="helpers:ManagedWindowExtensions.RestoreWindowGesture"
                     Value="ALT+r" />
-            <Setter Property="brushes:ManagedWindowExtensions.MoveWindowGesture"
+            <Setter Property="helpers:ManagedWindowExtensions.MoveWindowGesture"
                     Value="ALT+m" />
-            <Setter Property="brushes:ManagedWindowExtensions.SizeWindowGesture"
+            <Setter Property="helpers:ManagedWindowExtensions.SizeWindowGesture"
                     Value="ALT+s" />
 
             <Setter Property="Template">

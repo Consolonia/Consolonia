@@ -61,7 +61,6 @@
                 <MergeResourceInclude Source="/Templates/Controls/TreeView.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/TreeViewItem.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/TransitioningContentControl.axaml" />
-                <MergeResourceInclude Source="/Templates/Controls/Window.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/WindowNotificationManager.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
