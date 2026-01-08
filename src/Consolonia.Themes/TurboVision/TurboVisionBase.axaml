@@ -72,6 +72,4 @@
     <StyleInclude Source="/TurboVision/Controls/DropDownButton.axaml" />
     <StyleInclude Source="/TurboVision/Controls/CheckBox.axaml" />
     <StyleInclude Source="/TurboVision/Controls/RadioButton.axaml" />
-    
-    <StyleInclude Source="avares://Consolonia.ManagedWindows/Themes/TurboVision/TurboVision.axaml" />
 </Styles>
