@@ -16,13 +16,14 @@
     <ItemGroup>
         <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
         <ProjectReference Include="..\Consolonia.Controls\Consolonia.Controls.csproj" />
-    </ItemGroup>
+        <ProjectReference Include="..\Consolonia.Themes\Consolonia.Themes.csproj" />
+  </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Infrastructure\" />
-      <Folder Include="Templates\Controls\" />
-      <Folder Include="Themes\Modern\" />
-    </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Infrastructure\" />
+    <Folder Include="Templates\Controls\" />
+    <Folder Include="Themes\Modern\" />
+  </ItemGroup>
 
     <ItemGroup>
       <Compile Update="Controls\FolderPicker.axaml.cs">

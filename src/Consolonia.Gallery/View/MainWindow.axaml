@@ -12,7 +12,7 @@
         Title="Consolonia Control Gallery">
     <Window.Styles>
         <themes:AutoDataGridStyles/>
-        <!--<themes1:AutoManagedWindowTheme/>-->
+        <themes1:AutoManagedWindowStyles/>
     </Window.Styles>
     <views:ControlsListView />
 </Window>

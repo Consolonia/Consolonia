@@ -1,5 +1,24 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager">
+
+    <!-- Wrap window content into WindowsPanel for managed windows -->
+    <Style Selector="ContentControl.CONSOLONIA_WINDOW_CONTENT_WRAPPER">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <windowManager:WindowsPanel>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Content="{TemplateBinding Content}"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </windowManager:WindowsPanel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+
     <windowManager:WindowManagerTheme />
+
 </Styles>

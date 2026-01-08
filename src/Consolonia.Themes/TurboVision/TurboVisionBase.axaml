@@ -3,6 +3,7 @@
         xmlns:console="https://github.com/consolonia">
     <Styles.Resources>
         <ResourceDictionary>
+            <x:String x:Key="ConsoloniaThemeFamily">TurboVision</x:String>
             <x:String x:Key="ThemeLeftArrowSymbol">←</x:String>
             <x:String x:Key="ThemeRightArrowSymbol">→</x:String>
             <x:String x:Key="ThemeUpArrowSymbol">↑</x:String>
