@@ -5,7 +5,7 @@
     <Styles.Resources>
         <ResourceDictionary>
             <!--todo: this does not work<x:Static x:Key="ConsoloniaThemeFamily" Member="infrastructure:AutoThemeStylesBase.ModernThemeKey"/>-->
-            <x:String x:Key="ConsoloniaThemeFamily">Modern</x:String>
+            <x:String x:Key="{x:Static infrastructure:AutoThemeStylesBase.ConsoloniaThemeFamilyKey}">Modern</x:String>
             
             <x:String x:Key="ThemeLeftArrowSymbol">⏴</x:String>
             <x:String x:Key="ThemeRightArrowSymbol">⏵</x:String>

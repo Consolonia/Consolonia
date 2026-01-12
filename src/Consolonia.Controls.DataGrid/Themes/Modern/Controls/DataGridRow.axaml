@@ -10,7 +10,6 @@
                     <StaticResource ResourceKey="{x:Type DataGridRow}" />
                 </ControlTheme.BasedOn>
                 
-                <StyleInclude Source="../../Templates/Controls/DataGrid.axaml" />
                 <Style Selector="^ /template/ controls|CaretControl#FocusControl">
                     <Setter Property="CaretStyle"
                             Value="None" />

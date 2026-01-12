@@ -1,6 +1,7 @@
 using System;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Reactive;
 using Avalonia.Styling;
 
 namespace Consolonia.Themes.Infrastructure;
@@ -13,24 +14,24 @@ public abstract class AutoThemeStylesBase : Styles
 {
     public const string ModernThemeKey = "Modern";
     public const string TurboVisionThemeKey = "TurboVision";
+    public const string ConsoloniaThemeFamilyKey = "ConsoloniaThemeFamily";
     
     private string _currentFamily;
     private IDisposable _consoloniaThemeFamilySybscription; //todo: low: where to dispose?
 
     protected AutoThemeStylesBase()
     {
-        _consoloniaThemeFamilySybscription = this.GetResourceObservable("ConsoloniaThemeFamily").Subscribe(o =>
-        {
-            ApplyFromTheme((string)o);
-        });
+        _consoloniaThemeFamilySybscription = this.GetResourceObservable(ConsoloniaThemeFamilyKey)
+            .Subscribe(new AnonymousObserver<object>(o =>
+            {
+                ApplyFromTheme((string)o);
+            }));
     }
 
     private void ApplyFromTheme(string value)
     {
         Apply(value);
     }
-    
-    
 
     private void Apply(string family)
     {

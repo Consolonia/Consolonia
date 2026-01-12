@@ -3,13 +3,14 @@
                              xmlns:storage="clr-namespace:Avalonia.Platform.Storage;assembly=Avalonia.Base"
                              xmlns:core-Controls="clr-namespace:Consolonia.Core.Controls"
                              xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager"
+                             xmlns:controls="clr-namespace:Consolonia.ManagedWindows.Controls"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
                              CanResize="True"
                              WindowStartupLocation="Manual"
                              SizeToContent="Manual"
-                             x:DataType="core-Controls:FolderPickerViewModel"
-                             x:Class="Consolonia.Core.Controls.FolderPicker"
+                             x:DataType="controls:FolderPickerViewModel"
+                             x:Class="Consolonia.ManagedWindows.Controls.FolderPicker"
                              Icon="📁"
                              Title="{Binding Options.Title}">
     <Grid RowDefinitions="Auto * Auto">

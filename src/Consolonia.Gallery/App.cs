@@ -5,7 +5,6 @@ using System.Threading;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Consolonia.Themes;
-using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.Gallery
 {

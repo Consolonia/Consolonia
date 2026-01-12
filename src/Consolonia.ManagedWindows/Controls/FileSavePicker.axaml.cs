@@ -7,9 +7,10 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Consolonia.Core.Controls;
 using Iciclecreek.Avalonia.WindowManager;
 
-namespace Consolonia.Core.Controls
+namespace Consolonia.ManagedWindows.Controls
 {
     internal partial class FileSavePicker : ManagedWindow
     {
@@ -77,7 +78,7 @@ namespace Consolonia.Core.Controls
 
         private async void OnOK(object sender, RoutedEventArgs e)
         {
-            ListBoxItem focusedListBoxItem = ItemsListBox.GetFocusedListBoxItem();
+            ListBoxItem focusedListBoxItem = ListBoxExtensions.GetFocusedListBoxItem(ItemsListBox);
             if (focusedListBoxItem != null)
             {
                 object item = ItemsListBox.ItemFromContainer(focusedListBoxItem);

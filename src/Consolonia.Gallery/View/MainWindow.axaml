@@ -3,19 +3,16 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="using:Consolonia.Gallery.View"
-        xmlns:themes="clr-namespace:Consolonia.Themes;assembly=Consolonia.Controls.DataGrid"
-        xmlns:themes1="clr-namespace:Consolonia.Themes;assembly=Consolonia.ManagedWindows"
+        xmlns:gridThemes="clr-namespace:Consolonia.Themes;assembly=Consolonia.Controls.DataGrid"
+        xmlns:ManagedWindowThemes="clr-namespace:Consolonia.Themes;assembly=Consolonia.ManagedWindows"
         mc:Ignorable="d"
         d:DesignWidth="800"
         d:DesignHeight="450"
         x:Class="Consolonia.Gallery.MainWindow"
         Title="Consolonia Control Gallery">
     <Window.Styles>
-        <themes:AutoDataGridStyles />
-        <!--<StyleInclude Source="avares://Consolonia.ManagedWindows/Themes/Base.axaml" />-->
-        <themes1:AutoManagedWindowStyles/>
-        
-
+        <gridThemes:AutoDataGridStyles />
+        <ManagedWindowThemes:AutoManagedWindowStyles />
     </Window.Styles>
     <views:ControlsListView />
 </Window>

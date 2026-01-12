@@ -5,9 +5,10 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Consolonia.Core.Controls;
 using Iciclecreek.Avalonia.WindowManager;
 
-namespace Consolonia.Core.Controls
+namespace Consolonia.ManagedWindows.Controls
 {
     internal partial class FolderPicker : ManagedWindow
     {
@@ -61,7 +62,7 @@ namespace Consolonia.Core.Controls
         {
             e.Handled = true;
 
-            ListBoxItem focusedListBoxItem = ItemsListBox.GetFocusedListBoxItem();
+            ListBoxItem focusedListBoxItem = ListBoxExtensions.GetFocusedListBoxItem(ItemsListBox);
             if (focusedListBoxItem != null)
             {
                 object item = ItemsListBox.ItemFromContainer(focusedListBoxItem);

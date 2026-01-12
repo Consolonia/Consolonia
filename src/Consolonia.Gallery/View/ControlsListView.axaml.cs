@@ -161,7 +161,7 @@ namespace Consolonia.Gallery.View
                 return;
             
             Window mainWindow = ((IClassicDesktopStyleApplicationLifetime)App.Current.ApplicationLifetime).MainWindow;
-            mainWindow.Content = null;
+            mainWindow.Content = null; // otherwise Avalonia sets some trash template to WindowsPanel
 
             // NOTE: this assumes first style object is the old theme!
             Application.Current.Styles[0] = selectedTheme switch

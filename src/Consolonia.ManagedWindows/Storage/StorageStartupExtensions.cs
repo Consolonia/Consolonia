@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.Platform;
 
-namespace Consolonia.Core.Infrastructure
+namespace Consolonia.ManagedWindows.Storage
 {
     public static class StorageStartupExtensions
     {

@@ -4,9 +4,10 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Consolonia.Core.Controls;
 using DotNet.Globbing;
 
-namespace Consolonia.Core.Controls
+namespace Consolonia.ManagedWindows.Controls
 {
     internal partial class FileOpenPickerViewModel : PickerViewModelBase<FilePickerOpenOptions>
     {
@@ -25,7 +26,7 @@ namespace Consolonia.Core.Controls
             SelectedFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSelection));
         }
 
-        public bool HasSelection => SelectedFiles.Any();
+        public bool HasSelection => Enumerable.Any<IStorageFile>(SelectedFiles);
 
         protected override bool FilterItem(IStorageItem item)
         {

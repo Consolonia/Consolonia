@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Platform;
 using Avalonia.Platform.Storage;
 
-namespace Consolonia.Core.Infrastructure
+namespace Consolonia.ManagedWindows.Storage
 {
     public class ConsoloniaStorageProviderFactory : IStorageProviderFactory
     {

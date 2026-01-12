@@ -7,23 +7,19 @@ namespace Consolonia.Themes;
 
 /// <summary>
 /// Auto-includes Managed Windows styles based on the ConsoloniaThemeFamily resource.
-/// - Modern → Base.axaml
-/// - TurboVision* → TurboVision.axaml
+/// Supports TurboVision and Modern themes.
 /// </summary>
 public class AutoManagedWindowStyles : AutoThemeStylesBase
 {
-    private static readonly Uri ModernBaseUri = new("avares://Consolonia.ManagedWindows/Themes/Base.axaml");
-    private static readonly Uri TurboVisionUri = new("avares://Consolonia.ManagedWindows/Themes/TurboVision/TurboVision.axaml");
-
     protected override void ComposeForFamily(string family)
     {
         switch (family)
         {
             case TurboVisionThemeKey:
-                IncludeStyle(TurboVisionUri);
+                IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/TurboVision/TurboVision.axaml"));
                 break;
             case ModernThemeKey:
-                IncludeStyle(ModernBaseUri);
+                IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/Base.axaml"));
                 break;
         }
     }

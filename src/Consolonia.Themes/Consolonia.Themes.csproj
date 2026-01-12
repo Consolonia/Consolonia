@@ -11,7 +11,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj"/>
-        <PackageReference Include="Iciclecreek.Avalonia.WindowManager" Version="3.0.9"/>
+        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj"/>        
     </ItemGroup>
 </Project>

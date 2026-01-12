@@ -22,8 +22,8 @@
                         <!--<VisualLayerManager.ChromeOverlayLayer>
                         <TitleBar />Red
                     </VisualLayerManager.ChromeOverlayLayer>-->
-                        <!-- application wide windows panel -->
-                        <!--<windowManager:WindowsPanel>--> 
+
+                        <!--Special ContentControl which allows to wrap content into something, like PanelWindows-->
                         <ContentControl Classes="CONSOLONIA_WINDOW_CONTENT_WRAPPER">
                             <ContentPresenter Name="PART_ContentPresenter"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"
@@ -32,7 +32,6 @@
                                               HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
                         </ContentControl>
-                        <!--</windowManager:WindowsPanel>-->
                     </VisualLayerManager>
                 </Panel>
             </ControlTemplate>

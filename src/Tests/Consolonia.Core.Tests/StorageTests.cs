@@ -7,6 +7,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
 using Consolonia.Core.Infrastructure;
+using Consolonia.ManagedWindows.Storage;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests

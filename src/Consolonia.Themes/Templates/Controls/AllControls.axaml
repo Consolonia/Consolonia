@@ -17,7 +17,6 @@
                 <MergeResourceInclude Source="/Templates/Controls/CheckBox.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/ComboBox.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/ComboBoxItem.axaml" />
-                <MergeResourceInclude Source="/Templates/Controls/ContentControl.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/DataValidationErrors.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/DropDownButton.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/Expander.axaml" />
