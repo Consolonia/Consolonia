@@ -1,16 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Core.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Core.Build.props', '$(MSBuildThisFileDirectory)../'))"/>
 
     <PropertyGroup>
         <Description>This package defines themes for Consolonia applications</Description>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)"/>
     </ItemGroup>
 
     <ItemGroup>
-    <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />    
-  </ItemGroup>
+        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj"/>
+        <PackageReference Include="Iciclecreek.Avalonia.WindowManager" Version="3.0.9"/>
+    </ItemGroup>
 </Project>

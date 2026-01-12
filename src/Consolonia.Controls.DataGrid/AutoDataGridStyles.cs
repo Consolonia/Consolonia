@@ -1,5 +1,11 @@
 using System;
+using System.Reflection;
 using Avalonia.Controls;
+using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using Consolonia.Themes.Infrastructure;
 
 namespace Consolonia.Themes;
 
@@ -16,18 +22,14 @@ public class AutoDataGridStyles : AutoThemeStylesBase
 
     protected override void ComposeForFamily(string family)
     {
-        if (family == null)
+        switch (family)
         {
-            Resources = new ResourceDictionary();
-            return;
-        }
-        
-        MergeResource(DataGridUri);
-
-        
-        if (!family.Equals("TurboVision", StringComparison.OrdinalIgnoreCase))
-        {
-            MergeResource(ModernRowUri);
+            case ModernThemeKey:
+                IncludeStyle(ModernRowUri);
+                break;
+            case TurboVisionThemeKey:
+                IncludeStyle(DataGridUri);
+                break;
         }
     }
 }

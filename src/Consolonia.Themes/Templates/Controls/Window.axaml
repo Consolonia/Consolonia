@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager">
     <ControlTheme x:Key="{x:Type Window}"
                   TargetType="Window">
         <Setter Property="Background"
@@ -22,7 +23,7 @@
                         <TitleBar />Red
                     </VisualLayerManager.ChromeOverlayLayer>-->
                         <!-- application wide windows panel -->
-                        <!--<windowManager:WindowsPanel> todo: -->
+                        <!--<windowManager:WindowsPanel>--> 
                         <ContentControl Classes="CONSOLONIA_WINDOW_CONTENT_WRAPPER">
                             <ContentPresenter Name="PART_ContentPresenter"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"

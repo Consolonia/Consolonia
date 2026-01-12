@@ -1,4 +1,7 @@
 using System;
+using Avalonia.Controls;
+using Consolonia.Themes.Infrastructure;
+using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.Themes;
 
@@ -14,6 +17,14 @@ public class AutoManagedWindowStyles : AutoThemeStylesBase
 
     protected override void ComposeForFamily(string family)
     {
-        IncludeStyle(family.Equals("TurboVision", StringComparison.OrdinalIgnoreCase) ? TurboVisionUri : ModernBaseUri);
+        switch (family)
+        {
+            case TurboVisionThemeKey:
+                IncludeStyle(TurboVisionUri);
+                break;
+            case ModernThemeKey:
+                IncludeStyle(ModernBaseUri);
+                break;
+        }
     }
 }

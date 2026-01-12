@@ -11,8 +11,11 @@
         x:Class="Consolonia.Gallery.MainWindow"
         Title="Consolonia Control Gallery">
     <Window.Styles>
-        <themes:AutoDataGridStyles/>
+        <themes:AutoDataGridStyles />
+        <!--<StyleInclude Source="avares://Consolonia.ManagedWindows/Themes/Base.axaml" />-->
         <themes1:AutoManagedWindowStyles/>
+        
+
     </Window.Styles>
     <views:ControlsListView />
 </Window>
