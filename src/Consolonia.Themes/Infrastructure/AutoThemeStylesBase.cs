@@ -17,7 +17,8 @@ public abstract class AutoThemeStylesBase : Styles
     public const string ConsoloniaThemeFamilyKey = "ConsoloniaThemeFamily";
     
     private string _currentFamily;
-    private IDisposable _consoloniaThemeFamilySybscription; //todo: low: where to dispose?
+    // ReSharper disable once NotAccessedField.Local //todo: low: where to dispose?
+    private IDisposable _consoloniaThemeFamilySybscription; 
 
     protected AutoThemeStylesBase()
     {
