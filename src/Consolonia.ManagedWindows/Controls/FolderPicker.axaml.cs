@@ -5,7 +5,6 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using Consolonia.Core.Controls;
 using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.ManagedWindows.Controls
@@ -62,7 +61,7 @@ namespace Consolonia.ManagedWindows.Controls
         {
             e.Handled = true;
 
-            ListBoxItem focusedListBoxItem = ListBoxExtensions.GetFocusedListBoxItem(ItemsListBox);
+            ListBoxItem focusedListBoxItem = ItemsListBox.GetFocusedListBoxItem();
             if (focusedListBoxItem != null)
             {
                 object item = ItemsListBox.ItemFromContainer(focusedListBoxItem);

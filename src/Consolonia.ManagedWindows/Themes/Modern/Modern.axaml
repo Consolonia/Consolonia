@@ -4,9 +4,12 @@
     <Styles.Resources>
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
-                <ResourceInclude x:Key="Light" Source="ModernWindowColors.axaml"/>
-                <ResourceInclude x:Key="Dark" Source="ModernWindowColors.axaml"/>
-                <ResourceInclude x:Key="Default" Source="ModernWindowColors.axaml"/>
+                <ResourceInclude x:Key="Light"
+                                 Source="ModernWindowColors.axaml" />
+                <ResourceInclude x:Key="Dark"
+                                 Source="ModernWindowColors.axaml" />
+                <ResourceInclude x:Key="Default"
+                                 Source="ModernWindowColors.axaml" />
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
     </Styles.Resources>

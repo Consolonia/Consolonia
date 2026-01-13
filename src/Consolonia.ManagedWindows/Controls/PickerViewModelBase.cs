@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Consolonia.Core.Controls;
 
 namespace Consolonia.ManagedWindows.Controls
 {

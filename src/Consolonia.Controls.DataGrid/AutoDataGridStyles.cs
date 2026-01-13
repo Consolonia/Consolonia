@@ -4,7 +4,7 @@ using Consolonia.Themes.Infrastructure;
 namespace Consolonia.Controls.DataGrid
 {
     /// <summary>
-    /// Auto-includes DataGrid styles/resources for the current Consolonia theme family.
+    ///     Auto-includes DataGrid styles/resources for the current Consolonia theme family.
     /// </summary>
     public class AutoDataGridStyles : AutoThemeStylesBase
     {

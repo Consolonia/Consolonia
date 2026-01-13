@@ -4,7 +4,6 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Consolonia.Core.Controls;
 
 namespace Consolonia.ManagedWindows.Controls
 {
@@ -22,7 +21,7 @@ namespace Consolonia.ManagedWindows.Controls
             SelectedFolders.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSelection));
         }
 
-        public bool HasSelection => Enumerable.Any<IStorageFolder>(SelectedFolders);
+        public bool HasSelection => SelectedFolders.Any();
 
         protected override bool FilterItem(IStorageItem item)
         {

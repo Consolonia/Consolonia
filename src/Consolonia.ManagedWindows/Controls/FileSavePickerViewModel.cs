@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Consolonia.Core.Controls;
 
 namespace Consolonia.ManagedWindows.Controls
 {

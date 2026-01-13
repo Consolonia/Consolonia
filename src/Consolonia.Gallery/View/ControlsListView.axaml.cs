@@ -159,7 +159,7 @@ namespace Consolonia.Gallery.View
             if (sender is not MenuItem { Tag: string themeName } ||
                 !Enum.TryParse(themeName, out ThemesList selectedTheme))
                 return;
-            
+
             Window mainWindow = ((IClassicDesktopStyleApplicationLifetime)App.Current.ApplicationLifetime).MainWindow;
             mainWindow.Content = null; // otherwise Avalonia sets some trash template to WindowsPanel
 

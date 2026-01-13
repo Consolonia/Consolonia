@@ -9,7 +9,7 @@
                 <ControlTheme.BasedOn>
                     <StaticResource ResourceKey="{x:Type DataGridRow}" />
                 </ControlTheme.BasedOn>
-                
+
                 <Style Selector="^ /template/ controls|CaretControl#FocusControl">
                     <Setter Property="CaretStyle"
                             Value="None" />

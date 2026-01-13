@@ -1,7 +1,6 @@
 <windowManager:ManagedWindow xmlns="https://github.com/avaloniaui"
                              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                              xmlns:storage="clr-namespace:Avalonia.Platform.Storage;assembly=Avalonia.Base"
-                             xmlns:core-Controls="clr-namespace:Consolonia.Core.Controls"
                              xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager"
                              xmlns:controls="clr-namespace:Consolonia.ManagedWindows.Controls"
                              HorizontalAlignment="Center"
