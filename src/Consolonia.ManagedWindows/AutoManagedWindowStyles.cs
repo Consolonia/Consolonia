@@ -1,7 +1,7 @@
 using System;
 using Consolonia.Themes.Infrastructure;
 
-namespace Consolonia.Themes
+namespace Consolonia.ManagedWindows
 {
     /// <summary>
     /// Auto-includes Managed Windows styles based on the ConsoloniaThemeFamily resource.

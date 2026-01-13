@@ -5,14 +5,16 @@
         xmlns:views="using:Consolonia.Gallery.View"
         xmlns:gridThemes="clr-namespace:Consolonia.Themes;assembly=Consolonia.Controls.DataGrid"
         xmlns:ManagedWindowThemes="clr-namespace:Consolonia.Themes;assembly=Consolonia.ManagedWindows"
+        xmlns:dataGrid="https://github.com/consolonia"
+        xmlns:managedWindows="clr-namespace:Consolonia.ManagedWindows;assembly=Consolonia.ManagedWindows"
         mc:Ignorable="d"
         d:DesignWidth="800"
         d:DesignHeight="450"
         x:Class="Consolonia.Gallery.MainWindow"
         Title="Consolonia Control Gallery">
     <Window.Styles>
-        <gridThemes:AutoDataGridStyles />
-        <ManagedWindowThemes:AutoManagedWindowStyles />
+        <dataGrid:AutoDataGridStyles />
+        <managedWindows:AutoManagedWindowStyles />
     </Window.Styles>
     <views:ControlsListView />
 </Window>

@@ -23,6 +23,7 @@
                     </VisualLayerManager.ChromeOverlayLayer>-->
 
                         <!--Special ContentControl which allows to wrap content into something, like PanelWindows-->
+                        <!-- ReSharper disable once Xaml.StyleClassNotFound -->
                         <ContentControl Classes="CONSOLONIA_WINDOW_CONTENT_WRAPPER">
                             <ContentPresenter Name="PART_ContentPresenter"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"
