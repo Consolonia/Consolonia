@@ -1,26 +1,25 @@
 using System;
-using Avalonia.Controls;
 using Consolonia.Themes.Infrastructure;
-using Iciclecreek.Avalonia.WindowManager;
 
-namespace Consolonia.Themes;
-
-/// <summary>
-/// Auto-includes Managed Windows styles based on the ConsoloniaThemeFamily resource.
-/// Supports TurboVision and Modern themes.
-/// </summary>
-public class AutoManagedWindowStyles : AutoThemeStylesBase
+namespace Consolonia.Themes
 {
-    protected override void ComposeForFamily(string family)
+    /// <summary>
+    /// Auto-includes Managed Windows styles based on the ConsoloniaThemeFamily resource.
+    /// Supports TurboVision and Modern themes.
+    /// </summary>
+    public class AutoManagedWindowStyles : AutoThemeStylesBase
     {
-        switch (family)
+        protected override void ComposeForFamily(string family)
         {
-            case TurboVisionThemeKey:
-                IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/TurboVision/TurboVision.axaml"));
-                break;
-            case ModernThemeKey:
-                IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/Base.axaml"));
-                break;
+            switch (family)
+            {
+                case TurboVisionThemeKey:
+                    IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/TurboVision/TurboVision.axaml"));
+                    break;
+                case ModernThemeKey:
+                    IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/Modern/Modern.axaml"));
+                    break;
+            }
         }
     }
 }

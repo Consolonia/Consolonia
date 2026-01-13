@@ -1,9 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Styles.Resources>
         <ResourceDictionary>
-            <!-- window manager resources-->
             <!-- ReSharper disable InconsistentNaming We need to keep same names as in WindowManager-->
             <BoxShadows x:Key="ManagedWindow_BoxShadows">none</BoxShadows>
             <Thickness x:Key='ManagedWindow_BorderThickness'>1</Thickness>
@@ -31,7 +29,6 @@
                 <ContentControl Content="{DynamicResource Icon_Menu}" />
             </DataTemplate>
             <!-- ReSharper restore InconsistentNaming -->
-            <!-- window manager resources end -->
         </ResourceDictionary>
     </Styles.Resources>
     <StyleInclude Source="WindowExtension.axaml" />

@@ -22,7 +22,6 @@
   <ItemGroup>
     <Folder Include="Infrastructure\" />
     <Folder Include="Templates\Controls\" />
-    <Folder Include="Themes\Modern\" />
   </ItemGroup>
 
     <ItemGroup>

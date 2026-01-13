@@ -50,10 +50,6 @@
             <SolidColorBrush x:Key="ThemeErrorBrush"
                              Color="#FF0000" />
 
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="avares://Consolonia.Themes/Modern/ModernWindowColors.axaml" />
-            </ResourceDictionary.MergedDictionaries>
-
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>
