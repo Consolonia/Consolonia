@@ -5,7 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Platform.Storage;
 
-namespace Consolonia.Core.Controls
+namespace Consolonia.ManagedWindows.Controls
 {
     [DebuggerDisplay("Folder: {Name}")]
     internal sealed class SystemStorageFolder(DirectoryInfo directoryInfo, bool isParent = false) : IStorageFolder

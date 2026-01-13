@@ -54,10 +54,6 @@
             <!--Indicating an error, failure etc, foreground only-->
             <SolidColorBrush x:Key="ThemeErrorBrush"
                              Color="#D83B01" />
-
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="avares://Consolonia.Themes/Modern/ModernWindowColors.axaml" />
-            </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
@@ -113,9 +109,6 @@
             <SolidColorBrush x:Key="ThemeErrorBrush"
                              Color="#FF6B6B" />
 
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="avares://Consolonia.Themes/Modern/ModernWindowColors.axaml" />
-            </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

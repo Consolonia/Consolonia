@@ -1,7 +1,9 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:controls="https://github.com/consolonia">
-    <!-- ManagedWindow resources -->
+                    xmlns:brushes="https://github.com/consolonia">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Consolonia.Themes/Modern/ModernColors.axaml" />
+    </ResourceDictionary.MergedDictionaries>
     <!-- ReSharper disable InconsistentNaming We need to keep same names as in WindowManager-->
     <StaticResource x:Key="ManagedWindow_ForegroundBrush"
                     ResourceKey="ThemeForegroundBrush" />
@@ -15,12 +17,13 @@
                     ResourceKey="ThemeAlternativeBackgroundBrush" />
     <StaticResource x:Key="ManagedWindow_Active_TitleBarForegroundBrush"
                     ResourceKey="ThemeForegroundBrush" />
-    <controls:LineBrush x:Key="ManagedWindow_BorderBrush"
-                        Brush="{StaticResource ThemeAlternativeBackgroundBrush}"
-                        LineStyle="Edge" />
-    <controls:LineBrush x:Key="ManagedWindow_Active_BorderBrush"
-                        Brush="{StaticResource ThemeBorderBrush}"
-                        LineStyle="Edge" />
+    <brushes:LineBrush x:Key="ManagedWindow_BorderBrush"
+                       Brush="{StaticResource ThemeAlternativeBackgroundBrush}"
+                       LineStyle="Edge" />
+    <brushes:LineBrush x:Key="ManagedWindow_Active_BorderBrush"
+                       Brush="{StaticResource ThemeBorderBrush}"
+                       LineStyle="Edge" />
+
     <StaticResource x:Key="ManagedWindow_ModalBackgroundBrush"
                     ResourceKey="ThemeShadeBrush" />
     <!-- ReSharper enable InconsistentNaming We need to keep same names as in WindowManager-->

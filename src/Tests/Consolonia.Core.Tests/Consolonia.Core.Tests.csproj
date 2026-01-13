@@ -16,6 +16,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\Consolonia.Core\Consolonia.Core.csproj" />
         <ProjectReference Include="..\..\Consolonia.Fonts\Consolonia.Fonts.csproj" />
+        <ProjectReference Include="..\..\Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj" />
         <ProjectReference Include="..\..\Consolonia.NUnit\Consolonia.NUnit.csproj" />
         <ProjectReference Include="..\..\Consolonia.PlatformSupport\Consolonia.PlatformSupport.csproj" />
     </ItemGroup>

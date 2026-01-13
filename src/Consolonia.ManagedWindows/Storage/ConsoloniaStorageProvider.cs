@@ -4,9 +4,12 @@ using System.IO;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Platform.Storage;
-using Consolonia.Core.Controls;
+using Consolonia.ManagedWindows.Controls;
+using FileOpenPicker = Consolonia.ManagedWindows.Controls.FileOpenPicker;
+using FileSavePicker = Consolonia.ManagedWindows.Controls.FileSavePicker;
+using FolderPicker = Consolonia.ManagedWindows.Controls.FolderPicker;
 
-namespace Consolonia.Core.Infrastructure
+namespace Consolonia.ManagedWindows.Storage
 {
     public class ConsoloniaStorageProvider : IStorageProvider
     {
