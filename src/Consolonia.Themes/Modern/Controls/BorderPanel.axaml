@@ -9,7 +9,7 @@
                     Value="{DynamicResource ThemeAlternativeBackgroundBrush}" />
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Panel x:Name="PART_Panel">
+                    <Grid x:Name="PART_Panel">
                         <Border x:Name="PART_Border"
                                 BorderThickness="1">
                             <Border.BorderBrush>
@@ -25,7 +25,7 @@
                                               Content="{TemplateBinding Content}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}" />
                         </Border>
-                    </Panel>
+                    </Grid>
                 </ControlTemplate>
             </Setter>
         </ControlTheme>
