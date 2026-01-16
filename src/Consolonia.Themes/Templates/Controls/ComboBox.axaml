@@ -11,8 +11,6 @@
                 Value="Left" />
         <Setter Property="VerticalContentAlignment"
                 Value="Center" />
-        <Setter Property="(console:ComboBoxExtensions.OpenOnEnter)"
-                Value="True" />
         <Setter Property="Padding"
                 Value="1,0" />
         <Setter Property="MinHeight"
@@ -65,19 +63,11 @@
                            PlacementTarget="{TemplateBinding}"
                            IsLightDismissEnabled="True">
                         <console:BorderPanel>
-
                             <ScrollViewer Background="{DynamicResource ThemeAlternativeBackgroundBrush}"
                                           HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                           VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                 <ItemsPresenter Name="PART_ItemsPresenter"
-                                                ItemsPanel="{TemplateBinding ItemsPanel}">
-                                    <ItemsPresenter.Styles>
-                                        <Style Selector="ItemsPresenter">
-                                            <Setter Property="(console:ComboBoxExtensions.FocusOnOpen)"
-                                                    Value="true" />
-                                        </Style>
-                                    </ItemsPresenter.Styles>
-                                </ItemsPresenter>
+                                                ItemsPanel="{TemplateBinding ItemsPanel}"/>
                             </ScrollViewer>
                         </console:BorderPanel>
                     </Popup>

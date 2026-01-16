@@ -3,13 +3,25 @@
         xmlns:console="https://github.com/consolonia"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Styles.Resources>
+        <console:PopupPlacementToOuterMargin x:Key="PopupPlacementToOuterMargin"/>
         <ControlTheme x:Key="{x:Type console:BorderPanel}"
                       TargetType="console:BorderPanel">
             <Setter Property="Background"
                     Value="{DynamicResource ThemeAlternativeBackgroundBrush}" />
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Grid x:Name="PART_Panel">
+                    <Decorator>
+                        <Decorator.Padding>
+                            <Binding
+                                RelativeSource="{RelativeSource AncestorType=Popup, Mode=FindAncestor, Tree=Logical}"
+                                Path="Placement"
+                                Mode="OneWay"
+                                Converter="{StaticResource PopupPlacementToOuterMargin}">
+                                <Binding.FallbackValue>
+                                    <Thickness>0</Thickness>
+                                </Binding.FallbackValue>
+                            </Binding>
+                        </Decorator.Padding>
                         <Border x:Name="PART_Border"
                                 BorderThickness="1">
                             <Border.BorderBrush>
@@ -25,7 +37,7 @@
                                               Content="{TemplateBinding Content}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}" />
                         </Border>
-                    </Grid>
+                    </Decorator>
                 </ControlTemplate>
             </Setter>
         </ControlTheme>
