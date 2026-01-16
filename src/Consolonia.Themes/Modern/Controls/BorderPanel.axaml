@@ -3,7 +3,7 @@
         xmlns:console="https://github.com/consolonia"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Styles.Resources>
-        <console:PopupPlacementToOuterMargin x:Key="PopupPlacementToOuterMargin"/>
+        <console:PopupPlacementToOuterMargin x:Key="PopupPlacementToOuterMargin" />
         <ControlTheme x:Key="{x:Type console:BorderPanel}"
                       TargetType="console:BorderPanel">
             <Setter Property="Background"

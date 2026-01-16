@@ -67,7 +67,7 @@
                                           HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                                           VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
                                 <ItemsPresenter Name="PART_ItemsPresenter"
-                                                ItemsPanel="{TemplateBinding ItemsPanel}"/>
+                                                ItemsPanel="{TemplateBinding ItemsPanel}" />
                             </ScrollViewer>
                         </console:BorderPanel>
                     </Popup>
