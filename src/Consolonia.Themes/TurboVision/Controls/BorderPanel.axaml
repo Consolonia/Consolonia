@@ -10,7 +10,7 @@
 
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Panel x:Name="PART_Panel">
+                    <Grid x:Name="PART_Panel"> <!--todo: investigate where else Panel can cause problems-->
                         <Border Background="{DynamicResource ThemeShadeBrush}"
                                 Margin="2,1,0,0" />
                         <Border x:Name="PART_Border"
@@ -27,7 +27,7 @@
                                               Content="{TemplateBinding Content}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}" />
                         </Border>
-                    </Panel>
+                    </Grid>
                 </ControlTemplate>
             </Setter>
         </ControlTheme>
