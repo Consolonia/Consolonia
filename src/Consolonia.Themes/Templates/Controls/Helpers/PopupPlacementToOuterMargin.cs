@@ -16,7 +16,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                 PlacementMode.Bottom or PlacementMode.BottomEdgeAlignedLeft or PlacementMode.BottomEdgeAlignedRight => new Thickness(0, -1, 0, 0),
                 PlacementMode.Left or PlacementMode.LeftEdgeAlignedBottom or PlacementMode.LeftEdgeAlignedTop => new Thickness(0, 0, -1, 0),
                 PlacementMode.Right or PlacementMode.RightEdgeAlignedBottom or PlacementMode.RightEdgeAlignedTop => new Thickness(-1, 0, 0, 0),
-                _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+                _ => new Thickness(0)
             };
         }
 
