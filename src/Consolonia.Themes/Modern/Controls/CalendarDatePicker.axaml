@@ -14,5 +14,5 @@
                         Value="{DynamicResource ThemeSelectionForegroundBrush}" />
             </Style>
         </ControlTheme>
-    </Styles.Resources>    
+    </Styles.Resources>
 </Styles>

@@ -77,7 +77,7 @@
                 </Grid>
             </ControlTemplate>
         </Setter>
-        
+
         <Style Selector="^ /template/ ToggleButton#toggle">
             <Setter Property="Background"
                     Value="{x:Null}" />

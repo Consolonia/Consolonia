@@ -26,5 +26,5 @@
                         Value="{StaticResource CalendarDatePickerToggleTheme}" />
             </Style>
         </ControlTheme>
-    </Styles.Resources>    
+    </Styles.Resources>
 </Styles>
