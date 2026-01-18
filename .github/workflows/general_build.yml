@@ -4,6 +4,9 @@ concurrency:
   group: build_checks_deploy-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -35,7 +38,28 @@ jobs:
       - name: Test
         run: dotnet test # --configuration release todo: release get stuck and never finishes
       - name: Pack
-        run: dotnet pack --configuration release -o ./packages --version-suffix beta.${{ github.run_number }} # https://stackoverflow.com/a/60067489/2362847
+        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
       - name: Push
         if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'}}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
+        
+        # tagging the commit so we can track exact version when issues reported
+      - name: Tag commit with version (post-publish)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'}}
+        run: |
+          set -e
+          git fetch --tags
+          VERSION=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
+          if [ -z "$VERSION" ]; then
+            echo "Failed to determine VersionPrefix from ../Directory.Build.props" >&2
+            exit 1
+          fi
+          echo "Version detected: $VERSION"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists, skipping creation."
+            exit 0
+          fi
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
