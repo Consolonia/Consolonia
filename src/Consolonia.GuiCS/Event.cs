@@ -1,3 +1,5 @@
+// Adapted from GUI.cs (MIT license)
+
 // cut by Evgeny Gorbovoy
 //
 // Evemts.cs: Events, Key mappings

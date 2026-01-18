@@ -1,4 +1,6 @@
-﻿// ReSharper disable All
+﻿// Adapted from GUI.cs (MIT license)
+
+// ReSharper disable All
 using System;
 using System.Runtime.Versioning;
 using Vanara.PInvoke;
