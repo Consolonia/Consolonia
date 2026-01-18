@@ -1,3 +1,5 @@
+// Adapted from GUI.cs (MIT license)
+
 //
 // System.Drawing.Size.cs
 //
