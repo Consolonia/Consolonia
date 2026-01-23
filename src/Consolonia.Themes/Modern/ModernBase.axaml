@@ -59,6 +59,7 @@
     <StyleInclude Source="/Modern/Controls/ToggleButton.axaml" />
     <StyleInclude Source="/Modern/Controls/ComboBox.axaml" />
     <StyleInclude Source="/Modern/Controls/ComboBoxItem.axaml" />
+    <StyleInclude Source="/Modern/Controls/CalendarDatePicker.axaml" />
     <StyleInclude Source="/Modern/Controls/DropDownButton.axaml" />
     <StyleInclude Source="/Modern/Controls/ListBoxItem.axaml" />
     <StyleInclude Source="/Modern/Controls/TabItem.axaml" />
