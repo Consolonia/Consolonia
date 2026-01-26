@@ -38,10 +38,8 @@
                                   IsChecked="{TemplateBinding IsDropDownOpen, Mode=TwoWay}"
                                   Grid.Column="1"
                                   Padding="0"
-                                  VerticalAlignment="Top"
-                                  Background="{x:Null}">
-                        <console:SymbolsControl Foreground="{TemplateBinding BorderBrush}"
-                                                Text="{DynamicResource ThemeDownArrowSymbol}"
+                                  VerticalAlignment="Top">
+                        <console:SymbolsControl Text="{DynamicResource ThemeDownArrowSymbol}"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center" />
                     </ToggleButton>
@@ -79,6 +77,11 @@
                 </Grid>
             </ControlTemplate>
         </Setter>
+
+        <Style Selector="^ /template/ ToggleButton#toggle">
+            <Setter Property="Background"
+                    Value="{x:Null}" />
+        </Style>
     </ControlTheme>
 
     <!--<Style Selector="CalendarDatePicker:focus /template/ TextBox#PART_TextBox">
