@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Dummy;
 
@@ -19,6 +20,14 @@ namespace Consolonia.Core.Drawing
     internal partial class DrawingContextImpl
     {
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
+        {
+            if (_consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsUnicode))
+                DrawQuadBitmap(source, opacity, sourceRect, destRect);
+            else
+                DrawHalfBlockBitmap(source, opacity, sourceRect, destRect);
+        }
+
+        public void DrawQuadBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
         {
             if (source is DummyBitmap)
                 return;
@@ -360,5 +369,115 @@ namespace Consolonia.Core.Drawing
         {
             return 0.299 * color.R + 0.587 * color.G + 0.114 * color.B + color.A;
         }
+
+        #region Half-Block Bitmap Rendering (1x2 subpixels per character)
+
+        /// <summary>
+        /// Half-block rendering uses upper half block '▀' to represent 2 vertical pixels per character.
+        /// Each pixel gets its exact color - no clustering or averaging needed.
+        /// Foreground = top pixel color, Background = bottom pixel color.
+        /// This provides 2x vertical resolution with universal terminal support.
+        /// </summary>
+        public void DrawHalfBlockBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
+        {
+            if (source is DummyBitmap)
+                return;
+
+            var targetRect = new Rect(Transform.Transform(destRect.TopLeft),
+                    Transform.Transform(destRect.BottomRight))
+                .ToPixelRect();
+
+            var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
+
+            // Resize source to target width x (height * 2) for half-block mapping
+            var targetSize = new PixelSize(targetRect.Width, targetRect.Height * 2);
+            using IBitmapImpl resizedBitmap =
+                renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
+
+            var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+
+            using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
+
+            PixelRect intersectedRect = CurrentClip.Intersect(targetRect);
+
+            if (intersectedRect.IsEmpty())
+                return;
+
+            int stride = frameBuffer.RowBytes;
+            int bytesPerPixel = frameBuffer.Format.BitsPerPixel / 8;
+            unsafe
+            {
+                ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                    ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
+                ReadOnlySpan<BgraColor> pixels = MemoryMarshal.Cast<byte, BgraColor>(pixelBytes);
+
+                int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
+                int startX = intersectedRect.X - targetRect.TopLeft.X;
+                int endY = startY + intersectedRect.Height * 2;
+                int endX = startX + intersectedRect.Width;
+
+                int py = intersectedRect.Y;
+
+                for (int y = startY; y < endY; y += 2, py++)
+                {
+                    int px = intersectedRect.X;
+                    for (int x = startX; x < endX; x++, px++)
+                    {
+                        var point = new PixelPoint(px, py);
+
+                        // Get top and bottom pixel colors
+                        BgraColor topColor = GetPixelColor(pixels, x, y, stride, bytesPerPixel);
+                        BgraColor bottomColor = GetPixelColor(pixels, x, y + 1, stride, bytesPerPixel);
+
+                        // Determine which character to use based on transparency
+                        char halfBlockChar;
+                        Color foreground;
+                        Color background;
+
+                        bool topTransparent = topColor.A < 128;
+                        bool bottomTransparent = bottomColor.A < 128;
+
+                        if (topTransparent && bottomTransparent)
+                        {
+                            // Both transparent - use space with transparent colors
+                            halfBlockChar = ' ';
+                            foreground = Colors.Transparent;
+                            background = Colors.Transparent;
+                        }
+                        else if (topTransparent)
+                        {
+                            // Only bottom visible - use lower half block
+                            halfBlockChar = '▄';
+                            foreground = bottomColor.ToColor();
+                            background = Colors.Transparent;
+                        }
+                        else if (bottomTransparent)
+                        {
+                            // Only top visible - use upper half block
+                            halfBlockChar = '▀';
+                            foreground = topColor.ToColor();
+                            background = Colors.Transparent;
+                        }
+                        else
+                        {
+                            // Both visible - use upper half block with top as foreground, bottom as background
+                            halfBlockChar = '▀';
+                            foreground = topColor.ToColor();
+                            background = bottomColor.ToColor();
+                        }
+
+                        var imagePixel = new Pixel(
+                            new PixelForeground(new Symbol(halfBlockChar), foreground),
+                            new PixelBackground(background));
+
+                        _pixelBuffer[point] = _pixelBuffer[point].Blend(imagePixel);
+                    }
+                }
+            }
+
+            _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+        }
+
+        #endregion
     }
 }

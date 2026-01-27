@@ -32,7 +32,12 @@ namespace Consolonia.Controls
         /// <summary>
         ///     Supports complex composite emoji rendering
         /// </summary>
-        SupportsComplexEmoji = 0x20
+        SupportsComplexEmoji = 0x20,
+
+        /// <summary>
+        /// Supports Unicode characters rendering
+        /// </summary>
+        SupportsUnicode = 0x40
     }
 
     public interface IConsoleCapabilities

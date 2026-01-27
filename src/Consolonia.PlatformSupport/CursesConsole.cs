@@ -258,7 +258,8 @@ namespace Consolonia.PlatformSupport
                     if (!TryEnableGpmMouseSupport())
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
-
+            if (!IsTtyTerminal())
+                Capabilities |= ConsoleCapabilities.SupportsUnicode;
             Curses.timeout(NoInputTimeout);
             WriteText(Esc.EnableBracketedPasteMode);
 
