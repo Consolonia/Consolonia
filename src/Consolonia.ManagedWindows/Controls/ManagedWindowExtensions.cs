@@ -6,7 +6,7 @@ using Avalonia.Input;
 using Consolonia.Controls;
 using Iciclecreek.Avalonia.WindowManager;
 
-namespace Consolonia.Themes.Templates.Controls.Helpers
+namespace Consolonia.ManagedWindows.Controls
 {
     public sealed class ManagedWindowExtensions
     {

@@ -1,17 +1,21 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="https://github.com/consolonia">
+    <StyleInclude Source="/Themes/Templates/Controls/DataGrid.axaml" />
     <Styles.Resources>
-        <ControlTheme x:Key="{x:Type DataGridRow}"
-                      TargetType="DataGridRow">
-            <ControlTheme.BasedOn>
-                <StaticResource ResourceKey="{x:Type DataGridRow}" />
-            </ControlTheme.BasedOn>
+        <ResourceDictionary>
+            <ControlTheme x:Key="{x:Type DataGridRow}"
+                          TargetType="DataGridRow">
+                <ControlTheme.BasedOn>
+                    <StaticResource ResourceKey="{x:Type DataGridRow}" />
+                </ControlTheme.BasedOn>
 
-            <Style Selector="^ /template/ controls|CaretControl#FocusControl">
-                <Setter Property="CaretStyle"
-                        Value="None" />
-            </Style>
-        </ControlTheme>
+                <Style Selector="^ /template/ controls|CaretControl#FocusControl">
+                    <Setter Property="CaretStyle"
+                            Value="None" />
+                </Style>
+            </ControlTheme>
+
+        </ResourceDictionary>
     </Styles.Resources>
 </Styles>

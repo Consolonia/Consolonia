@@ -12,8 +12,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
-        <ProjectReference Include="..\Consolonia.Controls\Consolonia.Controls.csproj" />
-    </ItemGroup>
+    <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
+    <ProjectReference Include="..\Consolonia.Themes\Consolonia.Themes.csproj" />
+  </ItemGroup>
 
 </Project>

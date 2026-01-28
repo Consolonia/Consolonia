@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace Consolonia.Core.Controls
+namespace Consolonia.ManagedWindows.Controls
 {
     internal static class ListBoxExtensions
     {

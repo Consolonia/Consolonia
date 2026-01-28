@@ -7,7 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Iciclecreek.Avalonia.WindowManager;
 
-namespace Consolonia.Core.Controls
+namespace Consolonia.ManagedWindows.Controls
 {
     internal partial class FolderPicker : ManagedWindow
     {
