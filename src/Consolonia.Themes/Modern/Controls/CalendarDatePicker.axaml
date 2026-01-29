@@ -1,0 +1,18 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Styles.Resources>
+        <ControlTheme x:Key="{x:Type CalendarDatePicker}"
+                      TargetType="CalendarDatePicker">
+            <ControlTheme.BasedOn>
+                <StaticResource ResourceKey="{x:Type CalendarDatePicker}" />
+            </ControlTheme.BasedOn>
+
+            <Style Selector="^ /template/ ToggleButton#toggle">
+                <Setter Property="Background"
+                        Value="{DynamicResource ThemeSelectionBackgroundBrush}" />
+                <Setter Property="Foreground"
+                        Value="{DynamicResource ThemeSelectionForegroundBrush}" />
+            </Style>
+        </ControlTheme>
+    </Styles.Resources>
+</Styles>
