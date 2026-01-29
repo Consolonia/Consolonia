@@ -1,4 +1,6 @@
-﻿// Evgeny Gorbovoy: cut from ConsoleDriver.cs
+﻿// Adapted from GUI.cs (MIT license)
+
+// Evgeny Gorbovoy: cut from ConsoleDriver.cs
 //
 // ConsoleDriver.cs: Definition for the Console Driver API
 //
