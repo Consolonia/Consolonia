@@ -24,6 +24,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
         });
 
         private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _backgroundConsoleColorMap;
+
+        private readonly Dictionary<Color, ConsoleColor> _consoleColorCache = new();
         private readonly (ConsoleColor Color, (int R, int G, int B) Rgb)[] _consoleColorMap;
         private readonly bool _supportBrightBackground;
 
@@ -67,16 +69,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                     return color1;
 
                 case EgaColorMode.Shaded when mode1 == EgaColorMode.Shaded:
-                    {
-                        ConsoleColor doubleShadedColor =
-                            Shade(Shade(consoleColor1, isTargetForeground), isTargetForeground);
-                        return ConvertToAvaloniaColor(doubleShadedColor, isTargetForeground);
-                    }
+                {
+                    ConsoleColor doubleShadedColor =
+                        Shade(Shade(consoleColor1, isTargetForeground), isTargetForeground);
+                    return ConvertToAvaloniaColor(doubleShadedColor, isTargetForeground);
+                }
                 case EgaColorMode.Shaded:
-                    {
-                        ConsoleColor shadedColor = Shade(consoleColor1, isTargetForeground);
-                        return ConvertToAvaloniaColor(shadedColor, isTargetForeground);
-                    }
+                {
+                    ConsoleColor shadedColor = Shade(consoleColor1, isTargetForeground);
+                    return ConvertToAvaloniaColor(shadedColor, isTargetForeground);
+                }
                 case EgaColorMode.Colored:
                     return ConvertToAvaloniaColor(consoleColor2, isTargetForeground);
                 default:
@@ -112,8 +114,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             return (consoleColor, mode);
         }
 
-        private Dictionary<Color, ConsoleColor> _consoleColorCache = new();
-
         private ConsoleColor MapToConsoleColor(Color color, bool isForeground)
         {
             if (_consoleColorCache.TryGetValue(color, out ConsoleColor cachedColor))
@@ -121,13 +121,13 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             int r = color.R, g = color.G, b = color.B;
 
             // Find the nearest ConsoleColor by RGB distance
-            var consoleColor = GetPalette(isForeground)
+            ConsoleColor consoleColor = GetPalette(isForeground)
                 .MinBy(c =>
                 {
                     int dr = c.Rgb.R - r, dg = c.Rgb.G - g, db = c.Rgb.B - b;
-                    return dr * dr + 
-                           dg * dg + 
-                           db * db;  
+                    return dr * dr +
+                           dg * dg +
+                           db * db;
                 }).Color;
             _consoleColorCache[color] = consoleColor;
             return consoleColor;
