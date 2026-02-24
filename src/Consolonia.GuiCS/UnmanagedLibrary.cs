@@ -1,4 +1,4 @@
-
+// Adapted from GUI.cs (MIT license)
 
 // Copyright 2015 gRPC authors.
 //

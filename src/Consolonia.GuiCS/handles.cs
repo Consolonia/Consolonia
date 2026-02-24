@@ -1,3 +1,5 @@
+// Adapted from GUI.cs (MIT license)
+
 // ReSharper disable All
 //
 // handles.cs: OO wrappers for some curses objects
