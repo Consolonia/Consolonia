@@ -19,9 +19,4 @@
         <ProjectReference Include="..\Consolonia.Themes\Consolonia.Themes.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Infrastructure\" />
-    <Folder Include="Templates\Controls\" />
-  </ItemGroup>
-
 </Project>
