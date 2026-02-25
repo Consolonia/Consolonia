@@ -24,19 +24,4 @@
     <Folder Include="Templates\Controls\" />
   </ItemGroup>
 
-    <ItemGroup>
-      <Compile Update="Controls\FolderPicker.axaml.cs">
-        <DependentUpon>FolderPicker.axaml</DependentUpon>
-        <SubType>Code</SubType>
-      </Compile>
-      <Compile Update="Controls\FileSavePicker.axaml.cs">
-        <DependentUpon>FileSavePicker.axaml</DependentUpon>
-        <SubType>Code</SubType>
-      </Compile>
-      <Compile Update="Controls\FileOpenPicker.axaml.cs">
-        <DependentUpon>FileOpenPicker.axaml</DependentUpon>
-        <SubType>Code</SubType>
-      </Compile>
-    </ItemGroup>
-
 </Project>
