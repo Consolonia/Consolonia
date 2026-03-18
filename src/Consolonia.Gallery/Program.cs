@@ -35,7 +35,7 @@ namespace Consolonia.Gallery
                 .UseConsolonia()
                 .UseAutoDetectedConsole()
                 .WithConsoleFonts()
-                //.ThrowOnErrors()
+                .ThrowOnErrors()
                 .WithDeveloperTools();
         }
     }
