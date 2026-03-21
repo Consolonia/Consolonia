@@ -17,7 +17,7 @@
         <IsPackable>False</IsPackable>
     </PropertyGroup>
     <PropertyGroup>
-        <AvaloniaVersion>11.3.9</AvaloniaVersion>
+        <AvaloniaVersion>11.3.12</AvaloniaVersion>
     </PropertyGroup>
     <ItemGroup Condition="'$(IsPackable)' != 'false'">
         <None Include="$(SolutionDir)/../Icon.png"
