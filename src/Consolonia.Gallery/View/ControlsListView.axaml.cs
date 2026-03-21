@@ -160,6 +160,9 @@ namespace Consolonia.Gallery.View
                 !Enum.TryParse(themeName, out ThemesList selectedTheme))
                 return;
 
+            Window mainWindow = ((IClassicDesktopStyleApplicationLifetime)App.Current.ApplicationLifetime).MainWindow;
+            mainWindow.Content = null; // otherwise Avalonia sets some trash template to WindowsPanel
+
             // NOTE: this assumes first style object is the old theme!
             Application.Current.Styles[0] = selectedTheme switch
             {
@@ -174,8 +177,7 @@ namespace Consolonia.Gallery.View
 
             ViewModel.SelectedTheme = themeName;
 
-            if (App.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
-                desktopLifetime.MainWindow.Content = new ControlsListView { DataContext = DataContext };
+            mainWindow.Content = new ControlsListView { DataContext = DataContext };
         }
 
         private void OnLoaded(object sender, RoutedEventArgs routedEventArgs)
