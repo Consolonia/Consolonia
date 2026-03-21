@@ -1,15 +1,15 @@
 <windowManager:ManagedWindow xmlns="https://github.com/avaloniaui"
                              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                              xmlns:storage="clr-namespace:Avalonia.Platform.Storage;assembly=Avalonia.Base"
-                             xmlns:core-Controls="clr-namespace:Consolonia.Core.Controls"
                              xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager"
+                             xmlns:controls="clr-namespace:Consolonia.ManagedWindows.Controls"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
                              CanResize="True"
                              WindowStartupLocation="Manual"
                              SizeToContent="Manual"
-                             x:DataType="core-Controls:FileOpenPickerViewModel"
-                             x:Class="Consolonia.Core.Controls.FileOpenPicker"
+                             x:DataType="controls:FileSavePickerViewModel"
+                             x:Class="Consolonia.ManagedWindows.Controls.FileSavePicker"
                              Icon="📰"
                              Title="{Binding Options.Title}">
     <Grid RowDefinitions="Auto * Auto Auto">
@@ -22,8 +22,7 @@
         <ListBox x:Name="ItemsListBox"
                  Grid.Row="1"
                  ItemsSource="{Binding Items}"
-                 SelectionMode="{Binding SelectionMode}"
-                 SelectionChanged="ListBox_SelectionChanged"
+                 SelectedItem="{Binding SelectedItem}"
                  DoubleTapped="OnDoubleTapped">
             <ListBox.DataTemplates>
                 <DataTemplate DataType="{x:Type storage:IStorageFolder}">
@@ -46,30 +45,26 @@
                 </DataTemplate>
             </ListBox.DataTemplates>
         </ListBox>
-        <ComboBox Grid.Row="2"
-                  ItemsSource="{Binding Options.FileTypeFilter}"
-                  SelectedIndex="{Binding SelectedFilterIndex}"
-                  HorizontalAlignment="Right">
-            <ComboBox.ItemTemplate>
-                <DataTemplate DataType="{x:Type storage:FilePickerFileType}">
-                    <TextBlock Text="{Binding Name}"
-                               HorizontalAlignment="Stretch" />
-                </DataTemplate>
-            </ComboBox.ItemTemplate>
-        </ComboBox>
-        <!--todo: copypaste between dialogs-->
+        <Grid Grid.Row="2"
+              ColumnDefinitions="Auto *">
+            <TextBlock Text="File:"
+                       Margin="0 0 1 0" />
+            <TextBox Text="{Binding SavePath, Mode=TwoWay}"
+                     Grid.Column="1" />
+        </Grid>
         <StackPanel Grid.Row="3"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="1,0"
                     Spacing="1">
-            <Button x:Name="OkButton"
-                    Content="OK"
+            <Button x:Name="SaveButton"
+                    Content="Save"
+                    Click="OnOK"
                     IsDefault="True"
-                    Click="OnOK" />
+                    IsEnabled="{Binding SavePath, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <Button x:Name="CancelButton"
                     Content="Cancel"
-                    IsCancel="true"
+                    IsCancel="True"
                     Click="OnCancel" />
         </StackPanel>
     </Grid>
