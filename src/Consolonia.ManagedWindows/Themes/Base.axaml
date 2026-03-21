@@ -1,0 +1,35 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Styles.Resources>
+        <ResourceDictionary>
+            <!-- ReSharper disable InconsistentNaming We need to keep same names as in WindowManager-->
+            <BoxShadows x:Key="ManagedWindow_BoxShadows">none</BoxShadows>
+            <Thickness x:Key='ManagedWindow_BorderThickness'>1</Thickness>
+            <x:Double x:Key="ManagedWindow_SystemIconSpacing">-1</x:Double>
+            <x:Double x:Key="ManagedWindow_SystemIconSize">1</x:Double>
+            <x:Int32 x:Key="ManagedWindow_SizingVector">1</x:Int32>
+            <Thickness x:Key='ManagedWindow_TitleMargin'>1 0 0 0</Thickness>
+            <DataTemplate x:Key="ManagedWindow_MinimizeIcon">
+                <ContentControl Content="{DynamicResource Icon_Minimize}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="ManagedWindow_MaximizeIcon">
+                <ContentControl Content="{DynamicResource Icon_Maximize}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="ManagedWindow_RestoreIcon">
+                <ContentControl Content="{DynamicResource Icon_Restore}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="ManagedWindow_CloseIcon">
+                <ContentControl Content="{DynamicResource Icon_Close}" />
+            </DataTemplate>
+
+            <DataTemplate x:Key="ManagedWindow_SystemMenuIcon">
+                <ContentControl Content="{DynamicResource Icon_Menu}" />
+            </DataTemplate>
+            <!-- ReSharper restore InconsistentNaming -->
+        </ResourceDictionary>
+    </Styles.Resources>
+    <StyleInclude Source="WindowExtension.axaml" />
+</Styles>
