@@ -52,7 +52,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
                 (ConsoleColor.White, (255, 255, 255))
             ];
 
-            _backgroundConsoleColorMap = supportBrightBackground ? _consoleColorMap : [.._consoleColorMap.Take(8)];
+            _backgroundConsoleColorMap = supportBrightBackground ? _consoleColorMap : [.. _consoleColorMap.Take(8)];
         }
 
         /// <inheritdoc />
@@ -117,9 +117,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor
             int r = color.R, g = color.G, b = color.B;
 
             // Find the nearest ConsoleColor by RGB distance
-            return GetPalette(isForeground)
-                .OrderBy(c => Math.Pow(c.Rgb.R - r, 2) + Math.Pow(c.Rgb.G - g, 2) + Math.Pow(c.Rgb.B - b, 2))
-                .First().Color;
+            ConsoleColor consoleColor = GetPalette(isForeground)
+                .MinBy(c =>
+                {
+                    int dr = c.Rgb.R - r, dg = c.Rgb.G - g, db = c.Rgb.B - b;
+                    return dr * dr +
+                           dg * dg +
+                           db * db;
+                }).Color;
+            return consoleColor;
         }
 
         private IEnumerable<(ConsoleColor Color, (int R, int G, int B) Rgb)> GetPalette(bool isForeground)
