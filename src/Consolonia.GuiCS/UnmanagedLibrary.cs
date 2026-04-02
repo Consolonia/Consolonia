@@ -258,13 +258,13 @@ namespace Unix.Terminal {
 		/// </summary>
 		static class CoreCLR
 		{
-#if NET6_0
+#if NET6_0_OR_GREATER
 			// Custom resolver to support true single-file apps
 			// (those which run directly from bundle; in-memory).
 			//     -1 on Unix means self-referencing binary (libcoreclr.so)
 			//     0 means fallback to CoreCLR's internal resolution
-			// Note: meaning of -1 stay the same even for non-single-file form factors.
-			static CoreCLR() =>  NativeLibrary.SetDllImportResolver(typeof(CoreCLR).Assembly,
+			// Note: meaning of -1 stays the same even for non-single-file form factors.
+			static CoreCLR() => NativeLibrary.SetDllImportResolver(typeof(CoreCLR).Assembly,
 				(string libraryName, Assembly assembly, DllImportSearchPath? searchPath) =>
 					libraryName == "libcoreclr.so" ? (IntPtr)(-1) : IntPtr.Zero);
 #endif
