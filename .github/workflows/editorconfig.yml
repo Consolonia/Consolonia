@@ -10,26 +10,25 @@ on:
       - main
       - pre-main
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:  
   inspection:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # from https://github.com/marketplace/actions/dotnet-format
     steps:
-      - name: Get branch info # todo: is this needed?
-        id: comment-branch
-        uses: xt0rted/pull-request-comment-branch@v1
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.ref }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: false
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ vars.WORKFLOW_DOTNET_VERSION }}
           
@@ -47,6 +46,15 @@ jobs:
           jb cleanupcode ${{ vars.SOLUTION_NAME }} --exclude="**Consolonia.GuiCS/**.*"
         working-directory: ./src
 
+      - name: Check for changes
+        id: git-check
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            git diff > cleanup.patch
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Inspect code
         uses: muno92/resharper_inspectcode@1.12.0
@@ -56,39 +64,44 @@ jobs:
           version: '2025.2.1'
           minimumSeverity: 'warning'
 
-      - name: Commit files
-        continue-on-error: true # todo: need to check whether has changes
+      - name: Save Metadata
+        if: steps.git-check.outputs.has_changes == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          USER_LOGIN: ${{ github.event.pull_request.user.login }}
+          USER_ID: ${{ github.event.pull_request.user.id }}
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -a -m 'Automated JetBrains cleanup
+          mkdir -p metadata
+          echo "$PR_NUMBER" > metadata/pr_number
+          echo "$HEAD_REPO" > metadata/head_repo
+          echo "$HEAD_REF" > metadata/head_ref
+          echo "$USER_LOGIN" > metadata/user_login
+          echo "$USER_ID" > metadata/user_id
 
-          Co-authored-by: ${{ github.event.comment.user.login }} <${{ github.event.comment.user.id }}+${{ github.event.comment.user.login }}@users.noreply.github.com>'
-          
-      - name: Push changes        
-        uses: ad-m/github-push-action@master
+      - name: Upload Artifacts
+        if: steps.git-check.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          branch: ${{ steps.comment-branch.outputs.ref }}
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          name: cleanup-artifacts
+          path: |
+            cleanup.patch
+            metadata/
 
   dupfinder:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Get branch info # todo: is this needed?
-        id: comment-branch
-        uses: xt0rted/pull-request-comment-branch@v1
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.ref }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: false
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ vars.WORKFLOW_DOTNET_VERSION }}
 

@@ -1,0 +1,85 @@
+name: Apply Code Cleanup
+
+on:
+  workflow_run:
+    workflows: ["Code Inspections"]
+    types:
+      - completed
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cleanup-artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true # Might not exist if no changes
+
+      - name: Check for cleanup patch
+        id: check-patch
+        run: |
+          if [ -f "cleanup.patch" ]; then
+            echo "has_patch=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_patch=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Read metadata
+        if: steps.check-patch.outputs.has_patch == 'true'
+        id: metadata
+        run: |
+          for file in pr_number head_repo head_ref user_login user_id; do
+            echo "$file<<EOF" >> "$GITHUB_OUTPUT"
+            cat "metadata/$file" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Checkout PR head
+        if: steps.check-patch.outputs.has_patch == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.metadata.outputs.head_repo }}
+          ref: ${{ steps.metadata.outputs.head_ref }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Apply patch
+        if: steps.check-patch.outputs.has_patch == 'true'
+        run: |
+          git apply cleanup.patch
+
+      - name: Commit and push
+        if: steps.check-patch.outputs.has_patch == 'true'
+        env:
+          HEAD_REF: ${{ steps.metadata.outputs.head_ref }}
+          USER_LOGIN: ${{ steps.metadata.outputs.user_login }}
+          USER_ID: ${{ steps.metadata.outputs.user_id }}
+        run: |
+          # Validate input to prevent shell injection
+          if [[ ! "$HEAD_REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Error: Invalid head_ref '$HEAD_REF'"
+            exit 1
+          fi
+          if [[ ! "$USER_LOGIN" =~ ^[A-Za-z0-9-]+$ ]]; then
+            echo "Error: Invalid user_login '$USER_LOGIN'"
+            exit 1
+          fi
+          if [[ ! "$USER_ID" =~ ^[0-9]+$ ]]; then
+            echo "Error: Invalid user_id '$USER_ID'"
+            exit 1
+          fi
+
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -a -m "Automated JetBrains cleanup
+          
+          Co-authored-by: $USER_LOGIN <$USER_ID+$USER_LOGIN@users.noreply.github.com>"
+          git push origin "HEAD:$HEAD_REF"
