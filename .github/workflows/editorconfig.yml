@@ -66,13 +66,19 @@ jobs:
 
       - name: Save Metadata
         if: steps.git-check.outputs.has_changes == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          USER_LOGIN: ${{ github.event.pull_request.user.login }}
+          USER_ID: ${{ github.event.pull_request.user.id }}
         run: |
           mkdir -p metadata
-          echo "${{ github.event.pull_request.number }}" > metadata/pr_number
-          echo "${{ github.event.pull_request.head.repo.full_name }}" > metadata/head_repo
-          echo "${{ github.event.pull_request.head.ref }}" > metadata/head_ref
-          echo "${{ github.event.pull_request.user.login }}" > metadata/user_login
-          echo "${{ github.event.pull_request.user.id }}" > metadata/user_id
+          echo "$PR_NUMBER" > metadata/pr_number
+          echo "$HEAD_REPO" > metadata/head_repo
+          echo "$HEAD_REF" > metadata/head_ref
+          echo "$USER_LOGIN" > metadata/user_login
+          echo "$USER_ID" > metadata/user_id
 
       - name: Upload Artifacts
         if: steps.git-check.outputs.has_changes == 'true'
