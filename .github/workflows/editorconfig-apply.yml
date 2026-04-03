@@ -1,0 +1,67 @@
+name: Apply Code Cleanup
+
+on:
+  workflow_run:
+    workflows: ["Code Inspections"]
+    types:
+      - completed
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cleanup-artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true # Might not exist if no changes
+
+      - name: Check for cleanup patch
+        id: check-patch
+        run: |
+          if [ -f "cleanup.patch" ]; then
+            echo "has_patch=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_patch=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Read metadata
+        if: steps.check-patch.outputs.has_patch == 'true'
+        id: metadata
+        run: |
+          echo "pr_number=$(cat metadata/pr_number)" >> $GITHUB_OUTPUT
+          echo "head_repo=$(cat metadata/head_repo)" >> $GITHUB_OUTPUT
+          echo "head_ref=$(cat metadata/head_ref)" >> $GITHUB_OUTPUT
+          echo "user_login=$(cat metadata/user_login)" >> $GITHUB_OUTPUT
+          echo "user_id=$(cat metadata/user_id)" >> $GITHUB_OUTPUT
+
+      - name: Checkout PR head
+        if: steps.check-patch.outputs.has_patch == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.metadata.outputs.head_repo }}
+          ref: ${{ steps.metadata.outputs.head_ref }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Apply patch
+        if: steps.check-patch.outputs.has_patch == 'true'
+        run: |
+          git apply cleanup.patch
+
+      - name: Commit and push
+        if: steps.check-patch.outputs.has_patch == 'true'
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -a -m 'Automated JetBrains cleanup
+
+          Co-authored-by: ${{ steps.metadata.outputs.user_login }} <${{ steps.metadata.outputs.user_id }}+${{ steps.metadata.outputs.user_login }}@users.noreply.github.com>'
+          git push origin HEAD:${{ steps.metadata.outputs.head_ref }}

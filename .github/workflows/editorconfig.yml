@@ -5,7 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - main
       - pre-main
@@ -46,6 +46,16 @@ jobs:
           jb cleanupcode ${{ vars.SOLUTION_NAME }} --exclude="**Consolonia.GuiCS/**.*"
         working-directory: ./src
 
+      - name: Check for changes
+        id: git-check
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            git diff > cleanup.patch
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Inspect code
         uses: muno92/resharper_inspectcode@1.12.0
         with:
@@ -54,21 +64,24 @@ jobs:
           version: '2025.2.1'
           minimumSeverity: 'warning'
 
-      - name: Commit files
-        continue-on-error: true # todo: need to check whether has changes
+      - name: Save Metadata
+        if: steps.git-check.outputs.has_changes == 'true'
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -a -m 'Automated JetBrains cleanup
+          mkdir -p metadata
+          echo "${{ github.event.pull_request.number }}" > metadata/pr_number
+          echo "${{ github.event.pull_request.head.repo.full_name }}" > metadata/head_repo
+          echo "${{ github.event.pull_request.head.ref }}" > metadata/head_ref
+          echo "${{ github.event.pull_request.user.login }}" > metadata/user_login
+          echo "${{ github.event.pull_request.user.id }}" > metadata/user_id
 
-          Co-authored-by: ${{ github.event.pull_request.user.login }} <${{ github.event.pull_request.user.id }}+${{ github.event.pull_request.user.login }}@users.noreply.github.com>'
-          
-      - name: Push changes        
-        uses: ad-m/github-push-action@master
+      - name: Upload Artifacts
+        if: steps.git-check.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
         with:
-          branch: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          name: cleanup-artifacts
+          path: |
+            cleanup.patch
+            metadata/
 
   dupfinder:
     runs-on: ubuntu-latest
