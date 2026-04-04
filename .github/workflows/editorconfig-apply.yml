@@ -49,6 +49,7 @@ jobs:
           repository: ${{ steps.metadata.outputs.head_repo }}
           ref: ${{ steps.metadata.outputs.head_ref }}
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          clean: false
 
       - name: Apply patch
         if: steps.check-patch.outputs.has_patch == 'true'
