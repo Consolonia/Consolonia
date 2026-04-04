@@ -5,7 +5,7 @@
         <Nullable>disable</Nullable>
     </PropertyGroup>
     <PropertyGroup>
-        <VersionPrefix>11.3.9</VersionPrefix>
+        <VersionPrefix>11.3.10</VersionPrefix>
         <Authors>https://github.com/consolonia/consolonia/graphs/contributors</Authors>
         <Copyright>© 2021–2025 Evgeny Gorbovoy &amp; Tom Laird-McConnell</Copyright>
         <ProjectUrl>https://github.com/consolonia/consolonia</ProjectUrl>
