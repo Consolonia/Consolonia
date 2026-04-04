@@ -27,10 +27,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load .env
+        uses: c-py/dotenv-action@v2
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ vars.WORKFLOW_DOTNET_VERSION }}
+          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION }}
       - name: Restore dependencies
         run: dotnet restore /p:Configuration=Release
       - name: Build
