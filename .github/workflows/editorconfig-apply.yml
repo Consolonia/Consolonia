@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: write
       actions: read
+      statuses: write
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
@@ -82,3 +83,20 @@ jobs:
           
           Co-authored-by: $USER_LOGIN <$USER_ID+$USER_LOGIN@users.noreply.github.com>"
           git push origin "HEAD:$HEAD_REF"
+
+      - name: Report commit status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ github.event.workflow_run.head_sha }}',
+              state: 'success',
+              context: 'Apply Code Cleanup',
+              description: '${{ steps.check-patch.outputs.has_patch }}' === 'true'
+                ? 'Cleanup applied and pushed'
+                : 'No cleanup needed'
+            });
