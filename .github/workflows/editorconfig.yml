@@ -112,7 +112,7 @@ jobs:
           dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
 
       - name: Restore
-        run: dotnet restore ${{ env.SOLUTION_NAME }}
+        run: dotnet restore
         working-directory: ./src
 
       - name: Install JetBrains ReSharper GlobalTools (dupfinder 2021.2.3)
