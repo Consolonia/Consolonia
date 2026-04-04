@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Metadata;
 
-[assembly: CLSCompliant(false)] // Same as other projects
+[assembly: CLSCompliant(false)] // Same as other projects?
 
 // Map Consolonia XML namespace to this assembly's CLR namespaces
 [assembly: XmlnsDefinition("https://github.com/consolonia", "Consolonia.Controls.DataGrid")]
