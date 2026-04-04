@@ -22,12 +22,11 @@ jobs:
           name: cleanup-artifacts
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true # Might not exist if no changes
 
       - name: Check for cleanup patch
         id: check-patch
         run: |
-          if [ -f "cleanup.patch" ]; then
+          if [ -s "cleanup.patch" ]; then
             echo "has_patch=true" >> $GITHUB_OUTPUT
           else
             echo "has_patch=false" >> $GITHUB_OUTPUT

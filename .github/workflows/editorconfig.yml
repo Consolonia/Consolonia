@@ -57,6 +57,7 @@ jobs:
             git diff > cleanup.patch
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
+            touch cleanup.patch
           fi
 
       - name: Inspect code
@@ -68,7 +69,6 @@ jobs:
           minimumSeverity: 'warning'
 
       - name: Save Metadata
-        if: steps.git-check.outputs.has_changes == 'true'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
@@ -84,7 +84,6 @@ jobs:
           echo "$USER_ID" > metadata/user_id
 
       - name: Upload Artifacts
-        if: steps.git-check.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: cleanup-artifacts
