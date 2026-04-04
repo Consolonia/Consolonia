@@ -3,7 +3,7 @@ name: Auto-dismiss approvals on real change
 
 on:
   pull_request_target:
-    types: [synchronize]   # fires when new commits are pushed to the PR branch
+    types: [opened, synchronize, reopened] 
 
 permissions:
   pull-requests: write     # allows review dismissal
