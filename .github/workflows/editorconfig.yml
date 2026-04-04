@@ -36,7 +36,7 @@ jobs:
           dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
           
       - name: Restore
-        run: dotnet restore ${{ env.SOLUTION_NAME }}
+        run: dotnet restore
         working-directory: ./src
         
       - name: install-resharper
