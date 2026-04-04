@@ -12,15 +12,12 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal class AspectRatioAdjustedBitmap : IWriteableBitmapImpl
     {
-        public AspectRatioAdjustedBitmap(IBitmapImpl   innerBitmap)
+        public AspectRatioAdjustedBitmap(IBitmapImpl innerBitmap)
         {
             InnerBitmap = innerBitmap ?? throw new ArgumentNullException(nameof(innerBitmap));
         }
 
-        public IBitmapImpl InnerBitmap {
-            get; 
-            
-        }
+        public IBitmapImpl InnerBitmap { get; }
 
         public Vector Dpi => InnerBitmap.Dpi;
 
