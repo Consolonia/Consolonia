@@ -22,11 +22,12 @@ jobs:
           name: cleanup-artifacts
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/cleanup-artifacts
 
       - name: Check for cleanup patch
         id: check-patch
         run: |
-          if [ -s "cleanup.patch" ]; then
+          if [ -s "${{ runner.temp }}/cleanup-artifacts/cleanup.patch" ]; then
             echo "has_patch=true" >> $GITHUB_OUTPUT
           else
             echo "has_patch=false" >> $GITHUB_OUTPUT
@@ -38,7 +39,7 @@ jobs:
         run: |
           for file in pr_number head_repo head_ref user_login user_id; do
             echo "$file<<EOF" >> "$GITHUB_OUTPUT"
-            cat "metadata/$file" >> "$GITHUB_OUTPUT"
+            cat "${{ runner.temp }}/cleanup-artifacts/metadata/$file" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
           done
 
@@ -49,12 +50,11 @@ jobs:
           repository: ${{ steps.metadata.outputs.head_repo }}
           ref: ${{ steps.metadata.outputs.head_ref }}
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          clean: false
 
       - name: Apply patch
         if: steps.check-patch.outputs.has_patch == 'true'
         run: |
-          git apply cleanup.patch
+          git apply "${{ runner.temp }}/cleanup-artifacts/cleanup.patch"
 
       - name: Commit and push
         if: steps.check-patch.outputs.has_patch == 'true'
