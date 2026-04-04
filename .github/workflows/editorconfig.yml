@@ -27,10 +27,13 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: false
 
+      - name: Load .env
+        uses: c-py/action-dotenv-to-setenv@v5
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ vars.WORKFLOW_DOTNET_VERSION }}
+          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
           
       - name: Restore
         run: dotnet restore
@@ -43,7 +46,7 @@ jobs:
 
       - name: resharper-cleanup
         run: |                    
-          jb cleanupcode ${{ vars.SOLUTION_NAME }} --exclude="**Consolonia.GuiCS/**.*"
+          jb cleanupcode ${{ env.SOLUTION_NAME }} --exclude="**Consolonia.GuiCS/**.*"
         working-directory: ./src
 
       - name: Check for changes
@@ -59,7 +62,7 @@ jobs:
       - name: Inspect code
         uses: muno92/resharper_inspectcode@1.12.0
         with:
-          solutionPath: ./src/${{ vars.SOLUTION_NAME }}
+          solutionPath: ./src/${{ env.SOLUTION_NAME }}
           exclude: "**Consolonia.GuiCS/**.*;**Consolonia.Gallery/**.*"
           version: '2025.2.1'
           minimumSeverity: 'warning'
@@ -100,10 +103,13 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: false
 
+      - name: Load .env
+        uses: c-py/action-dotenv-to-setenv@v5
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ vars.WORKFLOW_DOTNET_VERSION }}
+          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
 
       - name: Restore
         run: dotnet restore
@@ -114,7 +120,7 @@ jobs:
 
       - name: Run dupfinder (duplicate code check, produce XML)
         run: |
-          ~/.dotnet/tools/jb dupfinder ${{ vars.SOLUTION_NAME }} --exclude-code-regions='DUPFINDER_ignore' --exclude-by-comment='DUPFINDER_ignore' --output=dupfinder-report.xml --discard-cost=100
+          ~/.dotnet/tools/jb dupfinder ${{ env.SOLUTION_NAME }} --exclude-code-regions='DUPFINDER_ignore' --exclude-by-comment='DUPFINDER_ignore' --output=dupfinder-report.xml --discard-cost=100
         working-directory: ./src
 
       - name: Upload dupfinder XML report

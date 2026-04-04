@@ -46,6 +46,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		..\.github\workflows\editorconfig.yml = ..\.github\workflows\editorconfig.yml
 		..\.github\workflows\general_build.yml = ..\.github\workflows\general_build.yml
 		..\.github\workflows\repo-file-sync.yml = ..\.github\workflows\repo-file-sync.yml
+		..\.env = ..\.env
+		..\.github\workflows\editorconfig-apply.yml = ..\.github\workflows\editorconfig-apply.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{089100B1-113F-4E66-888A-E83F3999EAFD}"
