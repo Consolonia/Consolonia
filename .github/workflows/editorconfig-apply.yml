@@ -90,13 +90,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const jobStatus = '${{ job.status }}';
+            const state = jobStatus === 'success' ? 'success' : 'failure';
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
               sha: '${{ github.event.workflow_run.head_sha }}',
-              state: 'success',
+              state: state,
               context: 'Apply Code Cleanup',
-              description: '${{ steps.check-patch.outputs.has_patch }}' === 'true'
-                ? 'Cleanup applied and pushed'
-                : 'No cleanup needed'
+              description: jobStatus === 'success' 
+                ? ('${{ steps.check-patch.outputs.has_patch }}' === 'true' ? 'Cleanup applied and pushed' : 'No cleanup needed')
+                : 'Cleanup failed or was cancelled'
             });
