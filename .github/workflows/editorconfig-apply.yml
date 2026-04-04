@@ -13,6 +13,7 @@ jobs:
       contents: write
       actions: read
       statuses: write
+      checks: write
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
@@ -42,13 +43,14 @@ jobs:
           fi
 
       - name: Read metadata
-        if: steps.check-patch.outputs.has_patch == 'true'
         id: metadata
         run: |
-          for file in pr_number head_repo head_ref user_login user_id; do
-            echo "$file<<EOF" >> "$GITHUB_OUTPUT"
-            cat "cleanup-artifacts/metadata/$file" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
+          for file in pr_number head_repo head_ref head_sha user_login user_id; do
+            if [ -f "cleanup-artifacts/metadata/$file" ]; then
+              echo "$file<<EOF" >> "$GITHUB_OUTPUT"
+              cat "cleanup-artifacts/metadata/$file" >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
+            fi
           done
 
       - name: Apply patch
@@ -92,13 +94,35 @@ jobs:
           script: |
             const jobStatus = '${{ job.status }}';
             const state = jobStatus === 'success' ? 'success' : 'failure';
+            const head_sha = '${{ steps.metadata.outputs.head_sha }}' || '${{ github.event.workflow_run.head_sha }}';
+            const description = jobStatus === 'success' 
+                ? ('${{ steps.check-patch.outputs.has_patch }}' === 'true' ? 'Cleanup applied and pushed' : 'No cleanup needed')
+                : 'Cleanup failed or was cancelled';
+
+            console.log(`Reporting status to SHA: ${head_sha}`);
+
+            // Report Commit Status
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: '${{ github.event.workflow_run.head_sha }}',
+              sha: head_sha,
               state: state,
               context: 'Apply Code Cleanup',
-              description: jobStatus === 'success' 
-                ? ('${{ steps.check-patch.outputs.has_patch }}' === 'true' ? 'Cleanup applied and pushed' : 'No cleanup needed')
-                : 'Cleanup failed or was cancelled'
+              description: description,
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+            // Report Check Run
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Apply Code Cleanup',
+              head_sha: head_sha,
+              status: 'completed',
+              conclusion: state === 'success' ? 'success' : 'failure',
+              output: {
+                title: 'Code Cleanup Report',
+                summary: description
+              },
+              details_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
