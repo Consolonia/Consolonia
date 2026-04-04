@@ -16,18 +16,25 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success'
     steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_branch }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: cleanup-artifacts
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true # Might not exist if no changes
+          path: cleanup-artifacts
 
       - name: Check for cleanup patch
         id: check-patch
         run: |
-          if [ -f "cleanup.patch" ]; then
+          if [ -s "cleanup-artifacts/cleanup.patch" ]; then
             echo "has_patch=true" >> $GITHUB_OUTPUT
           else
             echo "has_patch=false" >> $GITHUB_OUTPUT
@@ -39,22 +46,14 @@ jobs:
         run: |
           for file in pr_number head_repo head_ref user_login user_id; do
             echo "$file<<EOF" >> "$GITHUB_OUTPUT"
-            cat "metadata/$file" >> "$GITHUB_OUTPUT"
+            cat "cleanup-artifacts/metadata/$file" >> "$GITHUB_OUTPUT"
             echo "EOF" >> "$GITHUB_OUTPUT"
           done
-
-      - name: Checkout PR head
-        if: steps.check-patch.outputs.has_patch == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ steps.metadata.outputs.head_repo }}
-          ref: ${{ steps.metadata.outputs.head_ref }}
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Apply patch
         if: steps.check-patch.outputs.has_patch == 'true'
         run: |
-          git apply cleanup.patch
+          git apply cleanup-artifacts/cleanup.patch
 
       - name: Commit and push
         if: steps.check-patch.outputs.has_patch == 'true'
