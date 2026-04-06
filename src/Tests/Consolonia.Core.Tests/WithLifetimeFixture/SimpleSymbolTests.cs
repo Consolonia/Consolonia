@@ -56,6 +56,26 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
+        public void ConstructorCjkChar()
+        {
+            // CJK ideographs are wide (width=2) but NOT emoji; U+FE0F must NOT be appended
+            var symbol = new Symbol('帮'); // U+5E2E, East Asian Width = Wide
+            Assert.That(symbol.Character, Is.EqualTo('帮'));
+            Assert.That(symbol.Complex, Is.Null);
+            Assert.That(symbol.Width, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ConstructorCjkString()
+        {
+            // Same check via the string constructor path
+            var symbol = new Symbol("帮");
+            Assert.That(symbol.Character, Is.EqualTo('帮'));
+            Assert.That(symbol.Complex, Is.Null);
+            Assert.That(symbol.Width, Is.EqualTo(2));
+        }
+
+        [Test]
         public void Equality()
         {
             var symbol = new Symbol('a');
