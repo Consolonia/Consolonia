@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -42,8 +43,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Complex = null;
             Width = width ?? (byte)UnicodeCalculator.GetWidth(ch);
             Pattern = 0;
-            // if we think it should be wide, OR we know it's an emoji 
-            if (Width == 2 || Emoji.IsEmoji(new string(ch, 1)))
+            // Use EmojiVariation for emoji characters and for non-letter wide chars (e.g. symbols like ☰).
+            // East Asian letters (CJK ideographs, Hiragana, Katakana, Hangul) are natively 2-wide in all
+            // terminals and must NOT have U+FE0F appended — doing so creates invalid sequences that
+            // some terminal environments render incorrectly.
+            if (Width == 2 && char.GetUnicodeCategory(ch) != UnicodeCategory.OtherLetter ||
+                Emoji.IsEmoji(new string(ch, 1)))
             {
                 // we want to use EmojiVariation to signal we think it's wide.
                 Character = char.MinValue;
