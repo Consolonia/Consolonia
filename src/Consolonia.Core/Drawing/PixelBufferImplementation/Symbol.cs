@@ -47,7 +47,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             // East Asian letters (CJK ideographs, Hiragana, Katakana, Hangul) are natively 2-wide in all
             // terminals and must NOT have U+FE0F appended — doing so creates invalid sequences that
             // some terminal environments render incorrectly.
-            if ((Width == 2 && char.GetUnicodeCategory(ch) != UnicodeCategory.OtherLetter) ||
+            if (Width == 2 && char.GetUnicodeCategory(ch) != UnicodeCategory.OtherLetter ||
                 Emoji.IsEmoji(new string(ch, 1)))
             {
                 // we want to use EmojiVariation to signal we think it's wide.
