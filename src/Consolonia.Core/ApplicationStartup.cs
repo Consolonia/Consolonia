@@ -11,7 +11,7 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor;
 using Consolonia.Core.Infrastructure;
 
-// ReSharper disable UnusedMember.Global //todo: how to disable it for public methods?
+// ReSharper disable UnusedMember.Global //todo: how to disable it for public methods??
 // ReSharper disable CheckNamespace
 // ReSharper disable MemberCanBePrivate.Global
 
