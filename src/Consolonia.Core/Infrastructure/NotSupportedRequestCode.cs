@@ -82,6 +82,7 @@ namespace Consolonia.Core.Infrastructure
         DrawRegionNotSupported = 62747,
         CubicBezierToNotSupported = 62748,
         QuadraticBezierToNotSupported = 62749,
-        BitmapsNotSupported = 62750
+        BitmapsNotSupported = 62750,
+        VerticalTextDecorationNotSupported = 62751
     }
 }

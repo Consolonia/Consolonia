@@ -171,6 +171,7 @@ namespace Consolonia.Core.Infrastructure
                 case NotSupportedRequestCode.DrawRegionNotSupported:
                 case NotSupportedRequestCode.CubicBezierToNotSupported:
                 case NotSupportedRequestCode.QuadraticBezierToNotSupported:
+                case NotSupportedRequestCode.VerticalTextDecorationNotSupported:
                     notSupportedRequest.SetHandled();
                     break;
                 // console window methods that are not implemented by design, because they are not applicable to console windows
