@@ -50,12 +50,12 @@ jobs:
       - name: Pack
         run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
       - name: Push
-        if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || github.event.inputs.push_packages == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
         
         # tagging the commit so we can track exact version when issues reported
       - name: Tag commit with version (post-publish)
-        if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || github.event.inputs.push_packages == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
         run: |
           set -e
           git fetch --tags
