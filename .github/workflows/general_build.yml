@@ -9,6 +9,12 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      push_packages:
+        description: 'Whether to push packages to NuGet'
+        required: false
+        default: 'false'
+        type: string
   push:
     branches: [ main ]
   pull_request:
@@ -44,16 +50,18 @@ jobs:
       - name: Pack
         run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
       - name: Push
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'}}
+        if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || github.event.inputs.push_packages == 'true' }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
         
         # tagging the commit so we can track exact version when issues reported
       - name: Tag commit with version (post-publish)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'}}
+        if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || github.event.inputs.push_packages == 'true' }}
         run: |
           set -e
           git fetch --tags
-          VERSION=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
+          VERSION_PREFIX=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
+          BUILD_VERSION=$(grep -oP '(?<=<ConsoloniaBuildVersion>).*?(?=</ConsoloniaBuildVersion>)' ../Directory.Build.props)
+          VERSION=$(echo $VERSION_PREFIX | sed "s/\$(ConsoloniaBuildVersion)/$BUILD_VERSION/g")
           if [ -z "$VERSION" ]; then
             echo "Failed to determine VersionPrefix from ../Directory.Build.props" >&2
             exit 1

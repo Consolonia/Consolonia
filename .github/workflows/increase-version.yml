@@ -1,0 +1,50 @@
+name: Increase Version
+
+concurrency:
+  group: increase-version-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  increase-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use a custom token if you want the push to trigger other workflows (e.g. push event)
+          # but here we trigger general_build.yml explicitly.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Increase version
+        run: |
+          # Read current version
+          VERSION=$(grep -oP '(?<=<ConsoloniaBuildVersion>).*?(?=</ConsoloniaBuildVersion>)' Directory.Build.props)
+          if [ -z "$VERSION" ]; then
+            echo "ConsoloniaBuildVersion not found in Directory.Build.props"
+            exit 1
+          fi
+          NEW_VERSION=$((VERSION + 1))
+          echo "Increasing version from $VERSION to $NEW_VERSION"
+          
+          # Replace in file
+          sed -i "s|<ConsoloniaBuildVersion>$VERSION</ConsoloniaBuildVersion>|<ConsoloniaBuildVersion>$NEW_VERSION</ConsoloniaBuildVersion>|" Directory.Build.props
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add Directory.Build.props
+          git commit -m "Increase ConsoloniaBuildVersion to $(grep -oP '(?<=<ConsoloniaBuildVersion>).*?(?=</ConsoloniaBuildVersion>)' Directory.Build.props)"
+          git push
+
+      - name: Trigger General Build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run general_build.yml --ref ${{ github.ref_name }} -f push_packages=true
