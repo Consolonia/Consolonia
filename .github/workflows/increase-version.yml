@@ -21,26 +21,22 @@ jobs:
           # but here we trigger general_build.yml explicitly.
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increase version
+      - name: Update .env
         run: |
-          # Read current version
-          VERSION=$(grep -oP '(?<=<ConsoloniaBuildVersion>).*?(?=</ConsoloniaBuildVersion>)' Directory.Build.props)
-          if [ -z "$VERSION" ]; then
-            echo "ConsoloniaBuildVersion not found in Directory.Build.props"
-            exit 1
+          NEW_VERSION="${{ github.run_number }}"
+          echo "Setting BUILD_VERSION to $NEW_VERSION in .env"
+          if grep -q "BUILD_VERSION=" .env; then
+            sed -i "s/BUILD_VERSION=.*/BUILD_VERSION=$NEW_VERSION/" .env
+          else
+            echo "BUILD_VERSION=$NEW_VERSION" >> .env
           fi
-          NEW_VERSION=$((VERSION + 1))
-          echo "Increasing version from $VERSION to $NEW_VERSION"
-          
-          # Replace in file
-          sed -i "s|<ConsoloniaBuildVersion>$VERSION</ConsoloniaBuildVersion>|<ConsoloniaBuildVersion>$NEW_VERSION</ConsoloniaBuildVersion>|" Directory.Build.props
 
       - name: Commit and push
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add Directory.Build.props
-          git commit -m "Increase ConsoloniaBuildVersion to $(grep -oP '(?<=<ConsoloniaBuildVersion>).*?(?=</ConsoloniaBuildVersion>)' Directory.Build.props)"
+          git add .env
+          git commit -m "Set BUILD_VERSION to ${{ github.run_number }} in .env"
           git push
 
       - name: Trigger General Build

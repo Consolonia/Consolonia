@@ -37,6 +37,15 @@ jobs:
       - name: Load .env
         uses: c-py/action-dotenv-to-setenv@v5
 
+      - name: Ensure BUILD_VERSION
+        run: |
+          if [ -z "$BUILD_VERSION" ]; then
+            echo "BUILD_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
+            echo "BUILD_VERSION was not set, using github.run_number: ${{ github.run_number }}"
+          else
+            echo "BUILD_VERSION is already set: $BUILD_VERSION"
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -59,19 +68,31 @@ jobs:
         run: |
           set -e
           git fetch --tags
-          VERSION_PREFIX=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
-          BUILD_VERSION=$(grep -oP '(?<=<ConsoloniaBuildVersion>).*?(?=</ConsoloniaBuildVersion>)' ../Directory.Build.props)
-          VERSION=$(echo $VERSION_PREFIX | sed "s/\$(ConsoloniaBuildVersion)/$BUILD_VERSION/g")
+          VERSION_LITERAL=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
+          # Evaluate VERSION by replacing $(BUILD_VERSION) with its value
+          VERSION=$(echo "$VERSION_LITERAL" | sed "s/\\\$(BUILD_VERSION)/$BUILD_VERSION/g")
           if [ -z "$VERSION" ]; then
-            echo "Failed to determine VersionPrefix from ../Directory.Build.props" >&2
+            echo "Failed to determine version from ../Directory.Build.props" >&2
             exit 1
           fi
           echo "Version detected: $VERSION"
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "Tag v$VERSION already exists, skipping creation."
-            exit 0
-          fi
+          echo "BUILD_VERSION: $BUILD_VERSION"
+          
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
+          
+          # Tag with full version
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists."
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
+          
+          # Tag with BUILD_VERSION only
+          if git rev-parse "$BUILD_VERSION" >/dev/null 2>&1; then
+            echo "Tag $BUILD_VERSION already exists."
+          else
+            git tag "$BUILD_VERSION"
+            git push origin "$BUILD_VERSION"
+          fi
