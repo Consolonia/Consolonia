@@ -1,7 +1,7 @@
-name: Increase Version
+name: Release
 
 concurrency:
-  group: increase-version-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: true
 
 on:
@@ -12,7 +12,7 @@ permissions:
   actions: write
 
 jobs:
-  increase-version:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

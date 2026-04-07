@@ -8,7 +8,7 @@ group:
       deleteOrphaned: true
       exclude: |
         repo-file-sync.yml
-        increase-version.yml
+        release.yml
     - source: .editorconfig
       dest: .editorconfig
       deleteOrphaned: true
