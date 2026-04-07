@@ -36,8 +36,12 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .env
-          git commit -m "Set BUILD_VERSION to ${{ github.run_number }} in .env"
-          git push
+          if git diff --cached --quiet; then
+            echo "No .env changes to commit."
+          else
+            git commit -m "Set BUILD_VERSION to ${{ github.run_number }} in .env"
+            git push
+          fi
 
       - name: Trigger General Build
         env:
