@@ -1,9 +1,10 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:console="https://github.com/consolonia"
-        xmlns:wm="using:Iciclecreek.Avalonia.WindowManager">
+        xmlns:infrastructure="clr-namespace:Consolonia.Themes.Infrastructure">
     <Styles.Resources>
         <ResourceDictionary>
+            <x:String x:Key="{x:Static infrastructure:AutoThemeStylesBase.ConsoloniaThemeFamilyKey}">TurboVision</x:String>
             <x:String x:Key="ThemeLeftArrowSymbol">←</x:String>
             <x:String x:Key="ThemeRightArrowSymbol">→</x:String>
             <x:String x:Key="ThemeUpArrowSymbol">↑</x:String>
@@ -66,8 +67,6 @@
                 Value="1 0" />
     </Style>
 
-    <wm:WindowManagerTheme />
-
     <StyleInclude Source="/TurboVision/Controls/BorderPanel.axaml" />
     <StyleInclude Source="/TurboVision/Controls/ConsoloniaAccessRun.axaml" />
     <StyleInclude Source="/TurboVision/Controls/ToggleButton.axaml" />
@@ -76,5 +75,4 @@
     <StyleInclude Source="/TurboVision/Controls/DropDownButton.axaml" />
     <StyleInclude Source="/TurboVision/Controls/CheckBox.axaml" />
     <StyleInclude Source="/TurboVision/Controls/RadioButton.axaml" />
-    <StyleInclude Source="/TurboVision/Controls/WindowManager.axaml" />
 </Styles>

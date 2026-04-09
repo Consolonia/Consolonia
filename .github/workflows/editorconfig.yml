@@ -10,28 +10,30 @@ on:
       - main
       - pre-main
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:  
   inspection:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # from https://github.com/marketplace/actions/dotnet-format
     steps:
-      - name: Get branch info # todo: is this needed?
-        id: comment-branch
-        uses: xt0rted/pull-request-comment-branch@v1
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.ref }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: false
 
+      - name: Load .env
+        uses: c-py/action-dotenv-to-setenv@v5
+
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
           
       - name: Restore
         run: dotnet restore
@@ -44,53 +46,71 @@ jobs:
 
       - name: resharper-cleanup
         run: |                    
-          jb cleanupcode ${{ vars.SOLUTION_NAME }} --exclude="**Consolonia.GuiCS/**.*"
+          jb cleanupcode ${{ env.SOLUTION_NAME }} --exclude="**Consolonia.GuiCS/**.*"
         working-directory: ./src
 
+      - name: Check for changes
+        id: git-check
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            git diff > cleanup.patch
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            touch cleanup.patch
+          fi
 
       - name: Inspect code
         uses: muno92/resharper_inspectcode@1.12.0
         with:
-          solutionPath: ./src/${{ vars.SOLUTION_NAME }}
+          solutionPath: ./src/${{ env.SOLUTION_NAME }}
           exclude: "**Consolonia.GuiCS/**.*;**Consolonia.Gallery/**.*"
           version: '2025.2.1'
           minimumSeverity: 'warning'
 
-      - name: Commit files
-        continue-on-error: true # todo: need to check whether has changes
+      - name: Save Metadata
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          USER_LOGIN: ${{ github.event.pull_request.user.login }}
+          USER_ID: ${{ github.event.pull_request.user.id }}
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -a -m 'Automated JetBrains cleanup
+          mkdir -p metadata
+          echo "$PR_NUMBER" > metadata/pr_number
+          echo "$HEAD_REPO" > metadata/head_repo
+          echo "$HEAD_REF" > metadata/head_ref
+          echo "$HEAD_SHA" > metadata/head_sha
+          echo "$USER_LOGIN" > metadata/user_login
+          echo "$USER_ID" > metadata/user_id
 
-          Co-authored-by: ${{ github.event.comment.user.login }} <${{ github.event.comment.user.id }}+${{ github.event.comment.user.login }}@users.noreply.github.com>'
-          
-      - name: Push changes        
-        uses: ad-m/github-push-action@master
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          branch: ${{ steps.comment-branch.outputs.ref }}
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          name: cleanup-artifacts
+          path: |
+            cleanup.patch
+            metadata/
 
   dupfinder:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Get branch info # todo: is this needed?
-        id: comment-branch
-        uses: xt0rted/pull-request-comment-branch@v1
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.ref }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
           persist-credentials: false
 
+      - name: Load .env
+        uses: c-py/action-dotenv-to-setenv@v5
+
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
 
       - name: Restore
         run: dotnet restore
@@ -101,7 +121,7 @@ jobs:
 
       - name: Run dupfinder (duplicate code check, produce XML)
         run: |
-          ~/.dotnet/tools/jb dupfinder ${{ vars.SOLUTION_NAME }} --exclude-code-regions='DUPFINDER_ignore' --exclude-by-comment='DUPFINDER_ignore' --output=dupfinder-report.xml --discard-cost=100
+          ~/.dotnet/tools/jb dupfinder ${{ env.SOLUTION_NAME }} --exclude-code-regions='DUPFINDER_ignore' --exclude-by-comment='DUPFINDER_ignore' --output=dupfinder-report.xml --discard-cost=100
         working-directory: ./src
 
       - name: Upload dupfinder XML report

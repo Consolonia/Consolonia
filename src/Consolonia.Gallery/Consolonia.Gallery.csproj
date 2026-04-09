@@ -13,14 +13,15 @@
     </ItemGroup>
     
     <ItemGroup>
+        <ProjectReference Include="..\Consolonia.Controls.DataGrid\Consolonia.Controls.DataGrid.csproj" />
         <ProjectReference Include="..\Consolonia.Fonts\Consolonia.Fonts.csproj" />
         <ProjectReference Include="..\Consolonia\Consolonia.csproj" />
+        <ProjectReference Include="..\Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
         <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
-        <PackageReference Include="Avalonia.ReactiveUI" Version="$(AvaloniaVersion)" />
         <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.0.4" />
     </ItemGroup>
 </Project>

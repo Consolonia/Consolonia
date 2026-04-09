@@ -4,8 +4,17 @@ concurrency:
   group: build_checks_deploy-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
+    inputs:
+      push_packages:
+        description: 'Whether to push packages to NuGet'
+        required: false
+        default: 'false'
+        type: string
   push:
     branches: [ main ]
   pull_request:
@@ -23,11 +32,24 @@ jobs:
         working-directory: ./src
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+
+      - name: Load .env
+        uses: c-py/action-dotenv-to-setenv@v5
+
+      - name: Ensure BUILD_VERSION
+        run: |
+          if [ -z "$BUILD_VERSION" ]; then
+            echo "BUILD_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
+            echo "BUILD_VERSION was not set, using github.run_number: ${{ github.run_number }}"
+          else
+            echo "BUILD_VERSION is already set: $BUILD_VERSION"
+          fi
+
       - name: Setup .NET
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
       - name: Restore dependencies
         run: dotnet restore /p:Configuration=Release
       - name: Build
@@ -35,7 +57,42 @@ jobs:
       - name: Test
         run: dotnet test # --configuration release todo: release get stuck and never finishes
       - name: Pack
-        run: dotnet pack --configuration release -o ./packages --version-suffix beta.${{ github.run_number }} # https://stackoverflow.com/a/60067489/2362847
+        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
       - name: Push
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'}}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
+        
+        # tagging the commit so we can track exact version when issues reported
+      - name: Tag commit with version (post-publish)
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
+        run: |
+          set -e
+          git fetch --tags
+          VERSION_LITERAL=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
+          # Evaluate VERSION by replacing $(BUILD_VERSION) with its value
+          VERSION=$(echo "$VERSION_LITERAL" | sed "s/\\\$(BUILD_VERSION)/$BUILD_VERSION/g")
+          if [ -z "$VERSION" ]; then
+            echo "Failed to determine version from ../Directory.Build.props" >&2
+            exit 1
+          fi
+          echo "Version detected: $VERSION"
+          echo "BUILD_VERSION: $BUILD_VERSION"
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          
+          # Tag with full version
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists."
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
+          
+          # Tag with BUILD_VERSION only
+          if git rev-parse "$BUILD_VERSION" >/dev/null 2>&1; then
+            echo "Tag $BUILD_VERSION already exists."
+          else
+            git tag "$BUILD_VERSION"
+            git push origin "$BUILD_VERSION"
+          fi

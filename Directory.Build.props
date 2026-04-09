@@ -5,7 +5,9 @@
         <Nullable>disable</Nullable>
     </PropertyGroup>
     <PropertyGroup>
-        <VersionPrefix>11.3.9</VersionPrefix>
+        <!--If ran not by pipeline - defining for local run-->
+        <BUILD_VERSION Condition="'$(BUILD_VERSION)' == ''">0</BUILD_VERSION>
+        <VersionPrefix>11.3.12.$(BUILD_VERSION)</VersionPrefix>
         <Authors>https://github.com/consolonia/consolonia/graphs/contributors</Authors>
         <Copyright>© 2021–2025 Evgeny Gorbovoy &amp; Tom Laird-McConnell</Copyright>
         <ProjectUrl>https://github.com/consolonia/consolonia</ProjectUrl>
@@ -17,7 +19,7 @@
         <IsPackable>False</IsPackable>
     </PropertyGroup>
     <PropertyGroup>
-        <AvaloniaVersion>11.3.9</AvaloniaVersion>
+        <AvaloniaVersion>11.3.12</AvaloniaVersion>
     </PropertyGroup>
     <ItemGroup Condition="'$(IsPackable)' != 'false'">
         <None Include="$(SolutionDir)/../Icon.png"

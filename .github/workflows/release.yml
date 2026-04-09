@@ -1,0 +1,50 @@
+name: Release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use a custom token if you want the push to trigger other workflows (e.g. push event)
+          # but here we trigger general_build.yml explicitly.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update .env
+        run: |
+          NEW_VERSION="${{ github.run_number }}"
+          echo "Setting BUILD_VERSION to $NEW_VERSION in .env"
+          if grep -q "BUILD_VERSION=" .env; then
+            sed -i "s/BUILD_VERSION=.*/BUILD_VERSION=$NEW_VERSION/" .env
+          else
+            echo "BUILD_VERSION=$NEW_VERSION" >> .env
+          fi
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .env
+          if git diff --cached --quiet; then
+            echo "No .env changes to commit."
+          else
+            git commit -m "Set BUILD_VERSION to ${{ github.run_number }} in .env"
+            git push
+          fi
+
+      - name: Trigger General Build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run general_build.yml --ref ${{ github.ref_name }} -f push_packages=true

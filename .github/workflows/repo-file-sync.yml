@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
       - name: Run repo file sync
         uses: BetaHuhn/repo-file-sync-action@v1
         with:

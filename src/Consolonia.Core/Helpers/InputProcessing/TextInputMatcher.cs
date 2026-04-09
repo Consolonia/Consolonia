@@ -7,7 +7,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
     ///     A matcher that matches any text input.
     /// </summary>
     public class TextInputMatcher<T>(Action<(string, T[])> onComplete, Func<T, Rune> toRune, uint? min = null)
-        : RegexMatcher<T>(onComplete, toRune, @"\A[^\x00\x1B]+\z")
+        : RegexMatcher<T>(onComplete, toRune, @"\A[^\x00\x0A\x0D\x1B]+\z")
     {
         public override bool TryFlush()
         {
