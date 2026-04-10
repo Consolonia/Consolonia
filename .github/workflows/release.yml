@@ -19,7 +19,7 @@ jobs:
         with:
           # Use a custom token if you want the push to trigger other workflows (e.g. push event)
           # but here we trigger general_build.yml explicitly.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Update .env
         run: |
@@ -33,13 +33,13 @@ jobs:
 
       - name: Commit and push
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .env
           if git diff --cached --quiet; then
             echo "No .env changes to commit."
           else
-            git commit -m "Set BUILD_VERSION to ${{ github.run_number }} in .env"
+            git commit -m "Set BUILD_VERSION to ${{ github.run_number }} in .env [skip ci]"
             git push
           fi
 
