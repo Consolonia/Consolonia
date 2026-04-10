@@ -46,6 +46,10 @@ jobs:
             echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
             echo "BUILD_VERSION is already set: $BUILD_VERSION"
           fi
+            
+          VAL=$(grep -oP '(?<=<ConsoloniaVersion Condition=".*">).*?(?=</ConsoloniaVersion>)' ../Directory.Build.props || grep -oP '(?<=<ConsoloniaVersion>).*?(?=</ConsoloniaVersion>)' ../Directory.Build.props)
+          echo "ConsoloniaVersion=$VAL" >> $GITHUB_ENV
+          echo "ConsoloniaVersion detected: $VAL"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
