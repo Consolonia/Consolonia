@@ -59,6 +59,9 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
+            if (pixel.Width <= 0)
+                return;
+
             if (position != _currentPosition)
             {
                 Flush();
