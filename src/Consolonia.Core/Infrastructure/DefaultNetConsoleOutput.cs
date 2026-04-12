@@ -59,7 +59,9 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
-            if (pixel.Width <= 0)
+            // Width 0 is the trailing placeholder cell of a previously rendered wide glyph.
+            // The legacy Console API path must skip it entirely to avoid writing a placeholder char.
+            if (pixel.Width == 0)
                 return;
 
             if (position != _currentPosition)
