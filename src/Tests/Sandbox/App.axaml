@@ -5,7 +5,7 @@
              x:Class="Sandbox.App"
              RequestedThemeVariant="Default">
     <Application.Styles>
-        <console:TurboVisionCompatibleTheme />
-        <modal:ModalTheme/>
+        <console:TurboVisionTheme />
+        <modal:ModalTheme />
     </Application.Styles>
 </Application>

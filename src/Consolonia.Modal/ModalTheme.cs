@@ -1,19 +1,21 @@
 using System;
-using Consolonia.Core.Styles;
+using Consolonia.Themes.Infrastructure;
 
 namespace Consolonia.Modal
 {
-    public class ModalTheme : ResourceIncludeBase
+    public class ModalTheme : AutoThemeStylesBase
     {
-        public ModalTheme(Uri baseUri) : base(baseUri)
+        protected override void ComposeForFamily(string family)
         {
-        }
+            IncludeStyle(new Uri("avares://Consolonia.Modal/Themes/DialogHost.axaml"));
 
-        public ModalTheme(IServiceProvider serviceProvider) : base(serviceProvider)
-        {
+            switch (family)
+            {
+                case TurboVisionThemeKey:
+                case ModernThemeKey:
+                    IncludeStyle(new Uri("avares://Consolonia.Modal/Themes/DialogWindow.axaml"));
+                    break;
+            }
         }
-
-        protected override Uri Uri =>
-            new("avares://Consolonia.Modal/DialogWindow.axaml");
     }
 }

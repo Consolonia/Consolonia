@@ -72,19 +72,29 @@
                                         VerticalAlignment="Top"
                                         Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
                                         IsVisible="{TemplateBinding IsCloseButtonVisible}">
-                                <Button Content="x"
-                                        Background="{x:Null}"
-                                        IsTabStop="False"
-                                        Padding="0"
-                                        Margin="2,0,0,0"
-                                        Command="{Binding Path=CloseClick, RelativeSource={RelativeSource TemplatedParent}}">
-                                    <Button.Styles>
-                                        <Style Selector="Button">
-                                            <Setter Property="brushes:ButtonExtensions.Shadow"
-                                                    Value="False" />
-                                        </Style>
-                                    </Button.Styles>
-                                </Button>
+                                <StackPanel.Styles>
+                                    <Style Selector="Button">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                                        <Setter Property="IsTabStop"
+                                                Value="False" />
+                                        <Setter Property="Theme"
+                                                Value="{DynamicResource ThemeNakedButton}" />
+                                    </Style>
+                                    <Style Selector="brushes|SymbolsControl">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource ThemeBorderBrush}" />
+                                    </Style>
+                                </StackPanel.Styles>
+                                <DockPanel Margin="2,0,0,0">
+                                    <brushes:SymbolsControl DockPanel.Dock="Left"
+                                                            Text="[" />
+                                    <brushes:SymbolsControl DockPanel.Dock="Right"
+                                                            Text="]" />
+                                    <Button Content="■"
+                                            x:Name="PART_CloseButton" 
+                                            Command="{Binding Path=CloseClick, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </DockPanel>
                             </StackPanel>
                         </Panel>
 
