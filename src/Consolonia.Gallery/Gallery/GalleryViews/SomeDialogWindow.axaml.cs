@@ -2,7 +2,7 @@ using System;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Consolonia.Themes.TurboVision.Templates.Controls.Dialog;
+using Consolonia.Modal;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
@@ -13,8 +13,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         public SomeDialogWindow(double width, double height)
         {
             InitializeComponent();
-            Width = width;
-            Height = height;
+            /*Width = width;
+            Height = height;*/
             Loaded += (_, _) =>
             {
                 this.FindControl<Button>("Button")!.Focus();

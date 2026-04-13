@@ -11,7 +11,7 @@ using Avalonia.VisualTree;
 
 // ReSharper disable MemberCanBeProtected.Global
 
-namespace Consolonia.Themes.TurboVision.Templates.Controls.Dialog
+namespace Consolonia.Modal
 {
     [TemplatePart("PART_ContentPresenter", typeof(ContentPresenter))]
     public class DialogWindow : UserControl

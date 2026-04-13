@@ -1,8 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:gallery="clr-namespace:Consolonia.Gallery.Gallery"
+        xmlns:modal="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
         x:Class="Consolonia.Gallery.View.ControlsListView"
-        Title="ControlsListView" Background="LightGray">
+        Title="ControlsListView" Background="LightGray"
+        modal:DialogHost.IsDialogHost="True">
     <Window.Resources>
         <gallery:GalleryItemConverter x:Key="GalleryItemConverter" />
     </Window.Resources>

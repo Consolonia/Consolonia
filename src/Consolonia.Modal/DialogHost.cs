@@ -11,15 +11,20 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using Consolonia.Core.Helpers;
 
-namespace Consolonia.Themes.TurboVision.Templates.Controls.Dialog
+using Consolonia.Themes.TurboVision.Templates.Controls;
+
+namespace Consolonia.Modal
 {
     public class DialogHost
     {
         public static readonly AttachedProperty<bool> IsDialogHostProperty =
-            AvaloniaProperty.RegisterAttached<Button, bool>("IsDialogHost", typeof(DialogHost));
+            AvaloniaProperty.RegisterAttached<Control, bool>("IsDialogHost", typeof(DialogHost));
+        
+        public static bool GetIsDialogHost(Control control) => control.GetValue(IsDialogHostProperty);
+        public static void SetIsDialogHost(Control control, bool value) => control.SetValue(IsDialogHostProperty, value);
 
         internal static readonly AttachedProperty<DialogHost> DialogHostProperty =
-            AvaloniaProperty.RegisterAttached<Button, DialogHost>("DialogHost", typeof(DialogHost));
+            AvaloniaProperty.RegisterAttached<Control, DialogHost>("DialogHost", typeof(DialogHost));
 
         private readonly Stack<OverlayPopupHost> _dialogs = new();
 

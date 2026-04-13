@@ -16,7 +16,6 @@
     <StyleInclude Source="/Templates/Controls/DataGrid.axaml" />
     <StyleInclude Source="/Templates/Controls/CaretControl.axaml" />
     <StyleInclude Source="/Templates/Controls/UserControl.axaml" />
-    <StyleInclude Source="/Templates/Controls/DialogWindow.axaml" />
     <StyleInclude Source="/Templates/Controls/ItemsControl.axaml" />
     <StyleInclude Source="/Templates/Controls/LightDismissOverlaylayer.axaml" />
     <StyleInclude Source="/Templates/Controls/DataValidationErrors.axaml" />

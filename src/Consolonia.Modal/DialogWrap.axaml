@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:drawing1="clr-namespace:Consolonia.Core.Drawing;assembly=Consolonia.Core"
-             x:Class="Consolonia.Themes.TurboVision.Templates.Controls.DialogWrap">
+             x:Class="Consolonia.Modal.DialogWrap">
 
     <Panel>
         <Border Background="{drawing1:ConsoleBrush Mode=Shaded}"

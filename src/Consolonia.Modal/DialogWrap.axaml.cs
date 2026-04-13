@@ -7,14 +7,12 @@ using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Reactive;
 using Avalonia.VisualTree;
-using Consolonia.Themes.TurboVision.Templates.Controls.Dialog;
-
-namespace Consolonia.Themes.TurboVision.Templates.Controls
+namespace Consolonia.Modal
 {
     [SuppressMessage("Usage", "PartialTypeWithSinglePart",
         Justification = "Partial class required for XAML code generation.")]
     // ReSharper disable once PartialTypeWithSinglePart
-    internal partial class DialogWrap : UserControl
+    public partial class DialogWrap : UserControl
     {
         public readonly ContentPresenter FoundContentPresenter;
         private IDisposable _disposable;

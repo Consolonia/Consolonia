@@ -1,12 +1,12 @@
 <dialog:DialogWindow xmlns="https://github.com/avaloniaui"
                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                      xmlns:drawing="clr-namespace:Consolonia.Core.Drawing;assembly=Consolonia.Core"
-                     xmlns:dialog="clr-namespace:Consolonia.Themes.TurboVision.Templates.Controls.Dialog;assembly=Consolonia.Themes.TurboVision"
+                     xmlns:dialog="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
                      HorizontalAlignment="Center"
                      VerticalAlignment="Center"
                      Title="Dialog"
                      x:Class="Consolonia.Gallery.Gallery.GalleryViews.SomeDialogWindow">
-    <Panel>
+    <Grid>
         <TextBlock xml:space="preserve"
                    HorizontalAlignment="Right"
                    VerticalAlignment="Bottom"
@@ -30,5 +30,5 @@ Bill Ames
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
                 Click="OneMore_Clicked" />
-    </Panel>
+    </Grid>
 </dialog:DialogWindow>

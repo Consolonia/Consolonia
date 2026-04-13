@@ -19,6 +19,7 @@ namespace Consolonia.Gallery
         public App()
         {
             Styles.Add(new TurboVisionTheme(new Uri("avares://Consolonia.Gallery")));
+            Styles.Add(new Consolonia.Modal.ModalTheme(new Uri("avares://Consolonia.Gallery")));
         }
 
         public override void OnFrameworkInitializationCompleted()
