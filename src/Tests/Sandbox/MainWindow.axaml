@@ -1,8 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:modal="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
         x:Class="Sandbox.MainWindow"
-        Title="Sandbox">
+        Title="Sandbox"
+        modal:DialogHost.IsDialogHost="True">
     <StackPanel>
+        <Button Content="Dialog"
+                HorizontalAlignment="Left"
+                Click="Button_OnClick"/>
         <Button Content="E_xit"
                 Click="OnExit"
                 HorizontalAlignment="Left" />

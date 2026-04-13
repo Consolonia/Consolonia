@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:drawing1="clr-namespace:Consolonia.Core.Drawing;assembly=Consolonia.Core"
+             x:Class="Consolonia.Modal.DialogWrap">
+
+    <Panel>
+        <Border Background="{StaticResource ThemeShadeBrush}"
+                IsVisible="{Binding RelativeSource={RelativeSource Self}, Path=IsEffectivelyEnabled}" />
+
+        <!-- ReSharper disable once UnusedMember.Local Used for manual search-->
+        <ContentPresenter Name="ContentPresenter"
+                          x:FieldModifier="private"
+                          HorizontalContentAlignment="Stretch"
+                          VerticalContentAlignment="Stretch"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch" />
+    </Panel>
+
+</UserControl>

@@ -1,0 +1,18 @@
+<modal:DialogWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:modal="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
+                    x:Class="Sandbox.DlWindow"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Title="Sandbox">
+    <Panel>
+        <TextBlock Width="10"
+                   Height="1">
+            Some text here Some text hereSome text hereSome text hereSome text here
+
+            Some text here Some text hereSome text hereSome text hereSome text here
+            Some text hereSome text hereSome text hereSome text here
+            hereSome text hereSome text hereSome text here
+        </TextBlock>
+    </Panel>
+</modal:DialogWindow>
