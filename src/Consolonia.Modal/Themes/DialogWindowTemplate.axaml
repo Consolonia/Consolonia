@@ -26,10 +26,10 @@
                     <Panel>
                         <!--Centered layout-->
                         <!--Panel shade Mode=Shaded-->
-                        <Border Background="{StaticResource ThemeShadeBrush}"
+                        <Border Background="{DynamicResource ThemeShadeBrush}"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Bottom">
-                            <Border BorderBrush="{StaticResource ThemeTransparentBrush}"
+                            <Border BorderBrush="{DynamicResource ThemeTransparentBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}">
                                 <Control
@@ -39,7 +39,7 @@
                                     Margin="{TemplateBinding Padding}" />
                             </Border>
                         </Border>
-                        
+
                         <!--Panel-->
                         <Panel Background="{TemplateBinding Background}"
                                HorizontalAlignment="Center"
