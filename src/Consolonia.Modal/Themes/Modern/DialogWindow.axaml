@@ -3,12 +3,17 @@
         xmlns:dialog="clr-namespace:Consolonia.Modal"
         xmlns:brushes="https://github.com/consolonia">
     <StyleInclude Source="avares://Consolonia.Modal/Themes/DialogWindowTemplate.axaml" />
-    <Style Selector=":is(dialog|DialogWindow)">
-        <Setter Property="BorderBrush">
-            <Setter.Value>
-                <brushes:LineBrush LineStyle="Edge"
-                                   Brush="{DynamicResource ThemeBorderBrush}" />
-            </Setter.Value>
-        </Setter>
-    </Style>
+    <Styles.Resources>
+        <ResourceDictionary>
+            <brushes:LineBrush x:Key="DialogWindowBorderBrush"
+                               LineStyle="Edge"
+                               Brush="{DynamicResource ThemeBorderBrush}" />
+            <ControlTheme x:Key="{x:Type dialog:DialogWindow}"
+                          TargetType="dialog:DialogWindow"
+                          BasedOn="{StaticResource {x:Type dialog:DialogWindow}}">
+                <Setter Property="BorderBrush"
+                        Value="{StaticResource DialogWindowBorderBrush}" />
+            </ControlTheme>
+        </ResourceDictionary>
+    </Styles.Resources>
 </Styles>

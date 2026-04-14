@@ -2,27 +2,24 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:dialog="clr-namespace:Consolonia.Modal"
         xmlns:brushes="https://github.com/consolonia">
-    <Style Selector=":is(dialog|DialogWindow)">
-        <Style.Resources>
-            <Thickness x:Key="ConsoloniaDialogWindowBorderMargin">1,0</Thickness>
-        </Style.Resources>
-        <Setter Property="Background"
-                Value="{DynamicResource ThemeBackgroundBrush}" />
-        <Setter Property="Foreground"
-                Value="{DynamicResource ThemeForegroundBrush}" />
-        <Setter Property="BorderBrush"
-                Value="{DynamicResource ThemeForegroundBrush}" />
-        <Setter Property="BorderThickness"
-                Value="1" />
-        <Setter Property="Margin"
-                Value="0" />
-        <Setter Property="Padding"
-                Value="0" />
-        <Setter Property="IsCloseButtonVisible"
-                Value="True" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="dialog:DialogWindow">
+    <Styles.Resources>
+        <Thickness x:Key="ConsoloniaDialogWindowBorderMargin">1,0</Thickness>
+        <ControlTheme x:Key="{x:Type dialog:DialogWindow}"
+                      TargetType="dialog:DialogWindow">
+            <Setter Property="Background"
+                    Value="{DynamicResource ThemeBackgroundBrush}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource ThemeForegroundBrush}" />
+            <Setter Property="BorderThickness"
+                    Value="1" />
+            <Setter Property="Margin"
+                    Value="0" />
+            <Setter Property="Padding"
+                    Value="0" />
+            <Setter Property="IsCloseButtonVisible"
+                    Value="True" />
+            <Setter Property="Template">
+                <ControlTemplate>
                     <Panel>
                         <!--Centered layout-->
                         <!--Panel shade Mode=Shaded-->
@@ -106,7 +103,7 @@
                         </Panel>
                     </Panel>
                 </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
+            </Setter>
+        </ControlTheme>
+    </Styles.Resources>
 </Styles>

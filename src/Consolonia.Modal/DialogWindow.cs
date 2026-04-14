@@ -14,8 +14,10 @@ using Avalonia.VisualTree;
 namespace Consolonia.Modal
 {
     [TemplatePart("PART_ContentPresenter", typeof(ContentPresenter))]
-    public class DialogWindow : UserControl
+    public class DialogWindow : ContentControl
     {
+        protected override Type StyleKeyOverride => typeof(DialogWindow);
+
         public static readonly DirectProperty<DialogWindow, Size> ContentSizeProperty =
             AvaloniaProperty.RegisterDirect<DialogWindow, Size>(nameof(ContentSize), window => window.ContentSize);
 
