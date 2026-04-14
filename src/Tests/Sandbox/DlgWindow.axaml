@@ -4,7 +4,7 @@
                     x:Class="Sandbox.DlWindow"
                     Margin="5"
                     Title="Sandbox">
-    <Panel>
+    <Panel Background="Red">
         <TextBlock xml:space="preserve">
             Some text here Some text hereSome text hereSome text hereSome text here
 

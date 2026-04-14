@@ -2,9 +2,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:dialog="clr-namespace:Consolonia.Modal"
         xmlns:brushes="https://github.com/consolonia">
+    <Style Selector="Border.DialogWindowBorder">
+        <Setter Property="Padding"
+                Value="0,1,0,0" />
+    </Style>
     <StyleInclude Source="avares://Consolonia.Modal/Themes/DialogWindowTemplate.axaml" />
     <Styles.Resources>
         <ResourceDictionary>
+            <SolidColorBrush x:Key="DialogWindowOuterBorderBackgroundBrush"
+                             Color="Transparent" />
             <brushes:LineBrush x:Key="DialogWindowBorderBrush"
                                LineStyle="Edge"
                                Brush="{DynamicResource ThemeBorderBrush}" />

@@ -5,6 +5,7 @@
     <StyleInclude Source="avares://Consolonia.Modal/Themes/DialogWindowTemplate.axaml" />
     <Styles.Resources>
         <ResourceDictionary>
+            <StaticResource x:Key="DialogWindowOuterBorderBackgroundBrush" ResourceKey="ThemeBackgroundBrush"/>
             <ControlTheme x:Key="{x:Type dialog:DialogWindow}"
                           TargetType="dialog:DialogWindow"
                           BasedOn="{StaticResource {x:Type dialog:DialogWindow}}">

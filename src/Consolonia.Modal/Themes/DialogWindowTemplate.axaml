@@ -38,11 +38,12 @@
                         </Border>
 
                         <!--Panel-->
-                        <Panel Background="{TemplateBinding Background}"
+                        <Panel Background="{DynamicResource DialogWindowOuterBorderBackgroundBrush}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center">
                             <Border BorderThickness="{TemplateBinding BorderThickness}"
                                     Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
+                                    Classes="DialogWindowBorder"
                                     BorderBrush="{TemplateBinding BorderBrush}">
                                 <Control
                                     Width="{Binding Path=ContentSize.Width, RelativeSource={RelativeSource TemplatedParent}}"
@@ -93,13 +94,13 @@
                             </StackPanel>
                         </Panel>
                         <Panel Margin="2,1,2,1">
-                            <ContentPresenter Name="PART_ContentPresenter"
-                                              Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
-                                              Padding="{TemplateBinding Padding}"
-                                              BorderThickness="{TemplateBinding BorderThickness}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              Content="{TemplateBinding Content}"
-                                              Foreground="{TemplateBinding Foreground}" />
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
+                                                  Padding="{TemplateBinding Padding}"
+                                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  Content="{TemplateBinding Content}"
+                                                  Foreground="{TemplateBinding Foreground}" />
                         </Panel>
                     </Panel>
                 </ControlTemplate>
