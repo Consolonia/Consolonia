@@ -6,6 +6,59 @@
     <Styles.Resources>
         <ResourceDictionary>
             <StaticResource x:Key="DialogWindowOuterBorderBackgroundBrush" ResourceKey="ThemeBackgroundBrush"/>
+            <ControlTheme x:Key="{x:Type dialog:DialogWindowHeader}"
+                          TargetType="dialog:DialogWindowHeader">
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Panel>
+                            <!--Title Text-->
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Top"
+                                        Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
+                                        ZIndex="10"
+                                        Orientation="Horizontal">
+                                <brushes:SymbolsControl Text=" "
+                                                        Foreground="{TemplateBinding BorderBrush}" />
+                                <TextBlock Text="{TemplateBinding Title}"
+                                           Foreground="{TemplateBinding Foreground}" />
+                                <brushes:SymbolsControl Text=" "
+                                                        Foreground="{TemplateBinding BorderBrush}" />
+                            </StackPanel>
+
+                            <!--Buttons-->
+                            <StackPanel Orientation="Horizontal"
+                                        ZIndex="10"
+                                        VerticalAlignment="Top"
+                                        Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
+                                        IsVisible="{TemplateBinding IsCloseButtonVisible}">
+                                <StackPanel.Styles>
+                                    <Style Selector="Button">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                                        <Setter Property="IsTabStop"
+                                                Value="False" />
+                                        <Setter Property="Theme"
+                                                Value="{DynamicResource ThemeNakedButton}" />
+                                    </Style>
+                                    <Style Selector="brushes|SymbolsControl">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource ThemeBorderBrush}" />
+                                    </Style>
+                                </StackPanel.Styles>
+                                <DockPanel Margin="2,0,0,0">
+                                    <brushes:SymbolsControl DockPanel.Dock="Left"
+                                                            Text="[" />
+                                    <brushes:SymbolsControl DockPanel.Dock="Right"
+                                                            Text="]" />
+                                    <Button Content="■"
+                                            x:Name="PART_CloseButton"
+                                            Command="{Binding Path=CloseClick, RelativeSource={RelativeSource AncestorType=dialog:DialogWindow}}" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Panel>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
             <ControlTheme x:Key="{x:Type dialog:DialogWindow}"
                           TargetType="dialog:DialogWindow"
                           BasedOn="{StaticResource {x:Type dialog:DialogWindow}}">
