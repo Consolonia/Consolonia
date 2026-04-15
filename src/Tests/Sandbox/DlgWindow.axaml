@@ -3,15 +3,19 @@
                     xmlns:modal="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
                     x:Class="Sandbox.DlWindow"
                     Margin="5"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
                     Title="Sandbox"
+                    IsCloseButtonVisible="False"
+                    CancelOnEscape="True"
                     Icon="🔬">
-    <Panel Background="Red">
+    <Grid>
         <TextBlock xml:space="preserve">
-            Some text here Some text hereSome text hereSome text hereSome text here
+ Some text here Some text hereSome text hereSome text hereSome text here
 
-            Some text here Some text hereSome text hereSome text hereSome text here
-            Some text hereSome text hereSome text hereSome text here
+Some text here Some text hereSome text hereSome text hereSome text here
+Some text hereSome text hereSome text hereSome text here
             hereSome text hereSome text hereSome text here
         </TextBlock>
-    </Panel>
+    </Grid>
 </modal:DialogWindow>
