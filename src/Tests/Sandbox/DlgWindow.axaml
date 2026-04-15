@@ -3,7 +3,8 @@
                     xmlns:modal="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
                     x:Class="Sandbox.DlWindow"
                     Margin="5"
-                    Title="Sandbox">
+                    Title="Sandbox"
+                    Icon="🔬">
     <Panel Background="Red">
         <TextBlock xml:space="preserve">
             Some text here Some text hereSome text hereSome text hereSome text here

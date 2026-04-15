@@ -22,6 +22,7 @@ namespace Consolonia.Modal
             AvaloniaProperty.RegisterDirect<DialogWindow, Size>(nameof(ContentSize), window => window.ContentSize);
 
         public static readonly StyledProperty<string> TitleProperty = Window.TitleProperty.AddOwner<DialogWindow>();
+        public static readonly StyledProperty<object> IconProperty = AvaloniaProperty.Register<DialogWindow, object>(nameof(Icon));
 
         public static readonly StyledProperty<bool> IsCloseButtonVisibleProperty =
             AvaloniaProperty.Register<DialogWindow, bool>(nameof(IsCloseButtonVisible), true);
@@ -57,6 +58,12 @@ namespace Consolonia.Modal
         {
             get => GetValue(IsCloseButtonVisibleProperty);
             set => SetValue(IsCloseButtonVisibleProperty, value);
+        }
+
+        public object Icon
+        {
+            get => GetValue(IconProperty);
+            set => SetValue(IconProperty, value);
         }
 
         // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global

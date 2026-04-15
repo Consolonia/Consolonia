@@ -25,7 +25,8 @@
                         <!--Panel shade Mode=Shaded-->
                         <Border Background="{DynamicResource ThemeShadeBrush}"
                                 HorizontalAlignment="Right"
-                                VerticalAlignment="Bottom">
+                                VerticalAlignment="Bottom"
+                                x:Name="PART_SHADOW">
                             <Border BorderBrush="{DynamicResource ThemeTransparentBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}">
@@ -53,6 +54,7 @@
                             </Border>
                             
                             <dialog:DialogWindowHeader Title="{TemplateBinding Title}"
+                                                       Icon="{TemplateBinding Icon}"
                                                        IsCloseButtonVisible="{TemplateBinding IsCloseButtonVisible}"
                                                        BorderBrush="{TemplateBinding BorderBrush}"
                                                        Foreground="{TemplateBinding Foreground}"

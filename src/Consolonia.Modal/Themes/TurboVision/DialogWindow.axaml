@@ -19,6 +19,9 @@
                                         Orientation="Horizontal">
                                 <brushes:SymbolsControl Text=" "
                                                         Foreground="{TemplateBinding BorderBrush}" />
+                                <ContentPresenter Content="{TemplateBinding Icon}"
+                                                  IsVisible="{Binding Icon, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                  Margin="0,0,1,0" />
                                 <TextBlock Text="{TemplateBinding Title}"
                                            Foreground="{TemplateBinding Foreground}" />
                                 <brushes:SymbolsControl Text=" "

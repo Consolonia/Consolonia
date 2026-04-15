@@ -39,7 +39,7 @@
             <x:String x:Key="ThemeCheckBoxIndeterminateSymbol">■</x:String>
 
             <x:String x:Key="ThemeCheckedSymbol">✓</x:String>
-            <x:String x:Key="ThemeCloseSymbol">✕</x:String>
+            <x:String x:Key="ThemeCloseSymbol">🗙</x:String>
 
             <x:String x:Key="ThemeToggleSwitchOffSymbol">◯</x:String>
             <x:String x:Key="ThemeToggleSwitchOnSymbol">⬤</x:String>

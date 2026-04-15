@@ -14,6 +14,15 @@ namespace Consolonia.Modal
             set => SetValue(TitleProperty, value);
         }
 
+        public static readonly StyledProperty<object> IconProperty =
+            DialogWindow.IconProperty.AddOwner<DialogWindowHeader>();
+
+        public object Icon
+        {
+            get => GetValue(IconProperty);
+            set => SetValue(IconProperty, value);
+        }
+
         public static readonly StyledProperty<bool> IsCloseButtonVisibleProperty =
             DialogWindow.IsCloseButtonVisibleProperty.AddOwner<DialogWindowHeader>();
 
