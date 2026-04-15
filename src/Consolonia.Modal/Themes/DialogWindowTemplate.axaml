@@ -51,6 +51,8 @@
                                     IsHitTestVisible="False"
                                     Margin="{TemplateBinding Padding}" />
                             </Border>
+                            
+                            <!--Title Text-->
                             <StackPanel HorizontalAlignment="Center"
                                         VerticalAlignment="Top"
                                         Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
@@ -63,6 +65,8 @@
                                 <brushes:SymbolsControl Text=" "
                                                         Foreground="{TemplateBinding BorderBrush}" />
                             </StackPanel>
+                            
+                            <!--Buttons-->
                             <StackPanel Orientation="Horizontal"
                                         ZIndex="10"
                                         VerticalAlignment="Top"
@@ -93,6 +97,8 @@
                                 </DockPanel>
                             </StackPanel>
                         </Panel>
+                        
+                        <!--Content-->
                         <Panel Margin="2,1,2,1">
                                 <ContentPresenter Name="PART_ContentPresenter"
                                                   Margin="{DynamicResource ConsoloniaDialogWindowBorderMargin}"
