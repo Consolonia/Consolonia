@@ -1,12 +1,9 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:console="https://github.com/consolonia"
-             xmlns:modal="clr-namespace:Consolonia.Modal;assembly=Consolonia.Modal"
              x:Class="Sandbox.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Default">
     <Application.Styles>
-        <!--<console:TurboVisionTheme />-->
         <console:ModernTheme />
-        <modal:ModalTheme />
     </Application.Styles>
 </Application>

@@ -20,10 +20,5 @@ namespace Sandbox
             var lifetime = Application.Current!.ApplicationLifetime as IControlledApplicationLifetime;
             lifetime!.Shutdown();
         }
-
-        private async void Button_OnClick(object? sender, RoutedEventArgs e)
-        {
-            await new DlWindow().ShowDialogAsync(this);
-        }
     }
 }

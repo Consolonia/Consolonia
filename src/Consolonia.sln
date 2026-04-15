@@ -66,8 +66,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sandbox", "Tests\Sandbox\Sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consolonia.ManagedWindows", "Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj", "{8131DA3C-EAD5-4D0B-A91D-6A71D81B8137}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consolonia.Modal", "Consolonia.Modal\Consolonia.Modal.csproj", "{11070F76-0476-4BCB-9F86-99046A0579F2}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
