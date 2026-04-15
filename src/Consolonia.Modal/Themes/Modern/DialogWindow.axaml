@@ -18,7 +18,7 @@
                           TargetType="dialog:DialogWindowHeader">
                 <Setter Property="Template">
                     <ControlTemplate>
-                        <Panel>
+                        <Panel Margin="0,1,0,0">
                             <!--Title Text-->
                             <StackPanel HorizontalAlignment="Center"
                                         VerticalAlignment="Top"
