@@ -22,7 +22,7 @@ namespace Consolonia.Core.Drawing
         private readonly ConsoleWindowImpl _consoleTopLevelImpl;
 
         // cache of pixels written so we can ignore them if unchanged.
-        private Pixel?[,] _cache;
+        private Pixel?[,] _cache = null!; //todo: why Pixel can be null
         private ConsoleCursor _consoleCursor;
 
         private bool _renderPending;
