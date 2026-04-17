@@ -8,20 +8,20 @@ namespace Consolonia.Core.Infrastructure
         {
         }
 
+        private Task PauseTask { get; set; }
+
         public virtual void PauseIO(Task task)
         {
             task.ContinueWith(_ => { PauseTask = null; }, TaskScheduler.Default);
             PauseTask = task;
         }
 
-        private Task PauseTask { get; set; }
-
         protected Task WaitPauseTaskIfNecessaryAsync()
         {
             Task pauseTask = PauseTask;
             return pauseTask ?? Task.CompletedTask;
         }
-        
+
         protected void WaitPauseTaskIfNecessary()
         {
             Task pauseTask = PauseTask;

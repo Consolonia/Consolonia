@@ -82,7 +82,7 @@ namespace Consolonia.Core.Infrastructure
         void Flush();
 
         /// <summary>
-        /// Pause IO operations
+        ///     Pause IO operations
         /// </summary>
         /// <param name="task"></param>
         void PauseIO(Task task);

@@ -34,7 +34,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
         protected bool Disposed { get; private set; }
-        
+
         public override void PauseIO(Task task)
         {
             base.PauseIO(task);

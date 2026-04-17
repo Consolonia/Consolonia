@@ -348,7 +348,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
         public event Action<ConsoleCursor> CursorChanged;
-        
+
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
             if (args.Sender != _inputRoot) return;
@@ -527,7 +527,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
         public event Action ClearScreenRequested;
-        
+
         public void ClearScreen()
         {
             DirtyRegions.AddRect(PixelBuffer.Size);

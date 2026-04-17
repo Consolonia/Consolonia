@@ -110,7 +110,7 @@ namespace Consolonia.Core.Infrastructure
                 return;
 
             WaitPauseTaskIfNecessary();
-            
+
             // Debug.WriteLine($"[{_currentBufferPoint.X},{_currentBufferPoint.Y}] {_lastForegroundColor} on {_lastBackgroundColor} '{_stringBuilder}'");
             Console.Write(_stringBuilder.ToString());
             _stringBuilder.Clear();
@@ -125,7 +125,7 @@ namespace Consolonia.Core.Infrastructure
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
             WaitPauseTaskIfNecessary();
-            
+
             try
             {
 #pragma warning disable CA1416 // Validate platform compatibility

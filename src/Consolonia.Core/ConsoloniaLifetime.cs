@@ -166,10 +166,7 @@ namespace Consolonia
             pauseTask.ContinueWith(_ =>
             {
                 consoleWindow.ClearScreen();
-                Dispatcher.UIThread.Post(() =>
-                {
-                    MainWindow.InvalidateVisual();
-                });
+                Dispatcher.UIThread.Post(() => { MainWindow.InvalidateVisual(); });
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
             return Dispatcher.UIThread.InvokeAsync(() => { }).GetTask();
