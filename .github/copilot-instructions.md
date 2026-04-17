@@ -176,7 +176,8 @@ Always perform these validation steps for CI compatibility:
 - **`Consolonia.Themes`** - Default themes and styling
 - **`Consolonia.Gallery`** - Component showcase application (packaged as global tool)
 - **`Example`** - Sample movie catalog application
-- **`Consolonia.Templates`** - dotnet project templates  
+- **`Consolonia.Templates`** - dotnet project templates
+- **`Consolonia.Modal`** - Modal dialogs and overlay system
 - **`Tools/Consolonia.PreviewHost`** - Live AXAML preview tool
 - **`Tests/`** - NUnit test projects
 - **`Experimental/`** - Experimental features (may have warnings/errors)
