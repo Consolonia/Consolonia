@@ -21,7 +21,5 @@ namespace Consolonia.Core.Infrastructure
         event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
 
         event Action<bool> FocusEvent;
-
-        void PauseIO(Task task);
     }
 }

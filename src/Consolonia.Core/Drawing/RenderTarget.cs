@@ -36,9 +36,23 @@ namespace Consolonia.Core.Drawing
         {
             _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
             _consoleTopLevelImpl = consoleTopLevelImpl;
-            _cache = InitializeCache(_consoleTopLevelImpl.PixelBuffer.Width, _consoleTopLevelImpl.PixelBuffer.Height);
+            InitializeCacheInternal();
             _consoleTopLevelImpl.Resized += OnResized;
             _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
+            _consoleTopLevelImpl.ClearScreenRequested += OnClearScreenRequested;
+        }
+
+        private void InitializeCacheInternal()
+        {
+            _cache = InitializeCache(_consoleTopLevelImpl.PixelBuffer.Width, _consoleTopLevelImpl.PixelBuffer.Height);
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        private void OnClearScreenRequested()
+        {
+            _console.ClearScreen();
+            _console.Flush();
+            InitializeCacheInternal();
         }
 
         public RenderTarget(IEnumerable<object> surfaces)
@@ -53,6 +67,7 @@ namespace Consolonia.Core.Drawing
         {
             _consoleTopLevelImpl.Resized -= OnResized;
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
+            _consoleTopLevelImpl.ClearScreenRequested -= OnClearScreenRequested;
         }
 
         public void Save(string fileName, int? quality = null)
@@ -92,10 +107,11 @@ namespace Consolonia.Core.Drawing
         }
 
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         private void OnResized(Size size, WindowResizeReason reason)
         {
             // todo: should we check the reason?
-            _cache = InitializeCache(_consoleTopLevelImpl.PixelBuffer.Width, _consoleTopLevelImpl.PixelBuffer.Height);
+            InitializeCacheInternal();
         }
 
         private static Pixel?[,] InitializeCache(ushort width, ushort height)

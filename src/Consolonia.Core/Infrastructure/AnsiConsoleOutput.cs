@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Media;
 using Consolonia.Controls;
@@ -14,7 +15,7 @@ namespace Consolonia.Core.Infrastructure
     /// <remarks>
     ///     This console buffers all output and only writes to the console on Flush.
     /// </remarks>
-    public class AnsiConsoleOutput : IConsoleOutput
+    public class AnsiConsoleOutput : PauseBase, IConsoleOutput
 
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
@@ -172,6 +173,7 @@ namespace Consolonia.Core.Infrastructure
         {
             if (_outputBuffer.Length > 0)
             {
+                WaitPauseTaskIfNecessary();
                 Console.Write(_outputBuffer.ToString());
                 _outputBuffer.Clear();
             }
@@ -184,6 +186,7 @@ namespace Consolonia.Core.Infrastructure
         /// <param name="str"></param>
         public void WriteText(string str)
         {
+            WaitPauseTaskIfNecessary();
             _outputBuffer.Append(str);
         }
 
