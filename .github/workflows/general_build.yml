@@ -38,7 +38,7 @@ jobs:
         uses: c-py/action-dotenv-to-setenv@v5
 
       - name: Beta Version Suffix
-        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'refs/heads/main' }}
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
         run: echo "BUILD_VERSION=beta.${{ github.run_number }}" >> $GITHUB_ENV
 
       - name: Ensure BUILD_VERSION
