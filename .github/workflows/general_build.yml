@@ -39,7 +39,7 @@ jobs:
 
       - name: Beta Version Suffix
         if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
-        run: echo "BUILD_VERSION=beta.${{ github.run_number }}" >> $GITHUB_ENV
+        run: echo "VERSION_SUFFIX=beta.${{ github.run_number }}" >> $GITHUB_ENV
 
       - name: Ensure BUILD_VERSION
         run: |
@@ -66,7 +66,7 @@ jobs:
       - name: Test
         run: dotnet test # --configuration release todo: release get stuck and never finishes
       - name: Pack
-        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
+        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true --version-suffix $VERSION_SUFFIX # https://stackoverflow.com/a/60067489/2362847
       - name: Push
         if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true' || github.event_name == 'pull_request') && github.ref == 'refs/heads/main' }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
