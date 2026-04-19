@@ -73,7 +73,7 @@ jobs:
         
         # tagging the commit so we can track exact version when issues reported
       - name: Tag commit with version (post-publish)
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main' }}
         run: |
           set -e
           git fetch --tags
