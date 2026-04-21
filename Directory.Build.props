@@ -4,12 +4,18 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>disable</Nullable>
     </PropertyGroup>
+
     <PropertyGroup>
         <ConsoloniaVersion>11.3.12</ConsoloniaVersion>
         <ConsoloniaVersionLatest>$(ConsoloniaVersion).*</ConsoloniaVersionLatest>
         <!--If ran not by pipeline - defining for local run-->
         <BUILD_VERSION Condition="'$(BUILD_VERSION)' == ''">0</BUILD_VERSION>
         <VersionPrefix>$(ConsoloniaVersion).$(BUILD_VERSION)</VersionPrefix>
+
+        <AvaloniaVersion>11.3.12</AvaloniaVersion>
+    </PropertyGroup>
+
+    <PropertyGroup>
         <Authors>https://github.com/consolonia/consolonia/graphs/contributors</Authors>
         <Copyright>© 2021–2025 Evgeny Gorbovoy &amp; Tom Laird-McConnell</Copyright>
         <ProjectUrl>https://github.com/consolonia/consolonia</ProjectUrl>
@@ -20,9 +26,7 @@
         <NoWarn>AVA3001</NoWarn>
         <IsPackable>False</IsPackable>
     </PropertyGroup>
-    <PropertyGroup>
-        <AvaloniaVersion>11.3.12</AvaloniaVersion>
-    </PropertyGroup>
+
     <ItemGroup Condition="'$(IsPackable)' != 'false'">
         <None Include="$(SolutionDir)/../Icon.png"
               Pack="True"

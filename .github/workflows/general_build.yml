@@ -37,6 +37,10 @@ jobs:
       - name: Load .env
         uses: c-py/action-dotenv-to-setenv@v5
 
+      - name: Beta Version Suffix
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+        run: echo "VERSION_SUFFIX=beta.${{ github.run_number }}" >> $GITHUB_ENV
+
       - name: Ensure BUILD_VERSION
         run: |
           if [ -z "$BUILD_VERSION" ]; then
@@ -62,14 +66,14 @@ jobs:
       - name: Test
         run: dotnet test # --configuration release todo: release get stuck and never finishes
       - name: Pack
-        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
+        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true --version-suffix $VERSION_SUFFIX # https://stackoverflow.com/a/60067489/2362847
       - name: Push
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main'  || (github.event_name == 'pull_request' && github.base_ref == 'main') }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
         
         # tagging the commit so we can track exact version when issues reported
       - name: Tag commit with version (post-publish)
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main' }}
         run: |
           set -e
           git fetch --tags
