@@ -76,6 +76,20 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
+        [TestCase('：')]
+        [TestCase('。')]
+        [TestCase('（')]
+        [TestCase('）')]
+        [TestCase('！')]
+        public void ConstructorFullWidthPunctuationChar(char ch)
+        {
+            var symbol = new Symbol(ch);
+            Assert.That(symbol.Character, Is.EqualTo(ch));
+            Assert.That(symbol.Complex, Is.Null);
+            Assert.That(symbol.Width, Is.EqualTo(2));
+        }
+
+        [Test]
         public void Equality()
         {
             var symbol = new Symbol('a');

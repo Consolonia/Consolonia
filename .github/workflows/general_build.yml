@@ -37,14 +37,23 @@ jobs:
       - name: Load .env
         uses: c-py/action-dotenv-to-setenv@v5
 
+      - name: Beta Version Suffix
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+        run: echo "VERSION_SUFFIX=beta.${{ github.run_number }}" >> $GITHUB_ENV
+
       - name: Ensure BUILD_VERSION
         run: |
           if [ -z "$BUILD_VERSION" ]; then
             echo "BUILD_VERSION=${{ github.run_number }}" >> $GITHUB_ENV
             echo "BUILD_VERSION was not set, using github.run_number: ${{ github.run_number }}"
           else
+            echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
             echo "BUILD_VERSION is already set: $BUILD_VERSION"
           fi
+            
+          VAL=$(grep -oP '(?<=<ConsoloniaVersion Condition=".*">).*?(?=</ConsoloniaVersion>)' ../Directory.Build.props || grep -oP '(?<=<ConsoloniaVersion>).*?(?=</ConsoloniaVersion>)' ../Directory.Build.props)
+          echo "ConsoloniaVersion=$VAL" >> $GITHUB_ENV
+          echo "ConsoloniaVersion detected: $VAL"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -57,26 +66,27 @@ jobs:
       - name: Test
         run: dotnet test # --configuration release todo: release get stuck and never finishes
       - name: Pack
-        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true
+        run: dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true --version-suffix $VERSION_SUFFIX # https://stackoverflow.com/a/60067489/2362847
       - name: Push
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main'  || (github.event_name == 'pull_request' && github.base_ref == 'main') }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
         
         # tagging the commit so we can track exact version when issues reported
       - name: Tag commit with version (post-publish)
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true')  && github.ref == 'refs/heads/main' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main' }}
         run: |
           set -e
           git fetch --tags
           VERSION_LITERAL=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
-          # Evaluate VERSION by replacing $(BUILD_VERSION) with its value
-          VERSION=$(echo "$VERSION_LITERAL" | sed "s/\\\$(BUILD_VERSION)/$BUILD_VERSION/g")
+          # Evaluate VERSION by replacing MSBuild variables with their values
+          VERSION=$(echo "$VERSION_LITERAL" | sed "s/\\\$(ConsoloniaVersion)/$ConsoloniaVersion/g" | sed "s/\\\$(BUILD_VERSION)/$BUILD_VERSION/g")
           if [ -z "$VERSION" ]; then
             echo "Failed to determine version from ../Directory.Build.props" >&2
             exit 1
           fi
           echo "Version detected: $VERSION"
           echo "BUILD_VERSION: $BUILD_VERSION"
+          echo "ConsoloniaVersion: $ConsoloniaVersion"
           
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"

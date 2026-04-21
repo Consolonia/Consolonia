@@ -25,7 +25,7 @@ namespace Consolonia.Gallery.Tests
         public async Task DisplaysWideTermText()
         {
             await UITest.KeyInput(Key.Down);
-            await UITest.AssertHasText("Ｈ️ｅ️ｌ️ｌ️ｏ️  Ｗ️ｏ️ｒ️ｌ️ｄ️！️");
+            await UITest.AssertHasText("Ｈｅｌｌｏ  Ｗｏｒｌｄ！");
         }
 
 
