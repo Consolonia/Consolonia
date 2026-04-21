@@ -38,9 +38,9 @@ jobs:
       - name: Load .env
         uses: c-py/action-dotenv-to-setenv@v5
 
-      - name: Beta Version Suffix
-        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && contains(github.event.pull_request.labels.*.name, 'publish beta') }}
-        run: echo "VERSION_SUFFIX=beta.${{ github.run_number }}" >> $GITHUB_ENV
+      - name: Alpha Version Suffix
+        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && contains(github.event.pull_request.labels.*.name, 'publish alpha') }}
+        run: echo "VERSION_SUFFIX=alpha.${{ github.run_number }}" >> $GITHUB_ENV
 
       - name: Ensure BUILD_VERSION
         run: |
@@ -74,7 +74,7 @@ jobs:
           fi
           dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true $VERSION_SUFFIX_ARG
       - name: Push
-        if: ${{ ((github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.base_ref == 'main' && contains(github.event.pull_request.labels.*.name, 'publish beta')) }}
+        if: ${{ ((github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.base_ref == 'main' && contains(github.event.pull_request.labels.*.name, 'publish alpha')) }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
         
         # tagging the commit so we can track exact version when issues reported
