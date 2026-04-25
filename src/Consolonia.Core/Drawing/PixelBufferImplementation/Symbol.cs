@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Serialization;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using NeoSmart.Unicode;
 using Wcwidth;
 
@@ -36,7 +37,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Pattern = 0;
         }
 
-        public Symbol(byte[] sixel, byte width)
+        public Symbol(Sixel sixel, byte width)
         {
             Character = char.MinValue;
             Complex = null;
@@ -166,7 +167,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public readonly byte Pattern;
 
         // sixel
-        public readonly byte[] Sixel;
+        public readonly Sixel Sixel;
 
         [JsonIgnore] public readonly byte Width;
 #pragma warning restore CA1051 // Do not declare visible instance fields

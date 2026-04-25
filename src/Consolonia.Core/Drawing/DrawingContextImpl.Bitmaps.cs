@@ -48,7 +48,7 @@ namespace Consolonia.Core.Drawing
             int cellPixelWidth = _consoleWindowImpl.Console.CellPixelWidth;
             int cellPixelHeight = _consoleWindowImpl.Console.CellPixelHeight;
 
-            if (!_sixels.TryGetValue(source, out var sixel))
+            if (!_sixels.TryGetValue(source, out var sixelImage))
             {
 
                 var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
@@ -73,16 +73,14 @@ namespace Consolonia.Core.Drawing
                     byte[] visibleBytes = CopyVisibleBitmapBytes(pixelBytes, frameBuffer.RowBytes, visibleTargetSize,
                         visibleOffsetX, visibleOffsetY);
 
-                    SixelEncoder.Quantize(visibleBytes, out byte[] palette, out int paletteCount, out byte[] indexed);
-
-                    sixel = SixelEncoder.Encode(indexed, visibleTargetSize.Width, visibleTargetSize.Height,
-                        palette, paletteCount);
-                    _sixels[source] = sixel;
+                    sixelImage = Sixel.CreateFromBitmap(visibleBytes,
+                        visibleTargetSize.Width, visibleTargetSize.Height);
+                    _sixels[source] = sixelImage;
                 }
             }
             var topLeft = intersectedRect.TopLeft;
             _pixelBuffer[topLeft] = new Pixel(
-                new PixelForeground(new Symbol(sixel, (byte)intersectedRect.Width), Colors.Transparent));
+                new PixelForeground(new Symbol(sixelImage, (byte)intersectedRect.Width), Colors.Transparent));
 
             for (int y = 0; y < intersectedRect.Height; y++)
             {
@@ -130,23 +128,24 @@ namespace Consolonia.Core.Drawing
                         byte[] fullBytes = CopyVisibleBitmapBytes(pixelBytes, frameBuffer.RowBytes,
                             fullTargetSize, 0, 0);
 
-                        SixelEncoder.Quantize(fullBytes, out byte[] palette, out int paletteCount,
-                            out byte[] indexed);
+                        // Quantize the full image once to get a shared palette
+                        Sixel fullSixel = Sixel.CreateFromBitmap(fullBytes,
+                            fullTargetSize.Width, fullTargetSize.Height);
 
                         var bitmapBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
-                        byte[] cellIndexed = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight);
+                        byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
 
                         for (int cellY = 0; cellY < targetRect.Height; cellY++)
                         {
                             for (int cellX = 0; cellX < targetRect.Width; cellX++)
                             {
-                                FillCellIndexedBuffer(indexed, targetSize.Width, cellX, cellY,
-                                    cellPixelWidth, cellPixelHeight, cellIndexed);
+                                FillCellBgrxBuffer(fullBytes, fullTargetSize.Width, cellX, cellY,
+                                    cellPixelWidth, cellPixelHeight, cellBgrx);
 
-                                byte[] sixel = SixelEncoder.Encode(cellIndexed, cellPixelWidth, cellPixelHeight,
-                                    palette, paletteCount);
+                                Sixel cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                                    cellPixelWidth, cellPixelHeight, fullSixel.Palette);
                                 bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                                    new PixelForeground(new Symbol(sixel, 1), Colors.Transparent));
+                                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent));
                             }
                         }
 
@@ -277,15 +276,18 @@ namespace Consolonia.Core.Drawing
             return visibleBytes;
         }
 
-        private static void FillCellIndexedBuffer(ReadOnlySpan<byte> indexed, int imageWidth, int cellX, int cellY,
-            int cellPixelWidth, int cellPixelHeight, Span<byte> cellIndexed)
+        private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,
+            int cellPixelWidth, int cellPixelHeight, Span<byte> cellBgrx)
         {
+            int bytesPerPixel = 4;
+            int srcRowBytes = imageWidth * bytesPerPixel;
+            int cellRowBytes = cellPixelWidth * bytesPerPixel;
             for (int row = 0; row < cellPixelHeight; row++)
             {
-                int sourceOffset = ((cellY * cellPixelHeight) + row) * imageWidth + (cellX * cellPixelWidth);
-                int targetOffset = row * cellPixelWidth;
-                indexed.Slice(sourceOffset, cellPixelWidth)
-                    .CopyTo(cellIndexed.Slice(targetOffset, cellPixelWidth));
+                int sourceOffset = ((cellY * cellPixelHeight) + row) * srcRowBytes + (cellX * cellPixelWidth * bytesPerPixel);
+                int targetOffset = row * cellRowBytes;
+                bgrx.Slice(sourceOffset, cellRowBytes)
+                    .CopyTo(cellBgrx.Slice(targetOffset, cellRowBytes));
             }
         }
 

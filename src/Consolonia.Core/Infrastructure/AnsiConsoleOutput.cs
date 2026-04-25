@@ -81,7 +81,7 @@ namespace Consolonia.Core.Infrastructure
 
             if (pixel.Foreground.Symbol.Sixel != null)
             {
-                ReadOnlySpan<byte> sixel = pixel.Foreground.Symbol.Sixel;
+                ReadOnlySpan<byte> sixel = pixel.Foreground.Symbol.Sixel.ToBytes();
                 sixel.CopyTo(_outputBuffer.GetSpan(sixel.Length));
                 _outputBuffer.Advance(sixel.Length);
 

@@ -1,26 +1,117 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using Avalonia.Platform;
 using JeremyAnsel.ColorQuant;
 
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    /// High-performance SIXEL encoder.
-    /// Takes pre-quantized indexed pixel data and palette.
-    /// Uses SIMD for bitmask building, pooled buffers, direct byte[] output.
+    /// Represents a sixel image with palette and indexed pixel data.
+    /// Supports composition via BitBlt and serialization via ToBytes.
     /// </summary>
-    static class SixelEncoder
+    public class Sixel
     {
+        /// <summary>BGRX palette, 4 bytes per entry.</summary>
+        public byte[] Palette { get; }
+
+        /// <summary>Number of colors in the palette.</summary>
+        public int PaletteCount { get; }
+
+        /// <summary>Indexed pixel data (one byte per pixel, index into Palette).</summary>
+        public byte[] Pixels { get; }
+
+        /// <summary>Pixel width of the image.</summary>
+        public int Width { get; }
+
+        /// <summary>Pixel height of the image.</summary>
+        public int Height { get; }
+
+        /// <summary>Original bitmap source (may be null).</summary>
+        public IBitmapImpl Source { get; }
+
+        public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height, IBitmapImpl source = null)
+        {
+            Palette = palette;
+            PaletteCount = paletteCount;
+            Pixels = pixels;
+            Width = width;
+            Height = height;
+            Source = source;
+        }
+
+        /// <summary>
+        /// Create a Sixel from raw BGRX pixel data.
+        /// If a palette is provided it is used to quantize against, otherwise a new palette is created.
+        /// </summary>
+        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, byte[] palette = null)
+        {
+            if (palette != null)
+            {
+                int paletteCount = palette.Length / 4;
+                byte[] indexed = QuantizeWithPalette(bgrx, palette, paletteCount);
+                return new Sixel(palette, paletteCount, indexed, width, height);
+            }
+            else
+            {
+                Quantize(bgrx, out byte[] newPalette, out int paletteCount, out byte[] indexed);
+                return new Sixel(newPalette, paletteCount, indexed, width, height);
+            }
+        }
+
+        /// <summary>
+        /// Copy source image pixels into this image at pixel position (x, y).
+        /// Clips if source extends beyond this image's bounds.
+        /// </summary>
+        public void BitBlt(Sixel source, int x, int y)
+        {
+            for (int row = 0; row < source.Height; row++)
+            {
+                int destY = y + row;
+                if (destY < 0)
+                    continue;
+                if (destY >= Height)
+                    break;
+
+                int srcOffset = row * source.Width;
+                int dstOffset = destY * Width + x;
+
+                int srcX = 0;
+                int dstX = x;
+
+                if (dstX < 0)
+                {
+                    srcX = -dstX;
+                    dstX = 0;
+                    dstOffset = destY * Width;
+                }
+
+                int copyLen = Math.Min(source.Width - srcX, Width - dstX);
+                if (copyLen <= 0)
+                    continue;
+
+                Array.Copy(source.Pixels, srcOffset + srcX, Pixels, dstOffset, copyLen);
+            }
+        }
+
+        #region Serialization
+
         [ThreadStatic] private static byte[] _outputBuf;
 
-        public static byte[] Encode(byte[] indexed, int width, int height, byte[] palette, int paletteCount)
+        /// <summary>
+        /// Serialize this image to SIXEL escape sequence bytes.
+        /// The returned span is backed by a thread-static buffer and is valid until the next call to ToBytes.
+        /// </summary>
+        public ReadOnlySpan<byte> ToBytes()
         {
+            int width = Width;
+            int height = Height;
+            byte[] palette = Palette;
+            int paletteCount = PaletteCount;
+            byte[] indexed = Pixels;
+
             int maxOutput = 64 + paletteCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
             var output = RentOrGrow(ref _outputBuf, maxOutput);
             int pos = 0;
@@ -118,17 +209,18 @@ namespace Consolonia.Core.Drawing
             output[pos++] = 0x1B;
             output[pos++] = (byte)'\\';
 
-            var result = GC.AllocateUninitializedArray<byte>(pos);
-            output.AsSpan(0, pos).CopyTo(result);
             _outputBuf = output;
-            return result;
+            return output.AsSpan(0, pos);
         }
+
+        #endregion
+
+        #region Quantization
 
         /// <summary>
         /// Quantize BGRX pixel data using Wu's variance-minimizing algorithm.
-        /// Returns BGRX palette (4 bytes per entry) and indexed pixel data.
         /// </summary>
-        public static void Quantize(byte[] bgrx,
+        private static void Quantize(byte[] bgrx,
             out byte[] palette, out int paletteCount, out byte[] indexed)
         {
             var quantizer = new WuColorQuantizer();
@@ -139,6 +231,45 @@ namespace Consolonia.Core.Drawing
             indexed = result.Bytes;
         }
 
+        /// <summary>
+        /// Map BGRX pixel data to an existing palette using nearest-color matching.
+        /// </summary>
+        private static byte[] QuantizeWithPalette(byte[] bgrx, byte[] palette, int paletteCount)
+        {
+            int pixelCount = bgrx.Length / 4;
+            byte[] indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
+
+            for (int i = 0; i < pixelCount; i++)
+            {
+                int off = i * 4;
+                int b = bgrx[off];
+                int g = bgrx[off + 1];
+                int r = bgrx[off + 2];
+
+                int bestIdx = 0;
+                int bestDist = int.MaxValue;
+                for (int c = 0; c < paletteCount; c++)
+                {
+                    int po = c * 4;
+                    int db = b - palette[po];
+                    int dg = g - palette[po + 1];
+                    int dr = r - palette[po + 2];
+                    int dist = dr * dr + dg * dg + db * db;
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        bestIdx = c;
+                    }
+                }
+                indexed[i] = (byte)bestIdx;
+            }
+
+            return indexed;
+        }
+
+        #endregion
+
+        #region SIMD helpers
 
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private static void BuildSixelRow(byte[] indexed, byte[] sixelRow, int width, int yStart, int bandRows, byte color)
@@ -256,6 +387,10 @@ namespace Consolonia.Core.Drawing
             return (byte)(bits + 63);
         }
 
+        #endregion
+
+        #region Buffer helpers
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int WriteIntBuf(byte[] buf, int pos, int value)
         {
@@ -327,6 +462,7 @@ namespace Consolonia.Core.Drawing
                 buf = GC.AllocateUninitializedArray<T>(Math.Max(minSize, 4096));
             return buf;
         }
-    }
 
+        #endregion
+    }
 }
