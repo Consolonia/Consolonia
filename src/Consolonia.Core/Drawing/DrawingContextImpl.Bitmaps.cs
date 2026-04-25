@@ -42,6 +42,7 @@ namespace Consolonia.Core.Drawing
             if (intersectedRect.IsEmpty())
                 return;
             var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
+            bool trackedDirtyRegions = false;
 #if SIXEL
 
             int cellPixelWidth = _consoleWindowImpl.Console.CellPixelWidth;
@@ -151,13 +152,42 @@ namespace Consolonia.Core.Drawing
                     }
                 });
 
+            trackedDirtyRegions = true;
             for (int y = 0; y < intersectedRect.Height; y++)
             {
+                int dirtyRunStart = -1;
                 for (int x = 0; x < intersectedRect.Width; x++)
                 {
                     var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
                     var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
-                    _pixelBuffer[destPoint] = renderedBitmap[sourcePoint];
+                    Pixel newPixel = renderedBitmap[sourcePoint];
+                    if (_pixelBuffer[destPoint] == newPixel)
+                    {
+                        if (dirtyRunStart >= 0)
+                        {
+                            _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                                intersectedRect.X + dirtyRunStart,
+                                intersectedRect.Y + y,
+                                x - dirtyRunStart,
+                                1));
+                            dirtyRunStart = -1;
+                        }
+
+                        continue;
+                    }
+
+                    _pixelBuffer[destPoint] = newPixel;
+                    if (dirtyRunStart < 0)
+                        dirtyRunStart = x;
+                }
+
+                if (dirtyRunStart >= 0)
+                {
+                    _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                        intersectedRect.X + dirtyRunStart,
+                        intersectedRect.Y + y,
+                        intersectedRect.Width - dirtyRunStart,
+                        1));
                 }
             }
 
@@ -219,7 +249,8 @@ namespace Consolonia.Core.Drawing
                 }
             }
 #endif
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            if (!trackedDirtyRegions)
+                _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
 
         public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
