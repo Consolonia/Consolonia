@@ -1,4 +1,6 @@
 using System;
+using System.Buffers;
+using System.IO;
 using System.Text;
 using Avalonia;
 using Avalonia.Media;
@@ -22,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        private readonly StringBuilder _outputBuffer = new();
+        private readonly ArrayBufferWriter<byte> _outputBuffer = new();
 
         private PixelBufferCoordinate _headBufferPoint;
         private Color _lastBackground = Colors.Transparent;
@@ -30,10 +32,24 @@ namespace Consolonia.Core.Infrastructure
         private FontStyle? _lastStyle;
         private TextDecorationLocation? _lastTextDecoration;
         private FontWeight? _lastWeight;
+        private Stream _stdOut;
+
+        internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
+
+        public AnsiConsoleOutput()
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            _stdOut = Console.OpenStandardOutput();
+        }
+
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
         public PixelBufferSize Size { get; set; }
+
+        public int CellPixelWidth { get; private set; }
+
+        public int CellPixelHeight { get; private set; }
 
         public void SetTitle(string title)
         {
@@ -55,14 +71,24 @@ namespace Consolonia.Core.Infrastructure
 
         public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
-            if (pixel.Width <=
-                0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
+            if (pixel.Width <= 0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
                 return;
 
             //todo: performance of retrieval of the service, at least can be retrieved once
             Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
 
             SetCaretPosition(position);
+
+            if (pixel.Foreground.Symbol.Sixel != null)
+            {
+                ReadOnlySpan<byte> sixel = pixel.Foreground.Symbol.Sixel;
+                sixel.CopyTo(_outputBuffer.GetSpan(sixel.Length));
+                _outputBuffer.Advance(sixel.Length);
+
+                position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
+                SetCaretPositionInternal(position);
+                return;
+            }
 
             if (pixel.Foreground.TextDecoration != _lastTextDecoration)
             {
@@ -155,8 +181,8 @@ namespace Consolonia.Core.Infrastructure
 
             position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
             if (pixel.Width > 1 || pixel.Foreground.Symbol.Complex != null)
-                // then we force set the next position to where we want to be because again
-                // we can't rely on the terminal to advance the caret correctly.
+            // then we force set the next position to where we want to be because again
+            // we can't rely on the terminal to advance the caret correctly.
             {
                 SetCaretPositionInternal(position);
             }
@@ -170,9 +196,10 @@ namespace Consolonia.Core.Infrastructure
 
         public void Flush()
         {
-            if (_outputBuffer.Length > 0)
+            if (_outputBuffer.WrittenCount > 0)
             {
-                Console.Write(_outputBuffer.ToString());
+                _stdOut.Write(_outputBuffer.WrittenSpan);
+                _stdOut.Flush();
                 _outputBuffer.Clear();
             }
         }
@@ -184,14 +211,15 @@ namespace Consolonia.Core.Infrastructure
         /// <param name="str"></param>
         public void WriteText(string str)
         {
-            _outputBuffer.Append(str);
+            int max = Encoding.UTF8.GetMaxByteCount(str.Length);
+            Span<byte> span = _outputBuffer.GetSpan(max);
+            int written = Encoding.UTF8.GetBytes(str.AsSpan(), span);
+            _outputBuffer.Advance(written);
         }
 
         public void PrepareConsole()
         {
 #pragma warning disable CA1303 // Do not pass literals as localized parameters
-            Console.OutputEncoding = Encoding.UTF8;
-
             // enable alternate screen so original console screen is not affected by the app
             Console.Write(Esc.EnableAlternateBuffer);
 
@@ -205,6 +233,10 @@ namespace Consolonia.Core.Infrastructure
             if (left2 - left == 2)
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
+            // determine cell pixel sizes
+            (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ?? (8, 16);
+            this.CellPixelHeight = cellH;
+            this.CellPixelWidth = cellW;
             BlackColorTTYWorkaround();
 
             ClearScreen();
@@ -313,7 +345,14 @@ namespace Consolonia.Core.Infrastructure
         public void WriteChar(char ch)
         {
             if (ch > 0)
-                _outputBuffer.Append(ch);
+            {
+                Span<char> chars = stackalloc char[1];
+                chars[0] = ch;
+
+                Span<byte> bytes = _outputBuffer.GetSpan(Encoding.UTF8.GetMaxByteCount(1));
+                int written = Encoding.UTF8.GetBytes(chars, bytes);
+                _outputBuffer.Advance(written);
+            }
         }
     }
 }

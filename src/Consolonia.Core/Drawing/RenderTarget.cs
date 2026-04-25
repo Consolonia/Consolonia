@@ -104,8 +104,8 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-            for (ushort x = 0; x < width; x++)
-                cache[x, y] = Pixel.Empty;
+                for (ushort x = 0; x < width; x++)
+                    cache[x, y] = Pixel.Empty;
 
             return cache;
         }
@@ -183,8 +183,15 @@ namespace Consolonia.Core.Drawing
                                 pixel.Background, pixel.CaretStyle);
                         }
                     }
+                    if (pixel.Foreground.Symbol.Sixel != null)
+                    {
+                        _console.WritePixel(new PixelBufferCoordinate(x, y), in pixel);
+                        _cache[x, y] = pixel;
+                        continue;
+                    }
 
                     if (pixel.Width > 1)
+
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
                             if (pixelBuffer[(ushort)(x + i), y].Width != 0)

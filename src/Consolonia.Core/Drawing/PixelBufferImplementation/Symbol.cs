@@ -36,6 +36,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Pattern = 0;
         }
 
+        public Symbol(byte[] sixel, byte width)
+        {
+            Character = char.MinValue;
+            Complex = null;
+            Width = width;
+            Pattern = 0;
+            Sixel = sixel;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Symbol(char ch, byte? width = null)
         {
@@ -155,6 +164,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         // box pattern for box merging.
         public readonly byte Pattern;
+
+        // sixel
+        public readonly byte[] Sixel;
 
         [JsonIgnore] public readonly byte Width;
 #pragma warning restore CA1051 // Do not declare visible instance fields

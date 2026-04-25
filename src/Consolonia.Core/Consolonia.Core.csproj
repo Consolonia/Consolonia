@@ -7,7 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />                
+        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="JeremyAnsel.ColorQuant" Version="3.0.74" />
     </ItemGroup>
 
     <ItemGroup>
@@ -15,12 +16,12 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Update="Drawing\DrawingContextImpl.Bitmaps.cs">
-        <DependentUpon>DrawingContextImpl.cs</DependentUpon>
-      </Compile>
-      <Compile Update="Drawing\DrawingContextImpl.Boxes.cs">
-        <DependentUpon>DrawingContextImpl.cs</DependentUpon>
-      </Compile>
+        <Compile Update="Drawing\DrawingContextImpl.Bitmaps.cs">
+            <DependentUpon>DrawingContextImpl.cs</DependentUpon>
+        </Compile>
+        <Compile Update="Drawing\DrawingContextImpl.Boxes.cs">
+            <DependentUpon>DrawingContextImpl.cs</DependentUpon>
+        </Compile>
     </ItemGroup>
 
 </Project>

@@ -33,6 +33,10 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => throw new NotImplementedException();
+
+        public int CellPixelHeight => throw new NotImplementedException();
+
         public virtual void SetTitle(string title)
         {
             Console.Title = title;
