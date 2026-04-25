@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -15,12 +16,16 @@ namespace Consolonia.Core.Drawing
     public class Sixel
     {
         /// <summary>BGRX palette, 4 bytes per entry.</summary>
+        [SuppressMessage("Performance", "CA1819:Properties should not return arrays",
+            Justification = "The sixel hot path uses the backing array directly to avoid extra copies.")]
         public byte[] Palette { get; }
 
         /// <summary>Number of colors in the palette.</summary>
         public int PaletteCount { get; }
 
         /// <summary>Indexed pixel data (one byte per pixel, index into Palette).</summary>
+        [SuppressMessage("Performance", "CA1819:Properties should not return arrays",
+            Justification = "The sixel hot path uses the backing array directly to avoid extra copies.")]
         public byte[] Pixels { get; }
 
         /// <summary>Pixel width of the image.</summary>
@@ -115,6 +120,9 @@ namespace Consolonia.Core.Drawing
         #region Serialization
 
         [ThreadStatic] private static byte[] _outputBuf;
+        [ThreadStatic] private static WuColorQuantizer _quantizer;
+
+        private static readonly ConditionalWeakTable<byte[], PaletteLookup> PaletteLookups = new();
 
         /// <summary>
         /// Serialize this image to SIXEL escape sequence bytes.
@@ -239,7 +247,7 @@ namespace Consolonia.Core.Drawing
         private static void Quantize(byte[] bgrx,
             out byte[] palette, out int paletteCount, out byte[] indexed)
         {
-            var quantizer = new WuColorQuantizer();
+            var quantizer = _quantizer ??= new WuColorQuantizer();
             var result = quantizer.Quantize(bgrx, 256);
 
             palette = result.Palette;
@@ -254,30 +262,19 @@ namespace Consolonia.Core.Drawing
         {
             int pixelCount = bgrx.Length / 4;
             byte[] indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
+            ReadOnlySpan<byte> bgrxSpan = bgrx;
+            ReadOnlySpan<byte> paletteLookup = PaletteLookups.GetValue(palette, static currentPalette =>
+                new PaletteLookup(currentPalette)).Lookup;
 
-            for (int i = 0; i < pixelCount; i++)
+            for (int i = 0, offset = 0; i < pixelCount; i++, offset += 4)
             {
-                int off = i * 4;
-                int b = bgrx[off];
-                int g = bgrx[off + 1];
-                int r = bgrx[off + 2];
-
-                int bestIdx = 0;
-                int bestDist = int.MaxValue;
-                for (int c = 0; c < paletteCount; c++)
-                {
-                    int po = c * 4;
-                    int db = b - palette[po];
-                    int dg = g - palette[po + 1];
-                    int dr = r - palette[po + 2];
-                    int dist = dr * dr + dg * dg + db * db;
-                    if (dist < bestDist)
-                    {
-                        bestDist = dist;
-                        bestIdx = c;
-                    }
-                }
-                indexed[i] = (byte)bestIdx;
+                int b = bgrxSpan[offset];
+                int g = bgrxSpan[offset + 1];
+                int r = bgrxSpan[offset + 2];
+                int lookupIndex = ((r >> PaletteLookup.ChannelShift) << (PaletteLookup.ChannelBits * 2)) |
+                    ((g >> PaletteLookup.ChannelShift) << PaletteLookup.ChannelBits) |
+                    (b >> PaletteLookup.ChannelShift);
+                indexed[i] = paletteLookup[lookupIndex];
             }
 
             return indexed;
@@ -477,6 +474,47 @@ namespace Consolonia.Core.Drawing
             if (buf == null || buf.Length < minSize)
                 buf = GC.AllocateUninitializedArray<T>(Math.Max(minSize, 4096));
             return buf;
+        }
+
+        private sealed class PaletteLookup
+        {
+            public const int ChannelBits = 5;
+            public const int ChannelShift = 8 - ChannelBits;
+            private const int LookupSize = 1 << (ChannelBits * 3);
+
+            public PaletteLookup(byte[] palette)
+            {
+                Lookup = GC.AllocateUninitializedArray<byte>(LookupSize);
+
+                int paletteCount = palette.Length / 4;
+                for (int index = 0; index < Lookup.Length; index++)
+                {
+                    int r = ((index >> (ChannelBits * 2)) & ((1 << ChannelBits) - 1)) << ChannelShift;
+                    int g = ((index >> ChannelBits) & ((1 << ChannelBits) - 1)) << ChannelShift;
+                    int b = (index & ((1 << ChannelBits) - 1)) << ChannelShift;
+
+                    int bestPaletteIndex = 0;
+                    int bestDistance = int.MaxValue;
+
+                    for (int paletteIndex = 0; paletteIndex < paletteCount; paletteIndex++)
+                    {
+                        int paletteOffset = paletteIndex * 4;
+                        int db = b - palette[paletteOffset];
+                        int dg = g - palette[paletteOffset + 1];
+                        int dr = r - palette[paletteOffset + 2];
+                        int distance = dr * dr + dg * dg + db * db;
+                        if (distance < bestDistance)
+                        {
+                            bestDistance = distance;
+                            bestPaletteIndex = paletteIndex;
+                        }
+                    }
+
+                    Lookup[index] = (byte)bestPaletteIndex;
+                }
+            }
+
+            public byte[] Lookup { get; }
         }
 
         #endregion
