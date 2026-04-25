@@ -51,6 +51,6 @@ public class SixelBenchmarks
     [Benchmark]
     public int SerializeToBytes()
     {
-        return _sixel.ToBytes().Length;
+        return _sixel.Render().Length;
     }
 }

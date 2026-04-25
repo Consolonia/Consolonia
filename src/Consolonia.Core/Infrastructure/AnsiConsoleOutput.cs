@@ -203,7 +203,7 @@ namespace Consolonia.Core.Infrastructure
         {
             SetCaretPosition(position);
 
-            ReadOnlySpan<byte> bytes = sixel.ToBytes();
+            ReadOnlySpan<byte> bytes = sixel.Render();
             bytes.CopyTo(_outputBuffer.GetSpan(bytes.Length));
             _outputBuffer.Advance(bytes.Length);
 

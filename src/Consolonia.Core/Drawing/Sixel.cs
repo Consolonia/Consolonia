@@ -115,21 +115,27 @@ namespace Consolonia.Core.Drawing
 
                 Array.Copy(source.Pixels, srcOffset + srcX, Pixels, dstOffset, copyLen);
             }
+            _renderedBytes = null;
         }
 
         #region Serialization
 
-        [ThreadStatic] private static byte[] _outputBuf;
+        [ThreadStatic] private static byte[] _scratchRenderBuf;
         [ThreadStatic] private static WuColorQuantizer _quantizer;
 
         private static readonly ConditionalWeakTable<byte[], PaletteLookup> PaletteLookups = new();
 
+        private byte[] _renderedBytes;
+
         /// <summary>
         /// Serialize this image to SIXEL escape sequence bytes.
-        /// The returned span is backed by a thread-static buffer and is valid until the next call to ToBytes.
+        /// The returned span is cached on the instance after the first render.
         /// </summary>
-        public ReadOnlySpan<byte> ToBytes()
+        public ReadOnlySpan<byte> Render()
         {
+            if (_renderedBytes != null)
+                return _renderedBytes;
+
             int width = Width;
             int height = Height;
             byte[] palette = Palette;
@@ -137,7 +143,7 @@ namespace Consolonia.Core.Drawing
             byte[] indexed = Pixels;
 
             int maxOutput = 64 + paletteCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
-            var output = RentOrGrow(ref _outputBuf, maxOutput);
+            var output = RentOrGrow(ref _scratchRenderBuf, maxOutput);
             int pos = 0;
 
             // DCS q
@@ -200,7 +206,7 @@ namespace Consolonia.Core.Drawing
                         int newLen = Math.Max(output.Length * 2, pos + bandWorstCase + 4096);
                         var newBuf = new byte[newLen];
                         output.AsSpan(0, pos).CopyTo(newBuf);
-                        _outputBuf = newBuf;
+                        _scratchRenderBuf = newBuf;
                         output = newBuf;
                     }
 
@@ -233,9 +239,13 @@ namespace Consolonia.Core.Drawing
             output[pos++] = 0x1B;
             output[pos++] = (byte)'\\';
 
-            _outputBuf = output;
-            return output.AsSpan(0, pos);
+            byte[] rendered = GC.AllocateUninitializedArray<byte>(pos);
+            output.AsSpan(0, pos).CopyTo(rendered);
+            _renderedBytes = rendered;
+            return rendered;
         }
+
+        public ReadOnlySpan<byte> ToBytes() => Render();
 
         #endregion
 
