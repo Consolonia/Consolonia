@@ -1,4 +1,4 @@
-#define SIXEL_CELLS
+#define SIXEL
 //DUPFINDER_ignore
 //todo: this file is under refactoring. Restore the duplication finder
 
@@ -43,59 +43,8 @@ namespace Consolonia.Core.Drawing
                 return;
             var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
             bool trackedDirtyRegions = false;
+
 #if SIXEL
-
-            int cellPixelWidth = _consoleWindowImpl.Console.CellPixelWidth;
-            int cellPixelHeight = _consoleWindowImpl.Console.CellPixelHeight;
-
-            if (!_sixels.TryGetValue(source, out var sixelImage))
-            {
-
-                var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
-                    targetRect.Height * cellPixelHeight);
-                var visibleTargetSize = new PixelSize(intersectedRect.Width * cellPixelWidth,
-                    intersectedRect.Height * cellPixelHeight);
-
-                using IBitmapImpl resizedBitmap =
-                    renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
-
-                var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
-
-                using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
-
-                unsafe
-                {
-                    ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                        ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), frameBuffer.RowBytes * frameBuffer.Size.Height);
-
-                    int visibleOffsetX = (intersectedRect.X - targetRect.X) * cellPixelWidth;
-                    int visibleOffsetY = (intersectedRect.Y - targetRect.Y) * cellPixelHeight;
-                    byte[] visibleBytes = CopyVisibleBitmapBytes(pixelBytes, frameBuffer.RowBytes, visibleTargetSize,
-                        visibleOffsetX, visibleOffsetY);
-
-                    sixelImage = Sixel.CreateFromBitmap(visibleBytes,
-                        visibleTargetSize.Width, visibleTargetSize.Height,
-                        cellPixelWidth, cellPixelHeight);
-                    _sixels[source] = sixelImage;
-                }
-            }
-            var topLeft = intersectedRect.TopLeft;
-            _pixelBuffer[topLeft] = new Pixel(
-                new PixelForeground(new Symbol(sixelImage, (byte)intersectedRect.Width), Colors.Transparent));
-
-            for (int y = 0; y < intersectedRect.Height; y++)
-            {
-                int startX = y == 0 ? 1 : 0;
-                for (int x = startX; x < intersectedRect.Width; x++)
-                {
-                    var point = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
-                    _pixelBuffer[point] = Pixel.Empty;
-                }
-            }
-#endif
-
-#if SIXEL_CELLS
-
             int cellPixelWidth = _consoleWindowImpl.Console.CellPixelWidth;
             int cellPixelHeight = _consoleWindowImpl.Console.CellPixelHeight;
 
