@@ -26,7 +26,7 @@ namespace Consolonia.Core.Drawing
     internal partial class DrawingContextImpl
     {
         private static readonly ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, PixelBuffer>>
-            _renderedBitmapCache = new();
+            RenderedBitmapCache = new();
 
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
         {
@@ -112,8 +112,10 @@ namespace Consolonia.Core.Drawing
                 {
                     var fullTargetSize = new PixelSize(targetSize.Width, targetSize.Height);
 
-                    using IBitmapImpl resizedBitmap =
-                        renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
+                    using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize) ? 
+                        renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality) : null;
+                    if (resizedBitmap != null)
+                        source = resizedBitmap;
 
                     var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
 
@@ -574,14 +576,14 @@ namespace Consolonia.Core.Drawing
             return 0.299 * color.R + 0.587 * color.G + 0.114 * color.B + color.A;
         }
 
-        private PixelBuffer GetOrCreateRenderedBitmap(IBitmapImpl source, PixelSize targetSize,
+        private static PixelBuffer GetOrCreateRenderedBitmap(IBitmapImpl source, PixelSize targetSize,
             Func<PixelBuffer> factory)
         {
             IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
-            var perBitmap = _renderedBitmapCache.GetOrCreateValue(cacheSource);
+            var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
             var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
 
-            if (perBitmap.TryGetValue(key, out PixelBuffer? renderedBitmap))
+            if (perBitmap.TryGetValue(key, out PixelBuffer renderedBitmap))
                 return renderedBitmap;
 
             renderedBitmap = factory();

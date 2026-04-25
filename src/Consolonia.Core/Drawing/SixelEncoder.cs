@@ -17,12 +17,12 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     static class SixelEncoder
     {
-        [ThreadStatic] private static byte[]? t_outputBuf;
+        [ThreadStatic] private static byte[] _outputBuf;
 
         public static byte[] Encode(byte[] indexed, int width, int height, byte[] palette, int paletteCount)
         {
             int maxOutput = 64 + paletteCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
-            var output = RentOrGrow(ref t_outputBuf, maxOutput);
+            var output = RentOrGrow(ref _outputBuf, maxOutput);
             int pos = 0;
 
             // DCS q
@@ -85,7 +85,7 @@ namespace Consolonia.Core.Drawing
                         int newLen = Math.Max(output.Length * 2, pos + bandWorstCase + 4096);
                         var newBuf = new byte[newLen];
                         output.AsSpan(0, pos).CopyTo(newBuf);
-                        t_outputBuf = newBuf;
+                        _outputBuf = newBuf;
                         output = newBuf;
                     }
 
@@ -120,7 +120,7 @@ namespace Consolonia.Core.Drawing
 
             var result = GC.AllocateUninitializedArray<byte>(pos);
             output.AsSpan(0, pos).CopyTo(result);
-            t_outputBuf = output;
+            _outputBuf = output;
             return result;
         }
 
@@ -321,7 +321,7 @@ namespace Consolonia.Core.Drawing
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static T[] RentOrGrow<T>(ref T[]? buf, int minSize)
+        private static T[] RentOrGrow<T>(ref T[] buf, int minSize)
         {
             if (buf == null || buf.Length < minSize)
                 buf = GC.AllocateUninitializedArray<T>(Math.Max(minSize, 4096));

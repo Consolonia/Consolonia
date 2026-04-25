@@ -218,8 +218,8 @@ namespace Consolonia.Core.Infrastructure
                 string[] parts = inner.Split(';', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 2)
                 {
-                    int.TryParse(parts[0], out heightPx);
-                    int.TryParse(parts[1], out widthPx);
+                    heightPx = int.Parse(parts[0]);
+                    widthPx = int.Parse(parts[1]);
                 }
             }
 
