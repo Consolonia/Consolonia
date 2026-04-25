@@ -16,7 +16,7 @@
         <ProjectReference Include="..\Consolonia.Controls.DataGrid\Consolonia.Controls.DataGrid.csproj" />
         <ProjectReference Include="..\Consolonia.Fonts\Consolonia.Fonts.csproj" />
         <ProjectReference Include="..\Consolonia\Consolonia.csproj" />
-        <ProjectReference Include="..\Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj"/>
+        <ProjectReference Include="..\Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj" />
     </ItemGroup>
 
     <ItemGroup>
