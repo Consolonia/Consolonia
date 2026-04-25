@@ -189,6 +189,11 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
+        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        {
+            _consoleOutput.WriteSixel(position, sixel);
+        }
+
         public virtual void WriteText(string str)
         {
             PauseTask?.Wait();

@@ -29,16 +29,31 @@ namespace Consolonia.Core.Drawing
         /// <summary>Pixel height of the image.</summary>
         public int Height { get; }
 
+        /// <summary>Width of a single cell in pixels.</summary>
+        public int CellWidth { get; }
+
+        /// <summary>Height of a single cell in pixels.</summary>
+        public int CellHeight { get; }
+
+        /// <summary>Width of this image in cells.</summary>
+        public int CellsWidth => Width / CellWidth;
+
+        /// <summary>Height of this image in cells.</summary>
+        public int CellsHeight => Height / CellHeight;
+
         /// <summary>Original bitmap source (may be null).</summary>
         public IBitmapImpl Source { get; }
 
-        public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height, IBitmapImpl source = null)
+        public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height,
+            int cellWidth, int cellHeight, IBitmapImpl source = null)
         {
             Palette = palette;
             PaletteCount = paletteCount;
             Pixels = pixels;
             Width = width;
             Height = height;
+            CellWidth = cellWidth;
+            CellHeight = cellHeight;
             Source = source;
         }
 
@@ -46,18 +61,19 @@ namespace Consolonia.Core.Drawing
         /// Create a Sixel from raw BGRX pixel data.
         /// If a palette is provided it is used to quantize against, otherwise a new palette is created.
         /// </summary>
-        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, byte[] palette = null)
+        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height,
+            int cellWidth, int cellHeight, byte[] palette = null)
         {
             if (palette != null)
             {
                 int paletteCount = palette.Length / 4;
                 byte[] indexed = QuantizeWithPalette(bgrx, palette, paletteCount);
-                return new Sixel(palette, paletteCount, indexed, width, height);
+                return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
             }
             else
             {
                 Quantize(bgrx, out byte[] newPalette, out int paletteCount, out byte[] indexed);
-                return new Sixel(newPalette, paletteCount, indexed, width, height);
+                return new Sixel(newPalette, paletteCount, indexed, width, height, cellWidth, cellHeight);
             }
         }
 

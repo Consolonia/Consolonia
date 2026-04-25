@@ -115,6 +115,11 @@ namespace Consolonia.Core.Infrastructure
             _stringBuilder.Clear();
         }
 
+        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        {
+            // Sixel not supported by legacy Console API
+        }
+
         public virtual void WriteText(string str)
         {
             Console.Write(str);

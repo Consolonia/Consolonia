@@ -70,6 +70,13 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
+        ///     Write a sixel image to the console at the given position.
+        /// </summary>
+        /// <param name="position">top-left cell coordinate</param>
+        /// <param name="sixel">the sixel image to write</param>
+        void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel);
+
+        /// <summary>
         ///     Write raw text to the console
         /// </summary>
         /// <param name="str"></param>

@@ -81,12 +81,7 @@ namespace Consolonia.Core.Infrastructure
 
             if (pixel.Foreground.Symbol.Sixel != null)
             {
-                ReadOnlySpan<byte> sixel = pixel.Foreground.Symbol.Sixel.ToBytes();
-                sixel.CopyTo(_outputBuffer.GetSpan(sixel.Length));
-                _outputBuffer.Advance(sixel.Length);
-
-                position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
-                SetCaretPositionInternal(position);
+                WriteSixel(position, pixel.Foreground.Symbol.Sixel);
                 return;
             }
 
@@ -202,6 +197,18 @@ namespace Consolonia.Core.Infrastructure
                 _stdOut.Flush();
                 _outputBuffer.Clear();
             }
+        }
+
+        public void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        {
+            SetCaretPosition(position);
+
+            ReadOnlySpan<byte> bytes = sixel.ToBytes();
+            bytes.CopyTo(_outputBuffer.GetSpan(bytes.Length));
+            _outputBuffer.Advance(bytes.Length);
+
+            var newPosition = new PixelBufferCoordinate((ushort)(position.X + sixel.CellsWidth), position.Y);
+            SetCaretPositionInternal(newPosition);
         }
 
         /// <summary>

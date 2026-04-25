@@ -74,7 +74,8 @@ namespace Consolonia.Core.Drawing
                         visibleOffsetX, visibleOffsetY);
 
                     sixelImage = Sixel.CreateFromBitmap(visibleBytes,
-                        visibleTargetSize.Width, visibleTargetSize.Height);
+                        visibleTargetSize.Width, visibleTargetSize.Height,
+                        cellPixelWidth, cellPixelHeight);
                     _sixels[source] = sixelImage;
                 }
             }
@@ -130,7 +131,8 @@ namespace Consolonia.Core.Drawing
 
                         // Quantize the full image once to get a shared palette
                         Sixel fullSixel = Sixel.CreateFromBitmap(fullBytes,
-                            fullTargetSize.Width, fullTargetSize.Height);
+                            fullTargetSize.Width, fullTargetSize.Height,
+                            cellPixelWidth, cellPixelHeight);
 
                         var bitmapBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
                         byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
@@ -143,6 +145,7 @@ namespace Consolonia.Core.Drawing
                                     cellPixelWidth, cellPixelHeight, cellBgrx);
 
                                 Sixel cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                                    cellPixelWidth, cellPixelHeight,
                                     cellPixelWidth, cellPixelHeight, fullSixel.Palette);
                                 bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
                                     new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent));
