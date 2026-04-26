@@ -1,4 +1,4 @@
-#define SIXEL
+//#define SIXEL
 //DUPFINDER_ignore
 //todo: this file is under refactoring. Restore the duplication finder
 
@@ -97,7 +97,7 @@ namespace Consolonia.Core.Drawing
                                     cellPixelWidth, cellPixelHeight,
                                     cellPixelWidth, cellPixelHeight, fullSixel.Palette);
                                 bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent));
+                                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent), PixelBackground.Transparent);
                             }
                         }
 
@@ -161,7 +161,6 @@ namespace Consolonia.Core.Drawing
             {
                 ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
                     ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
-                ReadOnlySpan<BgraColor> pixels = MemoryMarshal.Cast<byte, BgraColor>(pixelBytes);
 
                 int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
                 int startX = (intersectedRect.X - targetRect.TopLeft.X) * 2;
@@ -180,10 +179,10 @@ namespace Consolonia.Core.Drawing
                         // get the quad pixel from the bitmap as a quad of 4 BgraColor values
                         Span<BgraColor> quadPixelColors =
                         [
-                            GetPixelColor(pixels, x, y, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x + 1, y, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x, y + 1, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x + 1, y + 1, stride, bytesPerPixel)
+                            GetPixelColor(pixelBytes, x, y, stride, bytesPerPixel),
+                            GetPixelColor(pixelBytes, x + 1, y, stride, bytesPerPixel),
+                            GetPixelColor(pixelBytes, x, y + 1, stride, bytesPerPixel),
+                            GetPixelColor(pixelBytes, x + 1, y + 1, stride, bytesPerPixel)
                         ];
 
                         // map it to a single char to represent the 4 pixels
@@ -243,20 +242,17 @@ namespace Consolonia.Core.Drawing
             }
         }
 
-        private static BgraColor GetPixelColor(ReadOnlySpan<BgraColor> pixels, int x, int y, int stride,
+        private static BgraColor GetPixelColor(ReadOnlySpan<byte> pixels, int x, int y, int stride,
             int bytesPerPixel)
         {
-            int bytesPerRow = stride;
-            int pixelsPerRow = bytesPerRow / bytesPerPixel;
-            int offset = y * pixelsPerRow + x;
+            int offset = (y * stride) + (x * bytesPerPixel);
 
-            BgraColor pixel = pixels[offset];
-
-            // Handle RGB24 format (no alpha channel)
-            if (bytesPerPixel == 3)
-                pixel.A = 255;
-
-            return pixel;
+            return bytesPerPixel switch
+            {
+                4 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]),
+                3 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], 255),
+                _ => throw new NotSupportedException($"Unsupported bitmap format with {bytesPerPixel} bytes per pixel.")
+            };
         }
 
         private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
