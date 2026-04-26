@@ -83,6 +83,43 @@ namespace Consolonia
                 }, nameof(ConsoloniaRenderInterface));
         }
 
+        public static AppBuilder UseSixelFramebuffer(this AppBuilder builder)
+        {
+            Action? initialize = builder.RenderingSubsystemInitializer;
+
+            return builder
+                .UseStandardRuntimePlatformSubsystem()
+                .UseWindowingSubsystem(() =>
+                {
+                    // Register SixelMode marker BEFORE ConsoloniaPlatform initializes
+                    // so ConsoleWindowImpl knows to report pixel-based ClientSize
+                    AvaloniaLocator.CurrentMutable.Bind<SixelMode>().ToConstant(SixelMode.Instance);
+
+                    // Save the platform's font manager and text shaper before ConsoloniaPlatform overwrites them
+                    var platformFontManager = AvaloniaLocator.Current.GetService<IFontManagerImpl>();
+                    var platformTextShaper = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
+
+                    new ConsoloniaPlatform().Initialize();
+
+                    // Restore the platform's font manager and text shaper so Skia can render text
+                    if (platformFontManager != null)
+                        AvaloniaLocator.CurrentMutable.Bind<IFontManagerImpl>().ToConstant(platformFontManager);
+                    if (platformTextShaper != null)
+                        AvaloniaLocator.CurrentMutable.Bind<ITextShaperImpl>().ToConstant(platformTextShaper);
+                }, nameof(ConsoloniaPlatform))
+                .UseRenderingSubsystem(() =>
+                {
+                    if (initialize != null)
+                        initialize();
+
+                    var fallback = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
+                    var sixelRenderInterface = new SixelRenderInterface(fallback);
+
+                    AvaloniaLocator.CurrentMutable
+                        .Bind<IPlatformRenderInterface>().ToConstant(sixelRenderInterface);
+                }, nameof(SixelRenderInterface));
+        }
+
         public static ConsoloniaLifetime BuildLifetime<TApp>(IConsole console,
             IConsoleColorMode consoleColorMode, ConsoloniaPlatformSettings settings, string[] args)
             where TApp : Application, new()

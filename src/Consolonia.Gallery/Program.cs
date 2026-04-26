@@ -31,12 +31,15 @@ namespace Consolonia.Gallery
             return AppBuilder.Configure<App>()
                 /*.LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Input))*/
                 .LogToException()
+                .UsePlatformDetect()
+                //.WithInterFont()
                 // adding skia to have bitmap support
-                .UseSkia()
-                .UseConsoloniaStorage()
-                .UseConsolonia()
+                //.UseSkia()
+                //.UseConsoloniaStorage()
+                //.UseConsolonia()
+                //.WithConsoleFonts() 
+                .UseSixelFramebuffer()
                 .UseAutoDetectedConsole()
-                .WithConsoleFonts()
                 .ThrowOnErrors()
                 .WithDeveloperTools();
         }

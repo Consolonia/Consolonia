@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:wieslawsoltes.github.io)",
+      "WebFetch(domain:docs.avaloniaui.net)",
+      "Bash(dotnet tool:*)",
+      "Bash(ilspycmd s:/packages/nuget/avalonia/11.3.12/lib/net8.0/Avalonia.Base.dll -t \"Avalonia.Rendering.Composition.Server.ServerCompositionTarget\")",
+      "Bash(ilspycmd:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}

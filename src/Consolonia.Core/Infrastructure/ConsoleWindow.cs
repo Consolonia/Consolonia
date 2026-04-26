@@ -35,6 +35,7 @@ namespace Consolonia.Core.Infrastructure
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
         private bool _disposedValue;
         private IInputRoot _inputRoot;
+        private readonly bool _sixelMode;
 
         public ConsoleWindowImpl()
         {
@@ -47,6 +48,7 @@ namespace Consolonia.Core.Infrastructure
             _myKeyboardDevice = AvaloniaLocator.Current.GetRequiredService<IKeyboardDevice>();
             MouseDevice = AvaloniaLocator.Current.GetService<IMouseDevice>();
             Console = AvaloniaLocator.Current.GetRequiredService<IConsole>();
+            _sixelMode = AvaloniaLocator.Current.GetService<SixelMode>() != null;
             PixelBuffer = new PixelBuffer(Console.Size);
             DirtyRegions.AddRect(PixelBuffer.Size);
             Console.Resized += OnConsoleOnResized;
@@ -124,6 +126,10 @@ namespace Consolonia.Core.Infrastructure
             get
             {
                 PixelBufferSize pixelBufferSize = Console.Size;
+                if (_sixelMode)
+                    return new Size(
+                        pixelBufferSize.Width * Console.CellPixelWidth,
+                        pixelBufferSize.Height * Console.CellPixelHeight);
                 return new Size(pixelBufferSize.Width, pixelBufferSize.Height);
             }
         }
@@ -308,7 +314,17 @@ namespace Consolonia.Core.Infrastructure
             }
 
             if (featureType == typeof(IScreenImpl))
-                return new ConsoloniaScreen(new PixelRect(0, 0, Console.Size.Width, Console.Size.Height));
+            {
+                int w = Console.Size.Width;
+                int h = Console.Size.Height;
+                if (_sixelMode)
+                {
+                    w *= Console.CellPixelWidth;
+                    h *= Console.CellPixelHeight;
+                }
+
+                return new ConsoloniaScreen(new PixelRect(0, 0, w, h));
+            }
 
             if (featureType == typeof(ILauncher))
             {
@@ -360,6 +376,11 @@ namespace Consolonia.Core.Infrastructure
         private void ConsoleOnMouseEvent(RawPointerEventType type, Point point, Vector? wheelDelta,
             RawInputModifiers modifiers)
         {
+            // In Sixel mode, mouse coordinates from the terminal are in cell units
+            // but Avalonia layout is in pixel units, so scale them up
+            if (_sixelMode)
+                point = new Point(point.X * Console.CellPixelWidth, point.Y * Console.CellPixelHeight);
+
             ulong timestamp = (ulong)Environment.TickCount64;
             // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
             switch (type)
@@ -400,9 +421,11 @@ namespace Consolonia.Core.Infrastructure
 
         private void OnConsoleOnResized()
         {
-            var size = new Size(Console.Size.Width, Console.Size.Height);
-            PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
-            Resized!(size, WindowResizeReason.Unspecified);
+            var cellSize = new Size(Console.Size.Width, Console.Size.Height);
+            PixelBuffer = new PixelBuffer((ushort)cellSize.Width, (ushort)cellSize.Height);
+            Resized!(_sixelMode
+                ? new Size(cellSize.Width * Console.CellPixelWidth, cellSize.Height * Console.CellPixelHeight)
+                : cellSize, WindowResizeReason.Unspecified);
         }
 
         private void ConsoleOnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)

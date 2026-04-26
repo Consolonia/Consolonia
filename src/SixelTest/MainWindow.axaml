@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:internal="using:Avalonia.Dialogs.Internal"
+        xmlns:wm="using:Iciclecreek.Avalonia.WindowManager"
+        x:Class="SixelTest.MainWindow"
+        Title="Sixel Test">
+    <Grid>
+        <DockPanel>
+            <Menu DockPanel.Dock="Top">
+                <MenuItem Header="_File">
+                    <MenuItem Header="_New Window" Click="OnNewWindowClick"/>
+                    <Separator/>
+                    <MenuItem Header="_Exit" Click="OnExitClick"/>
+                </MenuItem>
+            </Menu>
+            <StackPanel Margin="20" Spacing="16">
+                <TextBlock x:Name="HelloWorld" Text="Hello Sixel World!" FontSize="{Binding Value, ElementName=FontSizeSlider}" FontWeight="Bold" Foreground="Black"/>
+                <TextBlock Text="This is rendered via Skia and output as Sixel graphics." FontSize="16" Foreground="Blue"/>
+
+                <Slider x:Name="FontSizeSlider"
+                        Minimum="12"
+                        Maximum="72"
+                        Value="32"
+                        Width="300"
+                        HorizontalAlignment="Left"/>
+                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+                    <Button Content="Click Me" FontSize="14" Padding="16,8"/>
+                    <Button Content="Another Button" FontSize="14" Padding="16,8" Classes="accent"/>
+                </StackPanel>
+
+                <Border Background="#2D2D2D" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="A Card" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="With rounded corners and padding." Foreground="#AAAAAA"/>
+                        <ProgressBar Value="65" Minimum="0" Maximum="100" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,16,0,0">
+                    <CheckBox Content="Option A" IsChecked="True"/>
+                    <CheckBox Content="Option B"/>
+                    <RadioButton Content="Choice 1" IsChecked="True"/>
+                    <RadioButton Content="Choice 2"/>
+                </StackPanel>
+
+            </StackPanel>
+        </DockPanel>
+        <wm:WindowsPanel/>
+    </Grid>
+</Window>

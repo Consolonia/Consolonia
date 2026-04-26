@@ -1,0 +1,11 @@
+<wm:ManagedWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wm="using:Iciclecreek.Avalonia.WindowManager"
+        x:Class="SixelTest.ChildWindow"
+        Title="Child Window"
+        Width="400" Height="200">
+    <StackPanel Margin="20" Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <TextBlock Text="Hello There" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center"/>
+        <Button Content="Close" HorizontalAlignment="Center" Click="OnCloseClick"/>
+    </StackPanel>
+</wm:ManagedWindow>
