@@ -41,5 +41,8 @@ namespace Consolonia.Controls
         ///     Console Capabilities
         /// </summary>
         ConsoleCapabilities Capabilities { get; }
+
+        int CellPixelWidth { get; }
+        int CellPixelHeight { get; }
     }
 }

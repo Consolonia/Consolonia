@@ -1,7 +1,10 @@
+#define SIXEL
+//#define QUAD_PIXEL
 //DUPFINDER_ignore
 //todo: this file is under refactoring. Restore the duplication finder
 
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -14,11 +17,18 @@ using Consolonia.Core.Dummy;
 
 namespace Consolonia.Core.Drawing
 {
+    internal readonly record struct BitmapQuantizedCacheKey(
+        int Version,
+        PixelSize TargetSize);
+
     /// <summary>
     ///     Bitmap - drawing implementation
     /// </summary>
     internal partial class DrawingContextImpl
     {
+        private static readonly ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, PixelBuffer>>
+            RenderedBitmapCache = new();
+
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
         {
             if (source is DummyBitmap)
@@ -28,8 +38,115 @@ namespace Consolonia.Core.Drawing
                     Transform.Transform(destRect.BottomRight))
                 .ToPixelRect();
 
-            var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
+            PixelRect intersectedRect = CurrentClip.Intersect(targetRect);
 
+            if (intersectedRect.IsEmpty())
+                return;
+            var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
+            bool trackedDirtyRegions = false;
+
+#if SIXEL
+            int cellPixelWidth = _consoleWindowImpl.Console.CellPixelWidth;
+            int cellPixelHeight = _consoleWindowImpl.Console.CellPixelHeight;
+
+            var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
+                targetRect.Height * cellPixelHeight);
+            var visibleRectInTarget = new PixelRect(
+                intersectedRect.X - targetRect.X,
+                intersectedRect.Y - targetRect.Y,
+                intersectedRect.Width,
+                intersectedRect.Height);
+
+            PixelBuffer renderedBitmap = GetOrCreateRenderedBitmap(source, targetSize, () =>
+                {
+                    var fullTargetSize = new PixelSize(targetSize.Width, targetSize.Height);
+
+                    using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize) ? 
+                        renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality) : null;
+                    if (resizedBitmap != null)
+                        source = resizedBitmap;
+
+                    var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+
+                    using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
+
+                    unsafe
+                    {
+                        ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                            ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
+                            frameBuffer.RowBytes * frameBuffer.Size.Height);
+
+                        byte[] fullBytes = CopyVisibleBitmapBytes(pixelBytes, frameBuffer.RowBytes,
+                            fullTargetSize, 0, 0);
+
+                        // Quantize the full image once to get a shared palette
+                        Sixel fullSixel = Sixel.CreateFromBitmap(fullBytes,
+                            fullTargetSize.Width, fullTargetSize.Height,
+                            cellPixelWidth, cellPixelHeight);
+
+                        var bitmapBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
+                        byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
+
+                        for (int cellY = 0; cellY < targetRect.Height; cellY++)
+                        {
+                            for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                            {
+                                FillCellBgrxBuffer(fullBytes, fullTargetSize.Width, cellX, cellY,
+                                    cellPixelWidth, cellPixelHeight, cellBgrx);
+
+                                Sixel cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                                    cellPixelWidth, cellPixelHeight,
+                                    cellPixelWidth, cellPixelHeight, fullSixel.Palette);
+                                bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent), PixelBackground.Transparent);
+                            }
+                        }
+
+                        return bitmapBuffer;
+                    }
+                });
+
+            trackedDirtyRegions = true;
+            for (int y = 0; y < intersectedRect.Height; y++)
+            {
+                int dirtyRunStart = -1;
+                for (int x = 0; x < intersectedRect.Width; x++)
+                {
+                    var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
+                    var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
+                    Pixel newPixel = renderedBitmap[sourcePoint];
+                    if (_pixelBuffer[destPoint] == newPixel)
+                    {
+                        if (dirtyRunStart >= 0)
+                        {
+                            _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                                intersectedRect.X + dirtyRunStart,
+                                intersectedRect.Y + y,
+                                x - dirtyRunStart,
+                                1));
+                            dirtyRunStart = -1;
+                        }
+
+                        continue;
+                    }
+
+                    _pixelBuffer[destPoint] = newPixel;
+                    if (dirtyRunStart < 0)
+                        dirtyRunStart = x;
+                }
+
+                if (dirtyRunStart >= 0)
+                {
+                    _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                        intersectedRect.X + dirtyRunStart,
+                        intersectedRect.Y + y,
+                        intersectedRect.Width - dirtyRunStart,
+                        1));
+                }
+            }
+
+#endif
+#if QUAD_PIXEL
             // Resize source to be target rect * 2 so we can map to quad pixels
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
             using IBitmapImpl resizedBitmap =
@@ -39,18 +156,12 @@ namespace Consolonia.Core.Drawing
 
             using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
 
-            PixelRect intersectedRect = CurrentClip.Intersect(targetRect);
-
-            if (intersectedRect.IsEmpty())
-                return;
-
             int stride = frameBuffer.RowBytes;
             int bytesPerPixel = frameBuffer.Format.BitsPerPixel / 8;
             unsafe
             {
                 ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
                     ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
-                ReadOnlySpan<BgraColor> pixels = MemoryMarshal.Cast<byte, BgraColor>(pixelBytes);
 
                 int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
                 int startX = (intersectedRect.X - targetRect.TopLeft.X) * 2;
@@ -69,10 +180,10 @@ namespace Consolonia.Core.Drawing
                         // get the quad pixel from the bitmap as a quad of 4 BgraColor values
                         Span<BgraColor> quadPixelColors =
                         [
-                            GetPixelColor(pixels, x, y, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x + 1, y, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x, y + 1, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x + 1, y + 1, stride, bytesPerPixel)
+                            GetPixelColor(pixelBytes, x, y, stride, bytesPerPixel),
+                            GetPixelColor(pixelBytes, x + 1, y, stride, bytesPerPixel),
+                            GetPixelColor(pixelBytes, x, y + 1, stride, bytesPerPixel),
+                            GetPixelColor(pixelBytes, x + 1, y + 1, stride, bytesPerPixel)
                         ];
 
                         // map it to a single char to represent the 4 pixels
@@ -90,8 +201,9 @@ namespace Consolonia.Core.Drawing
                     }
                 }
             }
-
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+#endif
+            if (!trackedDirtyRegions)
+                _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
 
         public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
@@ -99,21 +211,49 @@ namespace Consolonia.Core.Drawing
             throw new NotImplementedException();
         }
 
+        private static byte[] CopyVisibleBitmapBytes(ReadOnlySpan<byte> pixelBytes, int rowBytes,
+            PixelSize visibleTargetSize, int visibleOffsetX, int visibleOffsetY)
+        {
+            int visibleRowBytes = visibleTargetSize.Width * 4;
+            byte[] visibleBytes = GC.AllocateUninitializedArray<byte>(visibleRowBytes * visibleTargetSize.Height);
 
-        private static BgraColor GetPixelColor(ReadOnlySpan<BgraColor> pixels, int x, int y, int stride,
+            for (int row = 0; row < visibleTargetSize.Height; row++)
+            {
+                int sourceOffset = (visibleOffsetY + row) * rowBytes + visibleOffsetX * 4;
+                int targetOffset = row * visibleRowBytes;
+                pixelBytes.Slice(sourceOffset, visibleRowBytes)
+                    .CopyTo(visibleBytes.AsSpan(targetOffset, visibleRowBytes));
+            }
+
+            return visibleBytes;
+        }
+
+        private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,
+            int cellPixelWidth, int cellPixelHeight, Span<byte> cellBgrx)
+        {
+            int bytesPerPixel = 4;
+            int srcRowBytes = imageWidth * bytesPerPixel;
+            int cellRowBytes = cellPixelWidth * bytesPerPixel;
+            for (int row = 0; row < cellPixelHeight; row++)
+            {
+                int sourceOffset = ((cellY * cellPixelHeight) + row) * srcRowBytes + (cellX * cellPixelWidth * bytesPerPixel);
+                int targetOffset = row * cellRowBytes;
+                bgrx.Slice(sourceOffset, cellRowBytes)
+                    .CopyTo(cellBgrx.Slice(targetOffset, cellRowBytes));
+            }
+        }
+
+        private static BgraColor GetPixelColor(ReadOnlySpan<byte> pixels, int x, int y, int stride,
             int bytesPerPixel)
         {
-            int bytesPerRow = stride;
-            int pixelsPerRow = bytesPerRow / bytesPerPixel;
-            int offset = y * pixelsPerRow + x;
+            int offset = (y * stride) + (x * bytesPerPixel);
 
-            BgraColor pixel = pixels[offset];
-
-            // Handle RGB24 format (no alpha channel)
-            if (bytesPerPixel == 3)
-                pixel.A = 255;
-
-            return pixel;
+            return bytesPerPixel switch
+            {
+                4 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]),
+                3 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], 255),
+                _ => throw new NotSupportedException($"Unsupported bitmap format with {bytesPerPixel} bytes per pixel.")
+            };
         }
 
         private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
@@ -386,5 +526,28 @@ namespace Consolonia.Core.Drawing
         {
             return 0.299 * color.R + 0.587 * color.G + 0.114 * color.B + color.A;
         }
+
+        private static PixelBuffer GetOrCreateRenderedBitmap(IBitmapImpl source, PixelSize targetSize,
+            Func<PixelBuffer> factory)
+        {
+            IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
+            var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
+            var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
+
+            if (perBitmap.TryGetValue(key, out PixelBuffer renderedBitmap))
+                return renderedBitmap;
+
+            renderedBitmap = factory();
+            perBitmap[key] = renderedBitmap;
+            return renderedBitmap;
+        }
+
+        private static IBitmapImpl GetCacheBitmapImpl(IBitmapImpl bitmapImpl)
+        {
+            return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
+                ? adjustedBitmap.InnerBitmap
+                : bitmapImpl;
+        }
     }
+
 }

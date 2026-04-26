@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Serialization;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using NeoSmart.Unicode;
 using Wcwidth;
 
@@ -34,6 +35,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Complex = null;
             Width = 0;
             Pattern = 0;
+        }
+
+        public Symbol(Sixel sixel, byte width)
+        {
+            Character = char.MinValue;
+            Complex = null;
+            Width = width;
+            Pattern = 0;
+            Sixel = sixel;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -155,6 +165,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         // box pattern for box merging.
         public readonly byte Pattern;
+
+        // sixel
+        public readonly Sixel Sixel;
 
         [JsonIgnore] public readonly byte Width;
 #pragma warning restore CA1051 // Do not declare visible instance fields

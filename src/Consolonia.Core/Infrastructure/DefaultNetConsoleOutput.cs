@@ -33,6 +33,10 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => throw new NotImplementedException();
+
+        public int CellPixelHeight => throw new NotImplementedException();
+
         public virtual void SetTitle(string title)
         {
             Console.Title = title;
@@ -109,6 +113,11 @@ namespace Consolonia.Core.Infrastructure
             // Debug.WriteLine($"[{_currentBufferPoint.X},{_currentBufferPoint.Y}] {_lastForegroundColor} on {_lastBackgroundColor} '{_stringBuilder}'");
             Console.Write(_stringBuilder.ToString());
             _stringBuilder.Clear();
+        }
+
+        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        {
+            // Sixel not supported by legacy Console API
         }
 
         public virtual void WriteText(string str)

@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
@@ -29,6 +30,9 @@ namespace Consolonia.Core.Infrastructure
             Console.TreatControlCAsInput = true;
 
             _consoleOutput = consoleOutput;
+
+            if (consoleOutput is AnsiConsoleOutput ansiConsoleOutput)
+                ansiConsoleOutput.GetConsoleCellSizeHandler = GetConsoleCellSize;
 
             Size = consoleOutput.Size;
         }
@@ -127,6 +131,10 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => _consoleOutput.CellPixelWidth;
+
+        public int CellPixelHeight => _consoleOutput.CellPixelHeight;
+
         public event Action Resized;
 
         public virtual void ClearScreen()
@@ -181,6 +189,11 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
+        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        {
+            _consoleOutput.WriteSixel(position, sixel);
+        }
+
         public virtual void WriteText(string str)
         {
             PauseTask?.Wait();
@@ -192,6 +205,54 @@ namespace Consolonia.Core.Infrastructure
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;
             Size = new PixelBufferSize((ushort)Console.WindowWidth, (ushort)Console.WindowHeight);
             return true;
+        }
+
+        protected virtual (int CellWidth, int CellHeight) GetConsoleCellSize()
+        {
+            int cols = Console.WindowWidth;
+            int rows = Console.WindowHeight;
+
+            string response = RequestAnsiResponse("\x1b[14t", 't', 200);
+
+            int heightPx = 0;
+            int widthPx = 0;
+            int idx4 = response.IndexOf('4');
+            if (idx4 >= 0 && response.EndsWith('t'))
+            {
+                string inner = response[(idx4 + 1)..^1];
+                string[] parts = inner.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2)
+                {
+                    heightPx = int.Parse(parts[0]);
+                    widthPx = int.Parse(parts[1]);
+                }
+            }
+
+            if (widthPx > 0 && heightPx > 0)
+                return (widthPx / cols, heightPx / rows);
+
+            return (8, 16);
+        }
+
+        protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
+        {
+            WriteText(request);
+            Flush();
+
+            var sb = new StringBuilder();
+            long deadline = Environment.TickCount64 + timeoutMs;
+            while (Environment.TickCount64 < deadline)
+            {
+                if (!Console.KeyAvailable)
+                    continue;
+
+                char c = Console.ReadKey(true).KeyChar;
+                sb.Append(c);
+                if (c == terminator)
+                    break;
+            }
+
+            return sb.ToString();
         }
 
         #endregion
