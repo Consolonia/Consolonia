@@ -1,4 +1,5 @@
-//#define SIXEL
+#define SIXEL
+//#define QUAD_PIXEL
 //DUPFINDER_ignore
 //todo: this file is under refactoring. Restore the duplication finder
 
