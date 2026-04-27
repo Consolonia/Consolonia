@@ -663,9 +663,7 @@ namespace Consolonia.PlatformSupport
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
                 {
                     if (!Enum.TryParse(key.ToString(), true, out consoleKey))
-                    {
                         throw new NotImplementedException("We could not recognize the key: " + key);
-                    }
                     break;
                 }
             }
