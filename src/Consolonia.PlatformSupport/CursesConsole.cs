@@ -675,7 +675,8 @@ namespace Consolonia.PlatformSupport
             else
             {
                 if (consoleKey == default)
-                    throw new InvalidProgramException("consoleKey should have been initialized by TryParse");
+                    throw new NotImplementedException(
+                        $"Received key {key} was not mapped to anything using {nameof(KeyFlagTranslator)}, neither it is defined in enum {nameof(Key)}");
                 character = char.MinValue;
                 if (char.IsUpper(character))
                     modifiers |= RawInputModifiers.Shift;
