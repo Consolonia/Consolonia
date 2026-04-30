@@ -276,7 +276,7 @@ namespace Consolonia.PlatformSupport
         private static bool IsTtyTerminal()
         {
             string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
-            string terminalPath = Curses.TtyName(1);
+            string terminalPath = Curses.TtyName(1) ?? string.Empty;
             return terminalPath.StartsWith("/dev/tty", StringComparison.OrdinalIgnoreCase) ||
                    term.StartsWith("linux", StringComparison.OrdinalIgnoreCase);
         }
