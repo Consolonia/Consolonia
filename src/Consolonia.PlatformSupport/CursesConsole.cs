@@ -198,11 +198,16 @@ namespace Consolonia.PlatformSupport
         /// <summary>
         ///     https://github.com/gui-cs/Terminal.Gui/blob/v2_develop/Terminal.Gui/ConsoleDrivers/CursesDriver/CursesDriver.cs#L790
         /// </summary>
-        private const int NoInputTimeout = 10;
+        private const int NoInputTimeout = -1;
+
+        private const int SequenceCollectTimeout = 10;
 
         private (int, int)[] ReadInputFunction()
         {
             _rowInputBuffer.Clear();
+
+            Curses.timeout(NoInputTimeout);
+            
             do
             {
                 Task pauseTask = PauseTask;
@@ -212,8 +217,11 @@ namespace Consolonia.PlatformSupport
                 if (code != Curses.ERR)
                 {
                     _rowInputBuffer.Add((code, wch));
-                    //check if was escape, wait for one more escape
 
+                    if (_rowInputBuffer.Count == 1)
+                        Curses.timeout(SequenceCollectTimeout);
+                    
+                    //check if was escape, wait for one more escape
                     if (code != Curses.KEY_CODE_YES && wch == 27)
                     {
                         int code2 = Curses.get_wch(out int wch2);
@@ -259,7 +267,7 @@ namespace Consolonia.PlatformSupport
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
 
-            Curses.timeout(NoInputTimeout);
+            // Curses.timeout(NoInputTimeout); now it does not matter as input function sets dynamic timeout
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
