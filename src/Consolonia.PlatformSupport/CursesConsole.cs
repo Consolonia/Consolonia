@@ -207,7 +207,7 @@ namespace Consolonia.PlatformSupport
             _rowInputBuffer.Clear();
 
             Curses.timeout(NoInputTimeout);
-            
+
             do
             {
                 Task pauseTask = PauseTask;
@@ -220,7 +220,7 @@ namespace Consolonia.PlatformSupport
 
                     if (_rowInputBuffer.Count == 1)
                         Curses.timeout(SequenceCollectTimeout);
-                    
+
                     //check if was escape, wait for one more escape
                     if (code != Curses.KEY_CODE_YES && wch == 27)
                     {
