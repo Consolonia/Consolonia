@@ -4,6 +4,6 @@
              x:Class="Sandbox.App"
              RequestedThemeVariant="Default">
     <Application.Styles>
-        <console:ModernTheme />
+        <console:MonochromeTheme />
     </Application.Styles>
 </Application>

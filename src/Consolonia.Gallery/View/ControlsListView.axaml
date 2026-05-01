@@ -45,14 +45,20 @@
                           Header="TurboVision_Elegant"
                           Tag="TurboVisionElegant"
                           Click="OnThemeMenuItemClick" />
+                <MenuItem IsChecked="{Binding IsMonochrome}"
+                          Header="Mono_chrome"
+                          Tag="Monochrome"
+                          Click="OnThemeMenuItemClick" />
                 <Separator />
                 <MenuItem IsChecked="{Binding IsLight}"
                           Header="_Light Variant"
                           Tag="Light"
+                          IsEnabled="{Binding !IsMonochrome}"
                           Click="OnThemeVariantLightMenuClick" />
                 <MenuItem IsChecked="{Binding IsDark}"
                           Header="_Dark Variant"
                           Tag="Dark"
+                          IsEnabled="{Binding !IsMonochrome}"
                           Click="OnThemeVariantDarkMenuClick" />
             </MenuItem>
             <MenuItem Header="_View"

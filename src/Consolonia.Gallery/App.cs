@@ -20,12 +20,7 @@ namespace Consolonia.Gallery
 
         public override void OnFrameworkInitializationCompleted()
         {
-            if (((ConsoloniaLifetime)ApplicationLifetime).IsRgbColorMode()
-                && !((ConsoloniaLifetime)ApplicationLifetime).Args.Any(argument => argument != null &&
-                    argument.EndsWith(TurboVisionProgramParameter, StringComparison.OrdinalIgnoreCase)))
-                Styles.Add(new ModernTheme());
-            else
-                Styles.Add(new TurboVisionTheme());
+            Styles.Add(new MonochromeTheme());
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 desktop.MainWindow = new MainWindow(); // designer runs as classic desktop

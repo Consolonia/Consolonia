@@ -23,7 +23,8 @@ namespace Consolonia.Gallery.View
         TurboVision,
         TurboVisionCompatible,
         TurboVisionGray,
-        TurboVisionElegant
+        TurboVisionElegant,
+        Monochrome
     }
 
     public partial class ControlsListView : UserControl
@@ -172,6 +173,7 @@ namespace Consolonia.Gallery.View
                 ThemesList.TurboVisionCompatible => new TurboVisionCompatibleTheme(),
                 ThemesList.TurboVisionGray => new TurboVisionGrayTheme(),
                 ThemesList.TurboVisionElegant => new TurboVisionElegantTheme(),
+                ThemesList.Monochrome => new MonochromeTheme(),
                 _ => throw new InvalidDataException("Unknown theme name")
             };
 
@@ -194,6 +196,7 @@ namespace Consolonia.Gallery.View
         [NotifyPropertyChangedFor(nameof(IsTurboVisionCompatible))]
         [NotifyPropertyChangedFor(nameof(IsTurboVisionGray))]
         [NotifyPropertyChangedFor(nameof(IsTurboVisionElegant))]
+        [NotifyPropertyChangedFor(nameof(IsMonochrome))]
         private string _selectedTheme;
 
         public ThemeVariant RequestedThemeVariant
@@ -219,5 +222,6 @@ namespace Consolonia.Gallery.View
         public bool IsTurboVisionCompatible => SelectedTheme == nameof(ThemesList.TurboVisionCompatible);
         public bool IsTurboVisionGray => SelectedTheme == nameof(ThemesList.TurboVisionGray);
         public bool IsTurboVisionElegant => SelectedTheme == nameof(ThemesList.TurboVisionElegant);
+        public bool IsMonochrome => SelectedTheme == nameof(ThemesList.Monochrome);
     }
 }
