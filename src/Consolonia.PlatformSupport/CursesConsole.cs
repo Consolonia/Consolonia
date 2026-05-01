@@ -662,7 +662,8 @@ namespace Consolonia.PlatformSupport
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
                 {
-                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    if (!Enum.TryParse(key.ToString(), true, out consoleKey))
+                        throw new NotImplementedException("We could not recognize the key: " + key);
                     break;
                 }
             }
@@ -674,7 +675,8 @@ namespace Consolonia.PlatformSupport
             else
             {
                 if (consoleKey == default)
-                    throw new NotImplementedException();
+                    throw new NotImplementedException(
+                        $"Received key {key} was not mapped to anything using {nameof(KeyFlagTranslator)}, neither it is defined in enum {nameof(Key)}");
                 character = char.MinValue;
                 if (char.IsUpper(character))
                     modifiers |= RawInputModifiers.Shift;
