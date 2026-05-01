@@ -14,12 +14,12 @@
         <Menu DockPanel.Dock="Top"
               x:Name="Menu"
               IsTabStop="False">
-            <MenuItem Header="_File" 
+            <MenuItem Header="_File"
                       Focusable="False">
                 <MenuItem Header="E_xit"
                           Click="Exit_Click" />
             </MenuItem>
-            <MenuItem Header="_Theme" 
+            <MenuItem Header="_Theme"
                       Focusable="False">
                 <MenuItem IsChecked="{Binding IsModern}"
                           Header="_Modern"
@@ -55,7 +55,7 @@
                           Tag="Dark"
                           Click="OnThemeVariantDarkMenuClick" />
             </MenuItem>
-            <MenuItem Header="_View" 
+            <MenuItem Header="_View"
                       Focusable="False">
                 <MenuItem Header="Show _XAML"
                           Click="OnShowXaml" />
@@ -82,6 +82,6 @@
                 BorderThickness="1"
                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
         </DockPanel>
-        
+
     </DockPanel>
 </UserControl>
