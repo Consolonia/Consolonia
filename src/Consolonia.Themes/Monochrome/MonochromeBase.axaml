@@ -1,0 +1,54 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:console="https://github.com/consolonia"
+        xmlns:infrastructure="clr-namespace:Consolonia.Themes.Infrastructure">
+    <Styles.Resources>
+        <ResourceDictionary>
+            <x:String x:Key="{x:Static infrastructure:AutoThemeStylesBase.ConsoloniaThemeFamilyKey}">Monochrome</x:String>
+            <x:String x:Key="ThemeLeftArrowSymbol">←</x:String>
+            <x:String x:Key="ThemeRightArrowSymbol">→</x:String>
+            <x:String x:Key="ThemeUpArrowSymbol">↑</x:String>
+            <x:String x:Key="ThemeDownArrowSymbol">↓</x:String>
+
+            <x:String x:Key="ThemeScrollBarLeftSymbol">◄</x:String>
+            <x:String x:Key="ThemeScrollBarRightSymbol">►</x:String>
+            <x:String x:Key="ThemeScrollBarUpSymbol">▲</x:String>
+            <x:String x:Key="ThemeScrollBarDownSymbol">▼</x:String>
+
+            <x:String x:Key="ThemeScrollBarHorizontalBackgroundSymbol">░</x:String>
+            <x:String x:Key="ThemeScrollBarHorizontalThumbSymbol">█</x:String>
+
+            <x:String x:Key="ThemeScrollBarVerticalBackgroundSymbol">░</x:String>
+            <x:String x:Key="ThemeScrollBarVerticalThumbSymbol">█</x:String>
+
+            <x:String x:Key="ThemeProgressBarBackgroundSymbol">▒</x:String>
+
+            <x:String x:Key="ThemeSliderHorizontalThumbSymbol">O</x:String>
+            <x:String x:Key="ThemeSliderHorizontalBackgroundSymbol">─</x:String>
+
+            <x:String x:Key="ThemeSliderVerticalThumbSymbol">O</x:String>
+            <x:String x:Key="ThemeSliderVerticalBackgroundSymbol">│</x:String>
+
+            <x:String x:Key="ThemeRadioButtonNotSelectedSymbol">( )</x:String>
+            <x:String x:Key="ThemeRadioButtonSelectedSymbol">(*)</x:String>
+            <x:String x:Key="ThemeRadioButtonIndeterminateSymbol">(■)</x:String>
+
+            <x:String x:Key="ThemeCheckBoxNotSelectedSymbol">[ ]</x:String>
+            <x:String x:Key="ThemeCheckBoxSelectedSymbol">[x]</x:String>
+            <x:String x:Key="ThemeCheckBoxIndeterminateSymbol">[■]</x:String>
+
+            <x:String x:Key="ThemeCheckedSymbol">X</x:String>
+            <x:String x:Key="ThemeCloseSymbol">X</x:String>
+
+            <x:String x:Key="ThemeToggleSwitchOffSymbol">■</x:String>
+            <x:String x:Key="ThemeToggleSwitchOnSymbol">■</x:String>
+
+            <console:CaretStyle x:Key="ControlFocusCaretStyle">BlinkingBlock</console:CaretStyle>
+
+            <x:Int32 x:Key="ManagedWindow_SizingVector">1</x:Int32>
+            <x:Double x:Key="FontSizeNormal">1</x:Double>
+        </ResourceDictionary>
+    </Styles.Resources>
+
+    <StyleInclude Source="avares://Consolonia.Themes/Templates/Controls/AllControls.axaml" />
+</Styles>

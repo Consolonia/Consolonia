@@ -1,0 +1,30 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:consolonia="clr-namespace:Consolonia;assembly=Consolonia.Core">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+            <SolidColorBrush x:Key="ThemeForegroundBrush" Color="{consolonia:EgaColor White}" />
+            <SolidColorBrush x:Key="ThemeBackgroundBrush" Color="{consolonia:EgaColor Black}" />
+            <SolidColorBrush x:Key="ThemeAlternativeBackgroundBrush" Color="{consolonia:EgaColor Black}" />
+            
+            <SolidColorBrush x:Key="ThemeChooserBackgroundBrush" Color="{consolonia:EgaColor Black}" />
+            <SolidColorBrush x:Key="ThemeChooserForegroundBrush" Color="{consolonia:EgaColor White}" />
+            
+            <SolidColorBrush x:Key="ThemeActionBackgroundBrush" Color="{consolonia:EgaColor Black}" />
+            <SolidColorBrush x:Key="ThemeSelectionBackgroundBrush" Color="{consolonia:EgaColor Black}" />
+            <SolidColorBrush x:Key="ThemeSelectionForegroundBrush" Color="{consolonia:EgaColor White}" />
+            
+            <SolidColorBrush x:Key="ThemeHighlightForegroundBrush" Color="{consolonia:EgaColor White}" />
+            <SolidColorBrush x:Key="ThemeHighlightForegroundBrush2" Color="{consolonia:EgaColor White}" />
+            
+            <SolidColorBrush x:Key="ThemeBorderBrush" Color="{consolonia:EgaColor White}" />
+            <SolidColorBrush x:Key="ThemeNoDisturbBrush" Color="{consolonia:EgaColor Mode=Shaded}" />
+            
+            <SolidColorBrush x:Key="ThemeShadeBrush" Color="{consolonia:EgaColor Mode=Shaded}" />
+            <SolidColorBrush x:Key="ThemePseudoShadeBrush" Color="{consolonia:EgaColor White}" />
+            
+            <SolidColorBrush x:Key="ThemeErrorBrush" Color="{consolonia:EgaColor White}" />
+            <SolidColorBrush x:Key="ThemeTransparentBrush" Color="{consolonia:EgaColor Mode=Transparent}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>
