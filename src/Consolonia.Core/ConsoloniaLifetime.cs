@@ -149,12 +149,12 @@ namespace Consolonia
         }
 
         /// <summary>
-        ///     returned task indicates that console is successfully paused
+        ///     The returned task indicates when the console is successfully paused
         /// </summary>
         public Task DisconnectFromConsoleAsync(CancellationToken cancellationToken)
         {
             var taskToWaitFor = new TaskCompletionSource();
-            cancellationToken.Register(() => taskToWaitFor.SetResult());
+            cancellationToken.Register(taskToWaitFor.SetResult);
 
             var consoleWindow = (ConsoleWindowImpl)MainWindow.PlatformImpl;
             IConsole console = consoleWindow!.Console;
@@ -165,8 +165,7 @@ namespace Consolonia
 
             pauseTask.ContinueWith(_ =>
             {
-                consoleWindow.Console.ClearScreen();
-
+                consoleWindow.ClearScreen();
                 Dispatcher.UIThread.Post(() => { MainWindow.InvalidateVisual(); });
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
