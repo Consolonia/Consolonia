@@ -86,7 +86,7 @@ namespace Consolonia.Core.Infrastructure
             while (true)
                 try
                 {
-                    PauseTask?.Wait();
+                    WaitPauseTaskIfNecessary();
                     return [Console.ReadKey(true)];
                 }
                 catch (InvalidOperationException)
@@ -103,7 +103,7 @@ namespace Consolonia.Core.Infrastructure
 
                 while (!Disposed)
                 {
-                    PauseTask?.Wait();
+                    await WaitPauseTaskIfNecessaryAsync();
 
                     ConsoleKeyInfo[] consoleKeyInfos = _inputBuffer.Dequeue();
                     if (!consoleKeyInfos.Any())

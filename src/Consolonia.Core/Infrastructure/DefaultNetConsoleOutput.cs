@@ -13,7 +13,7 @@ namespace Consolonia.Core.Infrastructure
     /// <remarks>
     ///     Buffers on TextRuns of shared color/textstyle/properties
     /// </remarks>
-    public class DefaultNetConsoleOutput : IConsoleOutput
+    public class DefaultNetConsoleOutput : PauseBase, IConsoleOutput
     {
         private readonly StringBuilder _stringBuilder;
         private PixelBufferCoordinate _currentPosition;
@@ -35,11 +35,13 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void SetTitle(string title)
         {
+            WaitPauseTaskIfNecessary();
             Console.Title = title;
         }
 
         public virtual void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
+            WaitPauseTaskIfNecessary();
             try
             {
                 Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
@@ -53,6 +55,7 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
+            WaitPauseTaskIfNecessary();
             (int left, int top) = Console.GetCursorPosition();
             return new PixelBufferCoordinate((ushort)left, (ushort)top);
         }
@@ -106,6 +109,8 @@ namespace Consolonia.Core.Infrastructure
             if (_stringBuilder.Length == 0)
                 return;
 
+            WaitPauseTaskIfNecessary();
+
             // Debug.WriteLine($"[{_currentBufferPoint.X},{_currentBufferPoint.Y}] {_lastForegroundColor} on {_lastBackgroundColor} '{_stringBuilder}'");
             Console.Write(_stringBuilder.ToString());
             _stringBuilder.Clear();
@@ -113,11 +118,14 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void WriteText(string str)
         {
+            WaitPauseTaskIfNecessary();
             Console.Write(str);
         }
 
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
+            WaitPauseTaskIfNecessary();
+
             try
             {
 #pragma warning disable CA1416 // Validate platform compatibility
@@ -141,11 +149,13 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void HideCaret()
         {
+            WaitPauseTaskIfNecessary();
             Console.CursorVisible = false;
         }
 
         public virtual void ShowCaret()
         {
+            WaitPauseTaskIfNecessary();
             Console.CursorVisible = true;
         }
 
@@ -175,6 +185,7 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void ClearScreen()
         {
+            WaitPauseTaskIfNecessary();
             Console.Clear();
         }
     }
