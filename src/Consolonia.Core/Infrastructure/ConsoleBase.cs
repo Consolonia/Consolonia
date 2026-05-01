@@ -17,7 +17,7 @@ namespace Consolonia.Core.Infrastructure
     ///     This implements disposable and eventing for IConsoleInput and
     ///     wraps around internal IConsoleOutput
     /// </remarks>
-    public abstract class ConsoleBase : IConsole, IDisposable
+    public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
         private readonly IConsoleOutput _consoleOutput;
 
@@ -35,16 +35,10 @@ namespace Consolonia.Core.Infrastructure
 
         protected bool Disposed { get; private set; }
 
-        protected Task PauseTask { get; private set; }
-
-        /// <summary>
-        ///     Pause the IO
-        /// </summary>
-        /// <param name="task"></param>
-        public virtual void PauseIO(Task task)
+        public override void PauseIO(Task task)
         {
-            task.ContinueWith(_ => { PauseTask = null; }, TaskScheduler.Default);
-            PauseTask = task;
+            base.PauseIO(task);
+            _consoleOutput.PauseIO(task);
         }
 
         protected void StartSizeCheckTimerAsync(uint slowInterval = 1500)
@@ -55,9 +49,7 @@ namespace Consolonia.Core.Infrastructure
 
                 while (!Disposed)
                 {
-                    Task pauseTask = PauseTask;
-                    if (pauseTask != null)
-                        await pauseTask;
+                    await WaitPauseTaskIfNecessaryAsync();
 
 
                     int timeout = -1;
@@ -183,7 +175,6 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void WriteText(string str)
         {
-            PauseTask?.Wait();
             _consoleOutput.WriteText(str);
         }
 

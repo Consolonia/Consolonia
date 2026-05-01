@@ -17,7 +17,7 @@ namespace Consolonia.Core.Dummy
         }
     }
 
-    public class DummyConsoleOutput : IConsoleOutput
+    public class DummyConsoleOutput : PauseBase, IConsoleOutput
     {
         private PixelBufferCoordinate _caretPosition = new(0, 0);
         private bool _disposed;

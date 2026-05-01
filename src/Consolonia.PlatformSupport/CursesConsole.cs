@@ -210,8 +210,7 @@ namespace Consolonia.PlatformSupport
 
             do
             {
-                Task pauseTask = PauseTask;
-                pauseTask?.Wait();
+                WaitPauseTaskIfNecessary();
 
                 int code = Curses.get_wch(out int wch);
                 if (code != Curses.ERR)
@@ -224,6 +223,7 @@ namespace Consolonia.PlatformSupport
                     //check if was escape, wait for one more escape
                     if (code != Curses.KEY_CODE_YES && wch == 27)
                     {
+                        WaitPauseTaskIfNecessary();
                         int code2 = Curses.get_wch(out int wch2);
 
                         // ReSharper disable once ConvertIfStatementToConditionalTernaryExpression
@@ -670,7 +670,8 @@ namespace Consolonia.PlatformSupport
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
                 {
-                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    if (!Enum.TryParse(key.ToString(), true, out consoleKey))
+                        throw new NotImplementedException("We could not recognize the key: " + key);
                     break;
                 }
             }
@@ -682,7 +683,8 @@ namespace Consolonia.PlatformSupport
             else
             {
                 if (consoleKey == default)
-                    throw new NotImplementedException();
+                    throw new NotImplementedException(
+                        $"Received key {key} was not mapped to anything using {nameof(KeyFlagTranslator)}, neither it is defined in enum {nameof(Key)}");
                 character = char.MinValue;
                 if (char.IsUpper(character))
                     modifiers |= RawInputModifiers.Shift;

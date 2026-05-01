@@ -525,5 +525,13 @@ namespace Consolonia.Core.Infrastructure
         {
             CursorChanged?.Invoke(obj);
         }
+
+        public event Action ClearScreenRequested;
+
+        public void ClearScreen()
+        {
+            DirtyRegions.AddRect(PixelBuffer.Size);
+            ClearScreenRequested?.Invoke();
+        }
     }
 }
