@@ -47,6 +47,8 @@
 
             <x:Int32 x:Key="ManagedWindow_SizingVector">1</x:Int32>
             <x:Double x:Key="FontSizeNormal">1</x:Double>
+            
+            
         </ResourceDictionary>
     </Styles.Resources>
 

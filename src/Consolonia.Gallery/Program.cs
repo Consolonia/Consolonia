@@ -36,6 +36,7 @@ namespace Consolonia.Gallery
                 .UseConsoloniaStorage()
                 .UseConsolonia()
                 .UseAutoDetectedConsole()
+                .UseMonochromeConsoleColorMode()
                 .WithConsoleFonts()
                 .ThrowOnErrors()
                 .WithDeveloperTools();

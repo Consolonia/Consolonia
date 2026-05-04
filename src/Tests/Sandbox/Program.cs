@@ -17,6 +17,7 @@ namespace Sandbox
             return AppBuilder.Configure<App>()
                 .UseConsolonia()
                 .UseAutoDetectedConsole()
+                .UseMonochromeConsoleColorMode()
                 .WithConsoleFonts()
                 .WithDeveloperTools()
                 .LogToException();

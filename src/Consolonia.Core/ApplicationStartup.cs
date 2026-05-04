@@ -39,6 +39,11 @@ namespace Consolonia
             return builder.UseConsoleColorMode(new EgaConsoleColorMode(supportBrightBackground));
         }
 
+        public static AppBuilder UseMonochromeConsoleColorMode(this AppBuilder builder)
+        {
+            return builder.UseConsoleColorMode(new MonochromeColorMode());
+        }
+
         public static AppBuilder UseConsole(this AppBuilder builder, IConsole console)
         {
             return builder.With(console)
