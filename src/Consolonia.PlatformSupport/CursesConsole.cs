@@ -159,7 +159,7 @@ namespace Consolonia.PlatformSupport
         {
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-            StartSizeCheckTimerAsync(2500);
+            // StartSizeCheckTimerAsync(2500);
             StartEventLoop();
         }
 
