@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -140,6 +141,8 @@ namespace Consolonia.PlatformSupport
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
+        private IDisposable _sigwinchRegistration;
+        private volatile bool _resized;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -215,6 +218,12 @@ namespace Consolonia.PlatformSupport
                 int code = Curses.get_wch(out int wch);
                 if (code != Curses.ERR)
                 {
+                    if (code == Curses.KEY_CODE_YES && wch == Curses.KeyResize)
+                    {
+                        _resized = false;
+                        Curses.resizeterm(0, 0);
+                    }
+
                     _rowInputBuffer.Add((code, wch));
 
                     if (_rowInputBuffer.Count == 1)
@@ -240,6 +249,14 @@ namespace Consolonia.PlatformSupport
                 }
                 else
                 {
+                    if (_resized)
+                    {
+                        _resized = false;
+                        Curses.resizeterm(0, 0);
+                        _rowInputBuffer.Add((Curses.KEY_CODE_YES, Curses.KeyResize));
+                        break;
+                    }
+
                     if (_rowInputBuffer.Count == 0)
                         continue;
 
@@ -253,6 +270,20 @@ namespace Consolonia.PlatformSupport
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
+                {
+                    _resized = true;
+                    Curses.resizeterm(0, 0);
+                    DispatchInputAsync(() =>
+                    {
+                        CheckSize();
+                    });
+                });
+            }
+
             Curses.raw();
             Curses.noecho();
             _cursesWindow.keypad(true);
@@ -528,7 +559,7 @@ namespace Consolonia.PlatformSupport
             {
                 switch (wch)
                 {
-                    case Curses.KeyResize when Curses.CheckWinChange():
+                    case Curses.KeyResize:
                         CheckSize();
                         return;
                     case Curses.KeyMouse:
@@ -826,6 +857,7 @@ namespace Consolonia.PlatformSupport
             if (disposing)
             {
                 _inputBuffer.Dispose();
+                _sigwinchRegistration?.Dispose();
 
                 if (_gpmMonitor != null)
                 {
