@@ -93,7 +93,7 @@ namespace Unix.Terminal {
             //[DllImport ("libc")]
             //public extern static int ioctl (int fd, int cmd, out winsize argp);
 
-      		static void LoadMethods ()
+        static void LoadMethods ()
 		{
 			if (curses_library != null)
 				return;

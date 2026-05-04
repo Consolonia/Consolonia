@@ -142,7 +142,6 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
         private IDisposable _sigwinchRegistration;
-        private volatile bool _resized;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -162,7 +161,7 @@ namespace Consolonia.PlatformSupport
         {
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-            // StartSizeCheckTimerAsync(2500);
+            
             StartEventLoop();
         }
 
@@ -218,12 +217,6 @@ namespace Consolonia.PlatformSupport
                 int code = Curses.get_wch(out int wch);
                 if (code != Curses.ERR)
                 {
-                    if (code == Curses.KEY_CODE_YES && wch == Curses.KeyResize)
-                    {
-                        _resized = false;
-                        Curses.resizeterm(0, 0);
-                    }
-
                     _rowInputBuffer.Add((code, wch));
 
                     if (_rowInputBuffer.Count == 1)
@@ -249,14 +242,6 @@ namespace Consolonia.PlatformSupport
                 }
                 else
                 {
-                    if (_resized)
-                    {
-                        _resized = false;
-                        Curses.resizeterm(0, 0);
-                        _rowInputBuffer.Add((Curses.KEY_CODE_YES, Curses.KeyResize));
-                        break;
-                    }
-
                     if (_rowInputBuffer.Count == 0)
                         continue;
 
@@ -275,7 +260,6 @@ namespace Consolonia.PlatformSupport
             {
                 _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
                 {
-                    _resized = true;
                     Curses.resizeterm(0, 0);
                     DispatchInputAsync(() =>
                     {
