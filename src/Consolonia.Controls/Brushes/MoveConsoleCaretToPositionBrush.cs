@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace Consolonia.Controls.Brushes
 {
@@ -12,12 +13,30 @@ namespace Consolonia.Controls.Brushes
             AvaloniaProperty.Register<MoveConsoleCaretToPositionBrush, CaretStyle>(nameof(CaretStyle),
                 CaretStyle.BlinkingBar);
 
+        private volatile CaretStyle _caretStyle;
+
+        static MoveConsoleCaretToPositionBrush()
+        {
+            CaretStyleProperty.Changed.AddClassHandler<MoveConsoleCaretToPositionBrush>((brush, args) =>
+                brush._caretStyle = args.GetNewValue<CaretStyle>());
+        }
+
+        public MoveConsoleCaretToPositionBrush()
+        {
+            _caretStyle = CaretStyle;
+        }
+
         /// <summary>
         ///     style of caret
         /// </summary>
         public CaretStyle CaretStyle
         {
-            get => GetValue(CaretStyleProperty);
+            get
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                    return GetValue(CaretStyleProperty);
+                return _caretStyle;
+            }
             set => SetValue(CaretStyleProperty, value);
         }
 
