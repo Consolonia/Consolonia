@@ -9,6 +9,10 @@ namespace Consolonia.Controls.Brushes
     /// </summary>
     public class MoveConsoleCaretToPositionBrush : AvaloniaObject, IImmutableBrush
     {
+        public static readonly StyledProperty<CaretStyle> CaretStyleProperty =
+            AvaloniaProperty.Register<MoveConsoleCaretToPositionBrush, CaretStyle>(nameof(CaretStyle),
+                CaretStyle.BlinkingBar);
+
         private CaretStyle _caretStyle;
 
         static MoveConsoleCaretToPositionBrush()
@@ -21,10 +25,6 @@ namespace Consolonia.Controls.Brushes
         {
             _caretStyle = CaretStyle;
         }
-
-        public static readonly StyledProperty<CaretStyle> CaretStyleProperty =
-            AvaloniaProperty.Register<MoveConsoleCaretToPositionBrush, CaretStyle>(nameof(CaretStyle),
-                CaretStyle.BlinkingBar);
 
         /// <summary>
         ///     style of caret

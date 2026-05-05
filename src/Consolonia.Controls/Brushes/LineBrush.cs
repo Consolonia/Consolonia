@@ -11,6 +11,14 @@ namespace Consolonia.Controls.Brushes
     /// </summary>
     public class LineBrush : Animatable, IImmutableBrush
     {
+        //todo: we don't really implement immutable brush
+        public static readonly StyledProperty<IBrush> BrushProperty =
+            AvaloniaProperty.Register<LineBrush, IBrush>(
+                ControlUtils.GetStyledPropertyName() /*todo: re-use this method everywhere*/);
+
+        public static readonly StyledProperty<LineStyles> LineStyleProperty =
+            AvaloniaProperty.Register<LineBrush, LineStyles>(ControlUtils.GetStyledPropertyName());
+
         private IBrush _brush;
         private LineStyles _lineStyle;
 
@@ -39,19 +47,6 @@ namespace Consolonia.Controls.Brushes
             _lineStyle = LineStyle?.Clone();
         }
 
-        private void OnUnderlyingBrushPropertyChanged(object sender, AvaloniaPropertyChangedEventArgs e)
-        {
-            _brush = Brush?.ToImmutable();
-        }
-
-        //todo: we don't really implement immutable brush
-        public static readonly StyledProperty<IBrush> BrushProperty =
-            AvaloniaProperty.Register<LineBrush, IBrush>(
-                ControlUtils.GetStyledPropertyName() /*todo: re-use this method everywhere*/);
-
-        public static readonly StyledProperty<LineStyles> LineStyleProperty =
-            AvaloniaProperty.Register<LineBrush, LineStyles>(ControlUtils.GetStyledPropertyName());
-
         public IBrush Brush
         {
             get
@@ -78,6 +73,11 @@ namespace Consolonia.Controls.Brushes
         public double Opacity => 1;
         public ITransform Transform => null;
         public RelativePoint TransformOrigin => RelativePoint.TopLeft;
+
+        private void OnUnderlyingBrushPropertyChanged(object sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            _brush = Brush?.ToImmutable();
+        }
 
         public bool HasEdgeLineStyle()
         {
