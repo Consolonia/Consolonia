@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Avalonia;
 using Consolonia.Core.Drawing;
 
@@ -31,6 +30,7 @@ namespace Consolonia.Core.Infrastructure
                 if (inclusive ? rect.Contains(point) : rect.ContainsExclusive(point))
                     return true;
             }
+
             return false;
         }
 
