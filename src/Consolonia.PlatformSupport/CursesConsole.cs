@@ -260,9 +260,9 @@ namespace Consolonia.PlatformSupport
             {
                 _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
                 {
-                    Curses.resizeterm(0, 0);
-                    DispatchInputAsync(() =>
+                    Task unused = DispatchInputAsync(() =>
                     {
+                        Curses.resizeterm(0, 0);
                         CheckSize();
                     });
                 });
