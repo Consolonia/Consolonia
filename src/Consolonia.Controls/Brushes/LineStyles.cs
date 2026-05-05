@@ -40,6 +40,11 @@ namespace Consolonia.Controls.Brushes
         public LineStyle Right { get; set; }
         public LineStyle Bottom { get; set; }
 
+        public LineStyles Clone()
+        {
+            return new LineStyles(Left, Top, Right, Bottom);
+        }
+
         public static LineStyles Parse(string s)
         {
             return new LineStyles(s);
