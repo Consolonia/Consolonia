@@ -25,7 +25,13 @@ namespace Consolonia.Core.Infrastructure
         /// <returns>True if the point is contained, false otherwise.</returns>
         public bool Contains(PixelPoint point, bool inclusive)
         {
-            return _rectangles.Any(rect => inclusive ? rect.Contains(point) : rect.ContainsExclusive(point));
+            for (int i = 0; i < _rectangles.Count; i++)
+            {
+                PixelRect rect = _rectangles[i];
+                if (inclusive ? rect.Contains(point) : rect.ContainsExclusive(point))
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
