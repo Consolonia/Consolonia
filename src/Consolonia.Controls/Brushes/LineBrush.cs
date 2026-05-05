@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 // ReSharper disable CheckNamespace
 namespace Consolonia.Controls.Brushes
@@ -10,6 +11,39 @@ namespace Consolonia.Controls.Brushes
     /// </summary>
     public class LineBrush : Animatable, IImmutableBrush
     {
+        private IBrush _brush;
+        private LineStyles _lineStyle;
+
+        static LineBrush()
+        {
+            BrushProperty.Changed.AddClassHandler<LineBrush>((brush, args) =>
+            {
+                if (args.OldValue is AvaloniaObject oldBrush)
+                    oldBrush.PropertyChanged -= brush.OnUnderlyingBrushPropertyChanged;
+
+                if (args.NewValue is AvaloniaObject newBrush)
+                    newBrush.PropertyChanged += brush.OnUnderlyingBrushPropertyChanged;
+
+                brush._brush = ((IBrush)args.NewValue)?.ToImmutable();
+            });
+            LineStyleProperty.Changed.AddClassHandler<LineBrush>((brush, args) =>
+                brush._lineStyle = ((LineStyles)args.NewValue)?.Clone());
+        }
+
+        public LineBrush()
+        {
+            if (Brush is AvaloniaObject avaloniaObject)
+                avaloniaObject.PropertyChanged += OnUnderlyingBrushPropertyChanged;
+
+            _brush = Brush?.ToImmutable();
+            _lineStyle = LineStyle?.Clone();
+        }
+
+        private void OnUnderlyingBrushPropertyChanged(object sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            _brush = Brush?.ToImmutable();
+        }
+
         //todo: we don't really implement immutable brush
         public static readonly StyledProperty<IBrush> BrushProperty =
             AvaloniaProperty.Register<LineBrush, IBrush>(
@@ -20,13 +54,23 @@ namespace Consolonia.Controls.Brushes
 
         public IBrush Brush
         {
-            get => GetValue(BrushProperty);
+            get
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                    return GetValue(BrushProperty);
+                return _brush;
+            }
             set => SetValue(BrushProperty, value);
         }
 
         public LineStyles LineStyle
         {
-            get => GetValue(LineStyleProperty);
+            get
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                    return GetValue(LineStyleProperty);
+                return _lineStyle;
+            }
             set => SetValue(LineStyleProperty, value);
         }
 
