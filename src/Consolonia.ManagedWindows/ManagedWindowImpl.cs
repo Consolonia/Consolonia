@@ -33,6 +33,7 @@ namespace Consolonia.ManagedWindows
         private IWindowImpl _parentWindow;
         private IInputRoot _inputRoot;
         private Size _clientSize;
+        private bool _contentAdopted;
         private bool _disposing;
 
         public ManagedWindowImpl(IWindowImpl mainWindow)
@@ -110,6 +111,9 @@ namespace Consolonia.ManagedWindows
         /// </summary>
         private void AdoptContentFromSource()
         {
+            if (_contentAdopted)
+                return;
+
             // In Avalonia 11.x, the inputRoot IS the Window
             if (_inputRoot is not Window win)
                 return;
@@ -172,6 +176,8 @@ namespace Consolonia.ManagedWindows
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             if (layoutManagerProp?.GetValue(win) is IDisposable layoutManager)
                 layoutManager.Dispose();
+
+            _contentAdopted = true;
         }
 
         public Point PointToClient(PixelPoint point) => point.ToPoint(1);
