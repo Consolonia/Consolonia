@@ -8,6 +8,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -140,6 +141,7 @@ namespace Consolonia.PlatformSupport
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
+        private IDisposable _sigwinchRegistration;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -159,7 +161,7 @@ namespace Consolonia.PlatformSupport
         {
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-            StartSizeCheckTimerAsync(2500);
+
             StartEventLoop();
         }
 
@@ -253,6 +255,17 @@ namespace Consolonia.PlatformSupport
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
+                {
+                    Task unused = DispatchInputAsync(() =>
+                    {
+                        Curses.resizeterm(0, 0);
+                        CheckSize();
+                    });
+                });
+
             Curses.raw();
             Curses.noecho();
             _cursesWindow.keypad(true);
@@ -528,7 +541,7 @@ namespace Consolonia.PlatformSupport
             {
                 switch (wch)
                 {
-                    case Curses.KeyResize when Curses.CheckWinChange():
+                    case Curses.KeyResize:
                         CheckSize();
                         return;
                     case Curses.KeyMouse:
@@ -826,6 +839,7 @@ namespace Consolonia.PlatformSupport
             if (disposing)
             {
                 _inputBuffer.Dispose();
+                _sigwinchRegistration?.Dispose();
 
                 if (_gpmMonitor != null)
                 {

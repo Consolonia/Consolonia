@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 // ReSharper disable CheckNamespace
 namespace Consolonia.Controls.Brushes
@@ -18,15 +19,53 @@ namespace Consolonia.Controls.Brushes
         public static readonly StyledProperty<LineStyles> LineStyleProperty =
             AvaloniaProperty.Register<LineBrush, LineStyles>(ControlUtils.GetStyledPropertyName());
 
+        private volatile IBrush _brush;
+        private volatile LineStyles _lineStyle;
+
+        static LineBrush()
+        {
+            BrushProperty.Changed.AddClassHandler<LineBrush>((brush, args) =>
+            {
+                if (args.OldValue is AvaloniaObject oldBrush)
+                    oldBrush.PropertyChanged -= brush.OnUnderlyingBrushPropertyChanged;
+
+                if (args.NewValue is AvaloniaObject newBrush)
+                    newBrush.PropertyChanged += brush.OnUnderlyingBrushPropertyChanged;
+
+                brush._brush = args.GetNewValue<IBrush>()?.ToImmutable();
+            });
+            LineStyleProperty.Changed.AddClassHandler<LineBrush>((brush, args) =>
+                brush._lineStyle = args.GetNewValue<LineStyles>()?.Clone());
+        }
+
+        public LineBrush()
+        {
+            if (Brush is AvaloniaObject avaloniaObject)
+                avaloniaObject.PropertyChanged += OnUnderlyingBrushPropertyChanged;
+
+            _brush = Brush?.ToImmutable();
+            _lineStyle = LineStyle?.Clone();
+        }
+
         public IBrush Brush
         {
-            get => GetValue(BrushProperty);
+            get
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                    return GetValue(BrushProperty);
+                return _brush;
+            }
             set => SetValue(BrushProperty, value);
         }
 
         public LineStyles LineStyle
         {
-            get => GetValue(LineStyleProperty);
+            get
+            {
+                if (Dispatcher.UIThread.CheckAccess())
+                    return GetValue(LineStyleProperty);
+                return _lineStyle;
+            }
             set => SetValue(LineStyleProperty, value);
         }
 
@@ -34,6 +73,11 @@ namespace Consolonia.Controls.Brushes
         public double Opacity => 1;
         public ITransform Transform => null;
         public RelativePoint TransformOrigin => RelativePoint.TopLeft;
+
+        private void OnUnderlyingBrushPropertyChanged(object sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            _brush = Brush?.ToImmutable();
+        }
 
         public bool HasEdgeLineStyle()
         {
