@@ -13,12 +13,12 @@ namespace Consolonia.Controls.Brushes
             AvaloniaProperty.Register<MoveConsoleCaretToPositionBrush, CaretStyle>(nameof(CaretStyle),
                 CaretStyle.BlinkingBar);
 
-        private CaretStyle _caretStyle;
+        private volatile CaretStyle _caretStyle;
 
         static MoveConsoleCaretToPositionBrush()
         {
             CaretStyleProperty.Changed.AddClassHandler<MoveConsoleCaretToPositionBrush>((brush, args) =>
-                brush._caretStyle = (CaretStyle)args.NewValue);
+                brush._caretStyle = args.GetNewValue<CaretStyle>());
         }
 
         public MoveConsoleCaretToPositionBrush()

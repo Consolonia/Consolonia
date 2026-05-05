@@ -19,8 +19,8 @@ namespace Consolonia.Controls.Brushes
         public static readonly StyledProperty<LineStyles> LineStyleProperty =
             AvaloniaProperty.Register<LineBrush, LineStyles>(ControlUtils.GetStyledPropertyName());
 
-        private IBrush _brush;
-        private LineStyles _lineStyle;
+        private volatile IBrush _brush;
+        private volatile LineStyles _lineStyle;
 
         static LineBrush()
         {
@@ -32,10 +32,10 @@ namespace Consolonia.Controls.Brushes
                 if (args.NewValue is AvaloniaObject newBrush)
                     newBrush.PropertyChanged += brush.OnUnderlyingBrushPropertyChanged;
 
-                brush._brush = ((IBrush)args.NewValue)?.ToImmutable();
+                brush._brush = args.GetNewValue<IBrush>()?.ToImmutable();
             });
             LineStyleProperty.Changed.AddClassHandler<LineBrush>((brush, args) =>
-                brush._lineStyle = ((LineStyles)args.NewValue)?.Clone());
+                brush._lineStyle = args.GetNewValue<LineStyles>()?.Clone());
         }
 
         public LineBrush()
