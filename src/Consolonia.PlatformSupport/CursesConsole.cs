@@ -161,7 +161,7 @@ namespace Consolonia.PlatformSupport
         {
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-            
+
             StartEventLoop();
         }
 
@@ -257,7 +257,6 @@ namespace Consolonia.PlatformSupport
             _cursesWindow = Curses.initscr();
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
                 _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
                 {
                     Task unused = DispatchInputAsync(() =>
@@ -266,7 +265,6 @@ namespace Consolonia.PlatformSupport
                         CheckSize();
                     });
                 });
-            }
 
             Curses.raw();
             Curses.noecho();
