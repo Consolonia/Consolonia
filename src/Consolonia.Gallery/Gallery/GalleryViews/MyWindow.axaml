@@ -1,8 +1,9 @@
-<wm:ManagedWindow xmlns="https://github.com/avaloniaui"
+<Window xmlns="https://github.com/avaloniaui"
                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                   xmlns:wm="using:Iciclecreek.Avalonia.WindowManager"
                   xmlns:local="using:Consolonia.Gallery.Gallery.GalleryViews"
-                  Icon="😎"
+                  xmlns:console="https://github.com/consolonia"
+                  console:ManagedWindowImpl.TextIcon="😎"
                   Padding="1"
                   x:Class="Consolonia.Gallery.Gallery.GalleryViews.MyWindow"
                   x:DataType="local:MyWindowViewModel"
@@ -72,4 +73,4 @@
             CTRL+S - resize
         </TextBlock>
     </StackPanel>
-</wm:ManagedWindow>
+</Window>

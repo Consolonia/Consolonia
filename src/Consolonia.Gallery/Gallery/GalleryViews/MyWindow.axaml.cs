@@ -9,7 +9,7 @@ using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
-    public partial class MyWindow : ManagedWindow
+    public partial class MyWindow : Window
     {
         private static int _windowCount;
 
@@ -31,7 +31,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             InitializeComponent();
 
             //  this.Background = brushes[Random.Shared.Next(0, brushes.Length)];
-            AnimateWindow = ConsoloniaLifetime.Console.GetType().Name != "UnitTestConsole";
 
             DataContext = new MyWindowViewModel
             {
@@ -99,7 +98,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
     internal static class Utils
     {
-        public static void SizeToBounds(this ManagedWindow window, Rect rect)
+        public static void SizeToBounds(this Window window, Rect rect)
         {
             int minWidth = (int)rect.Width / 4;
             int minHeight = (int)rect.Height / 4;

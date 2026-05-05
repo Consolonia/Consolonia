@@ -18,12 +18,30 @@ namespace Consolonia.Core.Infrastructure
 {
     public class ConsoloniaPlatform : IWindowingPlatform
     {
+        private static IWindowImpl _mainWindow;
+
         internal static ConsoloniaPlatformSettings Settings =>
             AvaloniaLocator.Current.GetService<IPlatformSettings>() as ConsoloniaPlatformSettings;
 
+        /// <summary>
+        ///     Gets the main console window implementation.
+        /// </summary>
+        internal static IWindowImpl MainWindow => _mainWindow;
+
+        /// <summary>
+        ///     Factory for creating secondary windows (dialogs, etc.) as ManagedWindow-based IWindowImpl.
+        ///     Set by Consolonia.ManagedWindows via UseManagedWindows() extension.
+        /// </summary>
+        public static Func<IWindowImpl, IWindowImpl> SecondaryWindowFactory { get; set; }
+
         public IWindowImpl CreateWindow()
         {
-            return new ConsoleWindowImpl();
+            if (_mainWindow != null && SecondaryWindowFactory != null)
+                return SecondaryWindowFactory(_mainWindow);
+
+            var window = new ConsoleWindowImpl();
+            _mainWindow = window;
+            return window;
         }
 
         public IWindowImpl CreateEmbeddableWindow()

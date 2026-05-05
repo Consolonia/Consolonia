@@ -24,8 +24,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             };
 
             window.SizeToBounds(Bounds);
-
-            Windows.Show(window);
+           
+            window.Show();
         }
     }
 }
