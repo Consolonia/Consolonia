@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.Composition;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -42,7 +43,7 @@ namespace Consolonia.ManagedWindows
 
         public ChildWindowImpl(IWindowImpl mainWindow)
         {
-            base.Content = new Panel();
+            base.Content = new Panel() { Background = Brushes.Transparent };
             _mainWindow = mainWindow;
             _mainConsoleWindow = (ConsoleWindowImpl)mainWindow;
 
@@ -65,6 +66,17 @@ namespace Consolonia.ManagedWindows
             };
             base.Resized += (_, e) =>
             {
+                // e.ClientSize is the actual content presenter bounds (from WindowManager fix).
+                // Resize PixelBuffer to match the real content area.
+                var contentWidth = (ushort)Math.Max(1, e.ClientSize.Width);
+                var contentHeight = (ushort)Math.Max(1, e.ClientSize.Height);
+                if (PixelBuffer.Width != contentWidth || PixelBuffer.Height != contentHeight)
+                {
+                    _clientSize = e.ClientSize;
+                    PixelBuffer = new PixelBuffer(contentWidth, contentHeight);
+                    DirtyRegions.AddRect(PixelBuffer.Size);
+                    ((ITopLevelImpl)this).Resized?.Invoke(e.ClientSize, e.Reason);
+                }
                 UpdateSurfacePosition();
             };
             base.Closing += (_, e) =>
@@ -303,14 +315,14 @@ namespace Consolonia.ManagedWindows
             // Notify Avalonia of the new size — this triggers layout in the TopLevel
             ((ITopLevelImpl)this).Resized?.Invoke(clientSize, reason);
 
-            try
-            {
-                base.ClientSize = clientSize;
-            }
-            catch (Exception ex) when (ex is NullReferenceException or InvalidOperationException)
-            {
-                // ManagedWindow template may not be applied yet
-            }
+            // Set ManagedWindow's total size = clientSize + chrome.
+            // Don't use base.ClientSize — it sets explicit _content.Width/Height
+            // which prevents the content area from shrinking during user resize.
+            var border = this.BorderThickness;
+            int chromeW = Math.Max(2, (int)(border.Left + border.Right));
+            int chromeH = Math.Max(3, (int)(border.Top + border.Bottom) + 1); // +1 for title bar
+            this.Width = clientSize.Width + chromeW;
+            this.Height = clientSize.Height + chromeH;
 
             UpdateSurfacePosition();
         }

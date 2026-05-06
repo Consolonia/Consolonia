@@ -4,7 +4,8 @@
       "Bash(find /s/github/Consolonia -name \"*.cs\" -exec grep -l \"\\\\.Dispose\\(\\)\" {} \\\\;)",
       "Bash(find s:/github/Consolonia -path \"*/bin/*\" -name \"*.dll\" -exec strings {} \\\\;)",
       "Bash(dotnet exec:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find s:/github/avalonia/src -name \"*.cs\" -exec grep -l \"IEnumerable.*Surfaces\" {} \\\\;)"
     ]
   }
 }
