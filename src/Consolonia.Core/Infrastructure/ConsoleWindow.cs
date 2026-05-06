@@ -30,8 +30,6 @@ namespace Consolonia.Core.Infrastructure
         private static bool _singletonGuard;
         private readonly bool _accessKeysAlwaysOn;
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
-        private readonly IKeyboardDevice _myKeyboardDevice;
-        private readonly IMouseDevice _mouseDevice;
         private bool _disposedValue;
         private IInputRoot _inputRoot;
 
@@ -58,13 +56,6 @@ namespace Consolonia.Core.Infrastructure
                 if (focused) Activated?.Invoke();
                 else Deactivated?.Invoke();
             };
-
-            // Direct input subscriptions for main window (bypass ConsoleSurface routing for now)
-            _myKeyboardDevice = AvaloniaLocator.Current.GetRequiredService<IKeyboardDevice>();
-            _mouseDevice = AvaloniaLocator.Current.GetService<IMouseDevice>();
-            Surface.Console.KeyEvent += ConsoleOnKeyEvent;
-            Surface.Console.TextInputEvent += ConsoleOnTextInputEvent;
-            Surface.Console.MouseEvent += ConsoleOnMouseEvent;
 
             Handle = null!;
             _accessKeysAlwaysOn = !Surface.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsAltSolo);
@@ -249,9 +240,6 @@ namespace Consolonia.Core.Infrastructure
                 {
                     Closed?.Invoke();
                     _accessKeysAlwaysOnDisposable?.Dispose();
-                    Surface.Console.KeyEvent -= ConsoleOnKeyEvent;
-                    Surface.Console.TextInputEvent -= ConsoleOnTextInputEvent;
-                    Surface.Console.MouseEvent -= ConsoleOnMouseEvent;
                     Surface.Dispose();
                     _singletonGuard = false;
                 }
@@ -281,63 +269,5 @@ namespace Consolonia.Core.Infrastructure
         public void ClearScreen() => Surface.ClearScreen();
 
         internal IConsole Console => Surface.Console;
-
-        // --- Direct input handlers (same as old ConsoleWindowImpl) ---
-        private void ConsoleOnKeyEvent(Key key, char keyChar, RawInputModifiers rawInputModifiers, bool down,
-            ulong timeStamp, bool tryAsTextInput)
-        {
-            if (!down)
-            {
-                Input!(new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot,
-                    RawKeyEventType.KeyUp, key, rawInputModifiers));
-            }
-            else
-            {
-                var args = new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot,
-                    RawKeyEventType.KeyDown, key, rawInputModifiers);
-                Input!(args);
-
-                if (tryAsTextInput && !args.Handled && !char.IsControl(keyChar)
-                    && !rawInputModifiers.HasFlag(RawInputModifiers.Alt)
-                    && !rawInputModifiers.HasFlag(RawInputModifiers.Control))
-                    Input!(new RawTextInputEventArgs(_myKeyboardDevice, timeStamp, _inputRoot, keyChar.ToString()));
-            }
-        }
-
-        private void ConsoleOnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)
-        {
-            var args = new RawTextInputEventArgs(_myKeyboardDevice, timeStamp, _inputRoot, text);
-            Input!(args);
-            if (args.Handled)
-                canBeHandledEventArgs.Handled = true;
-        }
-
-        private void ConsoleOnMouseEvent(RawPointerEventType type, Point point, Vector? wheelDelta,
-            RawInputModifiers modifiers)
-        {
-            ulong timestamp = (ulong)Environment.TickCount64;
-            switch (type)
-            {
-                case RawPointerEventType.Move:
-                case RawPointerEventType.LeftButtonDown:
-                case RawPointerEventType.LeftButtonUp:
-                case RawPointerEventType.RightButtonUp:
-                case RawPointerEventType.RightButtonDown:
-                case RawPointerEventType.MiddleButtonDown:
-                case RawPointerEventType.XButton1Down:
-                case RawPointerEventType.XButton2Down:
-                case RawPointerEventType.NonClientLeftButtonDown:
-                case RawPointerEventType.MiddleButtonUp:
-                case RawPointerEventType.XButton1Up:
-                case RawPointerEventType.XButton2Up:
-                    Input!(new RawPointerEventArgs(_mouseDevice, timestamp, _inputRoot,
-                        type, point, modifiers));
-                    break;
-                case RawPointerEventType.Wheel:
-                    Input!(new RawMouseWheelEventArgs(_mouseDevice, timestamp, _inputRoot, point,
-                        (Vector)wheelDelta!, modifiers));
-                    break;
-            }
-        }
     }
 }

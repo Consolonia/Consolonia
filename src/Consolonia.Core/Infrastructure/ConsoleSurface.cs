@@ -33,11 +33,9 @@ namespace Consolonia.Core.Infrastructure
             Compositor = new Compositor(null);
 
             Console.Resized += OnConsoleResized;
-            // Input routing is temporarily handled directly by ConsoleWindowImpl
-            // TODO: Move input routing back to ConsoleSurface once focus issue is resolved
-            // Console.KeyEvent += OnKeyEvent;
-            // Console.TextInputEvent += OnTextInputEvent;
-            // Console.MouseEvent += OnMouseEvent;
+            Console.KeyEvent += OnKeyEvent;
+            Console.TextInputEvent += OnTextInputEvent;
+            Console.MouseEvent += OnMouseEvent;
             Console.FocusEvent += OnFocusEvent;
         }
 
@@ -289,6 +287,12 @@ namespace Consolonia.Core.Infrastructure
         public void SetCursorType(StandardCursorType cursorType)
         {
             _cursorType = cursorType;
+            UpdateCursor();
+        }
+
+        public void UpdateCursorPosition(Point point)
+        {
+            _cursorPosition = point;
             UpdateCursor();
         }
 
