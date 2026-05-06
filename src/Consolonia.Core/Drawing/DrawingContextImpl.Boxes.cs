@@ -195,7 +195,7 @@ namespace Consolonia.Core.Drawing
                             if (pixel.CaretStyle != moveBrush.CaretStyle)
                             {
                                 // only be dirty if something changed
-                                _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(head, new PixelSize(1, 1)));
+                                _surface.DirtyRegions.AddRect(new PixelRect(head, new PixelSize(1, 1)));
                                 _pixelBuffer[head] =
                                     pixel.Blend(new Pixel(moveBrush.CaretStyle));
                             }
@@ -293,7 +293,7 @@ namespace Consolonia.Core.Drawing
                 if (CurrentClip.ContainsExclusive(head))
                 {
                     _pixelBuffer[head] = _pixelBuffer[head].Blend(new Pixel(moveBrush.CaretStyle));
-                    _consoleWindowImpl.DirtyRegions.AddRect(
+                    _surface.DirtyRegions.AddRect(
                         CurrentClip.Intersect(new PixelRect(head, new PixelSize(1, 1))));
                 }
 
@@ -334,7 +334,7 @@ namespace Consolonia.Core.Drawing
                 head = head.WithX(head.X + 1);
             }
 
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectRect);
+            _surface.DirtyRegions.AddRect(intersectRect);
         }
 
         private void FillRectangleWithBrush(IBrush brush, PixelRect pixelRect)
@@ -381,7 +381,7 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            _consoleWindowImpl.DirtyRegions.AddRect(targetRect);
+            _surface.DirtyRegions.AddRect(targetRect);
         }
 
         /// <summary>
@@ -595,7 +595,7 @@ namespace Consolonia.Core.Drawing
                     head = head.WithX(head.X + 1);
             }
 
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectLine);
+            _surface.DirtyRegions.AddRect(intersectLine);
         }
     }
 }

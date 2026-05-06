@@ -17,7 +17,7 @@ namespace Consolonia.Core.Drawing
     internal partial class DrawingContextImpl : IDrawingContextImpl
     {
         private readonly Stack<PixelRect> _clipStack = new(100);
-        private readonly ConsoleWindowImpl _consoleWindowImpl;
+        private readonly IPixelBufferSurface _surface;
         private readonly PixelBuffer _pixelBuffer;
         private readonly Matrix _postTransform = Matrix.Identity;
 
@@ -25,10 +25,10 @@ namespace Consolonia.Core.Drawing
         private readonly Stack<RenderOptions> _renderOptions = new();
         private Matrix _transform = Matrix.Identity;
 
-        public DrawingContextImpl(ConsoleWindowImpl consoleWindowImpl)
+        public DrawingContextImpl(IPixelBufferSurface surface)
         {
-            _consoleWindowImpl = consoleWindowImpl;
-            _pixelBuffer = consoleWindowImpl.PixelBuffer;
+            _surface = surface;
+            _pixelBuffer = surface.PixelBuffer;
             _clipStack.Push(_pixelBuffer.Size);
         }
 
@@ -83,12 +83,12 @@ namespace Consolonia.Core.Drawing
             glyphTypefaceRender.DrawGlyphRun(this, startPosition, glyphRunImpl, foregroundColor,
                 out PixelRect rectToRefresh);
 
-            _consoleWindowImpl.DirtyRegions.AddRect(rectToRefresh);
+            _surface.DirtyRegions.AddRect(rectToRefresh);
         }
 
         public IDrawingContextLayerImpl CreateLayer(PixelSize size)
         {
-            return new RenderTarget(_consoleWindowImpl);
+            return new RenderTarget(_surface);
         }
 
         public void PushClip(Rect clip)

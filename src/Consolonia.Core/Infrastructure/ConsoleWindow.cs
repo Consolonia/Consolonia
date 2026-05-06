@@ -23,11 +23,13 @@ namespace Consolonia.Core.Infrastructure
     ///     ConsoleWindowImpl - An IWindowImpl which uses a PixelBuffer to render.
     /// </summary>
 #pragma warning disable CA1711 // Identifiers should not have incorrect suffix
-    public class ConsoleWindowImpl : IWindowImpl
+    public class ConsoleWindowImpl : IWindowImpl, IPixelBufferSurface
 #pragma warning restore CA1711 // Identifiers should not have incorrect suffix
     {
         private static bool _singletonGuard;
         [NotNull] internal readonly IConsole Console;
+
+        IConsole IPixelBufferSurface.Console => Console;
         private readonly bool _accessKeysAlwaysOn;
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
         private readonly IKeyboardDevice _myKeyboardDevice;
@@ -61,7 +63,7 @@ namespace Consolonia.Core.Infrastructure
                     AccessText.ShowAccessKeyProperty.Changed.SubscribeAction(OnShowAccessKeyPropertyChanged);
         }
 
-        internal Snapshot.Regions DirtyRegions { get; } = new();
+        public Snapshot.Regions DirtyRegions { get; } = new();
 
         public PixelBuffer PixelBuffer { get; private set; }
 
@@ -403,6 +405,7 @@ namespace Consolonia.Core.Infrastructure
             var size = new Size(Console.Size.Width, Console.Size.Height);
             PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
             Resized!(size, WindowResizeReason.Unspecified);
+            _surfaceResized?.Invoke(size, WindowResizeReason.Unspecified);
         }
 
         private void ConsoleOnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)
@@ -524,6 +527,14 @@ namespace Consolonia.Core.Infrastructure
         protected virtual void OnCursorChanged(ConsoleCursor obj)
         {
             CursorChanged?.Invoke(obj);
+        }
+
+        private event Action<Size, WindowResizeReason> _surfaceResized;
+
+        event Action<Size, WindowResizeReason> IPixelBufferSurface.Resized
+        {
+            add => _surfaceResized += value;
+            remove => _surfaceResized -= value;
         }
 
         public event Action ClearScreenRequested;

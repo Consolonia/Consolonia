@@ -7,7 +7,7 @@ namespace Consolonia.Core.Infrastructure
     /// <summary>
     ///     A readonly snapshot of rectangles.
     /// </summary>
-    internal class Snapshot
+    public class Snapshot
     {
         private readonly IReadOnlyList<PixelRect> _rectangles;
 

@@ -19,7 +19,7 @@ namespace Consolonia.Core.Drawing
     {
         private readonly IConsoleOutput _console;
 
-        private readonly ConsoleWindowImpl _consoleTopLevelImpl;
+        private readonly IPixelBufferSurface _surface;
 
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
@@ -32,19 +32,19 @@ namespace Consolonia.Core.Drawing
         private int _fps;
         private TimeSpan _lastFpsUpdate;
 #endif
-        internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
+        internal RenderTarget(IPixelBufferSurface surface)
         {
             _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
-            _consoleTopLevelImpl = consoleTopLevelImpl;
+            _surface = surface;
             InitializeCacheInternal();
-            _consoleTopLevelImpl.Resized += OnResized;
-            _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
-            _consoleTopLevelImpl.ClearScreenRequested += OnClearScreenRequested;
+            _surface.Resized += OnResized;
+            _surface.CursorChanged += OnCursorChanged;
+            _surface.ClearScreenRequested += OnClearScreenRequested;
         }
 
         private void InitializeCacheInternal()
         {
-            _cache = InitializeCache(_consoleTopLevelImpl.PixelBuffer.Width, _consoleTopLevelImpl.PixelBuffer.Height);
+            _cache = InitializeCache(_surface.PixelBuffer.Width, _surface.PixelBuffer.Height);
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -56,18 +56,18 @@ namespace Consolonia.Core.Drawing
         }
 
         public RenderTarget(IEnumerable<object> surfaces)
-            : this(surfaces.OfType<ConsoleWindowImpl>()
+            : this(surfaces.OfType<IPixelBufferSurface>()
                 .Single())
         {
         }
 
-        public PixelBuffer Buffer => _consoleTopLevelImpl.PixelBuffer;
+        public PixelBuffer Buffer => _surface.PixelBuffer;
 
         public void Dispose()
         {
-            _consoleTopLevelImpl.Resized -= OnResized;
-            _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
-            _consoleTopLevelImpl.ClearScreenRequested -= OnClearScreenRequested;
+            _surface.Resized -= OnResized;
+            _surface.CursorChanged -= OnCursorChanged;
+            _surface.ClearScreenRequested -= OnClearScreenRequested;
         }
 
         public void Save(string fileName, int? quality = null)
@@ -103,7 +103,7 @@ namespace Consolonia.Core.Drawing
         {
             if (useScaledDrawing)
                 throw new NotImplementedException("Consolonia doesn't support useScaledDrawing");
-            return new DrawingContextImpl(_consoleTopLevelImpl);
+            return new DrawingContextImpl(_surface);
         }
 
 
@@ -131,8 +131,8 @@ namespace Consolonia.Core.Drawing
         private void RenderToDevice()
         {
             _renderPending = false;
-            PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
-            Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
+            PixelBuffer pixelBuffer = _surface.PixelBuffer;
+            Snapshot dirtyRegions = _surface.DirtyRegions.GetSnapshotAndClear();
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -309,8 +309,8 @@ namespace Consolonia.Core.Drawing
                 oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
             var newCursorRect = new PixelRect(consoleCursor.Coordinate.X - 1,
                 consoleCursor.Coordinate.Y, consoleCursor.Width + 1, 1);
-            _consoleTopLevelImpl.DirtyRegions.AddRect(oldCursorRect);
-            _consoleTopLevelImpl.DirtyRegions.AddRect(newCursorRect);
+            _surface.DirtyRegions.AddRect(oldCursorRect);
+            _surface.DirtyRegions.AddRect(newCursorRect);
 
             if (!_renderPending)
             {

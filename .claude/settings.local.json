@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /s/github/Consolonia -name \"*.cs\" -exec grep -l \"\\\\.Dispose\\(\\)\" {} \\\\;)",
+      "Bash(find s:/github/Consolonia -path \"*/bin/*\" -name \"*.dll\" -exec strings {} \\\\;)",
+      "Bash(dotnet exec:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}

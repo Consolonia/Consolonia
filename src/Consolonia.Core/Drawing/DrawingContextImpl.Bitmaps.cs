@@ -91,7 +91,7 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            _surface.DirtyRegions.AddRect(intersectedRect);
         }
 
         public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
@@ -249,7 +249,7 @@ namespace Consolonia.Core.Drawing
         {
             if (colors.Length != 4) throw new ArgumentException("Array must contain exactly 4 colors.");
 
-            if (!_consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
+            if (!_surface.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
             {
                 BgraColor topRowColor = Average(colors[0], colors[1]);
                 BgraColor bottomRowColor = Average(colors[2], colors[3]);
