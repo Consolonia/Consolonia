@@ -18,8 +18,8 @@ namespace Consolonia.Core.Drawing
     internal class RenderTarget : IDrawingContextLayerImpl
     {
         private readonly IConsoleOutput _console;
-
-        private readonly IPixelBufferSurface _surface;
+        private readonly ConsoleSurface _consoleSurface;
+        private readonly IPixelBufferWindow _window;
 
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
@@ -32,19 +32,20 @@ namespace Consolonia.Core.Drawing
         private int _fps;
         private TimeSpan _lastFpsUpdate;
 #endif
-        internal RenderTarget(IPixelBufferSurface surface)
+        internal RenderTarget(IPixelBufferWindow window)
         {
             _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
-            _surface = surface;
+            _window = window;
+            _consoleSurface = window.Surface;
             InitializeCacheInternal();
-            _surface.Resized += OnResized;
-            _surface.CursorChanged += OnCursorChanged;
-            _surface.ClearScreenRequested += OnClearScreenRequested;
+            _consoleSurface.Resized += OnResized;
+            _consoleSurface.CursorChanged += OnCursorChanged;
+            _consoleSurface.ClearScreenRequested += OnClearScreenRequested;
         }
 
         private void InitializeCacheInternal()
         {
-            _cache = InitializeCache(_surface.PixelBuffer.Width, _surface.PixelBuffer.Height);
+            _cache = InitializeCache(_consoleSurface.FrameBuffer.Width, _consoleSurface.FrameBuffer.Height);
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -56,18 +57,18 @@ namespace Consolonia.Core.Drawing
         }
 
         public RenderTarget(IEnumerable<object> surfaces)
-            : this(surfaces.OfType<IPixelBufferSurface>()
+            : this(surfaces.OfType<IPixelBufferWindow>()
                 .Single())
         {
         }
 
-        public PixelBuffer Buffer => _surface.PixelBuffer;
+        public PixelBuffer Buffer => _consoleSurface.FrameBuffer;
 
         public void Dispose()
         {
-            _surface.Resized -= OnResized;
-            _surface.CursorChanged -= OnCursorChanged;
-            _surface.ClearScreenRequested -= OnClearScreenRequested;
+            _consoleSurface.Resized -= OnResized;
+            _consoleSurface.CursorChanged -= OnCursorChanged;
+            _consoleSurface.ClearScreenRequested -= OnClearScreenRequested;
         }
 
         public void Save(string fileName, int? quality = null)
@@ -86,12 +87,12 @@ namespace Consolonia.Core.Drawing
 
         void IDrawingContextLayerImpl.Blit(IDrawingContextImpl context)
         {
-            if (_surface is ConsoleWindowImpl)
+            if (_window is ConsoleWindowImpl)
             {
-                // Main window: render everything (including composited child surfaces) to console
+                // Main window: composite all windows and flush to console
                 try
                 {
-                    RenderToDevice();
+                    _consoleSurface.CompositeAndRenderToDevice(this);
                 }
                 catch (InvalidDrawingContextException)
                 {
@@ -99,15 +100,15 @@ namespace Consolonia.Core.Drawing
             }
             else
             {
-                // Child window: forward dirty region to main window so it composites on next render
+                // Child window rendered to its own PixelBuffer.
+                // Trigger main window to composite + flush.
                 var mainConsole = (AvaloniaLocator.Current.GetService<ConsoloniaPlatform>())
                     ?.MainWindow as ConsoleWindowImpl;
                 if (mainConsole != null)
                 {
-                    var pos = _surface.Position;
-                    var buf = _surface.PixelBuffer;
-                    mainConsole.DirtyRegions.AddRect(
-                        new PixelRect(pos.X, pos.Y, buf.Width, buf.Height));
+                    Dispatcher.UIThread.Post(() =>
+                        mainConsole.Paint?.Invoke(new Rect(0, 0,
+                            mainConsole.PixelBuffer.Width, mainConsole.PixelBuffer.Height)));
                 }
             }
         }
@@ -120,7 +121,8 @@ namespace Consolonia.Core.Drawing
         {
             if (useScaledDrawing)
                 throw new NotImplementedException("Consolonia doesn't support useScaledDrawing");
-            return new DrawingContextImpl(_surface);
+            System.Diagnostics.Debug.WriteLine($"[RenderTarget] CreateDrawingContext for {_window.GetType().Name} pos={_window.Position} contentSize={_window.ContentSize}");
+            return new DrawingContextImpl(_window);
         }
 
 
@@ -144,17 +146,14 @@ namespace Consolonia.Core.Drawing
         }
 
 
+        /// <summary>
+        ///     Renders the composited frame buffer to the console output.
+        ///     Called by ConsoleSurface.CompositeAndRenderToDevice after compositing.
+        /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
-        private void RenderToDevice()
+        internal void RenderFrameToDevice(PixelBuffer pixelBuffer)
         {
             _renderPending = false;
-            PixelBuffer pixelBuffer = _surface.PixelBuffer;
-            Snapshot dirtyRegions = _surface.DirtyRegions.GetSnapshotAndClear();
-
-            // Get child surfaces for compositing (only for main window)
-            IReadOnlyList<IPixelBufferSurface> childSurfaces = _surface is ConsoleWindowImpl mainWindow
-                ? mainWindow.ChildSurfaces
-                : null;
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -181,31 +180,6 @@ namespace Consolonia.Core.Drawing
                 {
                     Pixel pixel = pixelBuffer[x, y];
 
-                    // Composite child surfaces on top (highest z-index wins).
-                    // Skip unrendered (transparent) child pixels so the ManagedWindow
-                    // background shows through during resize before the child re-renders.
-                    if (childSurfaces != null)
-                    {
-                        for (int ci = childSurfaces.Count - 1; ci >= 0; ci--)
-                        {
-                            var child = childSurfaces[ci];
-                            var childBuf = child.PixelBuffer;
-                            int localX = x - child.Position.X;
-                            int localY = y - child.Position.Y;
-                            if (localX >= 0 && localX < childBuf.Width &&
-                                localY >= 0 && localY < childBuf.Height)
-                            {
-                                Pixel childPixel = childBuf[(ushort)localX, (ushort)localY];
-                                if (childPixel.Background.Color != Colors.Transparent ||
-                                    childPixel.Foreground.Color != Colors.Transparent)
-                                {
-                                    pixel = childPixel;
-                                }
-                                break; // topmost child wins
-                            }
-                        }
-                    }
-
                     if (pixel.IsCaret())
                     {
                         if (caretPosition != null)
@@ -214,8 +188,7 @@ namespace Consolonia.Core.Drawing
                         caretStyle = pixel.CaretStyle;
                     }
 
-                    if (!dirtyRegions.Contains(x, y, false) && childSurfaces is not { Count: > 0 })
-                        continue;
+                    // No dirty region check — the pixel cache handles redundancy
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (!_consoleCursor.IsEmpty() &&
@@ -356,8 +329,7 @@ namespace Consolonia.Core.Drawing
                 oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
             var newCursorRect = new PixelRect(consoleCursor.Coordinate.X - 1,
                 consoleCursor.Coordinate.Y, consoleCursor.Width + 1, 1);
-            _surface.DirtyRegions.AddRect(oldCursorRect);
-            _surface.DirtyRegions.AddRect(newCursorRect);
+            // Dirty rects are handled by the compositing + cache system
 
             if (!_renderPending)
             {
@@ -369,7 +341,7 @@ namespace Consolonia.Core.Drawing
                     if (_renderPending)
                     {
                         _renderPending = false;
-                        RenderToDevice();
+                        _consoleSurface.CompositeAndRenderToDevice(this);
                     }
                 }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
             }

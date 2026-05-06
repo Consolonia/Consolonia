@@ -183,6 +183,7 @@ namespace Consolonia.Gallery.View
 
         private void OnLoaded(object sender, RoutedEventArgs routedEventArgs)
         {
+            this.GalleryGrid.Focus();
         }
     }
 

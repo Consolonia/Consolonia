@@ -3,7 +3,7 @@
                   xmlns:wm="using:Iciclecreek.Avalonia.WindowManager"
                   xmlns:local="using:Consolonia.Gallery.Gallery.GalleryViews"
                   xmlns:console="https://github.com/consolonia"
-                  console:ManagedWindowImpl.TextIcon="😎"
+                  console:ChildWindowImpl.TextIcon="😎"
                   Padding="1"
                   x:Class="Consolonia.Gallery.Gallery.GalleryViews.MyWindow"
                   x:DataType="local:MyWindowViewModel"

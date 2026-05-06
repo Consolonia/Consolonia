@@ -4,7 +4,7 @@
                              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                              xmlns:console="https://github.com/consolonia"
                              mc:Ignorable="d"
-                             console:ManagedWindowImpl.TextIcon="🔬"
+                             console:ChildWindowImpl.TextIcon="🔬"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
                              WindowStartupLocation="CenterOwner"

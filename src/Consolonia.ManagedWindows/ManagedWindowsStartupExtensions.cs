@@ -25,7 +25,7 @@ namespace Consolonia.ManagedWindows
         {
             public IWindowImpl CreateChildWindow(IWindowImpl mainWindow)
             {
-                return new ManagedWindowImpl(mainWindow);
+                return new ChildWindowImpl(mainWindow);
             }
         }
     }

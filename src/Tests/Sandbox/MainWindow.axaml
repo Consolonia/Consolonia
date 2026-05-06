@@ -3,6 +3,7 @@
         x:Class="Sandbox.MainWindow"
         Title="Sandbox">
     <StackPanel>
+        <TextBox />
         <Button Content="E_xit"
                 Click="OnExit"
                 HorizontalAlignment="Left" />

@@ -4,7 +4,7 @@
                              xmlns:console="https://github.com/consolonia"
                              MinWidth="10"
                              Padding="1"
-                             console:ManagedWindowImpl.TextIcon="😎"
+                             console:ChildWindowImpl.TextIcon="😎"
                              x:Class="Consolonia.Gallery.Gallery.GalleryViews.MyDialog"
                              x:DataType="local:MyDialogViewModel"
                              Foreground="{DynamicResource ThemeForegroundBrush}"

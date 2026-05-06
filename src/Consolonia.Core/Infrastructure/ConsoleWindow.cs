@@ -13,6 +13,7 @@ using Avalonia.Input.Raw;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Rendering.Composition;
+using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Window = Avalonia.Controls.Window;
@@ -20,24 +21,17 @@ using Window = Avalonia.Controls.Window;
 namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
-    ///     ConsoleWindowImpl - An IWindowImpl which uses a PixelBuffer to render.
+    ///     ConsoleWindowImpl - The main window IWindowImpl. A viewport into the ConsoleSurface at (0,0).
     /// </summary>
-#pragma warning disable CA1711 // Identifiers should not have incorrect suffix
-    public class ConsoleWindowImpl : IWindowImpl, IPixelBufferSurface
-#pragma warning restore CA1711 // Identifiers should not have incorrect suffix
+#pragma warning disable CA1711
+    public class ConsoleWindowImpl : IWindowImpl, IPixelBufferWindow
+#pragma warning restore CA1711
     {
         private static bool _singletonGuard;
-        [NotNull] internal readonly IConsole Console;
-
-        IConsole IPixelBufferSurface.Console => Console;
         private readonly bool _accessKeysAlwaysOn;
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
         private readonly IKeyboardDevice _myKeyboardDevice;
-        private readonly List<IPixelBufferSurface> _childSurfaces = new();
-        private IPixelBufferSurface _pointerCaptureSurface; // surface that captured the pointer on button down
-        private bool _pointerCaptureActive; // true when any surface (including main) has capture
-        private Point _cursorPosition = new(0, 0);
-        private StandardCursorType _cursorType = StandardCursorType.Arrow;
+        private readonly IMouseDevice _mouseDevice;
         private bool _disposedValue;
         private IInputRoot _inputRoot;
 
@@ -49,95 +43,47 @@ namespace Consolonia.Core.Infrastructure
 
             _singletonGuard = true;
 
-            _myKeyboardDevice = AvaloniaLocator.Current.GetRequiredService<IKeyboardDevice>();
-            MouseDevice = AvaloniaLocator.Current.GetService<IMouseDevice>();
-            Console = AvaloniaLocator.Current.GetRequiredService<IConsole>();
-            PixelBuffer = new PixelBuffer(Console.Size);
+            Surface = new ConsoleSurface();
+            Surface.RegisterWindow(this);
+            PixelBuffer = new PixelBuffer(Surface.Console.Size);
             DirtyRegions.AddRect(PixelBuffer.Size);
-            Console.Resized += OnConsoleOnResized;
-            Console.KeyEvent += ConsoleOnKeyEvent;
-            Console.TextInputEvent += ConsoleOnTextInputEvent;
-            Console.MouseEvent += ConsoleOnMouseEvent;
-            Console.FocusEvent += ConsoleOnFocusEvent;
+            Surface.Resized += (size, reason) =>
+            {
+                PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
+                DirtyRegions.AddRect(PixelBuffer.Size);
+                Resized?.Invoke(size, reason);
+            };
+            Surface.FocusEvent += focused =>
+            {
+                if (focused) Activated?.Invoke();
+                else Deactivated?.Invoke();
+            };
+
+            // Direct input subscriptions for main window (bypass ConsoleSurface routing for now)
+            _myKeyboardDevice = AvaloniaLocator.Current.GetRequiredService<IKeyboardDevice>();
+            _mouseDevice = AvaloniaLocator.Current.GetService<IMouseDevice>();
+            Surface.Console.KeyEvent += ConsoleOnKeyEvent;
+            Surface.Console.TextInputEvent += ConsoleOnTextInputEvent;
+            Surface.Console.MouseEvent += ConsoleOnMouseEvent;
+
             Handle = null!;
-            _accessKeysAlwaysOn = !Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsAltSolo);
+            _accessKeysAlwaysOn = !Surface.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsAltSolo);
             if (_accessKeysAlwaysOn)
                 _accessKeysAlwaysOnDisposable =
                     AccessText.ShowAccessKeyProperty.Changed.SubscribeAction(OnShowAccessKeyPropertyChanged);
         }
 
-        public Snapshot.Regions DirtyRegions { get; } = new();
-
+        // --- IPixelBufferWindow ---
+        public ConsoleSurface Surface { get; }
         public PixelBuffer PixelBuffer { get; private set; }
+        public Snapshot.Regions DirtyRegions { get; } = new();
+        PixelPoint IPixelBufferWindow.Position => default;
+        Size IPixelBufferWindow.ContentSize => new(PixelBuffer.Width, PixelBuffer.Height);
+        bool IPixelBufferWindow.IsActive => true;
+        Action<RawInputEventArgs> IPixelBufferWindow.InputCallback => Input;
+        IInputRoot IPixelBufferWindow.InputRoot => _inputRoot;
 
-        PixelPoint IPixelBufferSurface.Position => default;
-
-        int IPixelBufferSurface.ZIndex => 0;
-
-        bool IPixelBufferSurface.IsActive => true;
-
-        Action<RawInputEventArgs> IPixelBufferSurface.InputCallback => Input;
-
-        IInputRoot IPixelBufferSurface.InputRoot => _inputRoot;
-
-        /// <summary>
-        ///     Registered child window surfaces, ordered by z-index for compositing.
-        /// </summary>
-        internal IReadOnlyList<IPixelBufferSurface> ChildSurfaces => _childSurfaces;
-
-        internal void RegisterChildSurface(IPixelBufferSurface surface)
-        {
-            _childSurfaces.Add(surface);
-            _childSurfaces.Sort((a, b) => a.ZIndex.CompareTo(b.ZIndex));
-        }
-
-        internal void UnregisterChildSurface(IPixelBufferSurface surface)
-        {
-            _childSurfaces.Remove(surface);
-            // Mark the area as dirty so the main window repaints where the child was
-            DirtyRegions.AddRect(new PixelRect(
-                surface.Position.X, surface.Position.Y,
-                surface.PixelBuffer.Width, surface.PixelBuffer.Height));
-        }
-
-        /// <summary>
-        ///     Finds the active child surface for keyboard input routing.
-        /// </summary>
-        private IPixelBufferSurface GetActiveChildSurface()
-        {
-            for (int i = _childSurfaces.Count - 1; i >= 0; i--)
-            {
-                if (_childSurfaces[i].IsActive)
-                    return _childSurfaces[i];
-            }
-            return null;
-        }
-
-        /// <summary>
-        ///     Hit-tests mouse position against child surfaces (topmost first).
-        ///     Returns the child surface and translated local coordinates, or null.
-        /// </summary>
-        private IPixelBufferSurface HitTestChildSurface(Point point, out Point localPoint)
-        {
-            for (int i = _childSurfaces.Count - 1; i >= 0; i--)
-            {
-                var child = _childSurfaces[i];
-                var pos = child.Position;
-                double localX = point.X - pos.X;
-                double localY = point.Y - pos.Y;
-                if (localX >= 0 && localX < child.PixelBuffer.Width &&
-                    localY >= 0 && localY < child.PixelBuffer.Height)
-                {
-                    localPoint = new Point(localX, localY);
-                    return child;
-                }
-            }
-            localPoint = default;
-            return null;
-        }
-
-        private IMouseDevice MouseDevice { get; }
-
+        // --- ITopLevelImpl ---
         public void SetInputRoot(IInputRoot inputRoot)
         {
             _inputRoot = inputRoot;
@@ -145,31 +91,17 @@ namespace Consolonia.Core.Infrastructure
                 _inputRoot.ShowAccessKeys = true;
         }
 
-        public Point PointToClient(PixelPoint point)
-        {
-            return point.ToPoint(1);
-        }
-
-        public PixelPoint PointToScreen(Point point)
-        {
-            // ReSharper disable once ArrangeObjectCreationWhenTypeNotEvident //todo: should we avoid suggesting type specification
-            return new((int)point.X, (int)point.Y);
-        }
+        public Point PointToClient(PixelPoint point) => point.ToPoint(1);
+        public PixelPoint PointToScreen(Point point) => new((int)point.X, (int)point.Y);
 
         public void SetCursor(ICursorImpl cursor)
         {
-            if (cursor is null)
-                // default to arrow
-                _cursorType = StandardCursorType.Arrow;
-            else
-                _cursorType = ((CursorImpl)cursor).CursorType;
-            UpdateCursor();
+            Surface.SetCursorType(cursor is null
+                ? StandardCursorType.Arrow
+                : ((CursorImpl)cursor).CursorType);
         }
 
-        public IPopupImpl CreatePopup()
-        {
-            return null; // when returning null top window overlay layer will be used
-        }
+        public IPopupImpl CreatePopup() => null;
 
         public void SetTransparencyLevelHint(IReadOnlyList<WindowTransparencyLevel> transparencyLevels)
         {
@@ -178,12 +110,9 @@ namespace Consolonia.Core.Infrastructure
 
         public void SetFrameThemeVariant(PlatformThemeVariant themeVariant)
         {
-            //todo: Light or dark
             switch (themeVariant)
             {
                 case PlatformThemeVariant.Dark:
-                    Debug.WriteLine($"ConsoleWindow.SetFrameThemeVariant({themeVariant}) called, not implemented");
-                    break;
                 case PlatformThemeVariant.Light:
                     Debug.WriteLine($"ConsoleWindow.SetFrameThemeVariant({themeVariant}) called, not implemented");
                     break;
@@ -194,169 +123,77 @@ namespace Consolonia.Core.Infrastructure
         {
             get
             {
-                PixelBufferSize pixelBufferSize = Console.Size;
-                return new Size(pixelBufferSize.Width, pixelBufferSize.Height);
+                PixelBufferSize size = Surface.Console.Size;
+                return new Size(size.Width, size.Height);
             }
         }
 
         public Size? FrameSize => ClientSize;
-
         public double RenderScaling => 1;
         public IEnumerable<object> Surfaces => [this];
-
         public Action<RawInputEventArgs> Input { get; set; }
-
         public Action<Rect> Paint { get; set; }
         public Action<Size, WindowResizeReason> Resized { get; set; }
-
-
         public Action<double> ScalingChanged { get; set; }
-
         public Action<WindowTransparencyLevel> TransparencyLevelChanged { get; set; }
-
         public Compositor Compositor { get; } = new(null);
         public Action Closed { get; set; }
         public Action LostFocus { get; set; }
-
         public WindowTransparencyLevel TransparencyLevel => WindowTransparencyLevel.None;
-
         public AcrylicPlatformCompensationLevels AcrylicCompensationLevels => new(1, 1, 1);
 
+        // --- IWindowBaseImpl ---
         public void Show(bool activate, bool isDialog)
         {
             if (activate)
-                Activated!();
+                Activated?.Invoke();
         }
 
-        public void Hide()
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowHideNotSupported);
-        }
-
-        public void Activate()
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowActivateNotSupported);
-        }
-
-        public void SetTopmost(bool value)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetTopmostNotSupported);
-        }
+        public void Hide() => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowHideNotSupported);
+        public void Activate() => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowActivateNotSupported);
+        public void SetTopmost(bool value) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetTopmostNotSupported);
 
         public double DesktopScaling => 1d;
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: get from _console if supported
         public PixelPoint Position { get; }
         public Action<PixelPoint> PositionChanged { get; set; }
         public Action Deactivated { get; set; }
         public Action Activated { get; set; }
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: get from _console if supported
         public IPlatformHandle Handle { get; }
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public Size MaxAutoSizeHint { get; }
 
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
-
-        public void SetTitle(string title)
-        {
-            Console.SetTitle(title);
-        }
-
-        public void SetParent(IWindowImpl parent)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetParentNotSupported);
-        }
-
-        public void SetEnabled(bool enable)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetEnabledNotSupported);
-        }
-
-        public void SetSystemDecorations(SystemDecorations enabled)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetSystemDecorationsNotSupported);
-        }
-
-        public void SetIcon(IWindowIconImpl icon)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetIconNotSupported);
-        }
-
-        public void ShowTaskbarIcon(bool value)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowShowTaskbarIconNotSupported);
-        }
-
-        public void CanResize(bool value)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowCanResizeNotSupported);
-        }
-
-        public void BeginMoveDrag(PointerPressedEventArgs e)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowBeginMoveDragNotSupported);
-        }
-
-        public void BeginResizeDrag(WindowEdge edge, PointerPressedEventArgs e)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowBeginResizeDragNotSupported);
-        }
+        // --- IWindowImpl ---
+        public void SetTitle(string title) => Surface.Console.SetTitle(title);
+        public void SetParent(IWindowImpl parent) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetParentNotSupported);
+        public void SetEnabled(bool enable) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetEnabledNotSupported);
+        public void SetSystemDecorations(SystemDecorations enabled) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetSystemDecorationsNotSupported);
+        public void SetIcon(IWindowIconImpl icon) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetIconNotSupported);
+        public void ShowTaskbarIcon(bool value) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowShowTaskbarIconNotSupported);
+        public void CanResize(bool value) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowCanResizeNotSupported);
+        public void BeginMoveDrag(PointerPressedEventArgs e) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowBeginMoveDragNotSupported);
+        public void BeginResizeDrag(WindowEdge edge, PointerPressedEventArgs e) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowBeginResizeDragNotSupported);
+        public void Move(PixelPoint point) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowMoveNotSupported);
+        public void SetMinMaxSize(Size minSize, Size maxSize) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetMinMaxSizeNotSupported);
+        public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetExtendClientAreaToDecorationsHintNotSupported);
+        public void SetExtendClientAreaChromeHints(ExtendClientAreaChromeHints hints) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetExtendClientAreaChromeHintsNotSupported);
+        public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetExtendClientAreaTitleBarHeightHintNotSupported);
+        public void SetCanMinimize(bool value) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetCanMinimizeNotSupported);
+        public void SetCanMaximize(bool value) => ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetCanMaximizeNotSupported);
 
         public void Resize(Size clientSize, WindowResizeReason reason = WindowResizeReason.Application)
         {
-            // this is called a lot, this is optimization for unchanged.
             if ((int)ClientSize.Width == (int)clientSize.Width && (int)ClientSize.Height == (int)clientSize.Height)
                 return;
-
             ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowBeginResizeNotSupported);
-        }
-
-        public void Move(PixelPoint point)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowMoveNotSupported);
-        }
-
-        public void SetMinMaxSize(Size minSize, Size maxSize)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetMinMaxSizeNotSupported);
-        }
-
-        public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode
-                .ConsoleWindowSetExtendClientAreaToDecorationsHintNotSupported);
-        }
-
-        public void SetExtendClientAreaChromeHints(ExtendClientAreaChromeHints hints)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode
-                .ConsoleWindowSetExtendClientAreaChromeHintsNotSupported);
-        }
-
-        public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode
-                .ConsoleWindowSetExtendClientAreaTitleBarHeightHintNotSupported);
         }
 
         public WindowState WindowState { get; set; }
         public Action<WindowState> WindowStateChanged { get; set; }
         public Action GotInputWhenDisabled { get; set; }
         public Func<WindowCloseReason, bool> Closing { get; set; }
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public bool IsClientAreaExtendedToDecorations { get; }
         public Action<bool> ExtendClientAreaToDecorationsChanged { get; set; }
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public bool NeedsManagedDecorations { get; }
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public Thickness ExtendedMargins { get; }
-
-        // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public Thickness OffScreenMargin { get; }
 
         public object TryGetFeature(Type featureType)
@@ -368,7 +205,6 @@ namespace Consolonia.Core.Infrastructure
             }
 
             if (featureType == typeof(IInsetsManager))
-                // IInsetsManager doesn't apply to console applications.
                 return null;
 
             if (featureType == typeof(IClipboard))
@@ -379,7 +215,7 @@ namespace Consolonia.Core.Infrastructure
             }
 
             if (featureType == typeof(IScreenImpl))
-                return new ConsoloniaScreen(new PixelRect(0, 0, Console.Size.Width, Console.Size.Height));
+                return new ConsoloniaScreen(new PixelRect(0, 0, Surface.Console.Size.Width, Surface.Console.Size.Height));
 
             if (featureType == typeof(ILauncher))
             {
@@ -388,102 +224,98 @@ namespace Consolonia.Core.Infrastructure
                 return (ILauncher)objHandle.Unwrap();
             }
 
-            // TODO ISystemNavigationManagerImpl should be implemented to handle BACK navigation between pages of controls like mobile apps do.
-            // TODO ITextInputMethodImpl should be implemented to handle text IME input
             Debug.WriteLine($"Missing Feature: {featureType.Name} is not implemented but someone is asking for it!");
             return null;
         }
 
         public void GetWindowsZOrder(Span<Window> windows, Span<long> zOrder)
         {
-            // In console mode, all windows are considered to be at the same z-order level
             for (int i = 0; i < zOrder.Length; i++)
                 zOrder[i] = 0;
         }
 
         public void Dispose()
         {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        public void SetCanMinimize(bool value)
+        protected virtual void Dispose(bool disposing)
         {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetCanMinimizeNotSupported);
+            if (!_disposedValue)
+            {
+                _disposedValue = true;
+                if (disposing)
+                {
+                    Closed?.Invoke();
+                    _accessKeysAlwaysOnDisposable?.Dispose();
+                    Surface.Console.KeyEvent -= ConsoleOnKeyEvent;
+                    Surface.Console.TextInputEvent -= ConsoleOnTextInputEvent;
+                    Surface.Console.MouseEvent -= ConsoleOnMouseEvent;
+                    Surface.Dispose();
+                    _singletonGuard = false;
+                }
+            }
         }
-
-        public void SetCanMaximize(bool value)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetCanMaximizeNotSupported);
-        }
-
-        public event Action<ConsoleCursor> CursorChanged;
 
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
             if (args.Sender != _inputRoot) return;
             if (args.GetNewValue<bool>()) return;
-
             _inputRoot.ShowAccessKeys = true;
+        }
+
+        // --- Surface events forwarded as IWindowImpl events ---
+        public event Action<ConsoleCursor> CursorChanged
+        {
+            add => Surface.CursorChanged += value;
+            remove => Surface.CursorChanged -= value;
+        }
+
+        public event Action ClearScreenRequested
+        {
+            add => Surface.ClearScreenRequested += value;
+            remove => Surface.ClearScreenRequested -= value;
+        }
+
+        public void ClearScreen() => Surface.ClearScreen();
+
+        internal IConsole Console => Surface.Console;
+
+        // --- Direct input handlers (same as old ConsoleWindowImpl) ---
+        private void ConsoleOnKeyEvent(Key key, char keyChar, RawInputModifiers rawInputModifiers, bool down,
+            ulong timeStamp, bool tryAsTextInput)
+        {
+            if (!down)
+            {
+                Input!(new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot,
+                    RawKeyEventType.KeyUp, key, rawInputModifiers));
+            }
+            else
+            {
+                var args = new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot,
+                    RawKeyEventType.KeyDown, key, rawInputModifiers);
+                Input!(args);
+
+                if (tryAsTextInput && !args.Handled && !char.IsControl(keyChar)
+                    && !rawInputModifiers.HasFlag(RawInputModifiers.Alt)
+                    && !rawInputModifiers.HasFlag(RawInputModifiers.Control))
+                    Input!(new RawTextInputEventArgs(_myKeyboardDevice, timeStamp, _inputRoot, keyChar.ToString()));
+            }
+        }
+
+        private void ConsoleOnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)
+        {
+            var args = new RawTextInputEventArgs(_myKeyboardDevice, timeStamp, _inputRoot, text);
+            Input!(args);
+            if (args.Handled)
+                canBeHandledEventArgs.Handled = true;
         }
 
         private void ConsoleOnMouseEvent(RawPointerEventType type, Point point, Vector? wheelDelta,
             RawInputModifiers modifiers)
         {
             ulong timestamp = (ulong)Environment.TickCount64;
-
-            // Pointer capture: on button down, lock to the surface under cursor.
-            // On button up, release capture. During drag, keep routing to captured surface.
-            bool isButtonDown = type is RawPointerEventType.LeftButtonDown
-                or RawPointerEventType.RightButtonDown
-                or RawPointerEventType.MiddleButtonDown
-                or RawPointerEventType.XButton1Down
-                or RawPointerEventType.XButton2Down
-                or RawPointerEventType.NonClientLeftButtonDown;
-            bool isButtonUp = type is RawPointerEventType.LeftButtonUp
-                or RawPointerEventType.RightButtonUp
-                or RawPointerEventType.MiddleButtonUp
-                or RawPointerEventType.XButton1Up
-                or RawPointerEventType.XButton2Up;
-
-            if (isButtonDown)
-            {
-                // Capture: lock to whatever surface is under cursor.
-                // null = main window, non-null = child. _pointerCaptureActive distinguishes from "no capture".
-                _pointerCaptureSurface = HitTestChildSurface(point, out _);
-                _pointerCaptureActive = true;
-            }
-
-            // Route to captured surface, or hit-test if no capture
-            IPixelBufferSurface targetSurface;
-            Point eventPoint;
-            if (_pointerCaptureActive)
-            {
-                // Pointer is captured — route to the captured surface (null = main window)
-                targetSurface = _pointerCaptureSurface;
-                if (targetSurface != null)
-                    eventPoint = new Point(point.X - targetSurface.Position.X, point.Y - targetSurface.Position.Y);
-                else
-                    eventPoint = point; // main window uses screen coordinates
-            }
-            else
-            {
-                // No capture — hit-test normally
-                targetSurface = HitTestChildSurface(point, out Point localPoint);
-                eventPoint = targetSurface != null ? localPoint : point;
-            }
-
-            var inputRoot = targetSurface?.InputRoot ?? _inputRoot;
-            var inputCallback = targetSurface?.InputCallback ?? Input!;
-
-            if (isButtonUp)
-            {
-                _pointerCaptureSurface = null;
-                _pointerCaptureActive = false;
-            }
-
-            // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
             switch (type)
             {
                 case RawPointerEventType.Move:
@@ -498,179 +330,14 @@ namespace Consolonia.Core.Infrastructure
                 case RawPointerEventType.MiddleButtonUp:
                 case RawPointerEventType.XButton1Up:
                 case RawPointerEventType.XButton2Up:
-                    inputCallback(new RawPointerEventArgs(MouseDevice, timestamp, inputRoot,
-                        type, eventPoint,
-                        modifiers));
+                    Input!(new RawPointerEventArgs(_mouseDevice, timestamp, _inputRoot,
+                        type, point, modifiers));
                     break;
                 case RawPointerEventType.Wheel:
-                    inputCallback(new RawMouseWheelEventArgs(MouseDevice, timestamp, inputRoot, eventPoint,
+                    Input!(new RawMouseWheelEventArgs(_mouseDevice, timestamp, _inputRoot, point,
                         (Vector)wheelDelta!, modifiers));
                     break;
             }
-
-            // draw the software cursor at this mouse position
-            _cursorPosition = point;
-            UpdateCursor();
-        }
-
-        private void ConsoleOnFocusEvent(bool focused)
-        {
-            if (focused)
-                Activated?.Invoke();
-            else Deactivated?.Invoke();
-        }
-
-        private void OnConsoleOnResized()
-        {
-            var size = new Size(Console.Size.Width, Console.Size.Height);
-            PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
-            Resized!(size, WindowResizeReason.Unspecified);
-            _surfaceResized?.Invoke(size, WindowResizeReason.Unspecified);
-        }
-
-        private void ConsoleOnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)
-        {
-            var activeChild = GetActiveChildSurface();
-            var inputRoot = activeChild?.InputRoot ?? _inputRoot;
-            var inputCallback = activeChild?.InputCallback ?? Input!;
-
-#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE
-            RawTextInputEventArgs rawInputEventArgs = new(_myKeyboardDevice, timeStamp, inputRoot, text);
-#pragma warning restore CS0618 // Type or member is obsolete
-            inputCallback(rawInputEventArgs);
-
-            if (rawInputEventArgs.Handled)
-                canBeHandledEventArgs.Handled = true;
-        }
-
-
-        private void ConsoleOnKeyEvent(Key key, char keyChar, RawInputModifiers rawInputModifiers, bool down,
-            ulong timeStamp, bool tryAsTextInput)
-        {
-            var activeChild = GetActiveChildSurface();
-            var inputRoot = activeChild?.InputRoot ?? _inputRoot;
-            var inputCallback = activeChild?.InputCallback ?? Input!;
-
-            if (!down)
-            {
-#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE
-                var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp, inputRoot,
-                    RawKeyEventType.KeyUp, key,
-                    rawInputModifiers);
-#pragma warning restore CS0618 // Type or member is obsolete
-                inputCallback(rawInputEventArgs);
-            }
-            else
-            {
-#pragma warning disable CS0618 // Type or member is obsolete //todo: CFA20A9A-3A24-4187-9CA3-9DF0081124EE
-                var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp,
-                    inputRoot,
-                    RawKeyEventType.KeyDown, key,
-                    rawInputModifiers);
-#pragma warning restore CS0618 // Type or member is obsolete
-                inputCallback(rawInputEventArgs);
-
-                if (tryAsTextInput &&
-                    !rawInputEventArgs.Handled
-                    && !char.IsControl(keyChar)
-                    && !rawInputModifiers.HasFlag(RawInputModifiers.Alt)
-                    && !rawInputModifiers.HasFlag(RawInputModifiers.Control))
-                    inputCallback(new RawTextInputEventArgs(_myKeyboardDevice,
-                        timeStamp,
-                        inputRoot,
-                        keyChar.ToString()));
-            }
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposedValue)
-            {
-                _disposedValue = true;
-                if (disposing)
-                {
-                    Closed?.Invoke();
-                    _accessKeysAlwaysOnDisposable?.Dispose();
-                    Console.Resized -= OnConsoleOnResized;
-                    Console.KeyEvent -= ConsoleOnKeyEvent;
-                    Console.TextInputEvent -= ConsoleOnTextInputEvent;
-                    Console.MouseEvent -= ConsoleOnMouseEvent;
-                    Console.FocusEvent -= ConsoleOnFocusEvent;
-                    _ = DirtyRegions.GetSnapshotAndClear();
-                    if (Console is IDisposable disposableConsole)
-                        disposableConsole.Dispose();
-                    _singletonGuard = false;
-                }
-            }
-        }
-
-        private void UpdateCursor()
-        {
-            OnCursorChanged(
-                new ConsoleCursor(
-                    new PixelBufferCoordinate((ushort)_cursorPosition.X, (ushort)_cursorPosition.Y),
-                    GetCursorText()));
-        }
-
-        private string GetCursorText()
-        {
-            return _cursorType switch
-            {
-                StandardCursorType.Arrow => GetDefaultCursor(),
-                StandardCursorType.Cross => "+",
-                StandardCursorType.Hand => "@",
-                StandardCursorType.Help => "?",
-                StandardCursorType.No => "X",
-                StandardCursorType.SizeAll => "*",
-                StandardCursorType.SizeNorthSouth => "^v",
-                StandardCursorType.SizeWestEast => "<>",
-                StandardCursorType.Wait => "o",
-                StandardCursorType.Ibeam => "I",
-                StandardCursorType.UpArrow => "^",
-                StandardCursorType.TopSide => "^",
-                StandardCursorType.BottomSide => "v",
-                StandardCursorType.LeftSide => "<",
-                StandardCursorType.RightSide => ">",
-                StandardCursorType.TopLeftCorner => @"\",
-                StandardCursorType.TopRightCorner => "/",
-                StandardCursorType.BottomLeftCorner => "/",
-                StandardCursorType.BottomRightCorner => @"\",
-                StandardCursorType.DragCopy => "+",
-                StandardCursorType.DragLink => "@",
-                StandardCursorType.DragMove => ">",
-                StandardCursorType.AppStarting => "o",
-                _ => " "
-            };
-        }
-
-        private string GetDefaultCursor()
-        {
-            if (Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove) &&
-                !Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor))
-                return " ";
-            return string.Empty;
-        }
-
-
-        protected virtual void OnCursorChanged(ConsoleCursor obj)
-        {
-            CursorChanged?.Invoke(obj);
-        }
-
-        private event Action<Size, WindowResizeReason> _surfaceResized;
-
-        event Action<Size, WindowResizeReason> IPixelBufferSurface.Resized
-        {
-            add => _surfaceResized += value;
-            remove => _surfaceResized -= value;
-        }
-
-        public event Action ClearScreenRequested;
-
-        public void ClearScreen()
-        {
-            DirtyRegions.AddRect(PixelBuffer.Size);
-            ClearScreenRequested?.Invoke();
         }
     }
 }

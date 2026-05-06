@@ -14,20 +14,20 @@ using Iciclecreek.Avalonia.WindowManager;
 namespace Consolonia.ManagedWindows
 {
     /// <summary>
-    ///     Wraps a ManagedWindow as an IWindowImpl and IPixelBufferSurface,
+    ///     Wraps a ManagedWindow as an IWindowImpl and IPixelBufferWindow,
     ///     enabling standard Avalonia Window.ShowDialog() to work in the console.
     ///     Each child window owns its own PixelBuffer and renders independently.
     ///     The main window composites all child PixelBuffers during RenderToDevice().
     /// </summary>
     [SuppressMessage("CA1711", "CA1711")]
-    public sealed class ManagedWindowImpl : ManagedWindow, IWindowImpl, IPixelBufferSurface
+    public sealed class ChildWindowImpl : ManagedWindow, IWindowImpl, IPixelBufferWindow
     {
         /// <summary>
         ///     Attached property for setting a text-based icon on a Window.
         ///     ManagedWindow.Icon is object?, so this text will be used directly.
         /// </summary>
         public static readonly AttachedProperty<string> TextIconProperty =
-            AvaloniaProperty.RegisterAttached<ManagedWindowImpl, Window, string>("TextIcon");
+            AvaloniaProperty.RegisterAttached<ChildWindowImpl, Window, string>("TextIcon");
 
         public static string GetTextIcon(Window window) => window.GetValue(TextIconProperty);
         public static void SetTextIcon(Window window, string value) => window.SetValue(TextIconProperty, value);
@@ -40,14 +40,11 @@ namespace Consolonia.ManagedWindows
         private bool _disposing;
         private bool _propertiesBound;
 
-        public ManagedWindowImpl(IWindowImpl mainWindow)
+        public ChildWindowImpl(IWindowImpl mainWindow)
         {
             base.Content = new Panel();
             _mainWindow = mainWindow;
             _mainConsoleWindow = (ConsoleWindowImpl)mainWindow;
-
-            // Initialize PixelBuffer with a default size (will be resized by Avalonia)
-            PixelBuffer = new PixelBuffer(1, 1);
 
             // ManagedWindow events → IWindowImpl callbacks
             base.Closed += (_, _) => ((IWindowImpl)this).Closed?.Invoke();
@@ -68,19 +65,6 @@ namespace Consolonia.ManagedWindows
             };
             base.Resized += (_, e) =>
             {
-                // e.ClientSize is the actual content presenter bounds (excludes chrome).
-                // This is what Avalonia should render to — our "client area".
-                _clientSize = e.ClientSize;
-                var width = (ushort)Math.Max(1, e.ClientSize.Width);
-                var height = (ushort)Math.Max(1, e.ClientSize.Height);
-                if (PixelBuffer.Width != width || PixelBuffer.Height != height)
-                {
-                    PixelBuffer = new PixelBuffer(width, height);
-                    DirtyRegions.AddRect(PixelBuffer.Size);
-                    _surfaceResized?.Invoke(e.ClientSize, e.Reason);
-                }
-                // Notify Avalonia of the content area size so it layouts correctly
-                ((ITopLevelImpl)this).Resized?.Invoke(e.ClientSize, e.Reason);
                 UpdateSurfacePosition();
             };
             base.Closing += (_, e) =>
@@ -94,34 +78,22 @@ namespace Consolonia.ManagedWindows
             };
         }
 
-        // --- IPixelBufferSurface implementation ---
-        public PixelBuffer PixelBuffer { get; private set; }
-
+        // --- IPixelBufferWindow ---
+        public ConsoleSurface Surface => _mainConsoleWindow.Surface;
+        public PixelBuffer PixelBuffer { get; private set; } = new(1, 1);
         public Snapshot.Regions DirtyRegions { get; } = new();
 
-        IConsole IPixelBufferSurface.Console => _mainConsoleWindow.Console;
-
-        PixelPoint IPixelBufferSurface.Position => _surfacePosition;
+        PixelPoint IPixelBufferWindow.Position => _surfacePosition;
         private PixelPoint _surfacePosition;
 
-        int IPixelBufferSurface.ZIndex => base.ZIndex;
+        Size IPixelBufferWindow.ContentSize => _clientSize;
 
         private bool _isActive;
-        bool IPixelBufferSurface.IsActive => _isActive;
+        bool IPixelBufferWindow.IsActive => _isActive;
 
-        Action<RawInputEventArgs> IPixelBufferSurface.InputCallback => Input;
+        Action<RawInputEventArgs> IPixelBufferWindow.InputCallback => Input;
 
-        IInputRoot IPixelBufferSurface.InputRoot => _inputRoot;
-
-        private event Action<Size, WindowResizeReason> _surfaceResized;
-        event Action<Size, WindowResizeReason> IPixelBufferSurface.Resized
-        {
-            add => _surfaceResized += value;
-            remove => _surfaceResized -= value;
-        }
-
-        public event Action<ConsoleCursor> CursorChanged;
-        public event Action ClearScreenRequested;
+        IInputRoot IPixelBufferWindow.InputRoot => _inputRoot;
 
         // --- ITopLevelImpl properties ---
         public new Size ClientSize => _clientSize;
@@ -133,7 +105,7 @@ namespace Consolonia.ManagedWindows
         Action<Size, WindowResizeReason> ITopLevelImpl.Resized { get; set; }
         public Action<double> ScalingChanged { get; set; }
         public Action<WindowTransparencyLevel> TransparencyLevelChanged { get; set; }
-        public Compositor Compositor => _mainWindow.Compositor;
+        public Compositor Compositor { get; } = new(null);
         Action ITopLevelImpl.Closed { get; set; }
         Action ITopLevelImpl.LostFocus { get; set; }
         public WindowTransparencyLevel TransparencyLevel => WindowTransparencyLevel.None;
@@ -182,7 +154,8 @@ namespace Consolonia.ManagedWindows
             // Bind properties from the Avalonia Window to this ManagedWindow
             this[!TitleProperty] = win[!Window.TitleProperty];
             this[!WindowStartupLocationProperty] = win[!Window.WindowStartupLocationProperty];
-            this[!BackgroundProperty] = win[!Window.BackgroundProperty];
+            // Don't bind Background — the ManagedWindow content area would overwrite
+            // the child window's rendered pixels. The child renders its own background.
             this[!ForegroundProperty] = win[!Window.ForegroundProperty];
             this[!PaddingProperty] = win[!Window.PaddingProperty];
             this[!FontSizeProperty] = win[!Window.FontSizeProperty];
@@ -218,7 +191,8 @@ namespace Consolonia.ManagedWindows
             if (win.Position != default)
                 this.Position = win.Position;
             this.CanResize = win.CanResize;
-            this.SizeToContent = win.SizeToContent;
+            // Don't copy SizeToContent to ManagedWindow — its content is a placeholder Panel.
+            // Avalonia's Window handles SizeToContent and calls Resize() with the result.
 
             _propertiesBound = true;
         }
@@ -229,29 +203,10 @@ namespace Consolonia.ManagedWindows
         /// </summary>
         private void UpdateSurfacePosition()
         {
-            // Mark the old position as dirty so stale content gets cleared
-            var oldPos = _surfacePosition;
-            var buf = PixelBuffer;
-            if (buf.Width > 0 && buf.Height > 0)
-            {
-                _mainConsoleWindow.DirtyRegions.AddRect(
-                    new PixelRect(oldPos.X, oldPos.Y, buf.Width, buf.Height));
-            }
-
-            // Content area is offset from ManagedWindow.Position by border + title bar.
-            // BorderThickness comes from the theme (typically 1 on all sides).
-            // Title bar is 1 row.
             var border = this.BorderThickness;
-            int chromeLeft = (int)border.Left;
-            int chromeTop = (int)border.Top + 1; // +1 for title bar row
+            int chromeLeft = Math.Max(1, (int)border.Left);
+            int chromeTop = Math.Max(1, (int)border.Top) + 1; // +1 for title bar row
             _surfacePosition = new PixelPoint(Position.X + chromeLeft, Position.Y + chromeTop);
-
-            // Mark the new position as dirty so content gets drawn there
-            if (buf.Width > 0 && buf.Height > 0)
-            {
-                _mainConsoleWindow.DirtyRegions.AddRect(
-                    new PixelRect(_surfacePosition.X, _surfacePosition.Y, buf.Width, buf.Height));
-            }
         }
 
         public Point PointToClient(PixelPoint point) => point.ToPoint(1);
@@ -278,9 +233,9 @@ namespace Consolonia.ManagedWindows
             // Bind properties before Show so chrome displays correctly.
             BindWindowProperties();
 
-            // Clamp to terminal screen size, but respect SizeToContent
+            // Clamp to terminal screen size, but respect SizeToContent from the Avalonia Window
             var maxSize = _mainWindow.ClientSize;
-            var sizeToContent = this.SizeToContent;
+            var sizeToContent = (_inputRoot as Window)?.SizeToContent ?? SizeToContent.Manual;
             if (sizeToContent != SizeToContent.Width && sizeToContent != SizeToContent.WidthAndHeight)
             {
                 if (this.Width > maxSize.Width || double.IsNaN(this.Width))
@@ -297,14 +252,14 @@ namespace Consolonia.ManagedWindows
                     Math.Min(_clientSize.Width, maxSize.Width),
                     Math.Min(_clientSize.Height, maxSize.Height));
 
-            // Register with main window for compositing
-            _mainConsoleWindow.RegisterChildSurface(this);
+            // Register for input routing
+            Surface.RegisterWindow(this);
 
             this.ShowActivated = activate;
             if (isDialog)
             {
                 // Pass the parent ManagedWindowImpl so nested dialogs work correctly
-                var parent = _parentWindow as ManagedWindowImpl;
+                var parent = _parentWindow as ChildWindowImpl;
                 base.ShowDialog(parent);
             }
             else
@@ -334,26 +289,30 @@ namespace Consolonia.ManagedWindows
                 Math.Min(clientSize.Width, maxSize.Width),
                 Math.Min(clientSize.Height, maxSize.Height));
 
+            _clientSize = clientSize;
+
+            // Resize the PixelBuffer to match
+            var width = (ushort)Math.Max(1, clientSize.Width);
+            var height = (ushort)Math.Max(1, clientSize.Height);
+            if (PixelBuffer.Width != width || PixelBuffer.Height != height)
+            {
+                PixelBuffer = new PixelBuffer(width, height);
+                DirtyRegions.AddRect(PixelBuffer.Size);
+            }
+
+            // Notify Avalonia of the new size — this triggers layout in the TopLevel
+            ((ITopLevelImpl)this).Resized?.Invoke(clientSize, reason);
+
             try
             {
-                // Setting base.ClientSize triggers ManagedWindow's Resized event,
-                // which updates _clientSize to the content area size and resizes PixelBuffer.
-                // But set _clientSize here too as fallback in case Resized doesn't fire yet.
-                _clientSize = clientSize;
                 base.ClientSize = clientSize;
             }
             catch (Exception ex) when (ex is NullReferenceException or InvalidOperationException)
             {
                 // ManagedWindow template may not be applied yet
-                var width = (ushort)Math.Max(1, clientSize.Width);
-                var height = (ushort)Math.Max(1, clientSize.Height);
-                if (PixelBuffer.Width != width || PixelBuffer.Height != height)
-                {
-                    PixelBuffer = new PixelBuffer(width, height);
-                    DirtyRegions.AddRect(PixelBuffer.Size);
-                    _surfaceResized?.Invoke(clientSize, reason);
-                }
             }
+
+            UpdateSurfacePosition();
         }
 
         // --- IWindowImpl methods ---
@@ -388,7 +347,7 @@ namespace Consolonia.ManagedWindows
             if (_disposing)
                 return;
             _disposing = true;
-            _mainConsoleWindow.UnregisterChildSurface(this);
+            Surface.UnregisterWindow(this);
             base.Close();
             GC.SuppressFinalize(this);
         }
