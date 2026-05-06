@@ -40,8 +40,8 @@ namespace Unix.Terminal {
 
 			static Window ()
 			{
-				var window = Curses.initscr ();
-				stdscr = window ?? new Window (Curses.console_sharp_get_stdscr ());
+				Curses.initscr ();
+				stdscr = new Window (Curses.console_sharp_get_stdscr ());
 				curscr = new Window (Curses.console_sharp_get_curscr ());
 			}
 

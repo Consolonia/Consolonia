@@ -95,9 +95,6 @@ namespace Unix.Terminal {
 
         static void LoadMethods ()
 		{
-			if (curses_library != null)
-				return;
-
 			var libs = UnmanagedLibrary.IsMacOSPlatform ? new string [] { "libncurses.dylib" } : new string [] { "libncursesw.so.6", "libncursesw.so.5" };
 			curses_library = new UnmanagedLibrary (libs, false);
 			methods = new NativeMethods (curses_library);
@@ -106,9 +103,6 @@ namespace Unix.Terminal {
 		static void FindNCurses ()
 		{
 			LoadMethods ();
-			if (curses_handle != IntPtr.Zero)
-				return;
-
 			curses_handle = methods.UnmanagedLibrary.NativeLibraryHandle;
 
 			stdscr = read_static_ptr ("stdscr");
@@ -117,27 +111,15 @@ namespace Unix.Terminal {
 			cols_ptr = get_ptr ("COLS");
 		}
 
-		static bool _isInitializing;
-
-		static public Window initscr ()
-		{
-			if (main_window != null)
-				return main_window;
-
-			if (_isInitializing) return null;
-
-			_isInitializing = true;
-			try {
+			static public Window initscr ()
+			{
 				setlocale (LC_ALL, "");
 				FindNCurses ();
 
 				// Prevents the terminal from being locked after exiting.
 				reset_shell_mode ();
 
-				IntPtr handle = methods.initscr ();
-				stdscr = handle;
-
-				main_window = new Window (handle);
+				main_window = new Window (methods.initscr ());
 				try {
 					console_sharp_get_dims (out lines, out cols);
 				} catch (DllNotFoundException) {
@@ -149,10 +131,7 @@ namespace Unix.Terminal {
 					Environment.Exit (1);
 				}
 				return main_window;
-			} finally {
-				_isInitializing = false;
 			}
-		}
 
 		public static int Lines {
 			get {
