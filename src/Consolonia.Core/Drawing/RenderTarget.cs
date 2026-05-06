@@ -181,7 +181,9 @@ namespace Consolonia.Core.Drawing
                 {
                     Pixel pixel = pixelBuffer[x, y];
 
-                    // Composite child surfaces on top (highest z-index wins)
+                    // Composite child surfaces on top (highest z-index wins).
+                    // Skip unrendered (transparent) child pixels so the ManagedWindow
+                    // background shows through during resize before the child re-renders.
                     if (childSurfaces != null)
                     {
                         for (int ci = childSurfaces.Count - 1; ci >= 0; ci--)
@@ -193,7 +195,12 @@ namespace Consolonia.Core.Drawing
                             if (localX >= 0 && localX < childBuf.Width &&
                                 localY >= 0 && localY < childBuf.Height)
                             {
-                                pixel = childBuf[(ushort)localX, (ushort)localY];
+                                Pixel childPixel = childBuf[(ushort)localX, (ushort)localY];
+                                if (childPixel.Background.Color != Colors.Transparent ||
+                                    childPixel.Foreground.Color != Colors.Transparent)
+                                {
+                                    pixel = childPixel;
+                                }
                                 break; // topmost child wins
                             }
                         }
