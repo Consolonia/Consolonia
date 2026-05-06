@@ -90,7 +90,11 @@ namespace Consolonia.ManagedWindows
         Action IWindowBaseImpl.Activated { get; set; }
 
         // --- IWindowImpl properties ---
-        public new WindowState WindowState { get; set; }
+        public new WindowState WindowState
+        {
+            get => base.WindowState;
+            set => base.WindowState = value;
+        }
         public Action<WindowState> WindowStateChanged { get; set; }
         public Action GotInputWhenDisabled { get; set; }
         Func<WindowCloseReason, bool> IWindowImpl.Closing { get; set; }
@@ -238,12 +242,8 @@ namespace Consolonia.ManagedWindows
 
         public void Hide()
         {
-            base.Close();
-        }
-
-        public new void Activate()
-        {
-            base.Activate();
+            // close is done through Closing and Dispose()
+            this.IsVisible = false;
         }
 
         public void Move(PixelPoint point) => Position = point;
