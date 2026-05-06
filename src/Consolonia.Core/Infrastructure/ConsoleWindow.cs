@@ -33,6 +33,7 @@ namespace Consolonia.Core.Infrastructure
         private readonly bool _accessKeysAlwaysOn;
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
         private readonly IKeyboardDevice _myKeyboardDevice;
+        private readonly List<IPixelBufferSurface> _childSurfaces = new();
         private Point _cursorPosition = new(0, 0);
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
         private bool _disposedValue;
@@ -66,6 +67,72 @@ namespace Consolonia.Core.Infrastructure
         public Snapshot.Regions DirtyRegions { get; } = new();
 
         public PixelBuffer PixelBuffer { get; private set; }
+
+        PixelPoint IPixelBufferSurface.Position => default;
+
+        int IPixelBufferSurface.ZIndex => 0;
+
+        bool IPixelBufferSurface.IsActive => true;
+
+        Action<RawInputEventArgs> IPixelBufferSurface.InputCallback => Input;
+
+        IInputRoot IPixelBufferSurface.InputRoot => _inputRoot;
+
+        /// <summary>
+        ///     Registered child window surfaces, ordered by z-index for compositing.
+        /// </summary>
+        internal IReadOnlyList<IPixelBufferSurface> ChildSurfaces => _childSurfaces;
+
+        internal void RegisterChildSurface(IPixelBufferSurface surface)
+        {
+            _childSurfaces.Add(surface);
+            _childSurfaces.Sort((a, b) => a.ZIndex.CompareTo(b.ZIndex));
+        }
+
+        internal void UnregisterChildSurface(IPixelBufferSurface surface)
+        {
+            _childSurfaces.Remove(surface);
+            // Mark the area as dirty so the main window repaints where the child was
+            DirtyRegions.AddRect(new PixelRect(
+                surface.Position.X, surface.Position.Y,
+                surface.PixelBuffer.Width, surface.PixelBuffer.Height));
+        }
+
+        /// <summary>
+        ///     Finds the active child surface for keyboard input routing.
+        /// </summary>
+        private IPixelBufferSurface GetActiveChildSurface()
+        {
+            for (int i = _childSurfaces.Count - 1; i >= 0; i--)
+            {
+                if (_childSurfaces[i].IsActive)
+                    return _childSurfaces[i];
+            }
+            return null;
+        }
+
+        /// <summary>
+        ///     Hit-tests mouse position against child surfaces (topmost first).
+        ///     Returns the child surface and translated local coordinates, or null.
+        /// </summary>
+        private IPixelBufferSurface HitTestChildSurface(Point point, out Point localPoint)
+        {
+            for (int i = _childSurfaces.Count - 1; i >= 0; i--)
+            {
+                var child = _childSurfaces[i];
+                var pos = child.Position;
+                double localX = point.X - pos.X;
+                double localY = point.Y - pos.Y;
+                if (localX >= 0 && localX < child.PixelBuffer.Width &&
+                    localY >= 0 && localY < child.PixelBuffer.Height)
+                {
+                    localPoint = new Point(localX, localY);
+                    return child;
+                }
+            }
+            localPoint = default;
+            return null;
+        }
 
         private IMouseDevice MouseDevice { get; }
 
@@ -363,6 +430,13 @@ namespace Consolonia.Core.Infrastructure
             RawInputModifiers modifiers)
         {
             ulong timestamp = (ulong)Environment.TickCount64;
+
+            // Hit-test against child surfaces for mouse routing
+            var childSurface = HitTestChildSurface(point, out Point localPoint);
+            var inputRoot = childSurface?.InputRoot ?? _inputRoot;
+            var inputCallback = childSurface?.InputCallback ?? Input!;
+            var eventPoint = childSurface != null ? localPoint : point;
+
             // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
             switch (type)
             {
@@ -378,12 +452,12 @@ namespace Consolonia.Core.Infrastructure
                 case RawPointerEventType.MiddleButtonUp:
                 case RawPointerEventType.XButton1Up:
                 case RawPointerEventType.XButton2Up:
-                    Input!(new RawPointerEventArgs(MouseDevice, timestamp, _inputRoot,
-                        type, point,
+                    inputCallback(new RawPointerEventArgs(MouseDevice, timestamp, inputRoot,
+                        type, eventPoint,
                         modifiers));
                     break;
                 case RawPointerEventType.Wheel:
-                    Input!(new RawMouseWheelEventArgs(MouseDevice, timestamp, _inputRoot, point,
+                    inputCallback(new RawMouseWheelEventArgs(MouseDevice, timestamp, inputRoot, eventPoint,
                         (Vector)wheelDelta!, modifiers));
                     break;
             }
@@ -410,10 +484,14 @@ namespace Consolonia.Core.Infrastructure
 
         private void ConsoleOnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)
         {
-#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE 
-            RawTextInputEventArgs rawInputEventArgs = new(_myKeyboardDevice, timeStamp, _inputRoot, text);
+            var activeChild = GetActiveChildSurface();
+            var inputRoot = activeChild?.InputRoot ?? _inputRoot;
+            var inputCallback = activeChild?.InputCallback ?? Input!;
+
+#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE
+            RawTextInputEventArgs rawInputEventArgs = new(_myKeyboardDevice, timeStamp, inputRoot, text);
 #pragma warning restore CS0618 // Type or member is obsolete
-            Input!(rawInputEventArgs);
+            inputCallback(rawInputEventArgs);
 
             if (rawInputEventArgs.Handled)
                 canBeHandledEventArgs.Handled = true;
@@ -423,33 +501,37 @@ namespace Consolonia.Core.Infrastructure
         private void ConsoleOnKeyEvent(Key key, char keyChar, RawInputModifiers rawInputModifiers, bool down,
             ulong timeStamp, bool tryAsTextInput)
         {
+            var activeChild = GetActiveChildSurface();
+            var inputRoot = activeChild?.InputRoot ?? _inputRoot;
+            var inputCallback = activeChild?.InputCallback ?? Input!;
+
             if (!down)
             {
-#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE 
-                var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot,
+#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE
+                var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp, inputRoot,
                     RawKeyEventType.KeyUp, key,
                     rawInputModifiers);
 #pragma warning restore CS0618 // Type or member is obsolete
-                Input!(rawInputEventArgs);
+                inputCallback(rawInputEventArgs);
             }
             else
             {
 #pragma warning disable CS0618 // Type or member is obsolete //todo: CFA20A9A-3A24-4187-9CA3-9DF0081124EE
                 var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp,
-                    _inputRoot,
+                    inputRoot,
                     RawKeyEventType.KeyDown, key,
                     rawInputModifiers);
 #pragma warning restore CS0618 // Type or member is obsolete
-                Input!(rawInputEventArgs);
+                inputCallback(rawInputEventArgs);
 
                 if (tryAsTextInput &&
                     !rawInputEventArgs.Handled
                     && !char.IsControl(keyChar)
                     && !rawInputModifiers.HasFlag(RawInputModifiers.Alt)
                     && !rawInputModifiers.HasFlag(RawInputModifiers.Control))
-                    Input!(new RawTextInputEventArgs(_myKeyboardDevice,
+                    inputCallback(new RawTextInputEventArgs(_myKeyboardDevice,
                         timeStamp,
-                        _inputRoot,
+                        inputRoot,
                         keyChar.ToString()));
             }
         }

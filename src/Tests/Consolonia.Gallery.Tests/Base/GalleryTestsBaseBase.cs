@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -9,6 +10,7 @@ using Consolonia.Fonts;
 using Consolonia.Gallery.View;
 using Consolonia.ManagedWindows;
 using Consolonia.NUnit;
+using Iciclecreek.Avalonia.WindowManager;
 using NUnit.Framework;
 
 namespace Consolonia.Gallery.Tests.Base
@@ -33,6 +35,21 @@ namespace Consolonia.Gallery.Tests.Base
         [OneTimeSetUp]
         public async Task Setup()
         {
+            // Close any ManagedWindows left open by a previous test
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var mainWindow =
+                    ((IClassicDesktopStyleApplicationLifetime)Application.Current!.ApplicationLifetime)!.MainWindow!;
+                var windowsPanel = mainWindow.FindDescendantOfType<WindowsPanel>();
+                if (windowsPanel != null)
+                {
+                    foreach (var child in windowsPanel.Windows.OfType<ManagedWindow>().ToList())
+                        child.Close();
+                }
+            });
+
+            await UITest.WaitRendered();
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 ControlsListView controlsListView = GetControlsListAndMainWindow();

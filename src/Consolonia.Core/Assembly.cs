@@ -4,6 +4,7 @@ using Avalonia.Metadata;
 
 [assembly: InternalsVisibleTo("Consolonia.Core.Tests")]
 [assembly: InternalsVisibleTo("Consolonia.Designer")]
+[assembly: InternalsVisibleTo("Consolonia.ManagedWindows")]
 
 [assembly: CLSCompliant(false)] //todo: should we make it compliant?
 [assembly: XmlnsDefinition("https://github.com/consolonia", "Consolonia")]

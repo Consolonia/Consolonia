@@ -86,12 +86,29 @@ namespace Consolonia.Core.Drawing
 
         void IDrawingContextLayerImpl.Blit(IDrawingContextImpl context)
         {
-            try
+            if (_surface is ConsoleWindowImpl)
             {
-                RenderToDevice();
+                // Main window: render everything (including composited child surfaces) to console
+                try
+                {
+                    RenderToDevice();
+                }
+                catch (InvalidDrawingContextException)
+                {
+                }
             }
-            catch (InvalidDrawingContextException)
+            else
             {
+                // Child window: forward dirty region to main window so it composites on next render
+                var mainConsole = (AvaloniaLocator.Current.GetService<ConsoloniaPlatform>())
+                    ?.MainWindow as ConsoleWindowImpl;
+                if (mainConsole != null)
+                {
+                    var pos = _surface.Position;
+                    var buf = _surface.PixelBuffer;
+                    mainConsole.DirtyRegions.AddRect(
+                        new PixelRect(pos.X, pos.Y, buf.Width, buf.Height));
+                }
             }
         }
 
@@ -134,6 +151,11 @@ namespace Consolonia.Core.Drawing
             PixelBuffer pixelBuffer = _surface.PixelBuffer;
             Snapshot dirtyRegions = _surface.DirtyRegions.GetSnapshotAndClear();
 
+            // Get child surfaces for compositing (only for main window)
+            IReadOnlyList<IPixelBufferSurface> childSurfaces = _surface is ConsoleWindowImpl mainWindow
+                ? mainWindow.ChildSurfaces
+                : null;
+
 #if FPS
             var now = _stopwatch.Elapsed;
             var elapsed = now - _lastFpsUpdate;
@@ -159,6 +181,24 @@ namespace Consolonia.Core.Drawing
                 {
                     Pixel pixel = pixelBuffer[x, y];
 
+                    // Composite child surfaces on top (highest z-index wins)
+                    if (childSurfaces != null)
+                    {
+                        for (int ci = childSurfaces.Count - 1; ci >= 0; ci--)
+                        {
+                            var child = childSurfaces[ci];
+                            var childBuf = child.PixelBuffer;
+                            int localX = x - child.Position.X;
+                            int localY = y - child.Position.Y;
+                            if (localX >= 0 && localX < childBuf.Width &&
+                                localY >= 0 && localY < childBuf.Height)
+                            {
+                                pixel = childBuf[(ushort)localX, (ushort)localY];
+                                break; // topmost child wins
+                            }
+                        }
+                    }
+
                     if (pixel.IsCaret())
                     {
                         if (caretPosition != null)
@@ -167,7 +207,7 @@ namespace Consolonia.Core.Drawing
                         caretStyle = pixel.CaretStyle;
                     }
 
-                    if (!dirtyRegions.Contains(x, y, false))
+                    if (!dirtyRegions.Contains(x, y, false) && childSurfaces is not { Count: > 0 })
                         continue;
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)

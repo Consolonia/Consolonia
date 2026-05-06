@@ -14,6 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\..\Avalonia.WindowManager\source\Iciclecreek.Avalonia.WindowManager\Iciclecreek.Avalonia.WindowManager.csproj" />
         <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
         <ProjectReference Include="..\Consolonia.Controls\Consolonia.Controls.csproj" />
         <ProjectReference Include="..\Consolonia.Themes\Consolonia.Themes.csproj" />
