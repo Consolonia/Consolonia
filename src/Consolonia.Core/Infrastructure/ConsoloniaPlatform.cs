@@ -66,7 +66,7 @@ namespace Consolonia.Core.Infrastructure
             AvaloniaLocator.CurrentMutable.BindToSelf(this)
                 .Bind<IWindowingPlatform>().ToConstant(this)
                 /*todo: need replacement? .Bind<IPlatformThreadingInterface>().ToSingleton<ConsoloniaPlatformThreadingInterface>()*/
-                .Bind<IRenderTimer>().ToConstant(new SleepLoopRenderTimer(120))
+                .Bind<IRenderTimer>().ToConstant(new UiThreadRenderTimer(120))
                 .Bind<IDispatcherImpl>().ToConstant(new ManagedDispatcherImpl(null))
                 /*SleepLoopRenderTimer : IRenderTimer*/
                 /*.Bind<IRenderLoop>().ToConstant(new RenderLoop()) todo: is internal now*/

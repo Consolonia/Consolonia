@@ -53,6 +53,9 @@ namespace Consolonia.ManagedWindows
             };
             base.Closing += (_, e) =>
             {
+                // When Dispose() initiates the close (from Avalonia Window.Close()),
+                // Avalonia has already processed the Closing check — don't call it again
+                // or it may cancel the close and block shutdown.
                 if (_disposing)
                     return;
 

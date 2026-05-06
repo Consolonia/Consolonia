@@ -18,7 +18,7 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasText(SomeDialogWindow.DialogTitle);
             await UITest.AssertHasText("One More");
             await UITest.KeyInput(Key.Escape);
-            // await Task.Delay(100);
+            await Task.Delay(100);
             await UITest.AssertHasNoText("One More");
         }
     }
