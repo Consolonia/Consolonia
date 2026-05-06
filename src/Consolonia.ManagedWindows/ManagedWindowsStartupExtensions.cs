@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Platform;
 using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.ManagedWindows
@@ -11,8 +12,21 @@ namespace Consolonia.ManagedWindows
         /// </summary>
         public static AppBuilder UseManagedWindows(this AppBuilder builder)
         {
-            ConsoloniaPlatform.SecondaryWindowFactory = mainWindow => new ManagedWindowImpl(mainWindow);
+            builder.AfterPlatformServicesSetup(_ =>
+            {
+                AvaloniaLocator.CurrentMutable
+                    .Bind<IChildWindowImplFactory>()
+                    .ToConstant(new ManagedChildWindowFactory());
+            });
             return builder;
+        }
+
+        private sealed class ManagedChildWindowFactory : IChildWindowImplFactory
+        {
+            public IWindowImpl CreateChildWindow(IWindowImpl mainWindow)
+            {
+                return new ManagedWindowImpl(mainWindow);
+            }
         }
     }
 }
