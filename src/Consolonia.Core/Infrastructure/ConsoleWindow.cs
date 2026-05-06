@@ -34,6 +34,8 @@ namespace Consolonia.Core.Infrastructure
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
         private readonly IKeyboardDevice _myKeyboardDevice;
         private readonly List<IPixelBufferSurface> _childSurfaces = new();
+        private IPixelBufferSurface _pointerCaptureSurface; // surface that captured the pointer on button down
+        private bool _pointerCaptureActive; // true when any surface (including main) has capture
         private Point _cursorPosition = new(0, 0);
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
         private bool _disposedValue;
@@ -431,11 +433,55 @@ namespace Consolonia.Core.Infrastructure
         {
             ulong timestamp = (ulong)Environment.TickCount64;
 
-            // Hit-test against child surfaces for mouse routing
-            var childSurface = HitTestChildSurface(point, out Point localPoint);
-            var inputRoot = childSurface?.InputRoot ?? _inputRoot;
-            var inputCallback = childSurface?.InputCallback ?? Input!;
-            var eventPoint = childSurface != null ? localPoint : point;
+            // Pointer capture: on button down, lock to the surface under cursor.
+            // On button up, release capture. During drag, keep routing to captured surface.
+            bool isButtonDown = type is RawPointerEventType.LeftButtonDown
+                or RawPointerEventType.RightButtonDown
+                or RawPointerEventType.MiddleButtonDown
+                or RawPointerEventType.XButton1Down
+                or RawPointerEventType.XButton2Down
+                or RawPointerEventType.NonClientLeftButtonDown;
+            bool isButtonUp = type is RawPointerEventType.LeftButtonUp
+                or RawPointerEventType.RightButtonUp
+                or RawPointerEventType.MiddleButtonUp
+                or RawPointerEventType.XButton1Up
+                or RawPointerEventType.XButton2Up;
+
+            if (isButtonDown)
+            {
+                // Capture: lock to whatever surface is under cursor.
+                // null = main window, non-null = child. _pointerCaptureActive distinguishes from "no capture".
+                _pointerCaptureSurface = HitTestChildSurface(point, out _);
+                _pointerCaptureActive = true;
+            }
+
+            // Route to captured surface, or hit-test if no capture
+            IPixelBufferSurface targetSurface;
+            Point eventPoint;
+            if (_pointerCaptureActive)
+            {
+                // Pointer is captured — route to the captured surface (null = main window)
+                targetSurface = _pointerCaptureSurface;
+                if (targetSurface != null)
+                    eventPoint = new Point(point.X - targetSurface.Position.X, point.Y - targetSurface.Position.Y);
+                else
+                    eventPoint = point; // main window uses screen coordinates
+            }
+            else
+            {
+                // No capture — hit-test normally
+                targetSurface = HitTestChildSurface(point, out Point localPoint);
+                eventPoint = targetSurface != null ? localPoint : point;
+            }
+
+            var inputRoot = targetSurface?.InputRoot ?? _inputRoot;
+            var inputCallback = targetSurface?.InputCallback ?? Input!;
+
+            if (isButtonUp)
+            {
+                _pointerCaptureSurface = null;
+                _pointerCaptureActive = false;
+            }
 
             // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
             switch (type)
