@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Input.Raw;
 using Avalonia.Media;
 using Avalonia.Platform;
@@ -38,12 +39,13 @@ namespace Consolonia.ManagedWindows
         private readonly ConsoleWindowImpl _mainConsoleWindow;
         private IWindowImpl _parentWindow;
         private IInputRoot _inputRoot;
-        private Size _clientSize;
+        private Size _clientSize; // initialized in constructor to console size
         private bool _disposing;
         private bool _propertiesBound;
 
         public ChildWindowImpl(IWindowImpl mainWindow)
         {
+            this.AnimateWindow = false;
             _mainWindow = mainWindow;
             _mainConsoleWindow = (ConsoleWindowImpl)mainWindow;
             base.Content = new PixelBufferPresenter(_mainConsoleWindow, this);
@@ -80,12 +82,10 @@ namespace Consolonia.ManagedWindows
             base.Resized += (_, e) =>
             {
                 // e.ClientSize is the actual content presenter bounds (from WindowManager fix).
-                // Resize PixelBuffer to match the real content area.
                 var contentWidth = (ushort)Math.Max(1, e.ClientSize.Width);
                 var contentHeight = (ushort)Math.Max(1, e.ClientSize.Height);
                 if (PixelBuffer.Width != contentWidth || PixelBuffer.Height != contentHeight)
                 {
-                    _clientSize = e.ClientSize;
                     PixelBuffer = new PixelBuffer(contentWidth, contentHeight);
                     DirtyRegions.AddRect(PixelBuffer.Size);
                     ((ITopLevelImpl)this).Resized?.Invoke(e.ClientSize, e.Reason);
@@ -164,6 +164,9 @@ namespace Consolonia.ManagedWindows
         public Thickness OffScreenMargin => default;
 
         // --- ITopLevelImpl methods ---
+        /// <summary>The Avalonia Window this ChildWindowImpl is backing.</summary>
+        internal Window ChildWindow => _inputRoot as Window;
+
         public void SetInputRoot(IInputRoot inputRoot)
         {
             _inputRoot = inputRoot;
@@ -205,11 +208,8 @@ namespace Consolonia.ManagedWindows
             if (!string.IsNullOrEmpty(textIcon))
                 this.Icon = textIcon;
 
-            // Copy size/position from the Window to the ManagedWindow
-            if (!double.IsNaN(win.Width))
-                this.Width = win.Width;
-            if (!double.IsNaN(win.Height))
-                this.Height = win.Height;
+            // Don't copy Width/Height — Resize() handles sizing (adds chrome offset).
+            // Copying from the Window would overwrite with the client size (no chrome).
             if (win.MinWidth > 0)
                 this.MinWidth = win.MinWidth;
             if (win.MinHeight > 0)
@@ -231,6 +231,7 @@ namespace Consolonia.ManagedWindows
         {
             base.OnApplyTemplate(e);
         }
+
 
         /// <summary>
         ///     Updates the surface position based on the ManagedWindow's position.
@@ -280,8 +281,10 @@ namespace Consolonia.ManagedWindows
         // --- IWindowBaseImpl methods ---
         public void Show(bool activate, bool isDialog)
         {
+            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Show(activate={activate}, isDialog={isDialog}) BEFORE BindWindowProperties Width={Width} Height={Height} _clientSize={_clientSize}");
             // Bind properties before Show so chrome displays correctly.
             BindWindowProperties();
+            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Show AFTER BindWindowProperties Width={Width} Height={Height}");
 
             // Clamp to terminal screen size, but respect SizeToContent from the Avalonia Window
             var maxSize = _mainWindow.ClientSize;
@@ -305,6 +308,7 @@ namespace Consolonia.ManagedWindows
             // Register for input routing
             Surface.RegisterWindow(this);
 
+            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Show AFTER clamp Width={Width} Height={Height} sizeToContent={(_inputRoot as Window)?.SizeToContent}");
             this.ShowActivated = activate;
             if (isDialog)
             {
@@ -334,11 +338,16 @@ namespace Consolonia.ManagedWindows
 
         public void Resize(Size clientSize, WindowResizeReason reason = WindowResizeReason.Application)
         {
+            // Ignore zero-dimension calls from Avalonia's initialization feedback
+            if (clientSize.Width <= 0 || clientSize.Height <= 0)
+                return;
+
             var maxSize = _mainWindow.ClientSize;
             clientSize = new Size(
                 Math.Min(clientSize.Width, maxSize.Width),
                 Math.Min(clientSize.Height, maxSize.Height));
 
+            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Resize({clientSize}, {reason}) current Width={Width} Height={Height} _clientSize={_clientSize}");
             _clientSize = clientSize;
 
             // Resize the PixelBuffer to match
@@ -361,6 +370,7 @@ namespace Consolonia.ManagedWindows
             int chromeH = Math.Max(3, (int)(border.Top + border.Bottom) + 1); // +1 for title bar
             this.Width = clientSize.Width + chromeW;
             this.Height = clientSize.Height + chromeH;
+            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Resize -> set Width={this.Width} Height={this.Height} (chrome={chromeW}x{chromeH}) border={border}");
 
             UpdateSurfacePosition();
         }

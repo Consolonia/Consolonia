@@ -31,12 +31,16 @@ namespace Consolonia.ManagedWindows
 
         protected override Size MeasureOverride(Size availableSize)
         {
-            // When SizeToContent is set, availableSize is infinite.
-            // Return the child window's clientSize so the ManagedWindow sizes correctly.
-            var desired = ((IPixelBufferWindow)_childWindow).ContentSize;
-            return new Size(
-                double.IsInfinity(availableSize.Width) ? desired.Width : availableSize.Width,
-                double.IsInfinity(availableSize.Height) ? desired.Height : availableSize.Height);
+            // Measure the child Window's content at full screen size to get its
+            // natural desired size. The layout system constrains as needed.
+            var childWindow = _childWindow.ChildWindow;
+            if (childWindow?.Content is Layoutable content)
+            {
+                content.Measure(_mainWindow.ClientSize);
+                return content.DesiredSize;
+            }
+
+            return availableSize;
         }
 
         public override void Render(DrawingContext context)
