@@ -112,20 +112,12 @@ namespace Consolonia.Core.Drawing
             else
             {
                 // Child rendered to its own PixelBuffer.
-                // Invalidate the ManagedWindow visual so Render() fires on the next
-                // main render pass (copying child pixels to main buffer).
-                // Then trigger Paint to flush.
-                if (_window is Visual visual)
-                    visual.InvalidateVisual();
-
-                var mainConsole = (AvaloniaLocator.Current.GetService<ConsoloniaPlatform>())
-                    ?.MainWindow as ConsoleWindowImpl;
-                if (mainConsole != null)
-                {
-                    Dispatcher.UIThread.Post(() =>
-                        mainConsole.Paint?.Invoke(new Rect(0, 0,
-                            mainConsole.PixelBuffer.Width, mainConsole.PixelBuffer.Height)));
-                }
+                // Invalidate the PixelBufferPresenter so its Render() fires on the
+                // next main render tick, copying child pixels AFTER template background.
+                // Do NOT trigger Paint — that causes an extra main render that overwrites
+                // the child pixels without re-firing the presenter's Render().
+                if (_window is ContentControl cc && cc.Content is Visual presenter)
+                    presenter.InvalidateVisual();
             }
         }
 

@@ -44,9 +44,10 @@ namespace Consolonia.ManagedWindows
 
         public ChildWindowImpl(IWindowImpl mainWindow)
         {
-            base.Content = new Panel() { Background = Brushes.Transparent };
             _mainWindow = mainWindow;
             _mainConsoleWindow = (ConsoleWindowImpl)mainWindow;
+            base.Background = Brushes.Transparent;
+            base.Content = new PixelBufferPresenter(_mainConsoleWindow, this);
 
             // ManagedWindow events → IWindowImpl callbacks
             base.Closed += (_, _) => ((IWindowImpl)this).Closed?.Invoke();
@@ -72,8 +73,8 @@ namespace Consolonia.ManagedWindows
                 ((IWindowBaseImpl)this).PositionChanged?.Invoke(e.Point);
                 UpdateSurfacePosition();
 
-                // Force Render() to fire at the new position
-                InvalidateVisual();
+                // Force PixelBufferPresenter.Render() to fire at the new position
+                (base.Content as Control)?.InvalidateVisual();
             };
             base.Resized += (_, e) =>
             {
@@ -220,6 +221,16 @@ namespace Consolonia.ManagedWindows
             _propertiesBound = true;
         }
 
+        protected override void OnApplyTemplate(Avalonia.Controls.Primitives.TemplateAppliedEventArgs e)
+        {
+            base.OnApplyTemplate(e);
+            // Kill any background on the template Grid so it doesn't paint over child pixels
+            Background = Brushes.Transparent;
+            var grid = e.NameScope.Find<Control>("PART_WindowBorder");
+            if (grid is Avalonia.Controls.Border border)
+                border.Background = Brushes.Transparent;
+        }
+
         /// <summary>
         ///     Updates the surface position based on the ManagedWindow's position.
         ///     The content area is offset from the window position by chrome (title bar, border).
@@ -230,58 +241,6 @@ namespace Consolonia.ManagedWindows
             int chromeLeft = Math.Max(1, (int)border.Left);
             int chromeTop = Math.Max(1, (int)border.Top) + 1; // +1 for title bar row
             _surfacePosition = new PixelPoint(Position.X + chromeLeft, Position.Y + chromeTop);
-        }
-
-        /// <summary>
-        ///     Copies this window's PixelBuffer into the main window's PixelBuffer
-        ///     at the content area position. Called during the main window's render pass,
-        ///     so z-order is handled naturally by the Canvas/WindowsPanel.
-        /// </summary>
-        private PixelPoint _lastRenderPosition;
-        private PixelSize _lastRenderSize;
-
-        public override void Render(Avalonia.Media.DrawingContext context)
-        {
-            base.Render(context);
-
-            var mainBuf = _mainConsoleWindow.PixelBuffer;
-            var childBuf = PixelBuffer;
-            if (childBuf.Width <= 1 || childBuf.Height <= 1)
-                return;
-
-            // Calculate content area position
-            var border = this.BorderThickness;
-            int chromeLeft = Math.Max(1, (int)border.Left);
-            int chromeTop = Math.Max(1, (int)border.Top) + 1;
-            var pos = new PixelPoint(Position.X + chromeLeft, Position.Y + chromeTop);
-            Debug.Print($"Rendering child window at {pos} with size {childBuf.Size}");
-            // Copy child PixelBuffer into main buffer at content area position
-            for (ushort y = 0; y < childBuf.Height; y++)
-            {
-                int screenY = pos.Y + y;
-                if (screenY < 0 || screenY >= mainBuf.Height) continue;
-
-                for (ushort x = 0; x < childBuf.Width; x++)
-                {
-                    int screenX = pos.X + x;
-                    if (screenX < 0 || screenX >= mainBuf.Width) continue;
-
-                    var pixel = childBuf[x, y];
-                    if (pixel.Background.Color == Colors.Transparent
-                        && pixel.Foreground.Color == Colors.Transparent)
-                        continue;
-
-                    mainBuf[(ushort)screenX, (ushort)screenY] = pixel;
-                }
-            }
-
-            // Invalidate main window's dirty regions so the next RenderFrameToDevice
-            // writes these pixels to the console even if the cache has matching values.
-            _mainConsoleWindow.DirtyRegions.AddRect(
-                new PixelRect(pos.X, pos.Y, childBuf.Width, childBuf.Height));
-
-            _lastRenderPosition = pos;
-            _lastRenderSize = new PixelSize(childBuf.Width, childBuf.Height);
         }
 
         public Point PointToClient(PixelPoint point) => point.ToPoint(1);

@@ -168,7 +168,9 @@ namespace Consolonia.Core.Drawing
 
         public object GetFeature(Type t)
         {
-            throw new NotImplementedException();
+            if (t.IsAssignableFrom(GetType()))
+                return this;
+            return null;
         }
 
         public Matrix Transform
