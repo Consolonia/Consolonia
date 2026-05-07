@@ -254,7 +254,12 @@ namespace Consolonia.ManagedWindows
 
         public Point PointToClient(PixelPoint point) => point.ToPoint(1);
         public PixelPoint PointToScreen(Point point) => new((int)point.X, (int)point.Y);
-        public void SetCursor(ICursorImpl cursor) { }
+        public void SetCursor(ICursorImpl cursor)
+        {
+            Surface.SetCursorType(cursor is null
+                ? StandardCursorType.Arrow
+                : ((CursorImpl)cursor).CursorType);
+        }
         public IPopupImpl CreatePopup() => null;
         public void SetTransparencyLevelHint(IReadOnlyList<WindowTransparencyLevel> transparencyLevels) { }
 
