@@ -19,7 +19,7 @@ namespace Consolonia.ManagedWindows
     internal class PixelBufferPresenter : Control
     {
         private readonly ConsoleWindowImpl _mainWindow;
-        private readonly ChildWindowImpl _childWindow;
+        internal readonly ChildWindowImpl _childWindow;
 
         public PixelBufferPresenter(ConsoleWindowImpl mainWindow, ChildWindowImpl childWindow)
         {
@@ -31,7 +31,9 @@ namespace Consolonia.ManagedWindows
 
         protected override Size MeasureOverride(Size availableSize)
         {
-            return availableSize;
+            return new Size(
+                double.IsInfinity(availableSize.Width) ? 0 : availableSize.Width,
+                double.IsInfinity(availableSize.Height) ? 0 : availableSize.Height);
         }
 
         public override void Render(DrawingContext context)
@@ -41,7 +43,7 @@ namespace Consolonia.ManagedWindows
                 return;
 
             context.Custom(new PixelBufferDrawOperation(childBuf,
-                new Rect(0, 0, childBuf.Width, childBuf.Height)));
+                new Rect(0, 0, childBuf.Width, childBuf.Height), _childWindow));
 
             // Stay dirty so we re-copy child pixels every frame
             Dispatcher.UIThread.Post(InvalidateVisual);
@@ -50,10 +52,12 @@ namespace Consolonia.ManagedWindows
         private class PixelBufferDrawOperation : ICustomDrawOperation
         {
             private readonly PixelBuffer _buffer;
+            private readonly ChildWindowImpl _childWindow;
 
-            public PixelBufferDrawOperation(PixelBuffer buffer, Rect bounds)
+            public PixelBufferDrawOperation(PixelBuffer buffer, Rect bounds, ChildWindowImpl childWindow)
             {
                 _buffer = buffer;
+                _childWindow = childWindow;
                 Bounds = bounds;
             }
 
@@ -70,8 +74,10 @@ namespace Consolonia.ManagedWindows
                 // ImmediateDrawingContext wraps our DrawingContextImpl
                 if (context.TryGetFeature<IDrawingContextImpl>() is DrawingContextImpl impl)
                 {
-                    // Get the transform offset so DrawPixel writes at the correct screen position
+                    // Get the transform offset so DrawPixel writes at the correct screen position.
+                    // Also update the child window's surface position for input hit-testing.
                     var offset = new Point(0, 0).Transform(impl.Transform).ToPixelPoint();
+                    _childWindow.SetSurfacePosition(offset);
 
                     for (ushort y = 0; y < _buffer.Height; y++)
                     {

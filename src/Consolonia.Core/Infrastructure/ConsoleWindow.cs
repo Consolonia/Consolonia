@@ -70,6 +70,7 @@ namespace Consolonia.Core.Infrastructure
         public Snapshot.Regions DirtyRegions { get; } = new();
         PixelPoint IPixelBufferWindow.Position => default;
         Size IPixelBufferWindow.ContentSize => new(PixelBuffer.Width, PixelBuffer.Height);
+        PixelRect IPixelBufferWindow.FullBounds => new(0, 0, PixelBuffer.Width, PixelBuffer.Height);
         bool IPixelBufferWindow.IsActive => true;
         Action<RawInputEventArgs> IPixelBufferWindow.InputCallback => Input;
         IInputRoot IPixelBufferWindow.InputRoot => _inputRoot;

@@ -46,18 +46,19 @@ namespace Consolonia.ManagedWindows
         {
             _mainWindow = mainWindow;
             _mainConsoleWindow = (ConsoleWindowImpl)mainWindow;
-            base.Background = Brushes.Transparent;
             base.Content = new PixelBufferPresenter(_mainConsoleWindow, this);
 
             // ManagedWindow events → IWindowImpl callbacks
             base.Closed += (_, _) => ((IWindowImpl)this).Closed?.Invoke();
             base.Activated += (_, _) =>
             {
+                System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Activated: {Title}");
                 _isActive = true;
                 ((IWindowBaseImpl)this).Activated?.Invoke();
             };
             base.Deactivated += (_, _) =>
             {
+                System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Deactivated: {Title}");
                 _isActive = false;
                 ((IWindowBaseImpl)this).Deactivated?.Invoke();
             };
@@ -111,6 +112,8 @@ namespace Consolonia.ManagedWindows
         private PixelPoint _surfacePosition;
 
         Size IPixelBufferWindow.ContentSize => _clientSize;
+        PixelRect IPixelBufferWindow.FullBounds => new(Position.X, Position.Y,
+            (int)Bounds.Width, (int)Bounds.Height);
 
         private bool _isActive;
         bool IPixelBufferWindow.IsActive => _isActive;
@@ -181,6 +184,7 @@ namespace Consolonia.ManagedWindows
             // Don't bind Background — the ManagedWindow content area would overwrite
             // the child window's rendered pixels. The child renders its own background.
             this[!ForegroundProperty] = win[!Window.ForegroundProperty];
+            this[!BackgroundProperty] = win[!Window.BackgroundProperty];
             this[!PaddingProperty] = win[!Window.PaddingProperty];
             this[!FontSizeProperty] = win[!Window.FontSizeProperty];
             this[!FontFamilyProperty] = win[!Window.FontFamilyProperty];
@@ -224,11 +228,6 @@ namespace Consolonia.ManagedWindows
         protected override void OnApplyTemplate(Avalonia.Controls.Primitives.TemplateAppliedEventArgs e)
         {
             base.OnApplyTemplate(e);
-            // Kill any background on the template Grid so it doesn't paint over child pixels
-            Background = Brushes.Transparent;
-            var grid = e.NameScope.Find<Control>("PART_WindowBorder");
-            if (grid is Avalonia.Controls.Border border)
-                border.Background = Brushes.Transparent;
         }
 
         /// <summary>
@@ -237,10 +236,20 @@ namespace Consolonia.ManagedWindows
         /// </summary>
         private void UpdateSurfacePosition()
         {
+            // Fallback until the first Render() sets the actual position from the transform
             var border = this.BorderThickness;
             int chromeLeft = Math.Max(1, (int)border.Left);
-            int chromeTop = Math.Max(1, (int)border.Top) + 1; // +1 for title bar row
+            int chromeTop = Math.Max(1, (int)border.Top) + 1;
             _surfacePosition = new PixelPoint(Position.X + chromeLeft, Position.Y + chromeTop);
+        }
+
+        /// <summary>
+        ///     Called by PixelBufferPresenter during Render() with the actual transform offset.
+        ///     This ensures input hit-testing uses the exact same position as rendering.
+        /// </summary>
+        internal void SetSurfacePosition(PixelPoint position)
+        {
+            _surfacePosition = position;
         }
 
         public Point PointToClient(PixelPoint point) => point.ToPoint(1);

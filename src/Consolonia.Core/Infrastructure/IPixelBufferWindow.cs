@@ -33,6 +33,12 @@ namespace Consolonia.Core.Infrastructure
 
         Size ContentSize { get; }
 
+        /// <summary>
+        ///     Full window bounds in screen coordinates (including chrome).
+        ///     Used for hit-testing to prevent lower windows from stealing clicks on chrome.
+        /// </summary>
+        PixelRect FullBounds { get; }
+
         bool IsActive { get; }
 
         Action<RawInputEventArgs> InputCallback { get; }

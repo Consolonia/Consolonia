@@ -113,9 +113,11 @@ namespace Consolonia.Core.Infrastructure
 
         private IPixelBufferWindow HitTestChildWindow(Point point, out Point localPoint)
         {
-            // Iterate topmost first. Check content area for input routing.
-            // If point is in a window's chrome area (full bounds but not content),
-            // return null so the main window handles it (chrome is in the main visual tree).
+            // Iterate topmost first.
+            // 1. If point is in content area → route to that child
+            // 2. If point is in full window bounds (chrome) → route to main window (null)
+            //    This prevents lower windows from stealing clicks on higher windows' chrome.
+            // 3. If point is outside entirely → check next window
             for (int i = _windows.Count - 1; i > 0; i--) // skip index 0 (main window)
             {
                 var child = _windows[i];
@@ -125,7 +127,7 @@ namespace Consolonia.Core.Infrastructure
                 double localX = point.X - pos.X;
                 double localY = point.Y - pos.Y;
 
-                // Check content area — route input to this child window
+                // Content area hit — route to child
                 if (localX >= 0 && localX < contentSize.Width &&
                     localY >= 0 && localY < contentSize.Height)
                 {
@@ -133,18 +135,14 @@ namespace Consolonia.Core.Infrastructure
                     return child;
                 }
 
-                // Check full bounds (including chrome: ~1 cell border + 1 row title bar)
-                // If point is in chrome, return null → routes to main window for chrome handling.
-                // This prevents lower windows from capturing clicks meant for this window's chrome.
-                double chromedX = point.X - (pos.X - 1); // 1 cell left border
-                double chromedY = point.Y - (pos.Y - 2); // 1 cell top border + 1 row title
-                double fullWidth = contentSize.Width + 2;  // left + right border
-                double fullHeight = contentSize.Height + 3; // top border + title + bottom border
-                if (chromedX >= 0 && chromedX < fullWidth &&
-                    chromedY >= 0 && chromedY < fullHeight)
+                // Check full window bounds (including chrome).
+                // If point is within the full bounds but not content, it's on chrome.
+                // Route to main window to prevent lower windows from stealing the click.
+                var fullBounds = child.FullBounds;
+                if (fullBounds.Contains(new PixelPoint((int)point.X, (int)point.Y)))
                 {
                     localPoint = default;
-                    return null; // route to main window for chrome handling
+                    return null;
                 }
             }
             localPoint = default;

@@ -129,7 +129,6 @@ namespace Consolonia.Core.Drawing
         {
             if (useScaledDrawing)
                 throw new NotImplementedException("Consolonia doesn't support useScaledDrawing");
-            System.Diagnostics.Debug.WriteLine($"[RenderTarget] CreateDrawingContext for {_window.GetType().Name} pos={_window.Position} contentSize={_window.ContentSize}");
             return new DrawingContextImpl(_window);
         }
 
