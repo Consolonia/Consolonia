@@ -111,7 +111,9 @@ namespace Consolonia.ManagedWindows
         PixelPoint IPixelBufferWindow.Position => _surfacePosition;
         private PixelPoint _surfacePosition;
 
-        Size IPixelBufferWindow.ContentSize => _clientSize;
+        Size IPixelBufferWindow.ContentSize => new Size(
+            Math.Max(0, PixelBuffer.Width - 1),
+            Math.Max(0, PixelBuffer.Height - 1));
         PixelRect IPixelBufferWindow.FullBounds => new(Position.X, Position.Y,
             (int)Bounds.Width, (int)Bounds.Height);
 
