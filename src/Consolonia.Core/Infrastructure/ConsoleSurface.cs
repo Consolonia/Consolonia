@@ -113,18 +113,38 @@ namespace Consolonia.Core.Infrastructure
 
         private IPixelBufferWindow HitTestChildWindow(Point point, out Point localPoint)
         {
-            for (int i = _windows.Count - 1; i >= 0; i--)
+            // Iterate topmost first. Check content area for input routing.
+            // If point is in a window's chrome area (full bounds but not content),
+            // return null so the main window handles it (chrome is in the main visual tree).
+            for (int i = _windows.Count - 1; i > 0; i--) // skip index 0 (main window)
             {
                 var child = _windows[i];
                 var pos = child.Position;
                 var contentSize = child.ContentSize;
+
                 double localX = point.X - pos.X;
                 double localY = point.Y - pos.Y;
+
+                // Check content area — route input to this child window
                 if (localX >= 0 && localX < contentSize.Width &&
                     localY >= 0 && localY < contentSize.Height)
                 {
                     localPoint = new Point(localX, localY);
                     return child;
+                }
+
+                // Check full bounds (including chrome: ~1 cell border + 1 row title bar)
+                // If point is in chrome, return null → routes to main window for chrome handling.
+                // This prevents lower windows from capturing clicks meant for this window's chrome.
+                double chromedX = point.X - (pos.X - 1); // 1 cell left border
+                double chromedY = point.Y - (pos.Y - 2); // 1 cell top border + 1 row title
+                double fullWidth = contentSize.Width + 2;  // left + right border
+                double fullHeight = contentSize.Height + 3; // top border + title + bottom border
+                if (chromedX >= 0 && chromedX < fullWidth &&
+                    chromedY >= 0 && chromedY < fullHeight)
+                {
+                    localPoint = default;
+                    return null; // route to main window for chrome handling
                 }
             }
             localPoint = default;
