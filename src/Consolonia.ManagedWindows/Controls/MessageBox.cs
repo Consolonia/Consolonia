@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -235,7 +236,7 @@ namespace Consolonia.Controls
                 Title = title,
                 Message = message
             };
-            return mb.ShowDialog<MessageBoxResult>(visual);
+            return mb.ShowDialog(visual);
         }
 
         /// <summary>
@@ -245,7 +246,19 @@ namespace Consolonia.Controls
         /// <returns></returns>
         public new async Task<MessageBoxResult> ShowDialog(Visual visual)
         {
-            return await ShowDialog<MessageBoxResult>(visual);
+            try
+            {
+                return await ShowDialog<MessageBoxResult>(visual);
+            }
+            catch (ArgumentNullException ex) when (ex.ParamName == "WindowsPanel")
+            {
+                throw new InvalidOperationException(
+                    "Cannot show MessageBox: no WindowsPanel was found in the visual tree. " +
+                    "Either host a Consolonia Window (which applies the CONSOLONIA_WINDOW_CONTENT_WRAPPER " +
+                    "style automatically), or add a windowManager:WindowsPanel to your view's visual hierarchy. " +
+                    "See the Consolonia.Gallery samples for both patterns.",
+                    ex);
+            }
         }
 
         private void OnOk(object sender, RoutedEventArgs e)
