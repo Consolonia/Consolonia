@@ -47,11 +47,13 @@ namespace Consolonia.Core.Infrastructure
             NotSupported += KeyInputIgnore;
             NotSupported += RenderNotSupportedIgnore;
 
+            var renderTimer = new BetterSleepLoopRenderTimer();
+
             AvaloniaLocator.CurrentMutable.BindToSelf(this)
                 .Bind<IWindowingPlatform>().ToConstant(this)
                 /*todo: need replacement? .Bind<IPlatformThreadingInterface>().ToSingleton<ConsoloniaPlatformThreadingInterface>()*/
-                .Bind<IRenderTimer>().ToConstant(new SleepLoopRenderTimer(120))
-                .Bind<IDispatcherImpl>().ToConstant(new ManagedDispatcherImpl(null))
+                .Bind<IRenderTimer>().ToConstant(renderTimer)
+                .Bind<IDispatcherImpl>().ToConstant(new ConsoloniaManagedDispatcherImpl(renderTimer))
                 /*SleepLoopRenderTimer : IRenderTimer*/
                 /*.Bind<IRenderLoop>().ToConstant(new RenderLoop()) todo: is internal now*/
                 .Bind<PlatformHotkeyConfiguration>().ToConstant(new PlatformHotkeyConfiguration(KeyModifiers.Control))
