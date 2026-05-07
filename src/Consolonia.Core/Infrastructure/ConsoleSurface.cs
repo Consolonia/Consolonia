@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Avalonia.Media;
 using Avalonia.Rendering.Composition;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -29,8 +31,9 @@ namespace Consolonia.Core.Infrastructure
             _keyboardDevice = AvaloniaLocator.Current.GetRequiredService<IKeyboardDevice>();
             MouseDevice = AvaloniaLocator.Current.GetService<IMouseDevice>();
             Console = AvaloniaLocator.Current.GetRequiredService<IConsole>();
-            FrameBuffer = new PixelBuffer(Console.Size);
+            _consoleOutput = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
             Compositor = new Compositor(null);
+            InitializeCache(Console.Size.Width, Console.Size.Height);
 
             Console.Resized += OnConsoleResized;
             Console.KeyEvent += OnKeyEvent;
@@ -39,55 +42,20 @@ namespace Consolonia.Core.Infrastructure
             Console.FocusEvent += OnFocusEvent;
         }
 
-        /// <summary>Frame buffer — the final composited output written to console.</summary>
-        public PixelBuffer FrameBuffer { get; private set; }
         public IConsole Console { get; }
         public Compositor Compositor { get; }
         public IMouseDevice MouseDevice { get; }
+
+        // --- Console output ---
+        private readonly IConsoleOutput _consoleOutput;
+        private Pixel?[,] _cache = null!;
 
         public event Action<Size, WindowResizeReason> Resized;
         public event Action<ConsoleCursor> CursorChanged;
         public event Action ClearScreenRequested;
         public Action<Rect> Paint { get; set; }
 
-        /// <summary>
-        ///     Composites all window PixelBuffers bottom-up into the frame buffer,
-        ///     then calls RenderToDevice on the provided RenderTarget to flush to console.
-        /// </summary>
-        internal void CompositeAndRenderToDevice(Drawing.RenderTarget renderTarget)
-        {
-            var frame = FrameBuffer;
 
-            // Composite all windows bottom-up
-            for (int wi = 0; wi < _windows.Count; wi++)
-            {
-                var window = _windows[wi];
-                var buf = window.PixelBuffer;
-                var pos = window.Position;
-
-                for (ushort y = 0; y < buf.Height; y++)
-                {
-                    int screenY = pos.Y + y;
-                    if (screenY < 0 || screenY >= frame.Height) continue;
-
-                    for (ushort x = 0; x < buf.Width; x++)
-                    {
-                        int screenX = pos.X + x;
-                        if (screenX < 0 || screenX >= frame.Width) continue;
-
-                        Pixel pixel = buf[x, y];
-                        // Skip transparent/unrendered pixels from child windows
-                        if (wi > 0 && pixel.Background.Color == Avalonia.Media.Colors.Transparent
-                                   && pixel.Foreground.Color == Avalonia.Media.Colors.Transparent)
-                            continue;
-
-                        frame[(ushort)screenX, (ushort)screenY] = pixel;
-                    }
-                }
-            }
-
-            renderTarget.RenderFrameToDevice(frame);
-        }
 
         // --- Window registry (for input routing) ---
 
@@ -154,7 +122,7 @@ namespace Consolonia.Core.Infrastructure
         private void OnConsoleResized()
         {
             var size = new Size(Console.Size.Width, Console.Size.Height);
-            FrameBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
+            InitializeCache((ushort)size.Width, (ushort)size.Height);
             Resized?.Invoke(size, WindowResizeReason.Unspecified);
         }
 
@@ -302,6 +270,8 @@ namespace Consolonia.Core.Infrastructure
 
         // --- Cursor ---
 
+        public ConsoleCursor Cursor { get; private set; }
+
         public void SetCursorType(StandardCursorType cursorType)
         {
             _cursorType = cursorType;
@@ -316,10 +286,81 @@ namespace Consolonia.Core.Infrastructure
 
         private void UpdateCursor()
         {
-            CursorChanged?.Invoke(
-                new ConsoleCursor(
-                    new PixelBufferCoordinate((ushort)_cursorPosition.X, (ushort)_cursorPosition.Y),
-                    GetCursorText()));
+            var newCursor = new ConsoleCursor(
+                new PixelBufferCoordinate((ushort)_cursorPosition.X, (ushort)_cursorPosition.Y),
+                GetCursorText());
+            if (Cursor.CompareTo(newCursor) == 0)
+                return;
+
+            // Invalidate cache at old AND new cursor positions
+            var oldCursor = Cursor;
+            InvalidateCursorCache(oldCursor);
+            InvalidateCursorCache(newCursor);
+
+            Cursor = newCursor;
+            CursorChanged?.Invoke(newCursor);
+        }
+
+        private void InvalidateCursorCache(ConsoleCursor cursor)
+        {
+            if (cursor.IsEmpty()) return;
+            for (int i = 0; i < cursor.Width; i++)
+            {
+                int cx = cursor.Coordinate.X + i;
+                int cy = cursor.Coordinate.Y;
+                if (cx >= 0 && cx < _cache.GetLength(0) && cy >= 0 && cy < _cache.GetLength(1))
+                    _cache[cx, cy] = null;
+            }
+            // Also mark dirty so RenderPixelBuffer processes these positions
+            if (_windows.Count > 0)
+                _windows[0].DirtyRegions.AddRect(new PixelRect(
+                    cursor.Coordinate.X, cursor.Coordinate.Y, cursor.Width, 1));
+        }
+
+        /// <summary>
+        ///     Applies the cursor overlay to a pixel at the given screen position.
+        ///     Called by RenderTarget during rendering.
+        /// </summary>
+        public Pixel ApplyCursorOverlay(Pixel pixel, ushort x, ushort y)
+        {
+            if (Cursor.IsEmpty()) return pixel;
+            if (Cursor.Coordinate.Y != y) return pixel;
+            if (x < Cursor.Coordinate.X || x >= Cursor.Coordinate.X + Cursor.Width) return pixel;
+
+            if (Cursor.Type == " " && pixel.Width == 1)
+            {
+                char cursorChar = pixel.Foreground.Symbol.Character != '\0'
+                    ? pixel.Foreground.Symbol.Character
+                    : ' ';
+                return new Pixel(
+                    new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
+                    new PixelBackground(GetContrastColor(pixel.Background.Color)));
+            }
+            else
+            {
+                char cursorChar = Cursor.Type[x - Cursor.Coordinate.X];
+                Color foreground = pixel.Foreground.Color != Colors.Transparent
+                    ? pixel.Foreground.Color
+                    : GetContrastColor(pixel.Background.Color);
+                return new Pixel(
+                    new PixelForeground(new Symbol(cursorChar, 1), foreground,
+                        pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
+                    pixel.Background, pixel.CaretStyle);
+            }
+        }
+
+        private static Color GetContrastColor(Color color)
+        {
+            double r = color.R / 255.0;
+            double g = color.G / 255.0;
+            double b = color.B / 255.0;
+            r = r <= 0.03928 ? r / 12.92 : Math.Pow((r + 0.055) / 1.055, 2.4);
+            g = g <= 0.03928 ? g / 12.92 : Math.Pow((g + 0.055) / 1.055, 2.4);
+            b = b <= 0.03928 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
+            double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            double contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05);
+            double contrastWithBlack = (luminance + 0.05) / (0.0 + 0.05);
+            return contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
         }
 
         private string GetCursorText()
@@ -332,8 +373,8 @@ namespace Consolonia.Core.Infrastructure
                 StandardCursorType.Help => "?",
                 StandardCursorType.No => "X",
                 StandardCursorType.SizeAll => "*",
-                StandardCursorType.SizeNorthSouth => "^v",
-                StandardCursorType.SizeWestEast => "<>",
+                StandardCursorType.SizeNorthSouth => "^",
+                StandardCursorType.SizeWestEast => ">",
                 StandardCursorType.Wait => "o",
                 StandardCursorType.Ibeam => "I",
                 StandardCursorType.UpArrow => "^",
@@ -361,11 +402,111 @@ namespace Consolonia.Core.Infrastructure
             return string.Empty;
         }
 
-        // --- Surface operations ---
+        // --- Console output ---
+
+        private void InitializeCache(ushort width, ushort height)
+        {
+            _cache = new Pixel?[width, height];
+            for (ushort y = 0; y < height; y++)
+            for (ushort x = 0; x < width; x++)
+                _cache[x, y] = Pixel.Empty;
+        }
 
         public void ClearScreen()
         {
+            _consoleOutput.ClearScreen();
+            _consoleOutput.Flush();
+            InitializeCache(Console.Size.Width, Console.Size.Height);
             ClearScreenRequested?.Invoke();
+        }
+
+        /// <summary>
+        ///     Renders a PixelBuffer to the console output. Applies cursor overlay,
+        ///     compares against cache, and writes only changed pixels.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void RenderPixelBuffer(PixelBuffer pixelBuffer, Snapshot dirtyRegions)
+        {
+            _consoleOutput.HideCaret();
+
+            PixelBufferCoordinate? caretPosition = null;
+            CaretStyle? caretStyle = null;
+
+            for (ushort y = 0; y < pixelBuffer.Height; y++)
+            {
+                bool isWide = false;
+                for (ushort x = 0; x < pixelBuffer.Width; x++)
+                {
+                    Pixel pixel = pixelBuffer[x, y];
+
+                    if (pixel.IsCaret())
+                    {
+                        if (caretPosition != null)
+                            throw new InvalidOperationException("Caret is already shown");
+                        caretPosition = new PixelBufferCoordinate(x, y);
+                        caretStyle = pixel.CaretStyle;
+                    }
+
+                    if (!dirtyRegions.Contains(x, y, false))
+                        continue;
+
+                    // Apply cursor overlay
+                    pixel = ApplyCursorOverlay(pixel, x, y);
+
+                    if (pixel.Width > 1)
+                        for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
+                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
+                            {
+                                pixel = new Pixel(
+                                    new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
+                                        pixel.Foreground.Style, pixel.Foreground.TextDecoration), pixel.Background,
+                                    pixel.CaretStyle);
+                                break;
+                            }
+
+                    {
+                        if (pixel.Width > 1)
+                            isWide = true;
+                        else if (pixel.Width == 1)
+                            isWide = false;
+                    }
+
+                    if (pixel.Width == 0 && !isWide)
+                        pixel = new Pixel(
+                            new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
+                                pixel.Foreground.Style, pixel.Foreground.TextDecoration), pixel.Background,
+                            pixel.CaretStyle);
+
+                    {
+                        bool anyDifferent = false;
+                        for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
+                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
+                            {
+                                anyDifferent = true;
+                                break;
+                            }
+
+                        if (!anyDifferent)
+                            continue;
+                    }
+
+                    _consoleOutput.WritePixel(new PixelBufferCoordinate(x, y), in pixel);
+                    _cache[x, y] = pixel;
+                }
+            }
+
+            _consoleOutput.Flush();
+
+            if (caretPosition != null && caretStyle != CaretStyle.None)
+            {
+                _consoleOutput.SetCaretPosition((PixelBufferCoordinate)caretPosition);
+                _consoleOutput.SetCaretStyle((CaretStyle)caretStyle!);
+                _consoleOutput.ShowCaret();
+            }
+            else
+            {
+                _consoleOutput.HideCaret();
+            }
         }
 
         public void Dispose()

@@ -3,13 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
@@ -17,59 +14,29 @@ namespace Consolonia.Core.Drawing
 {
     internal class RenderTarget : IDrawingContextLayerImpl
     {
-        private readonly IConsoleOutput _console;
         private readonly ConsoleSurface _consoleSurface;
         private readonly IPixelBufferWindow _window;
-
-        // cache of pixels written so we can ignore them if unchanged.
-        private Pixel?[,] _cache = null!; //todo: why Pixel can be null
-        private ConsoleCursor _consoleCursor;
-
         private bool _renderPending;
-#if FPS
-        private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        private int _framesThisSecond;
-        private int _fps;
-        private TimeSpan _lastFpsUpdate;
-#endif
+
         internal RenderTarget(IPixelBufferWindow window)
         {
-            _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
             _window = window;
             _consoleSurface = window.Surface;
-            InitializeCacheInternal();
 
             // Only the main window's RenderTarget handles surface events.
-            // Child RenderTargets must NOT subscribe — they'd write their small
-            // PixelBuffer directly to console at (0,0) without offset.
             if (window is ConsoleWindowImpl)
             {
                 _consoleSurface.Resized += OnResized;
                 _consoleSurface.CursorChanged += OnCursorChanged;
-                _consoleSurface.ClearScreenRequested += OnClearScreenRequested;
             }
         }
 
-        private void InitializeCacheInternal()
-        {
-            _cache = InitializeCache(_consoleSurface.FrameBuffer.Width, _consoleSurface.FrameBuffer.Height);
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        private void OnClearScreenRequested()
-        {
-            _console.ClearScreen();
-            _console.Flush();
-            InitializeCacheInternal();
-        }
-
         public RenderTarget(IEnumerable<object> surfaces)
-            : this(surfaces.OfType<IPixelBufferWindow>()
-                .Single())
+            : this(surfaces.OfType<IPixelBufferWindow>().Single())
         {
         }
 
-        public PixelBuffer Buffer => _consoleSurface.FrameBuffer;
+        public PixelBuffer Buffer => _window.PixelBuffer;
 
         public void Dispose()
         {
@@ -77,33 +44,26 @@ namespace Consolonia.Core.Drawing
             {
                 _consoleSurface.Resized -= OnResized;
                 _consoleSurface.CursorChanged -= OnCursorChanged;
-                _consoleSurface.ClearScreenRequested -= OnClearScreenRequested;
             }
         }
 
-        public void Save(string fileName, int? quality = null)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Save(Stream stream, int? quality = null)
-        {
-            throw new NotImplementedException();
-        }
-
+        public void Save(string fileName, int? quality = null) => throw new NotImplementedException();
+        public void Save(Stream stream, int? quality = null) => throw new NotImplementedException();
         public Vector Dpi { get; } = Vector.One;
         public PixelSize PixelSize { get; } = new(1, 1);
         public int Version => 0;
+        bool IDrawingContextLayerImpl.CanBlit => true;
+        public bool IsCorrupted => false;
 
         void IDrawingContextLayerImpl.Blit(IDrawingContextImpl context)
         {
             if (_window is ConsoleWindowImpl)
             {
-                // Main window: child windows have already copied their PixelBuffers
-                // into the main buffer via Render(). Just flush to console.
+                // Main window: flush to console
                 try
                 {
-                    RenderFrameToDevice(_window.PixelBuffer);
+                    var dirtyRegions = _window.DirtyRegions.GetSnapshotAndClear();
+                    _consoleSurface.RenderPixelBuffer(_window.PixelBuffer, dirtyRegions);
                 }
                 catch (InvalidDrawingContextException)
                 {
@@ -112,18 +72,12 @@ namespace Consolonia.Core.Drawing
             else
             {
                 // Child rendered to its own PixelBuffer.
-                // Invalidate the PixelBufferPresenter so its Render() fires on the
-                // next main render tick, copying child pixels AFTER template background.
-                // Do NOT trigger Paint — that causes an extra main render that overwrites
-                // the child pixels without re-firing the presenter's Render().
-                if (_window is ContentControl cc && cc.Content is Visual presenter)
-                    presenter.InvalidateVisual();
+                // Invalidate the PixelBufferPresenter so its Render() fires
+                // on the next main render tick.
+                //if (_window is ContentControl cc && cc.Content is Visual presenter)
+                //    presenter.InvalidateVisual();
             }
         }
-
-        bool IDrawingContextLayerImpl.CanBlit => true;
-
-        public bool IsCorrupted => false;
 
         public IDrawingContextImpl CreateDrawingContext(bool useScaledDrawing)
         {
@@ -132,225 +86,23 @@ namespace Consolonia.Core.Drawing
             return new DrawingContextImpl(_window);
         }
 
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
         private void OnResized(Size size, WindowResizeReason reason)
         {
-            // todo: should we check the reason?
-            InitializeCacheInternal();
-        }
-
-        private static Pixel?[,] InitializeCache(ushort width, ushort height)
-        {
-            var cache = new Pixel?[width, height];
-
-            // initialize the cache with Pixel.Empty as it literally means nothing
-            for (ushort y = 0; y < height; y++)
-            for (ushort x = 0; x < width; x++)
-                cache[x, y] = Pixel.Empty;
-
-            return cache;
-        }
-
-
-        /// <summary>
-        ///     Renders the composited frame buffer to the console output.
-        ///     Called by ConsoleSurface.CompositeAndRenderToDevice after compositing.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        internal void RenderFrameToDevice(PixelBuffer pixelBuffer)
-        {
-            _renderPending = false;
-            Snapshot dirtyRegions = _window.DirtyRegions.GetSnapshotAndClear();
-
-#if FPS
-            var now = _stopwatch.Elapsed;
-            var elapsed = now - _lastFpsUpdate;
-
-            ++_framesThisSecond;
-
-            if (elapsed.TotalSeconds > 1)
-            {
-                _fps = (int)(_framesThisSecond / elapsed.TotalSeconds);
-                _framesThisSecond = 0;
-                _lastFpsUpdate = now;
-            }
-#endif
-            _console.HideCaret();
-
-            PixelBufferCoordinate? caretPosition = null;
-            CaretStyle? caretStyle = null;
-
-            for (ushort y = 0; y < pixelBuffer.Height; y++)
-            {
-                bool isWide = false;
-                for (ushort x = 0; x < pixelBuffer.Width; x++)
-                {
-                    Pixel pixel = pixelBuffer[x, y];
-
-                    if (pixel.IsCaret())
-                    {
-                        if (caretPosition != null)
-                            throw new InvalidOperationException("Caret is already shown");
-                        caretPosition = new PixelBufferCoordinate(x, y);
-                        caretStyle = pixel.CaretStyle;
-                    }
-
-                    if (!dirtyRegions.Contains(x, y, false))
-                        continue;
-
-                    // painting mouse cursor if within the range of current pixel (possibly wide)
-                    if (!_consoleCursor.IsEmpty() &&
-                        _consoleCursor.Coordinate.Y == y &&
-                        _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
-                    {
-                        if (_consoleCursor.Type == " " && pixel.Width == 1)
-                        {
-                            // floating cursor tracking effect 
-                            // if we are drawing a " " and the pixel underneath is not wide char
-                            // then we lift the character from the underlying pixel and invert it
-                            char cursorChar = pixel.Foreground.Symbol.Character != '\0'
-                                ? pixel.Foreground.Symbol.Character
-                                : ' ';
-                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
-                                new PixelBackground(GetContrastColor(pixel.Background.Color)));
-                        }
-                        else
-                        {
-                            char cursorChar = _consoleCursor.Type[x - _consoleCursor.Coordinate.X];
-                            // simply draw the mouse cursor character in the current pixel colors.
-                            Color foreground = pixel.Foreground.Color != Colors.Transparent
-                                ? pixel.Foreground.Color
-                                : GetContrastColor(pixel.Background.Color);
-                            pixel = new Pixel(
-                                new PixelForeground(new Symbol(cursorChar, 1), foreground,
-                                    pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
-                                pixel.Background, pixel.CaretStyle);
-                        }
-                    }
-
-                    if (pixel.Width > 1)
-                        // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
-                        for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
-                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
-                            {
-                                pixel = new Pixel(
-                                    new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
-                                        pixel.Foreground.Style, pixel.Foreground.TextDecoration), pixel.Background,
-                                    pixel.CaretStyle);
-                                break;
-                            }
-
-                    {
-                        // tracking if we are on wide character sequence currently
-                        if (pixel.Width > 1)
-                            isWide = true;
-                        else if (pixel.Width == 1)
-                            isWide = false;
-                    }
-
-                    if (pixel.Width == 0 && !isWide)
-                        // fallback to spaces instead of empty chars in case wide character at the beginning was overwritten or we detected there is no room for it previously
-                        pixel = new Pixel(
-                            new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
-                                pixel.Foreground.Style, pixel.Foreground.TextDecoration), pixel.Background,
-                            pixel.CaretStyle);
-
-                    {
-                        // checking cache
-                        //todo: it does not consider that some of them will be replaced by space. But issue is pessimistic, just unnecessary redraws
-                        bool anyDifferent = false;
-                        for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
-                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
-                            {
-                                anyDifferent = true;
-                                break;
-                            }
-
-                        if (!anyDifferent)
-                            continue;
-                    }
-
-                    //todo: indexOutOfRange during resize
-
-                    _console.WritePixel(new PixelBufferCoordinate(x, y), in pixel);
-
-                    _cache[x, y] = pixel;
-                }
-            }
-
-            _console.Flush();
-#if FPS
-            var fps = $"FPS: {_fps: 000}";
-            for (ushort i = 0; i < fps.Length; i++)
-            {
-                var pixel =
- new Pixel(new PixelForeground(new Symbol(fps[i]), Colors.White), new PixelBackground(Colors.Black));
-                _console.WritePixel(new PixelBufferCoordinate((ushort)(pixelBuffer.Width - fps.Length + i), (ushort)(pixelBuffer.Height - 1)), in pixel);
-            }
-            _console.Flush();
-#endif
-
-            if (caretPosition != null && caretStyle != CaretStyle.None)
-            {
-                _console.SetCaretPosition((PixelBufferCoordinate)caretPosition);
-                _console.SetCaretStyle((CaretStyle)caretStyle!);
-                _console.ShowCaret();
-            }
-            else
-            {
-                _console.HideCaret(); //todo: Caret was hidden at the beginning of this method, why to hide it again?
-            }
-        }
-
-
-        private static Color GetContrastColor(Color color)
-        {
-            // Calculate relative luminance using the formula from WCAG 2.0
-            // https://www.w3.org/TR/WCAG20/#relativeluminancedef
-            double r = color.R / 255.0;
-            double g = color.G / 255.0;
-            double b = color.B / 255.0;
-
-            r = r <= 0.03928 ? r / 12.92 : Math.Pow((r + 0.055) / 1.055, 2.4);
-            g = g <= 0.03928 ? g / 12.92 : Math.Pow((g + 0.055) / 1.055, 2.4);
-            b = b <= 0.03928 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
-            double luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-            // Choose black or white based on which provides better contrast
-            // White luminance = 1.0, Black luminance = 0.0
-            double contrastWithWhite = (1.0 + 0.05) / (luminance + 0.05);
-            double contrastWithBlack = (luminance + 0.05) / (0.0 + 0.05);
-            Color result = contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
-            return result;
+            _consoleSurface.ClearScreen();
         }
 
         private void OnCursorChanged(ConsoleCursor consoleCursor)
         {
-            if (_consoleCursor.CompareTo(consoleCursor) == 0)
-                return;
-
-            ConsoleCursor oldConsoleCursor = _consoleCursor;
-            _consoleCursor = consoleCursor;
-
-            // Dirty rects expanded to handle potential wide char overlap
-            var oldCursorRect = new PixelRect(oldConsoleCursor.Coordinate.X - 1,
-                oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
-            var newCursorRect = new PixelRect(consoleCursor.Coordinate.X - 1,
-                consoleCursor.Coordinate.Y, consoleCursor.Width + 1, 1);
-            // Dirty rects are handled by the compositing + cache system
-
             if (!_renderPending)
             {
                 _renderPending = true;
-
-                // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
                 DispatcherTimer.RunOnce(() =>
                 {
                     if (_renderPending)
                     {
                         _renderPending = false;
-                        RenderFrameToDevice(_window.PixelBuffer);
+                        var dirtyRegions = _window.DirtyRegions.GetSnapshotAndClear();
+                        _consoleSurface.RenderPixelBuffer(_window.PixelBuffer, dirtyRegions);
                     }
                 }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
             }
