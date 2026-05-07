@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Avalonia;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
@@ -8,6 +9,21 @@ namespace Consolonia.Core.Tests
     [TestFixture]
     public class BetterSleepLoopRenderTimerTests
     {
+        [Test]
+        public void MustBeRemovedWhenAvaloniaIsNoLongerVersion11()
+        {
+            // BetterSleepLoopRenderTimer and ConsoloniaManagedDispatcherImpl are workarounds
+            // for CPU-spinning issues in Avalonia 11's SleepLoopRenderTimer / ManagedDispatcherImpl.
+            // These issues were fixed in Avalonia 12, so all this custom code should be removed once
+            // we upgrade. If this test fails, delete BetterSleepLoopRenderTimer,
+            // ConsoloniaManagedDispatcherImpl, and revert ConsoloniaPlatform to use the stock classes.
+            var avaloniaVersion = typeof(AvaloniaObject).Assembly.GetName().Version;
+            Assert.That(avaloniaVersion.Major, Is.EqualTo(11),
+                $"Avalonia version is {avaloniaVersion}. " +
+                "BetterSleepLoopRenderTimer and ConsoloniaManagedDispatcherImpl are Avalonia 11 workarounds " +
+                "and should be removed now that Avalonia has been upgraded.");
+        }
+
         [Test]
         public void TickFiresOnTrigger()
         {
