@@ -38,9 +38,16 @@ namespace Consolonia.Core.Drawing
             _window = window;
             _consoleSurface = window.Surface;
             InitializeCacheInternal();
-            _consoleSurface.Resized += OnResized;
-            _consoleSurface.CursorChanged += OnCursorChanged;
-            _consoleSurface.ClearScreenRequested += OnClearScreenRequested;
+
+            // Only the main window's RenderTarget handles surface events.
+            // Child RenderTargets must NOT subscribe — they'd write their small
+            // PixelBuffer directly to console at (0,0) without offset.
+            if (window is ConsoleWindowImpl)
+            {
+                _consoleSurface.Resized += OnResized;
+                _consoleSurface.CursorChanged += OnCursorChanged;
+                _consoleSurface.ClearScreenRequested += OnClearScreenRequested;
+            }
         }
 
         private void InitializeCacheInternal()
@@ -66,9 +73,12 @@ namespace Consolonia.Core.Drawing
 
         public void Dispose()
         {
-            _consoleSurface.Resized -= OnResized;
-            _consoleSurface.CursorChanged -= OnCursorChanged;
-            _consoleSurface.ClearScreenRequested -= OnClearScreenRequested;
+            if (_window is ConsoleWindowImpl)
+            {
+                _consoleSurface.Resized -= OnResized;
+                _consoleSurface.CursorChanged -= OnCursorChanged;
+                _consoleSurface.ClearScreenRequested -= OnClearScreenRequested;
+            }
         }
 
         public void Save(string fileName, int? quality = null)
@@ -89,10 +99,11 @@ namespace Consolonia.Core.Drawing
         {
             if (_window is ConsoleWindowImpl)
             {
-                // Main window: composite all windows and flush to console
+                // Main window: child windows have already copied their PixelBuffers
+                // into the main buffer via Render(). Just flush to console.
                 try
                 {
-                    _consoleSurface.CompositeAndRenderToDevice(this);
+                    RenderFrameToDevice(_window.PixelBuffer);
                 }
                 catch (InvalidDrawingContextException)
                 {
@@ -100,8 +111,13 @@ namespace Consolonia.Core.Drawing
             }
             else
             {
-                // Child window rendered to its own PixelBuffer.
-                // Trigger main window to composite + flush.
+                // Child rendered to its own PixelBuffer.
+                // Invalidate the ManagedWindow visual so Render() fires on the next
+                // main render pass (copying child pixels to main buffer).
+                // Then trigger Paint to flush.
+                if (_window is Visual visual)
+                    visual.InvalidateVisual();
+
                 var mainConsole = (AvaloniaLocator.Current.GetService<ConsoloniaPlatform>())
                     ?.MainWindow as ConsoleWindowImpl;
                 if (mainConsole != null)
@@ -154,6 +170,7 @@ namespace Consolonia.Core.Drawing
         internal void RenderFrameToDevice(PixelBuffer pixelBuffer)
         {
             _renderPending = false;
+            Snapshot dirtyRegions = _window.DirtyRegions.GetSnapshotAndClear();
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -188,7 +205,8 @@ namespace Consolonia.Core.Drawing
                         caretStyle = pixel.CaretStyle;
                     }
 
-                    // No dirty region check — the pixel cache handles redundancy
+                    if (!dirtyRegions.Contains(x, y, false))
+                        continue;
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (!_consoleCursor.IsEmpty() &&
@@ -341,7 +359,7 @@ namespace Consolonia.Core.Drawing
                     if (_renderPending)
                     {
                         _renderPending = false;
-                        _consoleSurface.CompositeAndRenderToDevice(this);
+                        RenderFrameToDevice(_window.PixelBuffer);
                     }
                 }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
             }
