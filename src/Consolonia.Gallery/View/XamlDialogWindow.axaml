@@ -1,10 +1,10 @@
-<windowManager:ManagedWindow xmlns="https://github.com/avaloniaui"
+<Window xmlns="https://github.com/avaloniaui"
                              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
                              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                             xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager"
+                             xmlns:console="https://github.com/consolonia"
                              mc:Ignorable="d"
-                             Icon="🔬"
+                             console:ManagedWindowImpl.TextIcon="🔬"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
                              WindowStartupLocation="CenterOwner"
@@ -16,4 +16,4 @@
         <SelectableTextBlock Name="Xaml"
                              Text="{Binding}" />
     </ScrollViewer>
-</windowManager:ManagedWindow>
+</Window>

@@ -18,12 +18,28 @@ namespace Consolonia.Core.Infrastructure
 {
     public class ConsoloniaPlatform : IWindowingPlatform
     {
+        private IWindowImpl _mainWindow;
+
         internal static ConsoloniaPlatformSettings Settings =>
             AvaloniaLocator.Current.GetService<IPlatformSettings>() as ConsoloniaPlatformSettings;
 
+        /// <summary>
+        ///     Gets the main console window implementation.
+        /// </summary>
+        internal IWindowImpl MainWindow => _mainWindow;
+
         public IWindowImpl CreateWindow()
         {
-            return new ConsoleWindowImpl();
+            if (_mainWindow != null)
+            {
+                var factory = AvaloniaLocator.Current.GetService<IChildWindowImplFactory>();
+                if (factory != null)
+                    return factory.CreateChildWindow(_mainWindow);
+            }
+
+            var window = new ConsoleWindowImpl();
+            _mainWindow = window;
+            return window;
         }
 
         public IWindowImpl CreateEmbeddableWindow()
@@ -50,7 +66,7 @@ namespace Consolonia.Core.Infrastructure
             AvaloniaLocator.CurrentMutable.BindToSelf(this)
                 .Bind<IWindowingPlatform>().ToConstant(this)
                 /*todo: need replacement? .Bind<IPlatformThreadingInterface>().ToSingleton<ConsoloniaPlatformThreadingInterface>()*/
-                .Bind<IRenderTimer>().ToConstant(new SleepLoopRenderTimer(120))
+                .Bind<IRenderTimer>().ToConstant(new UiThreadRenderTimer(120))
                 .Bind<IDispatcherImpl>().ToConstant(new ManagedDispatcherImpl(null))
                 /*SleepLoopRenderTimer : IRenderTimer*/
                 /*.Bind<IRenderLoop>().ToConstant(new RenderLoop()) todo: is internal now*/
