@@ -78,8 +78,10 @@ namespace Consolonia.Core.Infrastructure
                 _wakeup.Set();
             }
 
-            if (thread != null && thread.Join(TimeSpan.FromSeconds(5)))
-                _wakeup.Dispose();
+            if (thread != null && thread != Thread.CurrentThread)
+                thread.Join();
+
+            _wakeup.Dispose();
         }
 
         private void LoopProc()
