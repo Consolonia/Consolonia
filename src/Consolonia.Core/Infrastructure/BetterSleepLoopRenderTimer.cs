@@ -14,8 +14,8 @@ namespace Consolonia.Core.Infrastructure
         private readonly Stopwatch _st = Stopwatch.StartNew();
         private readonly AutoResetEvent _wakeup = new(false);
 
-        private Action<TimeSpan>? _tick;
-        private Thread? _thread;
+        private Action<TimeSpan> _tick;
+        private Thread _thread;
         private bool _disposed;
 
         public event Action<TimeSpan> Tick
@@ -95,7 +95,7 @@ namespace Consolonia.Core.Infrastructure
                     return;
                 }
 
-                Action<TimeSpan>? tick;
+                Action<TimeSpan> tick;
 
                 lock (_lock)
                 {
