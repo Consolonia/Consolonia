@@ -5,16 +5,18 @@ using Avalonia.Rendering;
 
 namespace Consolonia.Core.Infrastructure
 {
-    internal class BetterSleepLoopRenderTimer : IRenderTimer, IDisposable
+    /// <summary>
+    /// chatGPT 5.5 version, briefly checked
+    /// </summary>
+    internal sealed class BetterSleepLoopRenderTimer : IRenderTimer, IDisposable
     {
-        private Action<TimeSpan> _tick;
-        private int _count;
         private readonly object _lock = new();
-        private volatile bool _running;
-        private volatile bool _disposed;
         private readonly Stopwatch _st = Stopwatch.StartNew();
-        private readonly ManualResetEventSlim _wakeup = new(false);
-        private readonly ManualResetEventSlim _loopExited = new(false);
+        private readonly AutoResetEvent _wakeup = new(false);
+
+        private Action<TimeSpan>? _tick;
+        private Thread? _thread;
+        private bool _disposed;
 
         public event Action<TimeSpan> Tick
         {
@@ -22,49 +24,62 @@ namespace Consolonia.Core.Infrastructure
             {
                 lock (_lock)
                 {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+
                     _tick += value;
-                    _count++;
-                    if (_running)
+
+                    if (_thread != null)
                         return;
-                    _running = true;
-                    new Thread(LoopProc) { IsBackground = true }.Start();
+
+                    _thread = new Thread(LoopProc)
+                    {
+                        IsBackground = true,
+                        Name = nameof(BetterSleepLoopRenderTimer)
+                    };
+
+                    _thread.Start();
                 }
             }
+
             remove
             {
                 lock (_lock)
                 {
                     _tick -= value;
-                    _count--;
+
+                    if (_tick == null)
+                        _wakeup.Set();
                 }
             }
         }
 
         public bool RunsInBackground => true;
 
-        /// <summary>
-        /// Requests the render timer to fire a tick as soon as possible.
-        /// </summary>
         public void TriggerTick()
         {
-            if (!_disposed)
-                _wakeup.Set();
+            lock (_lock)
+            {
+                if (!_disposed)
+                    _wakeup.Set();
+            }
         }
 
         public void Dispose()
         {
-            bool wasRunning;
+            Thread thread;
+
             lock (_lock)
             {
+                if (_disposed)
+                    return;
+
                 _disposed = true;
-                wasRunning = _running;
+                thread = _thread;
+                _wakeup.Set();
             }
 
-            _wakeup.Set();
-            if (wasRunning)
-                _loopExited.Wait(TimeSpan.FromSeconds(5));
-            _wakeup.Dispose();
-            _loopExited.Dispose();
+            if (thread != null && thread.Join(TimeSpan.FromSeconds(5)))
+                _wakeup.Dispose();
         }
 
         private void LoopProc()
@@ -73,32 +88,27 @@ namespace Consolonia.Core.Infrastructure
             {
                 try
                 {
-                    _wakeup.Wait(Timeout.Infinite);
-                    _wakeup.Reset();
+                    _wakeup.WaitOne();
                 }
                 catch (ObjectDisposedException)
                 {
-                    _loopExited.Set();
                     return;
                 }
 
-                if (_disposed)
-                {
-                    _loopExited.Set();
-                    return;
-                }
+                Action<TimeSpan>? tick;
 
                 lock (_lock)
                 {
-                    if (_count == 0)
+                    if (_disposed || _tick == null)
                     {
-                        _running = false;
-                        _loopExited.Set();
+                        _thread = null;
                         return;
                     }
+
+                    tick = _tick;
                 }
 
-                _tick?.Invoke(_st.Elapsed);
+                tick(_st.Elapsed);
             }
         }
     }
