@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
@@ -82,6 +83,37 @@ namespace Consolonia.Core.Tests
         {
             using var timer = new BetterSleepLoopRenderTimer();
             Assert.IsTrue(timer.RunsInBackground);
+        }
+
+        [Test]
+        public void DisposeDoesNotBlockWhenTickHandlerIsInProgress()
+        {
+            using var timer = new BetterSleepLoopRenderTimer();
+            var tickEntered = new ManualResetEventSlim(false);
+            var allowTickToFinish = new ManualResetEventSlim(false);
+
+            timer.Tick += _ =>
+            {
+                tickEntered.Set();
+                allowTickToFinish.Wait();
+            };
+
+            timer.TriggerTick();
+            Assert.IsTrue(tickEntered.Wait(TimeSpan.FromSeconds(2)), "Tick should start before dispose");
+
+            var disposeTask = Task.Run(() => timer.Dispose());
+
+            try
+            {
+                Assert.IsTrue(disposeTask.Wait(TimeSpan.FromMilliseconds(300)),
+                    "Dispose should not block waiting for in-flight tick handlers");
+                Assert.IsFalse(disposeTask.IsFaulted, "Dispose should not throw");
+            }
+            finally
+            {
+                allowTickToFinish.Set();
+                disposeTask.Wait(TimeSpan.FromSeconds(2));
+            }
         }
 
         [Test]

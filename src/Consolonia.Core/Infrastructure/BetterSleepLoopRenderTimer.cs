@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Rendering;
 
 namespace Consolonia.Core.Infrastructure
@@ -15,8 +16,8 @@ namespace Consolonia.Core.Infrastructure
         private readonly AutoResetEvent _wakeup = new(false);
 
         private Action<TimeSpan> _tick;
-        private Thread _thread;
         private bool _disposed;
+        private Task _loopTask;
 
         public event Action<TimeSpan> Tick
         {
@@ -28,16 +29,10 @@ namespace Consolonia.Core.Infrastructure
 
                     _tick += value;
 
-                    if (_thread != null)
+                    if (_loopTask != null)
                         return;
 
-                    _thread = new Thread(LoopProc)
-                    {
-                        IsBackground = true,
-                        Name = nameof(BetterSleepLoopRenderTimer)
-                    };
-
-                    _thread.Start();
+                    _loopTask = Task.Run(LoopProc);
                 }
             }
 
@@ -66,27 +61,25 @@ namespace Consolonia.Core.Infrastructure
 
         public void Dispose()
         {
-            Thread thread;
-
+            Task task;
             lock (_lock)
             {
                 if (_disposed)
                     return;
 
                 _disposed = true;
-                thread = _thread;
+                task = _loopTask;
                 _wakeup.Set();
             }
 
-            if (thread != null && thread != Thread.CurrentThread)
-                thread.Join();
+            task?.Wait();
 
             _wakeup.Dispose();
         }
 
         private void LoopProc()
         {
-            while (true)
+            while (!_disposed)
             {
                 try
                 {
@@ -101,9 +94,9 @@ namespace Consolonia.Core.Infrastructure
 
                 lock (_lock)
                 {
-                    if (_disposed || _tick == null)
+                    if (_tick == null)
                     {
-                        _thread = null;
+                        _loopTask = null;
                         return;
                     }
 
