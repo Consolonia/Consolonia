@@ -314,8 +314,8 @@ namespace Consolonia.Core.Infrastructure
         {
             _cache = new Pixel?[width, height];
             for (ushort y = 0; y < height; y++)
-            for (ushort x = 0; x < width; x++)
-                _cache[x, y] = Pixel.Empty;
+                for (ushort x = 0; x < width; x++)
+                    _cache[x, y] = Pixel.Empty;
         }
 
         public void ClearScreen()
@@ -358,6 +358,13 @@ namespace Consolonia.Core.Infrastructure
 
                     // Apply cursor overlay
                     pixel = ApplyCursorOverlay(pixel, x, y);
+
+                    // Wide character on the last column would wrap to the next line.
+                    // Replace with a space to prevent console line wrapping.
+                    if (pixel.Width > 1 && x + pixel.Width > pixelBuffer.Width)
+                    {
+                        pixel = new Pixel(PixelForeground.Space, pixel.Background, pixel.CaretStyle);
+                    }
 
                     if (pixel.Width > 1)
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
