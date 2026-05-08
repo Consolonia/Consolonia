@@ -1,28 +1,25 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Media;
-using Avalonia.Rendering.Composition;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
-    ///     The console rendering surface. Owns the PixelBuffer, DirtyRegions,
-    ///     console I/O, and input routing. One per application.
-    ///     Windows (ConsoleWindowImpl, ManagedWindowImpl) are viewports into this surface.
+    ///     The console rendering surface. Owns console I/O, cache, cursor,
+    ///     and console event handlers. One per application.
+    ///     Input routing is delegated to an optional IInputRouter.
+    ///     When no router is set, all events go to the main window.
     /// </summary>
     public class ConsoleSurface
     {
         private readonly IKeyboardDevice _keyboardDevice;
-        private readonly List<IPixelBufferWindow> _windows = new();
-        private IPixelBufferWindow _pointerCaptureWindow;
-        private bool _pointerCaptureActive;
+        private ConsoleWindowImpl _mainWindow;
         private Point _cursorPosition;
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
 
@@ -32,7 +29,6 @@ namespace Consolonia.Core.Infrastructure
             MouseDevice = AvaloniaLocator.Current.GetService<IMouseDevice>();
             Console = AvaloniaLocator.Current.GetRequiredService<IConsole>();
             _consoleOutput = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
-            Compositor = new Compositor(null);
             InitializeCache(Console.Size.Width, Console.Size.Height);
 
             Console.Resized += OnConsoleResized;
@@ -43,8 +39,14 @@ namespace Consolonia.Core.Infrastructure
         }
 
         public IConsole Console { get; }
-        public Compositor Compositor { get; }
         public IMouseDevice MouseDevice { get; }
+
+        /// <summary>
+        ///     Optional input router for multi-window support.
+        ///     When set, routes input to the correct child window.
+        ///     When null, all input goes to the main window.
+        /// </summary>
+        public IInputRouter InputRouter { get; set; }
 
         // --- Console output ---
         private readonly IConsoleOutput _consoleOutput;
@@ -55,66 +57,11 @@ namespace Consolonia.Core.Infrastructure
         public event Action ClearScreenRequested;
         public Action<Rect> Paint { get; set; }
 
+        // --- Main window ---
 
-
-        // --- Window registry (for input routing) ---
-
-        public void RegisterWindow(IPixelBufferWindow window)
+        public void SetMainWindow(ConsoleWindowImpl mainWindow)
         {
-            _windows.Add(window);
-        }
-
-        public void UnregisterWindow(IPixelBufferWindow window)
-        {
-            _windows.Remove(window);
-        }
-
-        private IPixelBufferWindow GetActiveChildWindow()
-        {
-            for (int i = _windows.Count - 1; i >= 0; i--)
-            {
-                if (_windows[i].IsActive)
-                    return _windows[i];
-            }
-            return null;
-        }
-
-        private IPixelBufferWindow HitTestChildWindow(Point point, out Point localPoint)
-        {
-            // Iterate topmost first.
-            // 1. If point is in content area → route to that child
-            // 2. If point is in full window bounds (chrome) → route to main window (null)
-            //    This prevents lower windows from stealing clicks on higher windows' chrome.
-            // 3. If point is outside entirely → check next window
-            for (int i = _windows.Count - 1; i > 0; i--) // skip index 0 (main window)
-            {
-                var child = _windows[i];
-                var pos = child.Position;
-                var contentSize = child.ContentSize;
-
-                double localX = point.X - pos.X;
-                double localY = point.Y - pos.Y;
-
-                // Content area hit — route to child
-                if (localX >= 0 && localX < contentSize.Width &&
-                    localY >= 0 && localY < contentSize.Height)
-                {
-                    localPoint = new Point(localX, localY);
-                    return child;
-                }
-
-                // Check full window bounds (including chrome).
-                // If point is within the full bounds but not content, it's on chrome.
-                // Route to main window to prevent lower windows from stealing the click.
-                var fullBounds = child.FullBounds;
-                if (fullBounds.Contains(new PixelPoint((int)point.X, (int)point.Y)))
-                {
-                    localPoint = default;
-                    return null;
-                }
-            }
-            localPoint = default;
-            return null;
+            _mainWindow = mainWindow;
         }
 
         // --- Console event handlers ---
@@ -136,11 +83,9 @@ namespace Consolonia.Core.Infrastructure
         private void OnKeyEvent(Key key, char keyChar, RawInputModifiers rawInputModifiers, bool down,
             ulong timeStamp, bool tryAsTextInput)
         {
-            var activeChild = GetActiveChildWindow();
-            var inputRoot = activeChild?.InputRoot ?? (_windows.Count > 0 ? _windows[0] : null)?.InputRoot;
-            var inputCallback = activeChild?.InputCallback ?? (_windows.Count > 0 ? _windows[0] : null)?.InputCallback;
-
-            System.Diagnostics.Debug.WriteLine($"[ConsoleSurface] OnKeyEvent: key={key} down={down} activeChild={activeChild?.GetType().Name} inputRoot={inputRoot != null} inputCallback={inputCallback != null} windows={_windows.Count}");
+            var target = InputRouter?.RouteKeyboardEvent();
+            var inputRoot = target?.InputRoot ?? _mainWindow?.InputRoot;
+            var inputCallback = target?.InputCallback ?? _mainWindow?.Input;
 
             if (inputRoot == null || inputCallback == null)
                 return;
@@ -173,9 +118,9 @@ namespace Consolonia.Core.Infrastructure
 
         private void OnTextInputEvent(string text, ulong timeStamp, CanBeHandledEventArgs canBeHandledEventArgs)
         {
-            var activeChild = GetActiveChildWindow();
-            var inputRoot = activeChild?.InputRoot ?? (_windows.Count > 0 ? _windows[0] : null)?.InputRoot;
-            var inputCallback = activeChild?.InputCallback ?? (_windows.Count > 0 ? _windows[0] : null)?.InputCallback;
+            var target = InputRouter?.RouteKeyboardEvent();
+            var inputRoot = target?.InputRoot ?? _mainWindow?.InputRoot;
+            var inputCallback = target?.InputCallback ?? _mainWindow?.Input;
 
             if (inputRoot == null || inputCallback == null)
                 return;
@@ -194,49 +139,11 @@ namespace Consolonia.Core.Infrastructure
         {
             ulong timestamp = (ulong)Environment.TickCount64;
 
-            bool isButtonDown = type is RawPointerEventType.LeftButtonDown
-                or RawPointerEventType.RightButtonDown
-                or RawPointerEventType.MiddleButtonDown
-                or RawPointerEventType.XButton1Down
-                or RawPointerEventType.XButton2Down
-                or RawPointerEventType.NonClientLeftButtonDown;
-            bool isButtonUp = type is RawPointerEventType.LeftButtonUp
-                or RawPointerEventType.RightButtonUp
-                or RawPointerEventType.MiddleButtonUp
-                or RawPointerEventType.XButton1Up
-                or RawPointerEventType.XButton2Up;
-
-            if (isButtonDown)
-            {
-                _pointerCaptureWindow = HitTestChildWindow(point, out _);
-                _pointerCaptureActive = true;
-            }
-
-            IPixelBufferWindow targetWindow;
-            Point eventPoint;
-            if (_pointerCaptureActive)
-            {
-                targetWindow = _pointerCaptureWindow;
-                if (targetWindow != null)
-                    eventPoint = new Point(point.X - targetWindow.Position.X, point.Y - targetWindow.Position.Y);
-                else
-                    eventPoint = point;
-            }
-            else
-            {
-                targetWindow = HitTestChildWindow(point, out Point localPoint);
-                eventPoint = targetWindow != null ? localPoint : point;
-            }
-
-            var mainWindow = _windows.Count > 0 ? _windows[0] : null;
-            var inputRoot = targetWindow?.InputRoot ?? mainWindow?.InputRoot;
-            var inputCallback = targetWindow?.InputCallback ?? mainWindow?.InputCallback;
-
-            if (isButtonUp)
-            {
-                _pointerCaptureWindow = null;
-                _pointerCaptureActive = false;
-            }
+            // Query the router for the target window
+            var target = InputRouter?.RouteMouseEvent(type, point);
+            var inputCallback = target?.InputCallback ?? _mainWindow?.Input;
+            var inputRoot = target?.InputRoot ?? _mainWindow?.InputRoot;
+            var eventPoint = target?.LocalPoint ?? point;
 
             if (inputRoot == null || inputCallback == null)
                 return;
@@ -312,9 +219,8 @@ namespace Consolonia.Core.Infrastructure
                     _cache[cx, cy] = null;
             }
             // Also mark dirty so RenderPixelBuffer processes these positions
-            if (_windows.Count > 0)
-                _windows[0].DirtyRegions.AddRect(new PixelRect(
-                    cursor.Coordinate.X, cursor.Coordinate.Y, cursor.Width, 1));
+            _mainWindow?.DirtyRegions.AddRect(new PixelRect(
+                cursor.Coordinate.X, cursor.Coordinate.Y, cursor.Width, 1));
         }
 
         /// <summary>
@@ -516,7 +422,6 @@ namespace Consolonia.Core.Infrastructure
             Console.TextInputEvent -= OnTextInputEvent;
             Console.MouseEvent -= OnMouseEvent;
             Console.FocusEvent -= OnFocusEvent;
-            // DirtyRegions are per-window, no surface-level cleanup needed
             if (Console is IDisposable disposable)
                 disposable.Dispose();
         }

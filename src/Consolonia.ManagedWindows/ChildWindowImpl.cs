@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Layout;
 using Avalonia.Input.Raw;
-using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.Composition;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -54,27 +51,25 @@ namespace Consolonia.ManagedWindows
             base.Closed += (_, _) => ((IWindowImpl)this).Closed?.Invoke();
             base.Activated += (_, _) =>
             {
-                System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Activated: {Title}");
                 _isActive = true;
                 ((IWindowBaseImpl)this).Activated?.Invoke();
             };
             base.Deactivated += (_, _) =>
             {
-                System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Deactivated: {Title}");
                 _isActive = false;
                 ((IWindowBaseImpl)this).Deactivated?.Invoke();
             };
             base.PositionChanged += (_, e) =>
             {
-                // Mark old position dirty so stale pixels get cleared
-                var oldPos = _surfacePosition;
+                // Mark old content position dirty so stale pixels get cleared
+                var oldPos = ContentPosition;
                 var buf = PixelBuffer;
                 if (buf.Width > 1 && buf.Height > 1)
                     _mainConsoleWindow.DirtyRegions.AddRect(
                         new PixelRect(oldPos.X, oldPos.Y, buf.Width, buf.Height));
 
                 ((IWindowBaseImpl)this).PositionChanged?.Invoke(e.Point);
-                UpdateSurfacePosition();
+                UpdateContentPosition();
 
                 // Force PixelBufferPresenter.Render() to fire at the new position
                 (base.Content as Control)?.InvalidateVisual();
@@ -90,7 +85,6 @@ namespace Consolonia.ManagedWindows
                     DirtyRegions.AddRect(PixelBuffer.Size);
                     ((ITopLevelImpl)this).Resized?.Invoke(e.ClientSize, e.Reason);
                 }
-                UpdateSurfacePosition();
             };
             base.Closing += (_, e) =>
             {
@@ -108,21 +102,46 @@ namespace Consolonia.ManagedWindows
         public PixelBuffer PixelBuffer { get; private set; } = new(1, 1);
         public Snapshot.Regions DirtyRegions { get; } = new();
 
-        PixelPoint IPixelBufferWindow.Position => _surfacePosition;
-        private PixelPoint _surfacePosition;
+        private bool _isActive;
 
-        Size IPixelBufferWindow.ContentSize => new Size(
+        /// <summary>The input root for this child window (used by ManagedInputRouter).</summary>
+        internal IInputRoot InputRoot => _inputRoot;
+
+        /// <summary>
+        ///     Content area position in screen coordinates (used by ManagedInputRouter for hit-testing).
+        ///     Updated by PixelBufferPresenter during Render() from the actual render transform.
+        /// </summary>
+        internal PixelPoint ContentPosition { get; private set; }
+
+        /// <summary>
+        ///     Called by PixelBufferPresenter during Render() with the actual transform offset.
+        ///     This ensures input hit-testing uses the exact same position as rendering.
+        /// </summary>
+        internal void SetContentPosition(PixelPoint position)
+        {
+            ContentPosition = position;
+        }
+
+        private void UpdateContentPosition()
+        {
+            // Fallback from layout until the first Render() sets the actual position
+            var border = this.BorderThickness;
+            int chromeLeft = Math.Max(1, (int)border.Left);
+            int chromeTop = Math.Max(1, (int)border.Top) + 1;
+            ContentPosition = new PixelPoint(Position.X + chromeLeft, Position.Y + chromeTop);
+        }
+
+        /// <summary>Content area size (used by ManagedInputRouter for hit-testing).</summary>
+        internal Size ContentAreaSize => new Size(
             Math.Max(0, PixelBuffer.Width - 1),
             Math.Max(0, PixelBuffer.Height - 1));
-        PixelRect IPixelBufferWindow.FullBounds => new(Position.X, Position.Y,
-            (int)Bounds.Width, (int)Bounds.Height);
 
-        private bool _isActive;
-        bool IPixelBufferWindow.IsActive => _isActive;
-
-        Action<RawInputEventArgs> IPixelBufferWindow.InputCallback => Input;
-
-        IInputRoot IPixelBufferWindow.InputRoot => _inputRoot;
+        /// <summary>Computes local coordinates from screen point (used by ManagedInputRouter).</summary>
+        internal Point ComputeLocalPoint(Point screenPoint)
+        {
+            var pos = ContentPosition;
+            return new Point(screenPoint.X - pos.X, screenPoint.Y - pos.Y);
+        }
 
         // --- ITopLevelImpl properties ---
         public new Size ClientSize => _clientSize;
@@ -227,34 +246,6 @@ namespace Consolonia.ManagedWindows
             _propertiesBound = true;
         }
 
-        protected override void OnApplyTemplate(Avalonia.Controls.Primitives.TemplateAppliedEventArgs e)
-        {
-            base.OnApplyTemplate(e);
-        }
-
-
-        /// <summary>
-        ///     Updates the surface position based on the ManagedWindow's position.
-        ///     The content area is offset from the window position by chrome (title bar, border).
-        /// </summary>
-        private void UpdateSurfacePosition()
-        {
-            // Fallback until the first Render() sets the actual position from the transform
-            var border = this.BorderThickness;
-            int chromeLeft = Math.Max(1, (int)border.Left);
-            int chromeTop = Math.Max(1, (int)border.Top) + 1;
-            _surfacePosition = new PixelPoint(Position.X + chromeLeft, Position.Y + chromeTop);
-        }
-
-        /// <summary>
-        ///     Called by PixelBufferPresenter during Render() with the actual transform offset.
-        ///     This ensures input hit-testing uses the exact same position as rendering.
-        /// </summary>
-        internal void SetSurfacePosition(PixelPoint position)
-        {
-            _surfacePosition = position;
-        }
-
         public Point PointToClient(PixelPoint point) => point.ToPoint(1);
         public PixelPoint PointToScreen(Point point) => new((int)point.X, (int)point.Y);
         public void SetCursor(ICursorImpl cursor)
@@ -281,10 +272,7 @@ namespace Consolonia.ManagedWindows
         // --- IWindowBaseImpl methods ---
         public void Show(bool activate, bool isDialog)
         {
-            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Show(activate={activate}, isDialog={isDialog}) BEFORE BindWindowProperties Width={Width} Height={Height} _clientSize={_clientSize}");
-            // Bind properties before Show so chrome displays correctly.
             BindWindowProperties();
-            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Show AFTER BindWindowProperties Width={Width} Height={Height}");
 
             // Clamp to terminal screen size, but respect SizeToContent from the Avalonia Window
             var maxSize = _mainWindow.ClientSize;
@@ -305,14 +293,9 @@ namespace Consolonia.ManagedWindows
                     Math.Min(_clientSize.Width, maxSize.Width),
                     Math.Min(_clientSize.Height, maxSize.Height));
 
-            // Register for input routing
-            Surface.RegisterWindow(this);
-
-            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Show AFTER clamp Width={Width} Height={Height} sizeToContent={(_inputRoot as Window)?.SizeToContent}");
             this.ShowActivated = activate;
             if (isDialog)
             {
-                // Pass the parent ManagedWindowImpl so nested dialogs work correctly
                 var parent = _parentWindow as ChildWindowImpl;
                 base.ShowDialog(parent);
             }
@@ -321,7 +304,11 @@ namespace Consolonia.ManagedWindows
                 base.Show();
             }
 
-            UpdateSurfacePosition();
+            UpdateContentPosition();
+
+            // Set up input routing via WindowsPanel (first time only)
+            if (Surface.InputRouter == null)
+                Surface.InputRouter = new ManagedInputRouter(this.WindowsPanel);
         }
 
         public void Hide()
@@ -347,7 +334,6 @@ namespace Consolonia.ManagedWindows
                 Math.Min(clientSize.Width, maxSize.Width),
                 Math.Min(clientSize.Height, maxSize.Height));
 
-            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Resize({clientSize}, {reason}) current Width={Width} Height={Height} _clientSize={_clientSize}");
             _clientSize = clientSize;
 
             // Resize the PixelBuffer to match
@@ -370,9 +356,6 @@ namespace Consolonia.ManagedWindows
             int chromeH = Math.Max(3, (int)(border.Top + border.Bottom) + 1); // +1 for title bar
             this.Width = clientSize.Width + chromeW;
             this.Height = clientSize.Height + chromeH;
-            System.Diagnostics.Debug.WriteLine($"[ChildWindowImpl] Resize -> set Width={this.Width} Height={this.Height} (chrome={chromeW}x{chromeH}) border={border}");
-
-            UpdateSurfacePosition();
         }
 
         // --- IWindowImpl methods ---
@@ -407,7 +390,6 @@ namespace Consolonia.ManagedWindows
             if (_disposing)
                 return;
             _disposing = true;
-            Surface.UnregisterWindow(this);
             base.Close();
             GC.SuppressFinalize(this);
         }

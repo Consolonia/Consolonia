@@ -12,7 +12,8 @@
     <StackPanel Spacing="1">
         <StackPanel Orientation="Horizontal"
                     Spacing="1">
-            <Button HorizontalAlignment="Left"
+            <Button  x:Name="IncrementButton"
+                HorizontalAlignment="Left"
                     Click="OnIncrement">
                 Increment
             </Button>

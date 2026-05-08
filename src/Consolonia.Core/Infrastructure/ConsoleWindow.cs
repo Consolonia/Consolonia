@@ -42,7 +42,7 @@ namespace Consolonia.Core.Infrastructure
             _singletonGuard = true;
 
             Surface = new ConsoleSurface();
-            Surface.RegisterWindow(this);
+            Surface.SetMainWindow(this);
             PixelBuffer = new PixelBuffer(Surface.Console.Size);
             DirtyRegions.AddRect(PixelBuffer.Size);
             Surface.Resized += (size, reason) =>
@@ -68,12 +68,9 @@ namespace Consolonia.Core.Infrastructure
         public ConsoleSurface Surface { get; }
         public PixelBuffer PixelBuffer { get; private set; }
         public Snapshot.Regions DirtyRegions { get; } = new();
-        PixelPoint IPixelBufferWindow.Position => default;
-        Size IPixelBufferWindow.ContentSize => new(PixelBuffer.Width, PixelBuffer.Height);
-        PixelRect IPixelBufferWindow.FullBounds => new(0, 0, PixelBuffer.Width, PixelBuffer.Height);
-        bool IPixelBufferWindow.IsActive => true;
-        Action<RawInputEventArgs> IPixelBufferWindow.InputCallback => Input;
-        IInputRoot IPixelBufferWindow.InputRoot => _inputRoot;
+
+        /// <summary>The input root, accessible for ConsoleSurface input routing.</summary>
+        internal IInputRoot InputRoot => _inputRoot;
 
         // --- ITopLevelImpl ---
         public void SetInputRoot(IInputRoot inputRoot)

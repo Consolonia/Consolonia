@@ -1,5 +1,6 @@
 #pragma warning disable CA5394 // Do not use insecure randomness
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -28,6 +29,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
         public MyWindow()
         {
+            this.Opened += MyWindow_Opened;
             InitializeComponent();
 
             //  this.Background = brushes[Random.Shared.Next(0, brushes.Length)];
@@ -39,6 +41,12 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             };
 
             AttachedToVisualTree += OnAttachedToVisualTree;
+        }
+
+        private async void MyWindow_Opened(object sender, EventArgs e)
+        {
+            //await Task.Yield(); // ensures layout pass completed
+            this.IncrementButton.Focus();
         }
 
         public MyWindowViewModel ViewModel => (MyWindowViewModel)DataContext;

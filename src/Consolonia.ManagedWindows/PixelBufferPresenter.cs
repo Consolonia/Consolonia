@@ -82,9 +82,9 @@ namespace Consolonia.ManagedWindows
                 if (context.TryGetFeature<IDrawingContextImpl>() is DrawingContextImpl impl)
                 {
                     // Get the transform offset so DrawPixel writes at the correct screen position.
-                    // Also update the child window's surface position for input hit-testing.
+                    // Also update the child window's content position for input hit-testing.
                     var offset = new Point(0, 0).Transform(impl.Transform).ToPixelPoint();
-                    _childWindow.SetSurfacePosition(offset);
+                    _childWindow.SetContentPosition(offset);
 
                     for (ushort y = 0; y < _buffer.Height; y++)
                     {
