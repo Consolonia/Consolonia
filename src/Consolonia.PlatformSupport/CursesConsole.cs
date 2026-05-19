@@ -260,6 +260,9 @@ namespace Consolonia.PlatformSupport
             _eraseCharacter = Curses.erasechar();
             if (_eraseCharacter == -1) _eraseCharacter = 127;
 
+            if (_eraseCharacter != 127)
+                _verboseLogger.Log2("Erase character is {EraseCharacter}", _eraseCharacter);
+
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
                 {
