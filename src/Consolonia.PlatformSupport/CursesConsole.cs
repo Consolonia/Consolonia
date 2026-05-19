@@ -135,6 +135,7 @@ namespace Consolonia.PlatformSupport
         private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
 
         private Curses.Window _cursesWindow;
+        private int _eraseCharacter;
 
         private GpmMonitor _gpmMonitor;
 
@@ -142,7 +143,6 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
         private IDisposable _sigwinchRegistration;
-        private int _eraseCharacter;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
