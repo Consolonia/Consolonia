@@ -142,6 +142,7 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
         private IDisposable _sigwinchRegistration;
+        private int _eraseCharacter;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -255,6 +256,9 @@ namespace Consolonia.PlatformSupport
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
+
+            _eraseCharacter = Curses.erasechar();
+            if (_eraseCharacter == -1) _eraseCharacter = 127;
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
@@ -636,6 +640,10 @@ namespace Consolonia.PlatformSupport
             if (wch == Curses.KeyTab)
             {
                 k = MapCursesKey(wch);
+            }
+            else if (wch == _eraseCharacter)
+            {
+                k = Key.Backspace;
             }
             else
             {
