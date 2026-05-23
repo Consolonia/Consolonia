@@ -467,7 +467,7 @@ namespace Consolonia.PlatformSupport
                 (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End),
                 // Ctrl+Enter (`modifyOtherKeys` / xterm extended keys)
                 (@"\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
-                
+
                 // todo: should be other sequences, need research
             ];
 
