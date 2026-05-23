@@ -135,6 +135,7 @@ namespace Consolonia.PlatformSupport
         private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
 
         private Curses.Window _cursesWindow;
+        private int _eraseCharacter;
 
         private GpmMonitor _gpmMonitor;
 
@@ -255,6 +256,12 @@ namespace Consolonia.PlatformSupport
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
+
+            _eraseCharacter = Curses.erasechar();
+            if (_eraseCharacter == -1) _eraseCharacter = 127;
+
+            if (_eraseCharacter != 127)
+                _verboseLogger.Log2("Erase character is {EraseCharacter}", _eraseCharacter);
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
@@ -636,6 +643,10 @@ namespace Consolonia.PlatformSupport
             if (wch == Curses.KeyTab)
             {
                 k = MapCursesKey(wch);
+            }
+            else if (wch == _eraseCharacter)
+            {
+                k = Key.Backspace;
             }
             else
             {
