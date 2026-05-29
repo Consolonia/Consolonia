@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryAnsiArt">
+    <ScrollViewer XYFocus.NavigationModes="Keyboard">
+        <StackPanel Margin="1">
+            <TextBlock Text="ANSI Art Rendering" 
+                       HorizontalAlignment="Center"
+                       FontWeight="Bold" 
+                       Margin="0,0,0,1"/>
+            
+            <TextBlock Text="Original Size (Stretch=None):" Margin="0,1,0,0"/>
+            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}" 
+                    BorderThickness="1" 
+                    HorizontalAlignment="Left">
+                <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                       Stretch="None" />
+            </Border>
+
+            <TextBlock Text="Uniform Scaling (Fit to 40x20):" Margin="0,2,0,0"/>
+            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}" 
+                    BorderThickness="1" 
+                    Width="40" 
+                    Height="20"
+                    HorizontalAlignment="Left">
+                <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                       Stretch="Uniform" />
+            </Border>
+            
+            <TextBlock Text="Fill Scaling (Stretched to 60x10):" Margin="0,2,0,0"/>
+            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}" 
+                    BorderThickness="1" 
+                    Width="60" 
+                    Height="10"
+                    HorizontalAlignment="Left">
+                <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                       Stretch="Fill" />
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

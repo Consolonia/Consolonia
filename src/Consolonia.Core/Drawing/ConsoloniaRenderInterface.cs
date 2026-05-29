@@ -125,6 +125,12 @@ namespace Consolonia.Core.Drawing
 
         public IBitmapImpl LoadBitmap(string fileName)
         {
+            if (fileName.EndsWith(".ans", StringComparison.OrdinalIgnoreCase))
+            {
+                using FileStream stream = File.OpenRead(fileName);
+                return new PixelBufferBitmapImpl(AnsiParser.Parse(stream));
+            }
+
             if (_fallback != null)
             {
                 IBitmapImpl bitmap = _fallback.LoadBitmap(fileName);
@@ -137,6 +143,9 @@ namespace Consolonia.Core.Drawing
 
         public IBitmapImpl LoadBitmap(Stream stream)
         {
+            if (IsAnsi(stream))
+                return new PixelBufferBitmapImpl(AnsiParser.Parse(stream));
+
             if (_fallback != null)
             {
                 IBitmapImpl bitmap = _fallback.LoadBitmap(stream);
@@ -145,6 +154,23 @@ namespace Consolonia.Core.Drawing
 
             return ConsoloniaPlatform.RaiseNotSupported<IBitmapImpl>(NotSupportedRequestCode.BitmapsNotSupported, this,
                 nameof(LoadBitmap));
+        }
+
+        private static bool IsAnsi(Stream stream)
+        {
+            try
+            {
+                if (!stream.CanSeek) return false;
+                long position = stream.Position;
+
+                byte[] buffer = new byte[2];
+                int read = stream.Read(buffer, 0, 2);
+                return read == 2 && buffer[0] == 0x1B && buffer[1] == '[';
+            }
+            finally
+            {
+                stream.Position = 0;
+            }
         }
 
         public IWriteableBitmapImpl LoadWriteableBitmapToHeight(Stream stream, int height,
