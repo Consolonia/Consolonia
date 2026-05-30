@@ -18,6 +18,8 @@ namespace Consolonia.Core.Drawing
         private Color _backgroundColor = Colors.Black;
         private int _savedCursorX = 0;
         private int _savedCursorY = 0;
+        private int _sauceWidth = 0;
+        private int _sauceHeight = 0;
         private FontWeight _weight = FontWeight.Normal;
         private FontStyle _style = FontStyle.Normal;
         
@@ -30,29 +32,31 @@ namespace Consolonia.Core.Drawing
 
         public static PixelBuffer Parse(Stream stream)
         {
+            var ms = new MemoryStream();
+            stream.CopyTo(ms);
+            ms.Position = 0;
+
+            var sauce = ReadSauce(ms);
+            ms.Position = 0;
+
             var parser = new AnsiParser();
-            
+            if (sauce != null)
+            {
+                parser._sauceWidth = sauce.Value.Width;
+                parser._sauceHeight = sauce.Value.Height;
+            }
+
             // ANSI art often uses CP437
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            using var reader = new StreamReader(stream, Encoding.GetEncoding(437));
+            using var reader = new StreamReader(ms, Encoding.GetEncoding(437));
 
             var matchers = new List<IMatcher<char>>();
             
-            // CSI sequences
-            // Handle common CSI commands used in ANSI art
-            string csiCommands = "mABCDFGHJKfsuhl";
-            foreach (char command in csiCommands)
-            {
-                char cmd = command;
-                matchers.Add(new AnsiSequenceMatcher(paramsStr => 
-                    parser.HandleCsi(cmd, paramsStr), 
-                    "\x1B[", 
-                    cmd.ToString()));
-            }
+            // Single CSI matcher for all escape sequences
+            matchers.Add(new CsiMatcher((cmd, paramsStr) => parser.HandleCsi(cmd, paramsStr)));
 
-            // G0/G1 character sets
-            matchers.Add(new AnsiSequenceMatcher(_ => { }, "\x1B(", "B"));
-            matchers.Add(new AnsiSequenceMatcher(_ => { }, "\x1B)", "0"));
+            // G0/G1 character sets - single matcher
+            matchers.Add(new EscTwoCharMatcher());
 
             // Generic fallback for any other character
             matchers.Add(new GenericMatcher<char>(c => parser.HandleChar(c), c => c != '\x1B'));
@@ -60,15 +64,135 @@ namespace Consolonia.Core.Drawing
             var processor = new InputProcessor<char>(matchers);
 
             var content = reader.ReadToEnd();
+            int eofIndex = content.IndexOf('\x1A');
+            if (eofIndex >= 0) content = content.Substring(0, eofIndex);
+            
             processor.ProcessChunk(content.ToCharArray());
             
             return parser.ToPixelBuffer();
         }
 
-        private class AnsiSequenceMatcher(Action<string> onComplete, string startsWith, string endsWith)
-            : StartsEndsWithMatcher<char>(onComplete, c => new Rune(c), startsWith, endsWith)
+        private struct SauceInfo
         {
-            public override bool TryFlush() => false;
+            public ushort Width;
+            public ushort Height;
+        }
+
+        private static SauceInfo? ReadSauce(Stream stream)
+        {
+            if (stream.Length < 128) return null;
+            long originalPos = stream.Position;
+            try
+            {
+                stream.Seek(-128, SeekOrigin.End);
+                byte[] buffer = new byte[128];
+                int read = stream.Read(buffer, 0, 128);
+                if (read < 128) return null;
+
+                if (Encoding.ASCII.GetString(buffer, 0, 5) == "SAUCE")
+                {
+                    // DataType 1 is Character (ANSI)
+                    if (buffer[94] != 1) return null;
+
+                    ushort width = (ushort)(buffer[96] | (buffer[97] << 8));
+                    ushort height = (ushort)(buffer[98] | (buffer[99] << 8));
+                    return new SauceInfo { Width = width, Height = height };
+                }
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+            finally
+            {
+                stream.Seek(originalPos, SeekOrigin.Begin);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Matches any CSI sequence: ESC [ params command
+        /// where params are digits/semicolons/question marks and command is a single letter.
+        /// </summary>
+        private class CsiMatcher : IMatcher<char>
+        {
+            private readonly StringBuilder _accumulator = new();
+            private readonly Action<char, string> _onComplete;
+
+            public CsiMatcher(Action<char, string> onComplete) => _onComplete = onComplete;
+
+            public AppendResult Append(char input)
+            {
+                int len = _accumulator.Length;
+
+                if (len == 0 && input == '\x1B')
+                {
+                    _accumulator.Append(input);
+                    return AppendResult.Match;
+                }
+
+                if (len == 1 && input == '[')
+                {
+                    _accumulator.Append(input);
+                    return AppendResult.Match;
+                }
+
+                if (len >= 2)
+                {
+                    if (input >= 0x40 && input <= 0x7E) // final byte (command letter)
+                    {
+                        string paramsStr = _accumulator.ToString(2, len - 2);
+                        _onComplete(input, paramsStr);
+                        _accumulator.Clear();
+                        return AppendResult.AutoFlushed;
+                    }
+
+                    if ((input >= '0' && input <= '9') || input == ';' || input == '?')
+                    {
+                        _accumulator.Append(input);
+                        return AppendResult.Match;
+                    }
+                }
+
+                _accumulator.Clear();
+                return AppendResult.NoMatch;
+            }
+
+            public bool TryFlush() => false;
+            public void Reset() => _accumulator.Clear();
+            public string GetDebugInfo() => $"CsiMatcher {{{(_accumulator.Length == 0 ? "_" : _accumulator.ToString())}}}";
+        }
+
+        /// <summary>
+        /// Matches ESC followed by a single non-[ character and then one more character (e.g., ESC ( B for G0 charset).
+        /// These sequences are silently ignored.
+        /// </summary>
+        private class EscTwoCharMatcher : IMatcher<char>
+        {
+            private int _state; // 0=idle, 1=got ESC, 2=got ESC+char
+
+            public AppendResult Append(char input)
+            {
+                switch (_state)
+                {
+                    case 0 when input == '\x1B':
+                        _state = 1;
+                        return AppendResult.Match;
+                    case 1 when input != '[' && input != '\x1B':
+                        _state = 2;
+                        return AppendResult.Match;
+                    case 2:
+                        _state = 0;
+                        return AppendResult.AutoFlushed; // consume and ignore the 3-char sequence
+                    default:
+                        _state = 0;
+                        return AppendResult.NoMatch;
+                }
+            }
+
+            public bool TryFlush() => false;
+            public void Reset() => _state = 0;
+            public string GetDebugInfo() => $"EscTwoCharMatcher state={_state}";
         }
 
         private void HandleCsi(char command, string paramsStr)
@@ -82,6 +206,7 @@ namespace Consolonia.Core.Drawing
                 case 'B': HandleCursorMove(0, ParseInt(paramsStr, 1)); break;
                 case 'C': HandleCursorMove(ParseInt(paramsStr, 1), 0); break;
                 case 'D': HandleCursorMove(-ParseInt(paramsStr, 1), 0); break;
+                case 'F': HandleCursorMove(0, -ParseInt(paramsStr, 1)); _cursorX = 0; break;
                 case 'G': _cursorX = Math.Max(0, ParseInt(paramsStr, 1) - 1); break;
                 case 'J': HandleErase(paramsStr); break;
                 case 'K': HandleEraseLine(paramsStr); break;
@@ -102,6 +227,13 @@ namespace Consolonia.Core.Drawing
             if (c == '\r') { _cursorX = 0; return; }
             if (c == '\n') { _cursorY++; _cursorX = 0; return; }
             if (c == '\x1B') return;
+
+            int wrapWidth = _sauceWidth > 0 ? _sauceWidth : 80;
+            if (_cursorX >= wrapWidth)
+            {
+                _cursorX = 0;
+                _cursorY++;
+            }
             
             EnsureLine(_cursorY);
             EnsureColumn(_cursorY, _cursorX);
@@ -216,8 +348,8 @@ namespace Consolonia.Core.Drawing
 
         private PixelBuffer ToPixelBuffer()
         {
-            int height = _lines.Count;
-            int width = _lines.Count > 0 ? _lines.Max(l => l.Count) : 0;
+            int height = Math.Max(_sauceHeight, _lines.Count);
+            int width = Math.Max(_sauceWidth, _lines.Count > 0 ? _lines.Max(l => l.Count) : 0);
             if (width == 0 || height == 0) return new PixelBuffer(1, 1);
 
             var pixelBuffer = new PixelBuffer((ushort)width, (ushort)height);

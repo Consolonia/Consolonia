@@ -163,9 +163,15 @@ namespace Consolonia.Core.Drawing
                 if (!stream.CanSeek) return false;
                 long position = stream.Position;
 
-                byte[] buffer = new byte[2];
-                int read = stream.Read(buffer, 0, 2);
-                return read == 2 && buffer[0] == 0x1B && buffer[1] == '[';
+                byte[] buffer = new byte[256];
+                int read = stream.Read(buffer, 0, buffer.Length);
+                for (int i = 0; i < read - 1; i++)
+                {
+                    if (buffer[i] == 0x1B && buffer[i + 1] == '[')
+                        return true;
+                }
+
+                return false;
             }
             finally
             {

@@ -6,36 +6,44 @@
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryAnsiArt">
     <ScrollViewer XYFocus.NavigationModes="Keyboard">
         <StackPanel Margin="1">
-            <TextBlock Text="ANSI Art Rendering" 
+            <TextBlock Text="ANSI Art Rendering"
                        HorizontalAlignment="Center"
-                       FontWeight="Bold" 
-                       Margin="0,0,0,1"/>
-            
-            <TextBlock Text="Original Size (Stretch=None):" Margin="0,1,0,0"/>
-            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}" 
-                    BorderThickness="1" 
+                       FontWeight="Bold"
+                       Margin="0,0,0,1" />
+
+            <HyperlinkButton NavigateUri="https://16colo.rs/pack/blndr2023a/NI-BLND0123.ANS"
+                             HorizontalAlignment="Center"
+                             Content="'The Day the Scene Stood Still' by nitron"
+                             Margin="0,0,0,1" />
+
+            <TextBlock Text="Original Size (Stretch=None):"
+                       Margin="0,1,0,0" />
+            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}"
+                    BorderThickness="1"
                     HorizontalAlignment="Left">
-                <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
                        Stretch="None" />
             </Border>
 
-            <TextBlock Text="Uniform Scaling (Fit to 40x20):" Margin="0,2,0,0"/>
-            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}" 
-                    BorderThickness="1" 
-                    Width="40" 
+            <TextBlock Text="Uniform Scaling (Fit to 40x20):"
+                       Margin="0,2,0,0" />
+            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}"
+                    BorderThickness="1"
+                    Width="40"
                     Height="20"
                     HorizontalAlignment="Left">
-                <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
                        Stretch="Uniform" />
             </Border>
-            
-            <TextBlock Text="Fill Scaling (Stretched to 60x10):" Margin="0,2,0,0"/>
-            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}" 
-                    BorderThickness="1" 
-                    Width="60" 
+
+            <TextBlock Text="Fill Scaling (Stretched to 60x10):"
+                       Margin="0,2,0,0" />
+            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}"
+                    BorderThickness="1"
+                    Width="60"
                     Height="10"
                     HorizontalAlignment="Left">
-                <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
                        Stretch="Fill" />
             </Border>
         </StackPanel>
