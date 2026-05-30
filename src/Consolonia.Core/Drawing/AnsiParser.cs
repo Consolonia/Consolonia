@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Avalonia;
 using Avalonia.Media;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers.InputProcessing;
@@ -12,22 +11,22 @@ namespace Consolonia.Core.Drawing
 {
     internal class AnsiParser
     {
-        private int _cursorX = 0;
-        private int _cursorY = 0;
+        private int _cursorX;
+        private int _cursorY;
         private Color _foregroundColor = Colors.Gray;
         private Color _backgroundColor = Colors.Black;
-        private int _savedCursorX = 0;
-        private int _savedCursorY = 0;
-        private int _sauceWidth = 0;
-        private int _sauceHeight = 0;
+        private int _savedCursorX;
+        private int _savedCursorY;
+        private int _sauceWidth;
+        private int _sauceHeight;
         private FontWeight _weight = FontWeight.Normal;
         private FontStyle _style = FontStyle.Normal;
-        
-        private readonly List<List<Pixel>> _lines = new();
+
+        private readonly List<List<Pixel>> _lines = [];
 
         private AnsiParser()
         {
-            _lines.Add(new List<Pixel>());
+            _lines.Add([]);
         }
 
         public static PixelBuffer Parse(Stream stream)
@@ -51,7 +50,7 @@ namespace Consolonia.Core.Drawing
             using var reader = new StreamReader(ms, Encoding.GetEncoding(437));
 
             var matchers = new List<IMatcher<char>>();
-            
+
             // Single CSI matcher for all escape sequences
             matchers.Add(new CsiMatcher((cmd, paramsStr) => parser.HandleCsi(cmd, paramsStr)));
 
@@ -66,9 +65,8 @@ namespace Consolonia.Core.Drawing
             var content = reader.ReadToEnd();
             int eofIndex = content.IndexOf('\x1A');
             if (eofIndex >= 0) content = content.Substring(0, eofIndex);
-            
             processor.ProcessChunk(content.ToCharArray());
-            
+
             return parser.ToPixelBuffer();
         }
 
@@ -107,6 +105,7 @@ namespace Consolonia.Core.Drawing
             {
                 stream.Seek(originalPos, SeekOrigin.Begin);
             }
+
             return null;
         }
 
@@ -160,7 +159,9 @@ namespace Consolonia.Core.Drawing
 
             public bool TryFlush() => false;
             public void Reset() => _accumulator.Clear();
-            public string GetDebugInfo() => $"CsiMatcher {{{(_accumulator.Length == 0 ? "_" : _accumulator.ToString())}}}";
+
+            public string GetDebugInfo() =>
+                $"CsiMatcher {{{(_accumulator.Length == 0 ? "_" : _accumulator.ToString())}}}";
         }
 
         /// <summary>
@@ -206,12 +207,21 @@ namespace Consolonia.Core.Drawing
                 case 'B': HandleCursorMove(0, ParseInt(paramsStr, 1)); break;
                 case 'C': HandleCursorMove(ParseInt(paramsStr, 1), 0); break;
                 case 'D': HandleCursorMove(-ParseInt(paramsStr, 1), 0); break;
-                case 'F': HandleCursorMove(0, -ParseInt(paramsStr, 1)); _cursorX = 0; break;
+                case 'F':
+                    HandleCursorMove(0, -ParseInt(paramsStr, 1));
+                    _cursorX = 0;
+                    break;
                 case 'G': _cursorX = Math.Max(0, ParseInt(paramsStr, 1) - 1); break;
                 case 'J': HandleErase(paramsStr); break;
                 case 'K': HandleEraseLine(paramsStr); break;
-                case 's': _savedCursorX = _cursorX; _savedCursorY = _cursorY; break;
-                case 'u': _cursorX = _savedCursorX; _cursorY = _savedCursorY; break;
+                case 's':
+                    _savedCursorX = _cursorX;
+                    _savedCursorY = _cursorY;
+                    break;
+                case 'u':
+                    _cursorX = _savedCursorX;
+                    _cursorY = _savedCursorY;
+                    break;
             }
         }
 
@@ -224,8 +234,19 @@ namespace Consolonia.Core.Drawing
 
         private void HandleChar(char c)
         {
-            if (c == '\r') { _cursorX = 0; return; }
-            if (c == '\n') { _cursorY++; _cursorX = 0; return; }
+            if (c == '\r')
+            {
+                _cursorX = 0;
+                return;
+            }
+
+            if (c == '\n')
+            {
+                _cursorY++;
+                _cursorX = 0;
+                return;
+            }
+
             if (c == '\x1B') return;
 
             int wrapWidth = _sauceWidth > 0 ? _sauceWidth : 80;
@@ -234,10 +255,10 @@ namespace Consolonia.Core.Drawing
                 _cursorX = 0;
                 _cursorY++;
             }
-            
+
             EnsureLine(_cursorY);
             EnsureColumn(_cursorY, _cursorX);
-            
+
             _lines[_cursorY][_cursorX] = new Pixel(
                 new PixelForeground(new Symbol(c), _foregroundColor, _weight, _style),
                 new PixelBackground(_backgroundColor)
@@ -259,27 +280,28 @@ namespace Consolonia.Core.Drawing
 
         private void HandleSgr(string paramsStr)
         {
-             if (string.IsNullOrEmpty(paramsStr))
-             {
-                 ResetStyle();
-                 return;
-             }
-             var parts = paramsStr.Split(';');
-             for (int i = 0; i < parts.Length; i++)
-             {
-                 string part = parts[i];
-                 if (string.IsNullOrEmpty(part) || part == "0") ResetStyle();
-                 else if (part == "1") _weight = FontWeight.Bold;
-                 else if (part == "2") _weight = FontWeight.Light;
-                 else if (part == "3") _style = FontStyle.Italic;
-                 else if (int.TryParse(part, out int code))
-                 {
-                     if (code >= 30 && code <= 37) _foregroundColor = AnsiColors[code - 30];
-                     else if (code >= 40 && code <= 47) _backgroundColor = AnsiColors[code - 40];
-                     else if (code >= 90 && code <= 97) _foregroundColor = AnsiColors[code - 90 + 8];
-                     else if (code >= 100 && code <= 107) _backgroundColor = AnsiColors[code - 100 + 8];
-                     else if (code == 39) _foregroundColor = Colors.Gray;
-                     else if (code == 49) _backgroundColor = Colors.Black;
+            if (string.IsNullOrEmpty(paramsStr))
+            {
+                ResetStyle();
+                return;
+            }
+
+            var parts = paramsStr.Split(';');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i];
+                if (string.IsNullOrEmpty(part) || part == "0") ResetStyle();
+                else if (part == "1") _weight = FontWeight.Bold;
+                else if (part == "2") _weight = FontWeight.Light;
+                else if (part == "3") _style = FontStyle.Italic;
+                else if (int.TryParse(part, out int code))
+                {
+                    if (code >= 30 && code <= 37) _foregroundColor = AnsiColors[code - 30];
+                    else if (code >= 40 && code <= 47) _backgroundColor = AnsiColors[code - 40];
+                    else if (code >= 90 && code <= 97) _foregroundColor = AnsiColors[code - 90 + 8];
+                    else if (code >= 100 && code <= 107) _backgroundColor = AnsiColors[code - 100 + 8];
+                    else if (code == 39) _foregroundColor = Colors.Gray;
+                    else if (code == 49) _backgroundColor = Colors.Black;
                 }
             }
         }
@@ -299,7 +321,7 @@ namespace Consolonia.Core.Drawing
             int x = 1;
             if (parts.Length > 0 && int.TryParse(parts[0], out int py)) y = py;
             if (parts.Length > 1 && int.TryParse(parts[1], out int px)) x = px;
-            
+
             _cursorX = Math.Max(0, x - 1);
             _cursorY = Math.Max(0, y - 1);
             EnsureLine(_cursorY);
@@ -311,7 +333,7 @@ namespace Consolonia.Core.Drawing
             _cursorY = Math.Max(0, _cursorY + dy);
             EnsureLine(_cursorY);
         }
-        
+
         private void HandleErase(string paramsStr)
         {
             if (paramsStr == "2")
@@ -328,7 +350,7 @@ namespace Consolonia.Core.Drawing
             int mode = ParseInt(paramsStr, 0);
             EnsureLine(_cursorY);
             var line = _lines[_cursorY];
-            
+
             if (mode == 0) // From cursor to end of line
             {
                 // We don't really have a fixed width line, so we just clear what's there
@@ -363,27 +385,28 @@ namespace Consolonia.Core.Drawing
                         pixelBuffer[x, y] = new Pixel(new PixelBackground(Colors.Black));
                 }
             }
+
             return pixelBuffer;
         }
 
         private static readonly Color[] AnsiColors = new Color[]
         {
-            Color.FromRgb(0, 0, 0),       // Black
-            Color.FromRgb(128, 0, 0),     // DarkRed
-            Color.FromRgb(0, 128, 0),     // DarkGreen
-            Color.FromRgb(128, 128, 0),   // DarkYellow
-            Color.FromRgb(0, 0, 128),     // DarkBlue
-            Color.FromRgb(128, 0, 128),   // DarkMagenta
-            Color.FromRgb(0, 128, 128),   // DarkCyan
+            Color.FromRgb(0, 0, 0), // Black
+            Color.FromRgb(128, 0, 0), // DarkRed
+            Color.FromRgb(0, 128, 0), // DarkGreen
+            Color.FromRgb(128, 128, 0), // DarkYellow
+            Color.FromRgb(0, 0, 128), // DarkBlue
+            Color.FromRgb(128, 0, 128), // DarkMagenta
+            Color.FromRgb(0, 128, 128), // DarkCyan
             Color.FromRgb(192, 192, 192), // Gray
             Color.FromRgb(128, 128, 128), // DarkGray
-            Color.FromRgb(255, 0, 0),     // Red
-            Color.FromRgb(0, 255, 0),     // Green
-            Color.FromRgb(255, 255, 0),   // Yellow
-            Color.FromRgb(0, 0, 255),     // Blue
-            Color.FromRgb(255, 0, 255),   // Magenta
-            Color.FromRgb(0, 255, 255),   // Cyan
-            Color.FromRgb(255, 255, 255)  // White
+            Color.FromRgb(255, 0, 0), // Red
+            Color.FromRgb(0, 255, 0), // Green
+            Color.FromRgb(255, 255, 0), // Yellow
+            Color.FromRgb(0, 0, 255), // Blue
+            Color.FromRgb(255, 0, 255), // Magenta
+            Color.FromRgb(0, 255, 255), // Cyan
+            Color.FromRgb(255, 255, 255) // White
         };
     }
 }

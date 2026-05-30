@@ -4,48 +4,55 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryAnsiArt">
-    <ScrollViewer XYFocus.NavigationModes="Keyboard">
-        <StackPanel Margin="1">
+    <DockPanel Margin="1">
+        <StackPanel Orientation="Vertical"
+                    DockPanel.Dock="Top">
             <TextBlock Text="ANSI Art Rendering"
                        HorizontalAlignment="Center"
                        FontWeight="Bold"
                        Margin="0,0,0,1" />
 
-            <HyperlinkButton NavigateUri="https://16colo.rs/pack/blndr2023a/NI-BLND0123.ANS"
+            <HyperlinkButton NavigateUri="https://16colo.rs"
                              HorizontalAlignment="Center"
-                             Content="'The Day the Scene Stood Still' by nitron"
+                             IsTabStop="False"
+                             Content="16colo.rs"
                              Margin="0,0,0,1" />
-
-            <TextBlock Text="Original Size (Stretch=None):"
-                       Margin="0,1,0,0" />
-            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}"
-                    BorderThickness="1"
-                    HorizontalAlignment="Left">
-                <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
-                       Stretch="None" />
-            </Border>
-
-            <TextBlock Text="Uniform Scaling (Fit to 40x20):"
-                       Margin="0,2,0,0" />
-            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}"
-                    BorderThickness="1"
-                    Width="40"
-                    Height="20"
-                    HorizontalAlignment="Left">
-                <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
-                       Stretch="Uniform" />
-            </Border>
-
-            <TextBlock Text="Fill Scaling (Stretched to 60x10):"
-                       Margin="0,2,0,0" />
-            <Border BorderBrush="{DynamicResource ThemeActionBackgroundBrush}"
-                    BorderThickness="1"
-                    Width="60"
-                    Height="10"
-                    HorizontalAlignment="Left">
-                <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
-                       Stretch="Fill" />
-            </Border>
         </StackPanel>
-    </ScrollViewer>
+        <Button DockPanel.Dock="Bottom"
+                Click="NextButton_OnClick"
+                HorizontalAlignment="Left">
+            Next
+        </Button>
+        <Carousel x:Name="Carousel"
+                  WrapSelection="True">
+            <Carousel.PageTransition>
+                <PageSlide Duration="0.4"
+                           Orientation="Horizontal" />
+            </Carousel.PageTransition>
+            <Image Source="avares://Consolonia.Gallery/Resources/NI-BLND0123.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/12.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/ak-evoke.ans"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/BLUES.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/CHECS-GODZILLA 6.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/E_JOHN.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/MERMAID3.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/N-CRPNTR.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/N-HLKHGN.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/SFMSG11.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/US-MOTHR.ANS"
+                   Stretch="None" />
+            <Image Source="avares://Consolonia.Gallery/Resources/wa-goat.ans"
+                   Stretch="None" />
+        </Carousel>
+    </DockPanel>
 </UserControl>
