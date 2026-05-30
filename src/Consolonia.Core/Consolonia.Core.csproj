@@ -22,6 +22,9 @@
       <Compile Update="Drawing\DrawingContextImpl.Boxes.cs">
         <DependentUpon>DrawingContextImpl.cs</DependentUpon>
       </Compile>
+      <Compile Update="Drawing\AnsiArt\AnsiParser.CsiMatcher.cs">
+        <DependentUpon>AnsiParser.cs</DependentUpon>
+      </Compile>
     </ItemGroup>
 
 </Project>

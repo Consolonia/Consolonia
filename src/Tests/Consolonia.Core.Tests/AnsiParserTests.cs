@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
+using Consolonia.Core.Drawing.AnsiArt;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
