@@ -24,6 +24,12 @@ namespace Consolonia.Core.Drawing.AnsiArt
 
         private readonly List<List<Pixel>> _lines = [];
 
+        static AnsiParser()
+        {
+            // ANSI art often uses CP437
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        }
+
         private AnsiParser()
         {
             _lines.Add([]);
@@ -32,8 +38,8 @@ namespace Consolonia.Core.Drawing.AnsiArt
         public static PixelBuffer Parse(Stream stream)
         {
             SauceInfo? sauce = null;
-            
-            if(stream.CanSeek) 
+
+            if (stream.CanSeek)
                 sauce = ReadSauce(stream);
 
             var parser = new AnsiParser();
@@ -45,21 +51,19 @@ namespace Consolonia.Core.Drawing.AnsiArt
 
             stream.Seek(0, SeekOrigin.Begin);
 
-            // ANSI art often uses CP437
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             using var reader = new StreamReader(stream, Encoding.GetEncoding(437));
 
             bool sauceStarted = false;
-            
+
             var matchers = new List<IMatcher<char>>
             {
                 // Single CSI matcher for all escape sequences
                 new CsiMatcher((cmd, paramsStr) =>
                 {
-                    if(!sauceStarted)
+                    if (!sauceStarted)
                         parser.HandleCsi(cmd, paramsStr);
                 }),
-                
+
                 // Generic fallback for any other character or SAUSE
                 new RegexMatcher<char>(tuple =>
                 {
@@ -118,7 +122,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
 
             return null;
         }
-        
+
         private void HandleCsi(char command, string paramsStr)
         {
             //todo: this default values are by Claude. Even not sure why they required
@@ -273,6 +277,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 if (parts[0].Length > 0)
                     y = int.Parse(parts[0]);
             }
+
             if (parts.Length > 1) x = int.Parse(parts[1]);
 
             _cursorX = Math.Max(0, x - 1);
@@ -304,7 +309,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
         {
             int mode = ParseInt(paramsStr, 0);
             EnsureLine(_cursorY);
-            
+
             List<Pixel> line = _lines[_cursorY];
 
             switch (mode)
@@ -335,18 +340,18 @@ namespace Consolonia.Core.Drawing.AnsiArt
         {
             int height = Math.Max(_sauceHeight, _lines.Count);
             int width = Math.Max(_sauceWidth, _lines.Count > 0 ? _lines.Max(l => l.Count) : 0);
-            if (width == 0 || height == 0) 
+            if (width == 0 || height == 0)
                 return new PixelBuffer(1, 1); //todo: this 1,1 by Claude, why?
 
             var defaultBackgroundPixel = new Pixel(new PixelBackground(DefaultBackgroundColor));
             var pixelBuffer = new PixelBuffer((ushort)width, (ushort)height);
-            
+
             for (ushort y = 0; y < (ushort)height; y++)
             {
                 for (ushort x = 0; x < (ushort)width; x++)
                 {
-                    pixelBuffer[x, y] = y < _lines.Count && x < _lines[y].Count 
-                        ? _lines[y][x] 
+                    pixelBuffer[x, y] = y < _lines.Count && x < _lines[y].Count
+                        ? _lines[y][x]
                         : defaultBackgroundPixel;
                 }
             }
