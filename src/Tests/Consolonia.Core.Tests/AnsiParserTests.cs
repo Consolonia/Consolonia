@@ -19,7 +19,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void CheckDPIinAvaloniaHardcodedTo96()
+        public void CheckDpIinAvaloniaHardcodedTo96()
         {
             var originalPoint = new Point(1, 1);
             PixelPoint fromPointWithDpi = PixelPoint.FromPointWithDpi(originalPoint, RenderTarget.AvaloniaHardcodedDPI);
@@ -28,7 +28,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_SgrColor_ReturnsCorrectPixels()
+        public void ParseSgrColorReturnsCorrectPixels()
         {
             // \x1B[31mRed\x1B[m
             const string ansi = "\x1B[31mRed\x1B[0m";
@@ -44,7 +44,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_PlainChars_ReturnsCorrectPixels()
+        public void ParsePlainCharsReturnsCorrectPixels()
         {
             const string ansi = "AB";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
@@ -53,7 +53,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_CursorMove_ReturnsCorrectPixels()
+        public void ParseCursorMoveReturnsCorrectPixels()
         {
             const string ansi = "Z\x1B[1;2HX";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
@@ -66,7 +66,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_Background_DefaultsToBlack()
+        public void ParseBackgroundDefaultsToBlack()
         {
             const string ansi = "A";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
@@ -75,7 +75,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_EraseLine_ClearsCorrectly()
+        public void ParseEraseLineClearsCorrectly()
         {
             const string ansi = "ABC\x1B[1G\x1B[K";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
@@ -84,7 +84,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_AutoWrap_MovesToNextLine()
+        public void ParseAutoWrapMovesToNextLine()
         {
             // Default wrap width is 80 columns (standard terminal width).
             StringBuilder sb = new();
@@ -100,7 +100,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_CursorForward_CorrectPosition()
+        public void ParseCursorForwardCorrectPosition()
         {
             // AB[5CXY => A@0, B@1, cursor moves forward 5 to col 7, X@7, Y@8
             const string ansi = "AB\x1B[5CXY";
@@ -114,7 +114,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_MultipleSgr_NoCharLoss()
+        public void ParseMultipleSgrNoCharLoss()
         {
             // Test that SGR sequences don't eat adjacent characters
             // A[0m[40m B  => A@0, space@1, B@2... but with SGR between
@@ -133,7 +133,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void Parse_SgrThenCursorForward_CorrectPosition()
+        public void ParseSgrThenCursorForwardCorrectPosition()
         {
             // Simulate pattern from ANS file: SGR then CSI C
             const string ansi = "\x1B[0m\x1B[40m        \x1B[8C";
