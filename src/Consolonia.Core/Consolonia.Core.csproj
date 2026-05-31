@@ -25,7 +25,7 @@
       <Compile Update="Drawing\AnsiArt\AnsiParser.CsiMatcher.cs">
         <DependentUpon>AnsiParser.cs</DependentUpon>
       </Compile>
-      <Compile Update="Drawing\DrawingContextImpl.DrawPixelBufferBitmap.AntiArt.cs">
+      <Compile Update="Drawing\DrawingContextImpl.AnsiArt.cs">
         <DependentUpon>DrawingContextImpl.Bitmaps.cs</DependentUpon>
       </Compile>
     </ItemGroup>
