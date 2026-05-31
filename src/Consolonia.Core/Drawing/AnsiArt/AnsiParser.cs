@@ -257,7 +257,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
                                         _backgroundColor = AnsiColors[code - 100 + 8];
                                         break;
                                     case 39:
-                                        _foregroundColor = Colors.Gray;
+                                        _foregroundColor = DefaultForegroundColor;
                                         break;
                                     case 49:
                                         _backgroundColor = DefaultBackgroundColor;
