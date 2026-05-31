@@ -95,7 +95,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 }),
 
                 // PCBoard / BBS viewer directives: `@NOPAUSE@`, `@PAUSE@`, `@MUSIC:…@`, etc.
-                new RegexMatcher<char>(_ => { /* discard */ }, c => new Rune(c), "@[^@\x1B\r\n]+@"),
+                new RegexMatcher<char>(_ => { /* discard */ }, c => new Rune(c), "@[^@\u001b\r\n]+@"),
 
                 // Generic fallback for any other character or SAUSE
                 new RegexMatcher<char>(tuple =>
