@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using Avalonia;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.AnsiArt;
@@ -18,10 +19,19 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
+        public void CheckDPIinAvaloniaHardcodedTo96()
+        {
+            var originalPoint = new Point(1, 1);
+            PixelPoint fromPointWithDpi = PixelPoint.FromPointWithDpi(originalPoint, RenderTarget.AvaloniaHardcodedDPI);
+            Assert.That(fromPointWithDpi.X, Is.EqualTo(1));
+            Assert.That(fromPointWithDpi.Y, Is.EqualTo(1));
+        }
+
+        [Test]
         public void Parse_SgrColor_ReturnsCorrectPixels()
         {
             // \x1B[31mRed\x1B[m
-            string ansi = "\x1B[31mRed\x1B[0m";
+            const string ansi = "\x1B[31mRed\x1B[0m";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             
             PixelBuffer buffer = AnsiParser.Parse(stream);
@@ -36,7 +46,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void Parse_PlainChars_ReturnsCorrectPixels()
         {
-            string ansi = "AB";
+            const string ansi = "AB";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
             Assert.That(buffer.Width, Is.EqualTo(2));
@@ -45,8 +55,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void Parse_CursorMove_ReturnsCorrectPixels()
         {
-            // Z\x1B[1;2HX
-            string ansi = "Z\x1B[1;2HX";
+            const string ansi = "Z\x1B[1;2HX";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             
             PixelBuffer buffer = AnsiParser.Parse(stream);
@@ -59,7 +68,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void Parse_Background_DefaultsToBlack()
         {
-            string ansi = "A";
+            const string ansi = "A";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
             Assert.That(buffer[0, 0].Background.Color, Is.EqualTo(Colors.Black));
@@ -68,7 +77,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void Parse_EraseLine_ClearsCorrectly()
         {
-            string ansi = "ABC\x1B[1G\x1B[K";
+            const string ansi = "ABC\x1B[1G\x1B[K";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
             Assert.That(buffer.Width, Is.EqualTo(1));
@@ -79,7 +88,7 @@ namespace Consolonia.Core.Tests
         {
             // SAUCE width is not easily simulated without a full binary stream, 
             // but we can test the default wrap at 80.
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             sb.Append(new string('A', 80));
             sb.Append('B');
             
@@ -97,7 +106,7 @@ namespace Consolonia.Core.Tests
         public void Parse_CursorForward_CorrectPosition()
         {
             // AB[5CXY => A@0, B@1, cursor moves forward 5 to col 7, X@7, Y@8
-            string ansi = "AB\x1B[5CXY";
+            const string ansi = "AB\x1B[5CXY";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
             
@@ -130,19 +139,19 @@ namespace Consolonia.Core.Tests
         public void Parse_SgrThenCursorForward_CorrectPosition()
         {
             // Simulate pattern from ANS file: SGR then CSI C
-            string ansi = "\x1B[0m\x1B[40m        \x1B[8C";
+            const string ansi = "\x1B[0m\x1B[40m        \x1B[8C";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
-            PixelBuffer buffer = AnsiParser.Parse(stream);
+            PixelBuffer unused = AnsiParser.Parse(stream);
 
             // 8 spaces = cursor at 8, then CSI 8C = cursor at 16
             // Buffer should be at least 16 wide (all spaces/empty)
             // The key test: cursor should be at position 16
             // Add a char after to verify
-            string ansi2 = "\x1B[0m\x1B[40m        \x1B[8CX";
+            const string ansi2 = "\x1B[0m\x1B[40m        \x1B[8CX";
             using var stream2 = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi2));
             PixelBuffer buffer2 = AnsiParser.Parse(stream2);
             
-            Assert.That(buffer2[(ushort)16, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"), 
+            Assert.That(buffer2[16, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"), 
                 $"X should be at 16, width={buffer2.Width}");
         }
     }

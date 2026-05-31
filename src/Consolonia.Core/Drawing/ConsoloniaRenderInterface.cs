@@ -159,11 +159,11 @@ namespace Consolonia.Core.Drawing
 
         private static bool IsAnsi(Stream stream)
         {
+            if (!stream.CanSeek) 
+                return false;
+            
             try
             {
-                if (!stream.CanSeek) return false;
-                long position = stream.Position;
-
                 byte[] buffer = new byte[256];
                 int read = stream.Read(buffer, 0, buffer.Length);
                 for (int i = 0; i < read - 1; i++)

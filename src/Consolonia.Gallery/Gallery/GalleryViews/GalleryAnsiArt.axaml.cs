@@ -1,9 +1,10 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
+using JetBrains.Annotations;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
+    [UsedImplicitly]
     public partial class GalleryAnsiArt : UserControl
     {
         public GalleryAnsiArt()

@@ -8,10 +8,9 @@ namespace Consolonia.Core.Drawing
 {
     internal class PixelBufferBitmapImpl(PixelBuffer pixelBuffer) : IBitmapImpl
     {
-        public const double AvaloniaHardcodedDPI = 96;
         public PixelBuffer Buffer { get; } = pixelBuffer;
 
-        public Vector Dpi => new(AvaloniaHardcodedDPI, AvaloniaHardcodedDPI);
+        public Vector Dpi => new(RenderTarget.AvaloniaHardcodedDPI, RenderTarget.AvaloniaHardcodedDPI);
 
         public PixelSize PixelSize { get; } = new(pixelBuffer.Width, pixelBuffer.Height);
 

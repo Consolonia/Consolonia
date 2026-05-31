@@ -7,12 +7,8 @@ using NUnit.Framework;
 namespace Consolonia.Gallery.Tests
 {
     [TestFixture]
-    internal class AnsiArtTests : GalleryTestsBaseBase
+    internal class AnsiArtTests() : GalleryTestsBaseBase(new PixelBufferSize(160, 80))
     {
-        public AnsiArtTests() : base(new PixelBufferSize(160, 80))
-        {
-        }
-
         [Test]
         public async Task PerformSingleTest()
         {
@@ -24,15 +20,18 @@ namespace Consolonia.Gallery.Tests
 
             // Image 2: 12.ANS
             await ClickNext();
-            await UITest.AssertHasText("·  ▐████▄██████████████████████████████▐▓▓                  ░       █▒▌  │   3 ·");
+            await UITest.AssertHasText(
+                "·  ▐████▄██████████████████████████████▐▓▓                  ░       █▒▌  │   3 ·");
 
             // Image 3: ak-evoke.ans
             await ClickNext();
-            await UITest.AssertHasText(".'$$$'j$$$$$$$$$$$$$$$$$$#s┐ ,`$$$$$$$$'j$$P'jP`$: W$$l '  .   , `'²└*/┐.  `$$$$");
+            await UITest.AssertHasText(
+                ".'$$$'j$$$$$$$$$$$$$$$$$$#s┐ ,`$$$$$$$$'j$$P'jP`$: W$$l '  .   , `'²└*/┐.  `$$$$");
 
             // Image 4: BLUES.ANS - row with "C A F E" text, validates alignment of cafe sign
             await ClickNext();
-            await UITest.AssertHasText("░▒▓▓▒░░▒▓    █  C A F E  ██               ▐▌          ▐▌               ░░▒▓▓▒░░▒");
+            await UITest.AssertHasText(
+                "░▒▓▓▒░░▒▓    █  C A F E  ██               ▐▌          ▐▌               ░░▒▓▓▒░░▒");
 
             // Image 5: CHECS-GODZILLA 6.ANS - row with "HAVE CASTLED" text
             await ClickNext();
@@ -60,17 +59,19 @@ namespace Consolonia.Gallery.Tests
 
             // Image 11: US-MOTHR.ANS - eye row with 'o' characters at correct positions validates alignment
             await ClickNext();
-            await UITest.AssertHasText("▒░▒▀   ▒▌░▒▓▒▒▒ ▄▀     ░▒▓▀▄▄  ░▓░ o  ▄▓▄  o ▒▓░  ▄░▓▒░  ░   ▀▄ ▓▒▒▓▓░░▒░   ▀░░");
+            await UITest.AssertHasText(
+                "▒░▒▀   ▒▌░▒▓▒▒▒ ▄▀     ░▒▓▀▄▄  ░▓░ o  ▄▓▄  o ▒▓░  ▄░▓▒░  ░   ▀▄ ▓▒▒▓▓░░▒░   ▀░░");
 
             // Image 12: wa-goat.ans
             await ClickNext();
-            await UITest.AssertHasText("█████████▌    ▓▀█░▀██ ■▄▄▄▀▀▀█████  ▀▀▄▄▄▓ ████████▀▀▀▄▄▄▄▀▀████████████████████");
+            await UITest.AssertHasText(
+                "█████████▌    ▓▀█░▀██ ■▄▄▄▀▀▀█████  ▀▀▄▄▄▓ ████████▀▀▀▄▄▄▄▀▀████████████████████");
         }
 
-        private async Task ClickNext()
+        private static async Task ClickNext()
         {
             await UITest.KeyInput(Avalonia.Input.Key.Space);
-            await Task.Delay(500);
+            await Task.Delay(500); //todo: slow test
         }
     }
 }
