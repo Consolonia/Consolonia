@@ -123,12 +123,10 @@ namespace Consolonia.Core.Tests
             string ansi = "A\x1B[0m\x1B[40m B";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
-
-            Console.WriteLine($"[DEBUG_LOG] MultipleSgr buffer: {buffer.Width}x{buffer.Height}");
+            
             for (int x = 0; x < buffer.Width; x++)
             {
                 string t = buffer[(ushort)x, 0].Foreground.Symbol.GetText();
-                Console.WriteLine($"[DEBUG_LOG] x={x}: '{t}'");
             }
 
             Assert.That(buffer.Width, Is.EqualTo(3), "Buffer should have 3 chars: A, space, B");

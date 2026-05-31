@@ -162,6 +162,7 @@ namespace Consolonia.Core.Drawing
             if (!stream.CanSeek)
                 return false;
 
+            long position = stream.Position;
             try
             {
                 byte[] buffer = new byte[256];
@@ -174,7 +175,7 @@ namespace Consolonia.Core.Drawing
             }
             finally
             {
-                stream.Position = 0;
+                stream.Position = position;
             }
         }
 
