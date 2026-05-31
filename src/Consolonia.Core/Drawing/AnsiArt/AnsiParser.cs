@@ -124,7 +124,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
             {
                 string line = reader.ReadLine() + Environment.NewLine;
                 if (reader.EndOfStream)
-                    line = line.TrimEnd();
+                    line = line[..^Environment.NewLine.Length];
                 processor.ProcessChunk(line.ToCharArray());
             }
 
