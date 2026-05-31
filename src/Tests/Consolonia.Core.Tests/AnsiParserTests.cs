@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Text;
 using Avalonia;
@@ -123,7 +122,7 @@ namespace Consolonia.Core.Tests
             string ansi = "A\x1B[0m\x1B[40m B";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
-            
+
             for (int x = 0; x < buffer.Width; x++)
             {
                 string unused = buffer[(ushort)x, 0].Foreground.Symbol.GetText();

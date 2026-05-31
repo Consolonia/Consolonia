@@ -95,7 +95,10 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 }),
 
                 // PCBoard / BBS viewer directives: `@NOPAUSE@`, `@PAUSE@`, `@MUSIC:…@`, etc.
-                new RegexMatcher<char>(_ => { /* discard */ }, c => new Rune(c), "@[^@\u001b\r\n]+@"),
+                new RegexMatcher<char>(_ =>
+                {
+                    /* discard */
+                }, c => new Rune(c), "@[^@\u001b\r\n]+@"),
 
                 // Generic fallback for any other character or SAUSE
                 new RegexMatcher<char>(tuple =>
@@ -120,7 +123,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
             while (!reader.EndOfStream)
             {
                 string line = reader.ReadLine() + Environment.NewLine;
-                if(reader.EndOfStream)
+                if (reader.EndOfStream)
                     line = line.TrimEnd();
                 processor.ProcessChunk(line.ToCharArray());
             }

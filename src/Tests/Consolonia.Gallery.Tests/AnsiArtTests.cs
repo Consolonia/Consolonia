@@ -1,20 +1,19 @@
 using System.Threading.Tasks;
 using Avalonia.Input;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Gallery.Tests.Base;
 using Consolonia.NUnit;
 using NUnit.Framework;
 
 namespace Consolonia.Gallery.Tests
 {
-    [TestFixture()]
+    [TestFixture]
     internal class AnsiArtTests : GalleryTestsBaseBase
     {
         [Test]
         public async Task PerformSingleTest()
         {
             //Claude generated 
-            
+
             // Image 1: NI-BLND0123.ANS - row with "Nachos!" text, validates alignment of speech bubble
             await UITest.AssertHasText("     ■ ▄ ▀█ ■ ▄ ▓█▓█▓█▓█▓█▓█▓█▓▀▄▄▀/▓Nachos!▓▒░");
 
