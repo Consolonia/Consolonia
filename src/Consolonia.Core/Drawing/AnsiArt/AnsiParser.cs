@@ -62,8 +62,13 @@ namespace Consolonia.Core.Drawing.AnsiArt
         {
             SauceInfo? sauce = null;
 
-            if (stream.CanSeek)
+            bool canSeek = stream.CanSeek;
+            long position = -1;
+            if (canSeek)
+            {
+                position = stream.Position;
                 sauce = ReadSauce(stream);
+            }
 
             var parser = new AnsiParser();
             if (sauce != null)
@@ -73,7 +78,8 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 parser._wrapWidth = sauce.Value.Width;
             }
 
-            stream.Seek(0, SeekOrigin.Begin);
+            if (canSeek)
+                stream.Seek(position, SeekOrigin.Begin);
 
             using var reader = new StreamReader(stream, Encoding.GetEncoding(437));
 
