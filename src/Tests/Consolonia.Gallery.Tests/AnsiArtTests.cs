@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Avalonia.Input;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Gallery.Tests.Base;
 using Consolonia.NUnit;
@@ -70,7 +71,7 @@ namespace Consolonia.Gallery.Tests
 
         private static async Task ClickNext()
         {
-            await UITest.KeyInput(Avalonia.Input.Key.Space);
+            await UITest.KeyInput(Key.Space);
             await Task.Delay(500); //todo: slow test
         }
     }

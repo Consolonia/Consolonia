@@ -18,25 +18,23 @@ namespace Consolonia.Core.Drawing
                 return;
 
             for (int py = intersectedRect.Y; py < intersectedRect.Bottom; py++)
+            for (int px = intersectedRect.X; px < intersectedRect.Right; px++)
             {
-                for (int px = intersectedRect.X; px < intersectedRect.Right; px++)
+                double relativeX = (double)(px - targetRect.X) / targetRect.Width;
+                double relativeY = (double)(py - targetRect.Y) / targetRect.Height;
+
+                int ax = (int)(sourceRect.X + relativeX * sourceRect.Width);
+                int ay = (int)(sourceRect.Y + relativeY * sourceRect.Height);
+
+                //todo: low this is bad default scaling
+                if (ax >= 0 && ax < pixelBufferBitmap.Buffer.Width && ay >= 0 &&
+                    ay < pixelBufferBitmap.Buffer.Height)
                 {
-                    double relativeX = (double)(px - targetRect.X) / targetRect.Width;
-                    double relativeY = (double)(py - targetRect.Y) / targetRect.Height;
+                    var point = new PixelPoint(px, py);
+                    Pixel pixel = pixelBufferBitmap.Buffer[(ushort)ax, (ushort)ay];
 
-                    int ax = (int)(sourceRect.X + relativeX * sourceRect.Width);
-                    int ay = (int)(sourceRect.Y + relativeY * sourceRect.Height);
-
-                    //todo: low this is bad default scaling
-                    if (ax >= 0 && ax < pixelBufferBitmap.Buffer.Width && ay >= 0 &&
-                        ay < pixelBufferBitmap.Buffer.Height)
-                    {
-                        var point = new PixelPoint(px, py);
-                        Pixel pixel = pixelBufferBitmap.Buffer[(ushort)ax, (ushort)ay];
-
-                        // todo: handle opacity if necessary
-                        _pixelBuffer[point] = _pixelBuffer[point].Blend(pixel);
-                    }
+                    // todo: handle opacity if necessary
+                    _pixelBuffer[point] = _pixelBuffer[point].Blend(pixel);
                 }
             }
 

@@ -11,19 +11,41 @@ namespace Consolonia.Core.Drawing.AnsiArt
 {
     internal partial class AnsiParser
     {
+        private static readonly Color[] AnsiColors =
+        [
+            Color.FromRgb(0, 0, 0), // Black
+            Color.FromRgb(128, 0, 0), // DarkRed
+            Color.FromRgb(0, 128, 0), // DarkGreen
+            Color.FromRgb(128, 128, 0), // DarkYellow
+            Color.FromRgb(0, 0, 128), // DarkBlue
+            Color.FromRgb(128, 0, 128), // DarkMagenta
+            Color.FromRgb(0, 128, 128), // DarkCyan
+            Color.FromRgb(192, 192, 192), // Gray
+            Color.FromRgb(128, 128, 128), // DarkGray
+            Color.FromRgb(255, 0, 0), // Red
+            Color.FromRgb(0, 255, 0), // Green
+            Color.FromRgb(255, 255, 0), // Yellow
+            Color.FromRgb(0, 0, 255), // Blue
+            Color.FromRgb(255, 0, 255), // Magenta
+            Color.FromRgb(0, 255, 255), // Cyan
+            Color.FromRgb(255, 255, 255) // White
+        ];
+
+        private static readonly Color DefaultBackgroundColor = Colors.Black;
+        private static readonly Color DefaultForegroundColor = Colors.White;
+
+        private readonly List<List<Pixel>> _lines = [];
+        private Color _backgroundColor = DefaultBackgroundColor;
         private int _cursorX;
         private int _cursorY;
         private Color _foregroundColor = DefaultForegroundColor;
-        private Color _backgroundColor = DefaultBackgroundColor;
+        private int _sauceHeight;
+        private int _sauceWidth;
         private int _savedCursorX;
         private int _savedCursorY;
-        private int _sauceWidth;
-        private int _sauceHeight;
-        private int _wrapWidth = 80;
-        private FontWeight _weight = FontWeight.Normal;
         private FontStyle _style = FontStyle.Normal;
-
-        private readonly List<List<Pixel>> _lines = [];
+        private FontWeight _weight = FontWeight.Normal;
+        private int _wrapWidth = 80;
 
         static AnsiParser()
         {
@@ -70,7 +92,6 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 new RegexMatcher<char>(tuple =>
                 {
                     foreach (char c in tuple.Item2)
-                    {
                         if (!sauceStarted)
                         {
                             // if end of file
@@ -82,7 +103,6 @@ namespace Consolonia.Core.Drawing.AnsiArt
 
                             parser.HandleChar(c);
                         }
-                    }
                 }, c => new Rune(c), "[^\x1B]")
             };
 
@@ -95,12 +115,6 @@ namespace Consolonia.Core.Drawing.AnsiArt
             }
 
             return parser.ToPixelBuffer();
-        }
-
-        private struct SauceInfo
-        {
-            public ushort Width;
-            public ushort Height;
         }
 
         private static SauceInfo? ReadSauce(Stream stream)
@@ -155,8 +169,10 @@ namespace Consolonia.Core.Drawing.AnsiArt
             }
         }
 
-        private static int ParseInt(string s, int defaultValue) =>
-            string.IsNullOrEmpty(s) ? defaultValue : int.Parse(s);
+        private static int ParseInt(string s, int defaultValue)
+        {
+            return string.IsNullOrEmpty(s) ? defaultValue : int.Parse(s);
+        }
 
         private void HandleChar(char c)
         {
@@ -209,7 +225,6 @@ namespace Consolonia.Core.Drawing.AnsiArt
 
             string[] parts = paramsStr.Split(';');
             foreach (string part in parts)
-            {
                 if (string.IsNullOrEmpty(part) || part == "0")
                     ResetStyle();
                 else
@@ -227,7 +242,6 @@ namespace Consolonia.Core.Drawing.AnsiArt
                         default:
                         {
                             if (int.TryParse(part, out int code))
-                            {
                                 switch (code)
                                 {
                                     case >= 30 and <= 37:
@@ -249,12 +263,10 @@ namespace Consolonia.Core.Drawing.AnsiArt
                                         _backgroundColor = DefaultBackgroundColor;
                                         break;
                                 }
-                            }
 
                             break;
                         }
                     }
-            }
         }
 
         private void ResetStyle()
@@ -349,39 +361,18 @@ namespace Consolonia.Core.Drawing.AnsiArt
             var pixelBuffer = new PixelBuffer((ushort)width, (ushort)height);
 
             for (ushort y = 0; y < (ushort)height; y++)
-            {
-                for (ushort x = 0; x < (ushort)width; x++)
-                {
-                    pixelBuffer[x, y] = y < _lines.Count && x < _lines[y].Count
-                        ? _lines[y][x]
-                        : defaultBackgroundPixel;
-                }
-            }
+            for (ushort x = 0; x < (ushort)width; x++)
+                pixelBuffer[x, y] = y < _lines.Count && x < _lines[y].Count
+                    ? _lines[y][x]
+                    : defaultBackgroundPixel;
 
             return pixelBuffer;
         }
 
-        private static readonly Color[] AnsiColors =
-        [
-            Color.FromRgb(0, 0, 0), // Black
-            Color.FromRgb(128, 0, 0), // DarkRed
-            Color.FromRgb(0, 128, 0), // DarkGreen
-            Color.FromRgb(128, 128, 0), // DarkYellow
-            Color.FromRgb(0, 0, 128), // DarkBlue
-            Color.FromRgb(128, 0, 128), // DarkMagenta
-            Color.FromRgb(0, 128, 128), // DarkCyan
-            Color.FromRgb(192, 192, 192), // Gray
-            Color.FromRgb(128, 128, 128), // DarkGray
-            Color.FromRgb(255, 0, 0), // Red
-            Color.FromRgb(0, 255, 0), // Green
-            Color.FromRgb(255, 255, 0), // Yellow
-            Color.FromRgb(0, 0, 255), // Blue
-            Color.FromRgb(255, 0, 255), // Magenta
-            Color.FromRgb(0, 255, 255), // Cyan
-            Color.FromRgb(255, 255, 255) // White
-        ];
-
-        private static readonly Color DefaultBackgroundColor = Colors.Black;
-        private static readonly Color DefaultForegroundColor = Colors.White;
+        private struct SauceInfo
+        {
+            public ushort Width;
+            public ushort Height;
+        }
     }
 }

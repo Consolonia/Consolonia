@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text;
 using Avalonia;
@@ -33,12 +34,12 @@ namespace Consolonia.Core.Tests
             // \x1B[31mRed\x1B[m
             const string ansi = "\x1B[31mRed\x1B[0m";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
-            
+
             PixelBuffer buffer = AnsiParser.Parse(stream);
-            
+
             Assert.That(buffer.Width, Is.EqualTo(3));
             Assert.That(buffer[0, 0].Foreground.Symbol.GetText(), Is.EqualTo("R"));
-            
+
             // Our Red is Color.FromRgb(255, 0, 0), but standard ANSI 31 is often Maroon (128, 0, 0)
             Assert.That(buffer[0, 0].Foreground.Color, Is.EqualTo(Color.FromRgb(128, 0, 0)));
         }
@@ -57,9 +58,9 @@ namespace Consolonia.Core.Tests
         {
             const string ansi = "Z\x1B[1;2HX";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
-            
+
             PixelBuffer buffer = AnsiParser.Parse(stream);
-            
+
             Assert.That(buffer.Width, Is.EqualTo(2));
             Assert.That(buffer[0, 0].Foreground.Symbol.GetText(), Is.EqualTo("Z"));
             Assert.That(buffer[1, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"));
@@ -90,10 +91,10 @@ namespace Consolonia.Core.Tests
             StringBuilder sb = new();
             sb.Append(new string('A', 80));
             sb.Append('B');
-            
+
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(sb.ToString()));
             PixelBuffer buffer = AnsiParser.Parse(stream);
-            
+
             Assert.That(buffer.Width, Is.EqualTo(80));
             Assert.That(buffer.Height, Is.AtLeast(2));
             Assert.That(buffer[0, 1].Foreground.Symbol.GetText(), Is.EqualTo("B"));
@@ -106,10 +107,11 @@ namespace Consolonia.Core.Tests
             const string ansi = "AB\x1B[5CXY";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
-            
+
             Assert.That(buffer[0, 0].Foreground.Symbol.GetText(), Is.EqualTo("A"), "A at 0");
             Assert.That(buffer[1, 0].Foreground.Symbol.GetText(), Is.EqualTo("B"), "B at 1");
-            Assert.That(buffer[7, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"), $"X at 7, got '{buffer[7, 0].Foreground.Symbol.GetText()}', width={buffer.Width}");
+            Assert.That(buffer[7, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"),
+                $"X at 7, got '{buffer[7, 0].Foreground.Symbol.GetText()}', width={buffer.Width}");
             Assert.That(buffer[8, 0].Foreground.Symbol.GetText(), Is.EqualTo("Y"), "Y at 8");
         }
 
@@ -121,14 +123,14 @@ namespace Consolonia.Core.Tests
             string ansi = "A\x1B[0m\x1B[40m B";
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi));
             PixelBuffer buffer = AnsiParser.Parse(stream);
-            
-            System.Console.WriteLine($"[DEBUG_LOG] MultipleSgr buffer: {buffer.Width}x{buffer.Height}");
+
+            Console.WriteLine($"[DEBUG_LOG] MultipleSgr buffer: {buffer.Width}x{buffer.Height}");
             for (int x = 0; x < buffer.Width; x++)
             {
                 string t = buffer[(ushort)x, 0].Foreground.Symbol.GetText();
-                System.Console.WriteLine($"[DEBUG_LOG] x={x}: '{t}'");
+                Console.WriteLine($"[DEBUG_LOG] x={x}: '{t}'");
             }
-            
+
             Assert.That(buffer.Width, Is.EqualTo(3), "Buffer should have 3 chars: A, space, B");
         }
 
@@ -147,8 +149,8 @@ namespace Consolonia.Core.Tests
             const string ansi2 = "\x1B[0m\x1B[40m        \x1B[8CX";
             using var stream2 = new MemoryStream(Encoding.GetEncoding(437).GetBytes(ansi2));
             PixelBuffer buffer2 = AnsiParser.Parse(stream2);
-            
-            Assert.That(buffer2[16, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"), 
+
+            Assert.That(buffer2[16, 0].Foreground.Symbol.GetText(), Is.EqualTo("X"),
                 $"X should be at 16, width={buffer2.Width}");
         }
     }

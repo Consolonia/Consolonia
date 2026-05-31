@@ -7,8 +7,8 @@ namespace Consolonia.Core.Drawing.AnsiArt
     internal partial class AnsiParser
     {
         /// <summary>
-        /// Matches any CSI sequence: ESC [ params command
-        /// Example: \x1B[48;5;21m
+        ///     Matches any CSI sequence: ESC [ params command
+        ///     Example: \x1B[48;5;21m
         /// </summary>
         private class CsiMatcher(Action<char, string> onComplete) : IMatcher<char>
         {
@@ -45,8 +45,15 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 }
             }
 
-            public bool TryFlush() => false;
-            public void Reset() => _accumulator.Clear();
+            public bool TryFlush()
+            {
+                return false;
+            }
+
+            public void Reset()
+            {
+                _accumulator.Clear();
+            }
 
             public string GetDebugInfo()
             {
