@@ -22,7 +22,7 @@ namespace Consolonia.Core.Tests
         public void CheckDpIinAvaloniaHardcodedTo96()
         {
             var originalPoint = new Point(1, 1);
-            PixelPoint fromPointWithDpi = PixelPoint.FromPointWithDpi(originalPoint, RenderTarget.AvaloniaHardcodedDPI);
+            PixelPoint fromPointWithDpi = PixelPoint.FromPointWithDpi(originalPoint, RenderTarget.AvaloniaHardcodedDpi);
             Assert.That(fromPointWithDpi.X, Is.EqualTo(1));
             Assert.That(fromPointWithDpi.Y, Is.EqualTo(1));
         }

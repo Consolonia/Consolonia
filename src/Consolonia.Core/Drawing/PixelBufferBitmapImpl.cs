@@ -10,7 +10,7 @@ namespace Consolonia.Core.Drawing
     {
         public PixelBuffer Buffer { get; } = pixelBuffer;
 
-        public Vector Dpi => new(RenderTarget.AvaloniaHardcodedDPI, RenderTarget.AvaloniaHardcodedDPI);
+        public Vector Dpi => new(RenderTarget.AvaloniaHardcodedDpi, RenderTarget.AvaloniaHardcodedDpi);
 
         public PixelSize PixelSize { get; } = new(pixelBuffer.Width, pixelBuffer.Height);
 

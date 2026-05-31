@@ -79,8 +79,8 @@ namespace Consolonia.Core.Drawing
         {
             throw new NotImplementedException();
         }
-        public const double AvaloniaHardcodedDPI = 96;
-        public Vector Dpi { get; } = new(AvaloniaHardcodedDPI, AvaloniaHardcodedDPI);
+        public const double AvaloniaHardcodedDpi = 96;
+        public Vector Dpi { get; } = new(AvaloniaHardcodedDpi, AvaloniaHardcodedDpi);
         public PixelSize PixelSize { get; } = new(1, 1);
         public int Version => 0;
 
