@@ -32,6 +32,9 @@ namespace Consolonia.Gallery.Tests
             await ClickNext();
             await UITest.AssertHasText(
                 "   C A F E  ██               ▐▌          ▐▌           ");
+            // Verify PCBoard/BBS directives are not rendered
+            await UITest.AssertHasNoText("@NOPAUSE@");
+            await UITest.AssertHasNoText("@PAUSE@");
 
             // Image 5: CHECS-GODZILLA 6.ANS - row with "HAVE CASTLED" text
             await ClickNext();
