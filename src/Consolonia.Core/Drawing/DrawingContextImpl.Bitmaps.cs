@@ -26,7 +26,7 @@ namespace Consolonia.Core.Drawing
                 case DummyBitmap:
                     return;
                 case PixelBufferBitmapImpl pixelBufferBitmap:
-                    DrawPixelBufferBitmap(pixelBufferBitmap, opacity, sourceRect, destRect);
+                    DrawPixelBufferBitmap(pixelBufferBitmap, sourceRect, destRect);
                     return;
             }
 

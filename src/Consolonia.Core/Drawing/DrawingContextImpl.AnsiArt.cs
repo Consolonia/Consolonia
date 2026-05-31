@@ -5,7 +5,7 @@ namespace Consolonia.Core.Drawing
 {
     internal partial class DrawingContextImpl
     {
-        private void DrawPixelBufferBitmap(PixelBufferBitmapImpl pixelBufferBitmap, double opacity, Rect sourceRect,
+        private void DrawPixelBufferBitmap(PixelBufferBitmapImpl pixelBufferBitmap, Rect sourceRect,
             Rect destRect)
         {
             var targetRect = new Rect(Transform.Transform(destRect.TopLeft),
