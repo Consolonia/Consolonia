@@ -17,8 +17,9 @@ namespace Consolonia.Core.Drawing.AnsiArt
         private Color _backgroundColor = DefaultBackgroundColor;
         private int _savedCursorX;
         private int _savedCursorY;
-        private int _sauceWidth = 80;
-        private int _sauceHeight = 25;
+        private int _sauceWidth;
+        private int _sauceHeight;
+        private int _wrapWidth = 80;
         private FontWeight _weight = FontWeight.Normal;
         private FontStyle _style = FontStyle.Normal;
 
@@ -47,6 +48,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
             {
                 parser._sauceWidth = sauce.Value.Width;
                 parser._sauceHeight = sauce.Value.Height;
+                parser._wrapWidth = sauce.Value.Width;
             }
 
             stream.Seek(0, SeekOrigin.Begin);
@@ -169,7 +171,7 @@ namespace Consolonia.Core.Drawing.AnsiArt
                     return;
             }
 
-            if (_cursorX >= _sauceWidth)
+            if (_wrapWidth > 0 && _cursorX >= _wrapWidth)
             {
                 _cursorX = 0;
                 _cursorY++;

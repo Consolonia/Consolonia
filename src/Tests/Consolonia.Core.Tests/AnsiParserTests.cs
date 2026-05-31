@@ -86,8 +86,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void Parse_AutoWrap_MovesToNextLine()
         {
-            // SAUCE width is not easily simulated without a full binary stream, 
-            // but we can test the default wrap at 80.
+            // Default wrap width is 80 columns (standard terminal width).
             StringBuilder sb = new();
             sb.Append(new string('A', 80));
             sb.Append('B');
@@ -95,8 +94,6 @@ namespace Consolonia.Core.Tests
             using var stream = new MemoryStream(Encoding.GetEncoding(437).GetBytes(sb.ToString()));
             PixelBuffer buffer = AnsiParser.Parse(stream);
             
-            // Expected: 80 characters on first line, 'B' on second line.
-            // But wait, if it wraps, buffer width should be 80.
             Assert.That(buffer.Width, Is.EqualTo(80));
             Assert.That(buffer.Height, Is.AtLeast(2));
             Assert.That(buffer[0, 1].Foreground.Symbol.GetText(), Is.EqualTo("B"));
