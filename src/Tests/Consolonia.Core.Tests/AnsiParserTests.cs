@@ -126,7 +126,7 @@ namespace Consolonia.Core.Tests
             
             for (int x = 0; x < buffer.Width; x++)
             {
-                string t = buffer[(ushort)x, 0].Foreground.Symbol.GetText();
+                string unused = buffer[(ushort)x, 0].Foreground.Symbol.GetText();
             }
 
             Assert.That(buffer.Width, Is.EqualTo(3), "Buffer should have 3 chars: A, space, B");
