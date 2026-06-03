@@ -143,6 +143,106 @@ namespace Consolonia.PlatformSupport
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
         private IDisposable _sigwinchRegistration;
+        private bool _isKittyKeyboardEnabled;
+
+        /// <summary>
+        ///     Kitty keyboard protocol special key codepoints mapped to Avalonia Key.
+        /// </summary>
+        private static readonly Dictionary<int, Avalonia.Input.Key> KittyKeyMap = new()
+        {
+            { 27, Avalonia.Input.Key.Escape },
+            { 13, Avalonia.Input.Key.Return },
+            { 9, Avalonia.Input.Key.Tab },
+            { 127, Avalonia.Input.Key.Back },
+            { 57348, Avalonia.Input.Key.Insert },
+            { 57349, Avalonia.Input.Key.Delete },
+            { 57350, Avalonia.Input.Key.Left },
+            { 57351, Avalonia.Input.Key.Right },
+            { 57352, Avalonia.Input.Key.Up },
+            { 57353, Avalonia.Input.Key.Down },
+            { 57354, Avalonia.Input.Key.PageUp },
+            { 57355, Avalonia.Input.Key.PageDown },
+            { 57356, Avalonia.Input.Key.Home },
+            { 57357, Avalonia.Input.Key.End },
+            { 57358, Avalonia.Input.Key.CapsLock },
+            { 57359, Avalonia.Input.Key.Scroll },
+            { 57360, Avalonia.Input.Key.NumLock },
+            { 57361, Avalonia.Input.Key.PrintScreen },
+            { 57362, Avalonia.Input.Key.Pause },
+            { 57363, Avalonia.Input.Key.Apps },
+            { 57364, Avalonia.Input.Key.F1 },
+            { 57365, Avalonia.Input.Key.F2 },
+            { 57366, Avalonia.Input.Key.F3 },
+            { 57367, Avalonia.Input.Key.F4 },
+            { 57368, Avalonia.Input.Key.F5 },
+            { 57369, Avalonia.Input.Key.F6 },
+            { 57370, Avalonia.Input.Key.F7 },
+            { 57371, Avalonia.Input.Key.F8 },
+            { 57372, Avalonia.Input.Key.F9 },
+            { 57373, Avalonia.Input.Key.F10 },
+            { 57374, Avalonia.Input.Key.F11 },
+            { 57375, Avalonia.Input.Key.F12 },
+            { 57376, Avalonia.Input.Key.F13 },
+            { 57377, Avalonia.Input.Key.F14 },
+            { 57378, Avalonia.Input.Key.F15 },
+            { 57379, Avalonia.Input.Key.F16 },
+            { 57380, Avalonia.Input.Key.F17 },
+            { 57381, Avalonia.Input.Key.F18 },
+            { 57382, Avalonia.Input.Key.F19 },
+            { 57383, Avalonia.Input.Key.F20 },
+            { 57384, Avalonia.Input.Key.F21 },
+            { 57385, Avalonia.Input.Key.F22 },
+            { 57386, Avalonia.Input.Key.F23 },
+            { 57387, Avalonia.Input.Key.F24 },
+            { 57441, Avalonia.Input.Key.LeftShift },
+            { 57442, Avalonia.Input.Key.LeftCtrl },
+            { 57443, Avalonia.Input.Key.LeftAlt },
+            { 57444, Avalonia.Input.Key.LWin },
+            { 57447, Avalonia.Input.Key.RightShift },
+            { 57448, Avalonia.Input.Key.RightCtrl },
+            { 57449, Avalonia.Input.Key.RightAlt },
+            { 57450, Avalonia.Input.Key.RWin },
+        };
+
+        /// <summary>
+        ///     Legacy CSI letter terminators mapped to Avalonia Key.
+        ///     Used for arrow keys (A-D), Home (H), End (F), F1-F4 (P-S).
+        /// </summary>
+        private static readonly Dictionary<char, Avalonia.Input.Key> CsiLetterKeyMap = new()
+        {
+            { 'A', Avalonia.Input.Key.Up },
+            { 'B', Avalonia.Input.Key.Down },
+            { 'C', Avalonia.Input.Key.Right },
+            { 'D', Avalonia.Input.Key.Left },
+            { 'H', Avalonia.Input.Key.Home },
+            { 'F', Avalonia.Input.Key.End },
+            { 'P', Avalonia.Input.Key.F1 },
+            { 'Q', Avalonia.Input.Key.F2 },
+            { 'R', Avalonia.Input.Key.F3 },
+            { 'S', Avalonia.Input.Key.F4 },
+        };
+
+        /// <summary>
+        ///     Legacy CSI tilde key numbers mapped to Avalonia Key.
+        ///     Used for Insert, Delete, PageUp, PageDown, F5-F12.
+        /// </summary>
+        private static readonly Dictionary<int, Avalonia.Input.Key> CsiTildeKeyMap = new()
+        {
+            { 1, Avalonia.Input.Key.Home },
+            { 2, Avalonia.Input.Key.Insert },
+            { 3, Avalonia.Input.Key.Delete },
+            { 4, Avalonia.Input.Key.End },
+            { 5, Avalonia.Input.Key.PageUp },
+            { 6, Avalonia.Input.Key.PageDown },
+            { 15, Avalonia.Input.Key.F5 },
+            { 17, Avalonia.Input.Key.F6 },
+            { 18, Avalonia.Input.Key.F7 },
+            { 19, Avalonia.Input.Key.F8 },
+            { 20, Avalonia.Input.Key.F9 },
+            { 21, Avalonia.Input.Key.F10 },
+            { 23, Avalonia.Input.Key.F11 },
+            { 24, Avalonia.Input.Key.F12 },
+        };
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -287,6 +387,23 @@ namespace Consolonia.PlatformSupport
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
 
+            // Enable Kitty keyboard protocol if supported
+            if (IsKittyCompatibleTerminal())
+            {
+                WriteText(Esc.EnableKittyKeyboard);
+                _isKittyKeyboardEnabled = true;
+
+                // Kitty terminals support SGR mouse tracking directly
+                // Enable it even if ncurses couldn't set it up
+                if (!Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove))
+                {
+                    WriteText(Esc.EnableAllMouseEvents);
+                    WriteText(Esc.EnableExtendedMouseTracking);
+                    Capabilities |= ConsoleCapabilities.SupportsMouseButtons | ConsoleCapabilities.SupportsMouseMove;
+                    DetectSupportsMouseCursor();
+                }
+            }
+
             // Curses.timeout(NoInputTimeout); now it does not matter as input function sets dynamic timeout
             WriteText(Esc.EnableBracketedPasteMode);
 
@@ -368,10 +485,201 @@ namespace Consolonia.PlatformSupport
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
         }
 
+        /// <summary>
+        ///     Detects whether the terminal supports the Kitty keyboard protocol.
+        /// </summary>
+        private static bool IsKittyCompatibleTerminal()
+        {
+            string termProgram = Environment.GetEnvironmentVariable("TERM_PROGRAM") ?? string.Empty;
+            string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
+
+            return termProgram.Equals("kitty", StringComparison.OrdinalIgnoreCase) ||
+                   termProgram.Equals("WezTerm", StringComparison.OrdinalIgnoreCase) ||
+                   termProgram.Equals("ghostty", StringComparison.OrdinalIgnoreCase) ||
+                   term.Contains("kitty", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void HandleCsiKeyboardEvent((int keyCode, int modifiers, int eventType, char terminator) csiEvent)
+        {
+            int keyCode = csiEvent.keyCode;
+            int modifierValue = csiEvent.modifiers - 1; // Protocol uses modifiers + 1
+            int eventType = csiEvent.eventType;
+            char terminator = csiEvent.terminator;
+
+            // event type 3 = release, we handle press (1) and repeat (2)
+            bool isDown = eventType != 3;
+
+            // Decode modifiers
+            RawInputModifiers rawModifiers = RawInputModifiers.None;
+            if ((modifierValue & 1) != 0) rawModifiers |= RawInputModifiers.Shift;
+            if ((modifierValue & 2) != 0) rawModifiers |= RawInputModifiers.Alt;
+            if ((modifierValue & 4) != 0) rawModifiers |= RawInputModifiers.Control;
+
+            // Try to map the keycode based on terminator type
+            Avalonia.Input.Key key;
+            char character = char.MinValue;
+
+            if (terminator != 'u' && terminator != '~' && CsiLetterKeyMap.TryGetValue(terminator, out Avalonia.Input.Key letterKey))
+            {
+                // Legacy CSI letter sequence (arrows, Home, End, F1-F4)
+                key = letterKey;
+            }
+            else if (terminator == '~' && CsiTildeKeyMap.TryGetValue(keyCode, out Avalonia.Input.Key tildeKey))
+            {
+                // Legacy CSI tilde sequence (Insert, Delete, PgUp, PgDn, F5-F12)
+                key = tildeKey;
+            }
+            else if (terminator == 'u' && KittyKeyMap.TryGetValue(keyCode, out Avalonia.Input.Key mappedKey))
+            {
+                key = mappedKey;
+                // For Enter, Tab, Backspace, Space - set the character
+                if (keyCode == 13) character = '\r';
+                else if (keyCode == 9) character = '\t';
+                else if (keyCode == 127) character = '\b';
+                else if (keyCode == 27) character = '\x1B';
+            }
+            else if (terminator == 'u' && keyCode >= 32 && keyCode < 127)
+            {
+                // Printable ASCII via CSI u
+                character = (char)keyCode;
+
+                // Map to Avalonia Key enum
+                if (keyCode >= 'a' && keyCode <= 'z')
+                    key = Avalonia.Input.Key.A + (keyCode - 'a');
+                else if (keyCode >= 'A' && keyCode <= 'Z')
+                {
+                    key = Avalonia.Input.Key.A + (keyCode - 'A');
+                    rawModifiers |= RawInputModifiers.Shift;
+                }
+                else if (keyCode >= '0' && keyCode <= '9')
+                    key = Avalonia.Input.Key.D0 + (keyCode - '0');
+                else if (keyCode == ' ')
+                    key = Avalonia.Input.Key.Space;
+                else
+                {
+                    // Map punctuation characters to Avalonia Key
+                    key = character switch
+                    {
+                        '.' => Avalonia.Input.Key.OemPeriod,
+                        ',' => Avalonia.Input.Key.OemComma,
+                        ';' => Avalonia.Input.Key.OemSemicolon,
+                        '/' => Avalonia.Input.Key.Oem2,
+                        '\\' => Avalonia.Input.Key.Oem5,
+                        '=' => Avalonia.Input.Key.OemPlus,
+                        '-' => Avalonia.Input.Key.OemMinus,
+                        '[' => Avalonia.Input.Key.Oem4,
+                        ']' => Avalonia.Input.Key.Oem6,
+                        '\'' => Avalonia.Input.Key.Oem7,
+                        '`' => Avalonia.Input.Key.Oem3,
+                        _ => Avalonia.Input.Key.None
+                    };
+                }
+            }
+            else
+            {
+                // Unknown keycode or terminator
+                return;
+            }
+
+            RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64, !isDown);
+            if (eventType != 3) // For press events, also raise key up
+            {
+                Thread.Yield();
+                RaiseKeyPress(key, character, rawModifiers, false, (ulong)Environment.TickCount64);
+            }
+        }
+
+        private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
+        {
+            const double velocity = 1;
+
+            // SGR mouse coordinates are 1-based, convert to 0-based
+            var point = new Point(mouseEvent.x - 1, mouseEvent.y - 1);
+
+            int buttonCode = mouseEvent.button;
+
+            // Decode modifiers from button code
+            RawInputModifiers modifiers = RawInputModifiers.None;
+            if ((buttonCode & 4) != 0) modifiers |= RawInputModifiers.Shift;
+            if ((buttonCode & 8) != 0) modifiers |= RawInputModifiers.Alt;
+            if ((buttonCode & 16) != 0) modifiers |= RawInputModifiers.Control;
+
+            // Determine event type
+            int buttonIndex = buttonCode & 3;
+            bool isMotion = (buttonCode & 32) != 0;
+            bool isWheel = (buttonCode & 64) != 0;
+
+            if (isWheel)
+            {
+                // Wheel events: buttonIndex 0 = scroll up, 1 = scroll down
+                double delta = buttonIndex == 0 ? velocity : -velocity;
+                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, delta), modifiers);
+            }
+            else if (isMotion)
+            {
+                // Add button modifier for drag
+                RawInputModifiers buttonModifier = buttonIndex switch
+                {
+                    0 => RawInputModifiers.LeftMouseButton,
+                    1 => RawInputModifiers.MiddleMouseButton,
+                    2 => RawInputModifiers.RightMouseButton,
+                    _ => RawInputModifiers.None
+                };
+
+                RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers | buttonModifier | _moveModifers);
+            }
+            else if (mouseEvent.isRelease)
+            {
+                RawInputModifiers buttonModifier = buttonIndex switch
+                {
+                    0 => RawInputModifiers.LeftMouseButton,
+                    1 => RawInputModifiers.MiddleMouseButton,
+                    2 => RawInputModifiers.RightMouseButton,
+                    _ => RawInputModifiers.None
+                };
+                RawPointerEventType eventType = buttonIndex switch
+                {
+                    0 => RawPointerEventType.LeftButtonUp,
+                    1 => RawPointerEventType.MiddleButtonUp,
+                    2 => RawPointerEventType.RightButtonUp,
+                    _ => RawPointerEventType.LeftButtonUp
+                };
+
+                _moveModifers = RawInputModifiers.None;
+                RaiseMouseEvent(eventType, point, null, modifiers | buttonModifier);
+            }
+            else
+            {
+                // Button press
+                RawInputModifiers buttonModifier = buttonIndex switch
+                {
+                    0 => RawInputModifiers.LeftMouseButton,
+                    1 => RawInputModifiers.MiddleMouseButton,
+                    2 => RawInputModifiers.RightMouseButton,
+                    _ => RawInputModifiers.None
+                };
+                RawPointerEventType eventType = buttonIndex switch
+                {
+                    0 => RawPointerEventType.LeftButtonDown,
+                    1 => RawPointerEventType.MiddleButtonDown,
+                    2 => RawPointerEventType.RightButtonDown,
+                    _ => RawPointerEventType.LeftButtonDown
+                };
+
+                _moveModifers = modifiers | buttonModifier;
+                RaiseMouseEvent(eventType, point, null, modifiers | buttonModifier);
+            }
+        }
 
         public override void RestoreConsole()
         {
             base.RestoreConsole();
+
+            if (_isKittyKeyboardEnabled)
+            {
+                WriteText(Esc.DisableKittyKeyboard);
+                _isKittyKeyboardEnabled = false;
+            }
 
             WriteText(Esc.DisableAllMouseEvents);
             WriteText(Esc.DisableExtendedMouseTracking);
@@ -413,197 +721,221 @@ namespace Consolonia.PlatformSupport
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
 
-            (string, Key)[] fSequences =
-            [
-                // Ctrl+Alt+(F1 - F4)
-                (@"\x1B[1;7P", Key.CtrlMask | Key.AltMask | MapCursesKey(80 + 185)),
-                (@"\x1B[1;7Q", Key.CtrlMask | Key.AltMask | MapCursesKey(81 + 185)),
-                (@"\x1B[1;7R", Key.CtrlMask | Key.AltMask | MapCursesKey(82 + 185)),
-                (@"\x1B[1;7S", Key.CtrlMask | Key.AltMask | MapCursesKey(83 + 185)),
-                // Ctrl+Alt+(F5 - F8)
-                (@"\x1B[53;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(53 + 216)),
-                (@"\x1B[54;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(55 + 215)),
-                (@"\x1B[55;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(56 + 215)),
-                (@"\x1B[56;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(57 + 215)),
-                // Ctrl+Alt+(F9 - F12)
-                (@"\x1B[48;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(48 + 225)),
-                (@"\x1B[49;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(49 + 225)),
-                (@"\x1B[50;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(50 + 225)),
-                (@"\x1B[51;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Ctrl+Shift+Alt+(F1 - F4)
-                (@"\x1B[1;8;7P", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(80 + 185)),
-                (@"\x1B[1;8;7Q", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(81 + 185)),
-                (@"\x1B[1;8;7R", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(82 + 185)),
-                (@"\x1B[1;8;7S", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(83 + 185)),
-                // Ctrl+Shift+Alt+(F5 - F8)
-                (@"\x1B[53;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
-                (@"\x1B[54;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
-                (@"\x1B[55;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
-                (@"\x1B[56;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
-                // Ctrl+Shift+Alt+(F9 - F12)
-                (@"\x1B[48;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
-                (@"\x1B[49;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
-                (@"\x1B[50;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
-                (@"\x1B[51;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Shift+Alt+(F4)
-                (@"\x1B[1;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(268)),
-                // Shift+Alt+(F5 - F8)
-                (@"\x1B[53;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
-                (@"\x1B[54;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
-                (@"\x1B[55;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
-                (@"\x1B[56;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
-                // Shift+Alt+(F9 - F12)
-                (@"\x1B[48;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
-                (@"\x1B[49;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
-                (@"\x1B[50;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
-                (@"\x1B[51;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Shift+Ctrl+Alt+KeyNPage
-                (@"\x1B[54;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageDown),
-                // Shift+Ctrl+Alt+KeyPPage
-                (@"\x1B[53;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageUp),
-                // Shift+Ctrl+Alt+KeyHome
-                (@"\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
-                // Shift+Ctrl+Alt+KeyEnd
-                (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End)
-            ];
-
-            foreach ((string, Key) fSequence in fSequences)
-                yield return new SafeLockMatcher(
-                    new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
-                        fSequence.Item1, fSequence.Item1), 0, 0, 0);
-
-            // escape of ESC
-            yield return new SafeLockMatcher(
-                new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.Esc); }, cp => new Rune(cp), @"^\x1B+$", 2), 0,
-                0);
-
-            // SHIFT+TAB is received as ESC then TAB, both locked by key 0: https://unix.stackexchange.com/a/238412
-            yield return new SafeLockMatcher(
-                new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.BackTab); }, cp => new Rune(cp), @"^\x1B\t?$",
-                    2), 0, 0);
-
-            // The ESC-number handling, debatable.
-            yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
+            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde)
+            if (_isKittyKeyboardEnabled)
             {
-                var k = Key.Unknown;
-                // Simulates the AltMask itself by pressing Alt + Space.
-                int wch = tuple.Item2[0];
-                int wch2 = tuple.Item2[1];
+                yield return new SafeLockMatcher(
+                    new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
+            }
 
-                if (wch2 == (int)Key.Space)
-                {
-                    k = Key.AltMask;
-                }
-                else if (wch2 - (int)Key.Space >= (uint)Key.A && wch2 - (int)Key.Space <= (uint)Key.Z)
-                {
-                    k = (Key)((uint)Key.AltMask + (wch2 - (int)Key.Space));
-                }
-                else if (wch2 >= (uint)Key.A - 64 && wch2 <= (uint)Key.Z - 64)
-                {
-                    k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + (wch2 + 64));
-                }
-                else if (wch2 >= (uint)Key.D0 && wch2 <= (uint)Key.D9)
-                {
-                    k = (Key)((uint)Key.AltMask + (uint)Key.D0 + (wch2 - (uint)Key.D0));
-                }
-                else
-                {
-                    // Unfortunately there are no way to differentiate Ctrl+Alt+alfa and Ctrl+Shift+Alt+alfa.
-                    if (((Key)wch2 & Key.CtrlMask) != 0) _keyModifiers.Ctrl = true;
+            // SGR extended mouse sequences: ESC [ < button ; x ; y M/m
+            yield return new SafeLockMatcher(
+                new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
 
-                    if (wch2 == 0)
+            // Old protocol matchers are only needed when Kitty keyboard protocol is NOT active
+            if (!_isKittyKeyboardEnabled)
+            {
+                (string, Key)[] fSequences =
+                [
+                    // Ctrl+Alt+(F1 - F4)
+                    (@"\x1B[1;7P", Key.CtrlMask | Key.AltMask | MapCursesKey(80 + 185)),
+                    (@"\x1B[1;7Q", Key.CtrlMask | Key.AltMask | MapCursesKey(81 + 185)),
+                    (@"\x1B[1;7R", Key.CtrlMask | Key.AltMask | MapCursesKey(82 + 185)),
+                    (@"\x1B[1;7S", Key.CtrlMask | Key.AltMask | MapCursesKey(83 + 185)),
+                    // Ctrl+Alt+(F5 - F8)
+                    (@"\x1B[53;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(53 + 216)),
+                    (@"\x1B[54;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(55 + 215)),
+                    (@"\x1B[55;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(56 + 215)),
+                    (@"\x1B[56;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(57 + 215)),
+                    // Ctrl+Alt+(F9 - F12)
+                    (@"\x1B[48;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(48 + 225)),
+                    (@"\x1B[49;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(49 + 225)),
+                    (@"\x1B[50;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(50 + 225)),
+                    (@"\x1B[51;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(51 + 225)),
+                    // Ctrl+Shift+Alt+(F1 - F4)
+                    (@"\x1B[1;8;7P", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(80 + 185)),
+                    (@"\x1B[1;8;7Q", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(81 + 185)),
+                    (@"\x1B[1;8;7R", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(82 + 185)),
+                    (@"\x1B[1;8;7S", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(83 + 185)),
+                    // Ctrl+Shift+Alt+(F5 - F8)
+                    (@"\x1B[53;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
+                    (@"\x1B[54;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
+                    (@"\x1B[55;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
+                    (@"\x1B[56;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
+                    // Ctrl+Shift+Alt+(F9 - F12)
+                    (@"\x1B[48;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
+                    (@"\x1B[49;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
+                    (@"\x1B[50;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
+                    (@"\x1B[51;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
+                    // Shift+Alt+(F4)
+                    (@"\x1B[1;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(268)),
+                    // Shift+Alt+(F5 - F8)
+                    (@"\x1B[53;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
+                    (@"\x1B[54;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
+                    (@"\x1B[55;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
+                    (@"\x1B[56;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
+                    // Shift+Alt+(F9 - F12)
+                    (@"\x1B[48;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
+                    (@"\x1B[49;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
+                    (@"\x1B[50;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
+                    (@"\x1B[51;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
+                    // Shift+Ctrl+Alt+KeyNPage
+                    (@"\x1B[54;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageDown),
+                    // Shift+Ctrl+Alt+KeyPPage
+                    (@"\x1B[53;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageUp),
+                    // Shift+Ctrl+Alt+KeyHome
+                    (@"\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
+                    // Shift+Ctrl+Alt+KeyEnd
+                    (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End)
+                ];
+
+                foreach ((string, Key) fSequence in fSequences)
+                    yield return new SafeLockMatcher(
+                        new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
+                            fSequence.Item1, fSequence.Item1), 0, 0, 0);
+
+                // escape of ESC
+                yield return new SafeLockMatcher(
+                    new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.Esc); }, cp => new Rune(cp), @"^\x1B+$", 2), 0,
+                    0);
+
+                // SHIFT+TAB is received as ESC then TAB, both locked by key 0: https://unix.stackexchange.com/a/238412
+                yield return new SafeLockMatcher(
+                    new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.BackTab); }, cp => new Rune(cp), @"^\x1B\t?$",
+                        2), 0, 0);
+
+                // The ESC-number handling, debatable.
+                yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
+                {
+                    var k = Key.Unknown;
+                    // Simulates the AltMask itself by pressing Alt + Space.
+                    int wch = tuple.Item2[0];
+                    int wch2 = tuple.Item2[1];
+
+                    if (wch2 == (int)Key.Space)
                     {
-                        k = Key.CtrlMask | Key.AltMask | Key.Space;
+                        k = Key.AltMask;
                     }
-                    // ReSharper disable once ConditionIsAlwaysTrueOrFalse todo: check why
-                    else if (wch >= (uint)Key.A && wch <= (uint)Key.Z)
+                    else if (wch2 - (int)Key.Space >= (uint)Key.A && wch2 - (int)Key.Space <= (uint)Key.Z)
                     {
-                        _keyModifiers.Shift = true;
-                        _keyModifiers.Alt = true;
+                        k = (Key)((uint)Key.AltMask + (wch2 - (int)Key.Space));
                     }
-                    else if (wch2 < 256)
+                    else if (wch2 >= (uint)Key.A - 64 && wch2 <= (uint)Key.Z - 64)
                     {
-                        k = (Key)wch2;
-                        _keyModifiers.Alt = true;
+                        k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + (wch2 + 64));
+                    }
+                    else if (wch2 >= (uint)Key.D0 && wch2 <= (uint)Key.D9)
+                    {
+                        k = (Key)((uint)Key.AltMask + (uint)Key.D0 + (wch2 - (uint)Key.D0));
                     }
                     else
                     {
-                        k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + wch2);
-                    }
-                }
+                        // Unfortunately there are no way to differentiate Ctrl+Alt+alfa and Ctrl+Shift+Alt+alfa.
+                        if (((Key)wch2 & Key.CtrlMask) != 0) _keyModifiers.Ctrl = true;
 
-                RaiseKeyPressInternal(k);
-            }, cp => new Rune(cp), @"^\x1B[^\x1B\[]*$", 2), 0, 0);
-
-            // alt mask
-            yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
-            {
-                int wch = tuple.Item2[0];
-                Key k = Key.AltMask | MapCursesKey(wch);
-                RaiseKeyPressInternal(k);
-            }, cp => new Rune(cp), @"^\x1B[^\x00]*$", 2), 0, Curses.KEY_CODE_YES);
-
-            // mouse and resize detection and some special processing
-            yield return new SafeLockMatcher(new GenericMatcher<int>(wch =>
-            {
-                switch (wch)
-                {
-                    case Curses.KeyResize:
-                        CheckSize();
-                        return;
-                    case Curses.KeyMouse:
-                        if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                        if (wch2 == 0)
                         {
-                            _verboseLogger.Log2(
-                                $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
-                            HandleMouseInput(ev);
+                            k = Key.CtrlMask | Key.AltMask | Key.Space;
                         }
-
-                        return;
-                }
-
-                Key k = MapCursesKey(wch);
-
-                switch (wch)
-                {
-                    case >= 277 and <= 288:
-                        // Shift+(F1 - F12)
-                        wch -= 12;
-                        k = Key.ShiftMask | MapCursesKey(wch);
-                        break;
-                    case >= 289 and <= 300:
-                        // Ctrl+(F1 - F12)
-                        wch -= 24;
-                        k = Key.CtrlMask | MapCursesKey(wch);
-                        break;
-                    case >= 301 and <= 312:
-                        // Ctrl+Shift+(F1 - F12)
-                        wch -= 36;
-                        k = Key.CtrlMask | Key.ShiftMask | MapCursesKey(wch);
-                        break;
-                    case >= 313 and <= 324:
-                        // Alt+(F1 - F12)
-                        wch -= 48;
-                        k = Key.AltMask | MapCursesKey(wch);
-                        break;
-                    case >= 325 and <= 327:
-                        // Shift+Alt+(F1 - F3)
-                        wch -= 60;
-                        k = Key.ShiftMask | Key.AltMask | MapCursesKey(wch);
-                        break;
-                    case >= 523 and <= 570:
-                        // Ctrl/Shift/Alt and navigation keys (arrow, home, end)
-                        string distro = Environment.GetEnvironmentVariable("WSL_DISTRO_NAME");
-                        if (!string.IsNullOrEmpty(distro))
-                            wch -= 1;
+                        // ReSharper disable once ConditionIsAlwaysTrueOrFalse todo: check why
+                        else if (wch >= (uint)Key.A && wch <= (uint)Key.Z)
+                        {
+                            _keyModifiers.Shift = true;
+                            _keyModifiers.Alt = true;
+                        }
+                        else if (wch2 < 256)
+                        {
+                            k = (Key)wch2;
+                            _keyModifiers.Alt = true;
+                        }
                         else
-                            wch -= 9;
-                        k = MapCursesKey(wch); // has appropriate XxxMask internal
-                        break;
-                }
+                        {
+                            k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + wch2);
+                        }
+                    }
 
-                RaiseKeyPressInternal(k);
-            }), Curses.KEY_CODE_YES);
+                    RaiseKeyPressInternal(k);
+                }, cp => new Rune(cp), @"^\x1B[^\x1B\[]*$", 2), 0, 0);
+
+                // alt mask
+                yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
+                {
+                    int wch = tuple.Item2[0];
+                    Key k = Key.AltMask | MapCursesKey(wch);
+                    RaiseKeyPressInternal(k);
+                }, cp => new Rune(cp), @"^\x1B[^\x00]*$", 2), 0, Curses.KEY_CODE_YES);
+
+                // mouse and resize detection and some special processing
+                yield return new SafeLockMatcher(new GenericMatcher<int>(wch =>
+                {
+                    switch (wch)
+                    {
+                        case Curses.KeyResize:
+                            CheckSize();
+                            return;
+                        case Curses.KeyMouse:
+                            if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                            {
+                                _verboseLogger.Log2(
+                                    $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
+                                HandleMouseInput(ev);
+                            }
+
+                            return;
+                    }
+
+                    Key k = MapCursesKey(wch);
+
+                    switch (wch)
+                    {
+                        case >= 277 and <= 288:
+                            // Shift+(F1 - F12)
+                            wch -= 12;
+                            k = Key.ShiftMask | MapCursesKey(wch);
+                            break;
+                        case >= 289 and <= 300:
+                            // Ctrl+(F1 - F12)
+                            wch -= 24;
+                            k = Key.CtrlMask | MapCursesKey(wch);
+                            break;
+                        case >= 301 and <= 312:
+                            // Ctrl+Shift+(F1 - F12)
+                            wch -= 36;
+                            k = Key.CtrlMask | Key.ShiftMask | MapCursesKey(wch);
+                            break;
+                        case >= 313 and <= 324:
+                            // Alt+(F1 - F12)
+                            wch -= 48;
+                            k = Key.AltMask | MapCursesKey(wch);
+                            break;
+                        case >= 325 and <= 327:
+                            // Shift+Alt+(F1 - F3)
+                            wch -= 60;
+                            k = Key.ShiftMask | Key.AltMask | MapCursesKey(wch);
+                            break;
+                        case >= 523 and <= 570:
+                            // Ctrl/Shift/Alt and navigation keys (arrow, home, end)
+                            string distro = Environment.GetEnvironmentVariable("WSL_DISTRO_NAME");
+                            if (!string.IsNullOrEmpty(distro))
+                                wch -= 1;
+                            else
+                                wch -= 9;
+                            k = MapCursesKey(wch); // has appropriate XxxMask internal
+                            break;
+                    }
+
+                    RaiseKeyPressInternal(k);
+                }), Curses.KEY_CODE_YES);
+            }
+            else
+            {
+                // When Kitty keyboard protocol is active, we only need resize detection
+                yield return new SafeLockMatcher(new GenericMatcher<int>(wch =>
+                {
+                    if (wch == Curses.KeyResize)
+                        CheckSize();
+                }), Curses.KEY_CODE_YES);
+            }
 
             // text detection
             var textInputMatcher = new SafeLockMatcher(new TextInputMatcher<int>(tuple =>
