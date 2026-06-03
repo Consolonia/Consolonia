@@ -464,7 +464,11 @@ namespace Consolonia.PlatformSupport
                 // Shift+Ctrl+Alt+KeyHome
                 (@"\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
                 // Shift+Ctrl+Alt+KeyEnd
-                (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End)
+                (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End),
+                // Ctrl+Enter (`modifyOtherKeys` / xterm extended keys)
+                (@"\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
+
+                // todo: should be other sequences, need research
             ];
 
             foreach ((string, Key) fSequence in fSequences)
