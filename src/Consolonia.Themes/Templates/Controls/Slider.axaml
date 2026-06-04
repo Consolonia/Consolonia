@@ -1,7 +1,8 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:console="https://github.com/consolonia"
-                    x:ClassModifier="internal">
+                    x:ClassModifier="internal"
+                    x:CompileBindings="False">
     <ControlTheme x:Key="SliderRepeatTrackTheme"
                   TargetType="RepeatButton">
         <Setter Property="Background"

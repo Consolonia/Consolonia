@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Platform;
+using Avalonia.Platform.Surfaces;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -16,12 +19,18 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        public IRenderTarget CreateRenderTarget(IEnumerable<object> surfaces)
+        public IRenderTarget CreateRenderTarget(IEnumerable<IPlatformRenderSurface> surfaces)
         {
+            if (!HasSingleConsoleWindowSurface(surfaces))
+                throw new ArgumentException(
+                    $"{nameof(RenderTarget)} requires exactly one {nameof(ConsoleWindowImpl)} surface.",
+                    nameof(surfaces));
+
             return new RenderTarget(surfaces);
         }
 
-        public IDrawingContextLayerImpl CreateOffscreenRenderTarget(PixelSize pixelSize, double scaling)
+        public IDrawingContextLayerImpl CreateOffscreenRenderTarget(PixelSize pixelSize, Vector dpi,
+            bool mono)
         {
             throw new NotImplementedException();
         }
@@ -29,5 +38,20 @@ namespace Consolonia.Core.Drawing
         public bool IsLost => false;
 
         public IReadOnlyDictionary<Type, object> PublicFeatures { get; } = new Dictionary<Type, object>();
+
+        public PixelSize? MaxOffscreenRenderTargetPixelSize => null;
+
+        public bool IsReadyToCreateRenderTarget(IEnumerable<IPlatformRenderSurface> surfaces)
+        {
+            return HasSingleConsoleWindowSurface(surfaces);
+        }
+
+        private static bool HasSingleConsoleWindowSurface(IEnumerable<IPlatformRenderSurface> surfaces)
+        {
+            if (surfaces == null)
+                return false;
+
+            return surfaces.OfType<ConsoleWindowImpl>().Take(2).Count() == 1;
+        }
     }
 }

@@ -44,8 +44,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                                 Dispatcher.UIThread.Post(() =>
                                 {
                                     var focusedControl =
-                                        (Control)AvaloniaLocator.Current.GetRequiredService<IFocusManager>()!
-                                            .GetFocusedElement();
+                                        TopLevel.GetTopLevel(visual)?.FocusManager?.GetFocusedElement() as Control;
 
                                     if (focusedControl != null)
                                     {

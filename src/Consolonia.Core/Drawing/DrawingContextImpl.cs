@@ -77,7 +77,14 @@ namespace Consolonia.Core.Drawing
                     return;
             }
 
-            var glyphTypefaceRender = (IGlyphRunRender)glyphRun.GlyphTypeface;
+            var glyphTypefaceRender = glyphRunImpl.ConsoleTypeface as IGlyphRunRender;
+            if (glyphTypefaceRender == null)
+            {
+                ConsoloniaPlatform.RaiseNotSupported(
+                    NotSupportedRequestCode.DrawGlyphRunNotSupported, this, foreground, glyphRun);
+                return;
+            }
+
             Color foregroundColor = solidColorBrush.Color;
             var startPosition = new Point().Transform(Transform).ToPixelPoint();
             glyphTypefaceRender.DrawGlyphRun(this, startPosition, glyphRunImpl, foregroundColor,
@@ -164,6 +171,14 @@ namespace Consolonia.Core.Drawing
         public void PopRenderOptions()
         {
             _renderOptions.Pop();
+        }
+
+        public void PushTextOptions(TextOptions textOptions)
+        {
+        }
+
+        public void PopTextOptions()
+        {
         }
 
         public object GetFeature(Type t)

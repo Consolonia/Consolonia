@@ -61,10 +61,7 @@ namespace Consolonia.Core.Infrastructure
         }
     }
 
-#pragma warning disable CS0618 // Type or member is obsolete
-    public class AsyncDataTransferItem : IAsyncDataTransferItem,
-        IDataObject
-#pragma warning restore CS0618 // Type or member is obsolete
+    public class AsyncDataTransferItem : IAsyncDataTransferItem
     {
         private readonly List<DataFormat> _formats;
         private readonly object _item;
@@ -88,7 +85,7 @@ namespace Consolonia.Core.Infrastructure
 
         #endregion
 
-        #region IDataObject
+        #region Synchronous format helpers
 
         public bool Contains(string dataFormat)
         {

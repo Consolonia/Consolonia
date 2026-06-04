@@ -17,7 +17,7 @@ namespace Consolonia.Core.Text.Fonts
     /// <summary>
     ///     Fonts which use the TLF/Caca format
     /// </summary>
-    public class AsciiArtTypeface : IGlyphTypeface, ITextShaperImpl, IGlyphRunRender
+    public class AsciiArtTypeface : IConsoleTypeface
     {
         /// glyphindex to codepoint
         private readonly Dictionary<uint, ushort> _codepointsToIndex = new();
@@ -161,7 +161,7 @@ namespace Consolonia.Core.Text.Fonts
                 XBearing = 0,
                 YBearing = 0,
                 Height = Metrics.DesignEmHeight,
-                Width = GetGlyphAdvance(glyph)
+                Width = (ushort)GetGlyphAdvance(glyph)
             };
             return true;
         }
@@ -202,11 +202,11 @@ namespace Consolonia.Core.Text.Fonts
 
 
             var shapedBuffer =
-                new ShapedBuffer(text, graphemes.Count, this, Metrics.DesignEmHeight,
-                    0 /*todo: must be 1 for right to left?*/);
+                new ShapedBuffer(text, graphemes.Count, options.GlyphTypeface, Metrics.DesignEmHeight,
+                    options.BidiLevel);
 
-            for (ushort i = 0; i < shapedBuffer.Length; i++)
-                shapedBuffer[i] = new GlyphInfo(glyphIndices[i], i, advances[i]);
+            for (int i = 0; i < shapedBuffer.Length; i++)
+                shapedBuffer[i] = new GlyphInfo(glyphIndices[i], i, advances[i], default);
             return shapedBuffer;
         }
 

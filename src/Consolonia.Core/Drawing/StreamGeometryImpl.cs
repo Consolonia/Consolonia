@@ -91,7 +91,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>
         ///     A Consolonia implementation of a <see cref="IStreamGeometryContextImpl" />.
         /// </summary>
-        private class StreamGeometryContextImpl : IStreamGeometryContextImpl, IGeometryContext2
+        private class StreamGeometryContextImpl : IStreamGeometryContextImpl
         {
             private readonly StreamGeometryImpl _geometryImpl;
             private bool _isFilled;
@@ -132,30 +132,10 @@ namespace Consolonia.Core.Drawing
             }
 
             /// <inheritdoc />
-            public void ArcTo(Point point, Size size, double rotationAngle, bool isLargeArc,
-                SweepDirection sweepDirection)
-            {
-                // ignore arc instructions. It's attempt to draw rounded corners, we don't do that.
-                //_lastPoint = point;
-            }
-
-            /// <inheritdoc />
             public void BeginFigure(Point startPoint, bool isFilled)
             {
                 _isFilled = isFilled;
                 _lastPoint = startPoint;
-            }
-
-            /// <inheritdoc />
-            public void CubicBezierTo(Point point1, Point point2, Point point3)
-            {
-                ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.CubicBezierToNotSupported);
-            }
-
-            /// <inheritdoc />
-            public void QuadraticBezierTo(Point point1, Point point2)
-            {
-                ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.QuadraticBezierToNotSupported);
             }
 
             /// <inheritdoc />

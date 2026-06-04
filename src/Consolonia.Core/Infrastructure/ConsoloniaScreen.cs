@@ -12,7 +12,7 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoloniaScreen(PixelRect rect)
         {
-            _screens = [new Screen(0.0, rect, rect, true)];
+            _screens = [CreateScreen(rect)];
         }
 
         public int ScreenCount => 1;
@@ -44,6 +44,24 @@ namespace Consolonia.Core.Infrastructure
         public Screen ScreenFromWindow(IWindowBaseImpl window)
         {
             return _screens[0];
+        }
+
+        private static Screen CreateScreen(PixelRect rect)
+        {
+            var screen = new PlatformScreen(null);
+            SetScreenProperty(screen, nameof(Screen.DisplayName), "Console");
+            SetScreenProperty(screen, nameof(Screen.Scaling), 1d);
+            SetScreenProperty(screen, nameof(Screen.Bounds), rect);
+            SetScreenProperty(screen, nameof(Screen.WorkingArea), rect);
+            SetScreenProperty(screen, nameof(Screen.IsPrimary), true);
+            return screen;
+        }
+
+        private static void SetScreenProperty<T>(Screen screen, string propertyName, T value)
+        {
+            var property = typeof(Screen).GetProperty(propertyName) ??
+                           throw new InvalidOperationException($"Screen property '{propertyName}' not found.");
+            property.SetValue(screen, value);
         }
     }
 }

@@ -38,12 +38,12 @@
                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
                         <TextBlock Name="floatingWatermark"
                                    Foreground="{DynamicResource ThemeNoDisturbBrush}"
-                                   Text="{TemplateBinding Watermark}"
+                                   Text="{TemplateBinding PlaceholderText}"
                                    DockPanel.Dock="Top">
                             <TextBlock.IsVisible>
                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                                     <Binding RelativeSource="{RelativeSource TemplatedParent}"
-                                             Path="UseFloatingWatermark" />
+                                             Path="UseFloatingPlaceholder" />
                                     <Binding RelativeSource="{RelativeSource TemplatedParent}"
                                              Path="Text"
                                              Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
@@ -82,7 +82,7 @@
                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                                    Foreground="{TemplateBinding BorderBrush}"
-                                                   Text="{TemplateBinding Watermark}"
+                                                   Text="{TemplateBinding PlaceholderText}"
                                                    TextAlignment="{TemplateBinding TextAlignment}"
                                                    TextWrapping="{TemplateBinding TextWrapping}">
                                             <TextBlock.IsVisible>

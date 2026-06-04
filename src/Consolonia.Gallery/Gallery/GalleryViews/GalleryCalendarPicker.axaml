@@ -41,11 +41,11 @@
                     <CalendarDatePicker Name="DatePicker4" />
 
                     <TextBlock Text="Watermark" />
-                    <CalendarDatePicker Watermark="Watermark" />
+                    <CalendarDatePicker PlaceholderText="Watermark" />
                     <TextBlock Text="Floating Watermark" />
                     <CalendarDatePicker Name="DatePicker5"
-                                        Watermark="Floating Watermark"
-                                        UseFloatingWatermark="True" />
+                                        PlaceholderText="Floating Watermark"
+                                        UseFloatingPlaceholder="True" />
 
                     <TextBlock Text="Disabled" />
                     <CalendarDatePicker IsEnabled="False" />

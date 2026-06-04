@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Consolonia.Controls;
+using Consolonia.Core.Text;
 using Consolonia.Core.Text.Fonts;
 using NUnit.Framework;
 
@@ -11,11 +12,40 @@ namespace Consolonia.Core.Tests
     [TestFixture]
     public class AsciiArtTypefaceTests
     {
+        private GlyphTypeface _testGlyphTypeface;
+
         [SetUp]
         public void Setup()
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
                 { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
+            _testGlyphTypeface = new FontManagerImpl().CreateGlyphTypeface(new ConsoleTypeface());
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _testGlyphTypeface?.Dispose();
+            _testGlyphTypeface = null;
+        }
+
+        [Test]
+        public void ConsoleGlyphTypefaceMetricsMatchConsoleCell()
+        {
+            var glyphTypeface = new FontManagerImpl().CreateGlyphTypeface(new ConsoleTypeface());
+            try
+            {
+                FontMetrics metrics = glyphTypeface.Metrics;
+
+                Assert.AreEqual(1, metrics.DesignEmHeight);
+                Assert.AreEqual(-1, metrics.Ascent);
+                Assert.AreEqual(0, metrics.Descent);
+                Assert.AreEqual(0, metrics.LineGap);
+            }
+            finally
+            {
+                glyphTypeface.Dispose();
+            }
         }
 
         [Test]
@@ -268,7 +298,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["***"]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["**"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            var options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -292,7 +322,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*  ", "*  ", "*  "]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["  *", "  *", "  *"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            var options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -487,7 +517,7 @@ namespace Consolonia.Core.Tests
             };
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            var options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("A".AsMemory(), options);
@@ -534,6 +564,11 @@ namespace Consolonia.Core.Tests
             Assert.AreEqual(FontStyle.Italic, typeface.Style);
             Assert.AreEqual(FontStretch.Condensed, typeface.Stretch);
             Assert.AreEqual(FontSimulations.Bold, typeface.FontSimulations);
+        }
+
+        private TextShaperOptions CreateTextShaperOptions()
+        {
+            return new TextShaperOptions(_testGlyphTypeface, 1);
         }
     }
 }

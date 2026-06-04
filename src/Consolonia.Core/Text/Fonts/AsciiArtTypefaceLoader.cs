@@ -67,6 +67,11 @@ namespace Consolonia.Core.Text.Fonts
                 throw new InvalidDataException("Invalid FIGlet header - missing height parameter");
 
             typeface.Height = int.Parse(parts[0]);
+            const int maxSupportedHeight = short.MaxValue + 2;
+            if (typeface.Height <= 0 || typeface.Height > maxSupportedHeight)
+                throw new InvalidDataException(
+                    $"Invalid FIGlet header - height must be between 1 and {maxSupportedHeight}, got {typeface.Height}");
+
             int baseline = parts.Length > 1 ? int.Parse(parts[1]) : 0;
             typeface.Width = parts.Length > 2 ? int.Parse(parts[2]) : 0;
             int oldLayout = parts.Length > 3 ? int.Parse(parts[3]) : 0;
@@ -203,7 +208,7 @@ namespace Consolonia.Core.Text.Fonts
 
             typeface.Metrics = new FontMetrics
             {
-                DesignEmHeight = (short)typeface.Height,
+                DesignEmHeight = (ushort)typeface.Height,
                 IsFixedPitch = false,
                 StrikethroughPosition = (short)(typeface.Height / 2),
                 StrikethroughThickness = 1,

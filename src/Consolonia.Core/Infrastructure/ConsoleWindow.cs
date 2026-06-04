@@ -11,6 +11,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Input.Raw;
 using Avalonia.Platform;
+using Avalonia.Platform.Surfaces;
 using Avalonia.Platform.Storage;
 using Avalonia.Rendering.Composition;
 using Consolonia.Controls;
@@ -23,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
     ///     ConsoleWindowImpl - An IWindowImpl which uses a PixelBuffer to render.
     /// </summary>
 #pragma warning disable CA1711 // Identifiers should not have incorrect suffix
-    public class ConsoleWindowImpl : IWindowImpl
+    public class ConsoleWindowImpl : IWindowImpl, IPlatformRenderSurface
 #pragma warning restore CA1711 // Identifiers should not have incorrect suffix
     {
         private static bool _singletonGuard;
@@ -31,6 +32,7 @@ namespace Consolonia.Core.Infrastructure
         private readonly bool _accessKeysAlwaysOn;
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
         private readonly IKeyboardDevice _myKeyboardDevice;
+        private Compositor _compositor;
         private Point _cursorPosition = new(0, 0);
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
         private bool _disposedValue;
@@ -71,7 +73,7 @@ namespace Consolonia.Core.Infrastructure
         {
             _inputRoot = inputRoot;
             if (_accessKeysAlwaysOn)
-                _inputRoot.ShowAccessKeys = true;
+                SetShowAccessKeys(_inputRoot, true);
         }
 
         public Point PointToClient(PixelPoint point)
@@ -131,7 +133,12 @@ namespace Consolonia.Core.Infrastructure
         public Size? FrameSize => ClientSize;
 
         public double RenderScaling => 1;
-        public IEnumerable<object> Surfaces => [this];
+
+        [SuppressMessage("Performance", "CA1819:Properties should not return arrays",
+            Justification = "Required by Avalonia's ITopLevelImpl interface.")]
+        public IPlatformRenderSurface[] Surfaces => [this];
+
+        public bool IsReady => true;
 
         public Action<RawInputEventArgs> Input { get; set; }
 
@@ -143,7 +150,7 @@ namespace Consolonia.Core.Infrastructure
 
         public Action<WindowTransparencyLevel> TransparencyLevelChanged { get; set; }
 
-        public Compositor Compositor { get; } = new(null);
+        public Compositor Compositor => _compositor ??= new Compositor(null);
         public Action Closed { get; set; }
         public Action LostFocus { get; set; }
 
@@ -203,7 +210,7 @@ namespace Consolonia.Core.Infrastructure
             ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetEnabledNotSupported);
         }
 
-        public void SetSystemDecorations(SystemDecorations enabled)
+        public void SetWindowDecorations(WindowDecorations enabled)
         {
             ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode.ConsoleWindowSetSystemDecorationsNotSupported);
         }
@@ -258,12 +265,6 @@ namespace Consolonia.Core.Infrastructure
                 .ConsoleWindowSetExtendClientAreaToDecorationsHintNotSupported);
         }
 
-        public void SetExtendClientAreaChromeHints(ExtendClientAreaChromeHints hints)
-        {
-            ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode
-                .ConsoleWindowSetExtendClientAreaChromeHintsNotSupported);
-        }
-
         public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight)
         {
             ConsoloniaPlatform.RaiseNotSupported(NotSupportedRequestCode
@@ -271,6 +272,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
         public WindowState WindowState { get; set; }
+        public bool WindowStateGetterIsUsable => true;
         public Action<WindowState> WindowStateChanged { get; set; }
         public Action GotInputWhenDisabled { get; set; }
         public Func<WindowCloseReason, bool> Closing { get; set; }
@@ -282,11 +284,17 @@ namespace Consolonia.Core.Infrastructure
         // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public bool NeedsManagedDecorations { get; }
 
+        public PlatformRequestedDrawnDecoration RequestedDrawnDecorations => PlatformRequestedDrawnDecoration.None;
+
         // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public Thickness ExtendedMargins { get; }
 
         // ReSharper disable once UnassignedGetOnlyAutoProperty todo: what is this property
         public Thickness OffScreenMargin { get; }
+
+        public PlatformAllowedWindowActions AllowedWindowActions => PlatformAllowedWindowActions.None;
+
+        public Action<PlatformAllowedWindowActions> AllowedWindowActionsChanged { get; set; }
 
         public object TryGetFeature(Type featureType)
         {
@@ -323,13 +331,6 @@ namespace Consolonia.Core.Infrastructure
             return null;
         }
 
-        public void GetWindowsZOrder(Span<Window> windows, Span<long> zOrder)
-        {
-            // In console mode, all windows are considered to be at the same z-order level
-            for (int i = 0; i < zOrder.Length; i++)
-                zOrder[i] = 0;
-        }
-
         public void Dispose()
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
@@ -354,7 +355,7 @@ namespace Consolonia.Core.Infrastructure
             if (args.Sender != _inputRoot) return;
             if (args.GetNewValue<bool>()) return;
 
-            _inputRoot.ShowAccessKeys = true;
+            SetShowAccessKeys(_inputRoot, true);
         }
 
         private void ConsoleOnMouseEvent(RawPointerEventType type, Point point, Vector? wheelDelta,
@@ -422,21 +423,14 @@ namespace Consolonia.Core.Infrastructure
         {
             if (!down)
             {
-#pragma warning disable CS0618 // Type or member is obsolete // todo: change to correct constructor, CFA20A9A-3A24-4187-9CA3-9DF0081124EE 
-                var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot,
-                    RawKeyEventType.KeyUp, key,
-                    rawInputModifiers);
-#pragma warning restore CS0618 // Type or member is obsolete
+                RawKeyEventArgs rawInputEventArgs =
+                    CreateRawKeyEventArgs(timeStamp, RawKeyEventType.KeyUp, key, keyChar, rawInputModifiers);
                 Input!(rawInputEventArgs);
             }
             else
             {
-#pragma warning disable CS0618 // Type or member is obsolete //todo: CFA20A9A-3A24-4187-9CA3-9DF0081124EE
-                var rawInputEventArgs = new RawKeyEventArgs(_myKeyboardDevice, timeStamp,
-                    _inputRoot,
-                    RawKeyEventType.KeyDown, key,
-                    rawInputModifiers);
-#pragma warning restore CS0618 // Type or member is obsolete
+                RawKeyEventArgs rawInputEventArgs =
+                    CreateRawKeyEventArgs(timeStamp, RawKeyEventType.KeyDown, key, keyChar, rawInputModifiers);
                 Input!(rawInputEventArgs);
 
                 if (tryAsTextInput &&
@@ -449,6 +443,66 @@ namespace Consolonia.Core.Infrastructure
                         _inputRoot,
                         keyChar.ToString()));
             }
+        }
+
+        private RawKeyEventArgs CreateRawKeyEventArgs(ulong timeStamp, RawKeyEventType type, Key key, char keyChar,
+            RawInputModifiers rawInputModifiers)
+        {
+            PhysicalKey physicalKey = GetPhysicalKey(key);
+            string keySymbol = GetKeySymbol(keyChar, rawInputModifiers, physicalKey);
+            return new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot, type, key, rawInputModifiers,
+                physicalKey, keySymbol, KeyDeviceType.Keyboard);
+        }
+
+        private static string GetKeySymbol(char keyChar, RawInputModifiers rawInputModifiers, PhysicalKey physicalKey)
+        {
+            if (!char.IsControl(keyChar))
+                return keyChar.ToString();
+
+            if (physicalKey == PhysicalKey.None)
+                return null;
+
+            string qwertySymbol = physicalKey.ToQwertyKeySymbol(rawInputModifiers.HasFlag(RawInputModifiers.Shift));
+            return string.IsNullOrEmpty(qwertySymbol) ? null : qwertySymbol;
+        }
+
+        private static PhysicalKey GetPhysicalKey(Key key)
+        {
+            if (key >= Key.D0 && key <= Key.D9)
+                return (PhysicalKey)((int)PhysicalKey.Digit0 + ((int)key - (int)Key.D0));
+
+            if (Enum.TryParse(key.ToString(), out PhysicalKey physicalKey))
+                return physicalKey;
+
+            return key switch
+            {
+                Key.Left => PhysicalKey.ArrowLeft,
+                Key.Up => PhysicalKey.ArrowUp,
+                Key.Right => PhysicalKey.ArrowRight,
+                Key.Down => PhysicalKey.ArrowDown,
+                Key.Back => PhysicalKey.Backspace,
+                Key.Return => PhysicalKey.Enter,
+                Key.LeftAlt => PhysicalKey.AltLeft,
+                Key.RightAlt => PhysicalKey.AltRight,
+                Key.LeftCtrl => PhysicalKey.ControlLeft,
+                Key.RightCtrl => PhysicalKey.ControlRight,
+                Key.LeftShift => PhysicalKey.ShiftLeft,
+                Key.RightShift => PhysicalKey.ShiftRight,
+                Key.LWin => PhysicalKey.MetaLeft,
+                Key.RWin => PhysicalKey.MetaRight,
+                Key.OemMinus => PhysicalKey.Minus,
+                Key.OemPlus => PhysicalKey.Equal,
+                Key.OemComma => PhysicalKey.Comma,
+                Key.OemPeriod => PhysicalKey.Period,
+                Key.Oem1 => PhysicalKey.Semicolon,
+                Key.Oem2 => PhysicalKey.Slash,
+                Key.Oem3 => PhysicalKey.Backquote,
+                Key.Oem4 => PhysicalKey.BracketLeft,
+                Key.Oem5 => PhysicalKey.Backslash,
+                Key.Oem6 => PhysicalKey.BracketRight,
+                Key.Oem7 => PhysicalKey.Quote,
+                _ => PhysicalKey.None
+            };
         }
 
         protected virtual void Dispose(bool disposing)
@@ -518,6 +572,12 @@ namespace Consolonia.Core.Infrastructure
                 !Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseCursor))
                 return " ";
             return string.Empty;
+        }
+
+        private static void SetShowAccessKeys(IInputRoot inputRoot, bool value)
+        {
+            if (inputRoot is AvaloniaObject avaloniaObject)
+                avaloniaObject.SetValue(AccessText.ShowAccessKeyProperty, value);
         }
 
 

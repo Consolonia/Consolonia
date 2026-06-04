@@ -5,7 +5,6 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Utilities;
 
 namespace Consolonia.Themes.Templates.Controls.Helpers
 {
@@ -17,6 +16,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
         private static readonly MethodInfo SnapOffsetMethod =
             typeof(ScrollContentPresenter).GetMethod("SnapOffset",
                 BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy);
+        private const double MinWheelDeltaTolerance = 1e-6;
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
@@ -37,7 +37,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                 // If Shift-Key is pressed and X is close to 0 we swap the Vector.
                 // NOTE: Changed to also include CTRL
                 if ((e.KeyModifiers == KeyModifiers.Control || e.KeyModifiers == KeyModifiers.Shift) &&
-                    MathUtilities.IsZero(delta.X))
+                    Math.Abs(delta.X) < MinWheelDeltaTolerance)
                     delta = new Vector(delta.Y, delta.X);
                 else
                     delta = AdjustDeltaForFlowDirection(delta, FlowDirection);

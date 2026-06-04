@@ -16,7 +16,7 @@
                     <Border Background="{TemplateBinding Background}"
                             IsHitTestVisible="True" />
                     <!--<Panel Background="Transparent" Margin="{TemplateBinding WindowDecorationMargin}" /> -->
-                    <VisualLayerManager>
+                    <VisualLayerManager Name="PART_VisualLayerManager">
 
                         <!--<VisualLayerManager.ChromeOverlayLayer>
                         <TitleBar />Red

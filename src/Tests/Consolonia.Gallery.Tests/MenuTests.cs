@@ -22,5 +22,16 @@ namespace Consolonia.Gallery.Tests
             await UITest.KeyInput(Key.Escape);
             await UITest.AssertHasNoText("Standard Menu Item");
         }
+
+        [Test]
+        public async Task AltAccessKeyOpensMenu()
+        {
+            await UITest.AssertHasText("First", "Second");
+            await UITest.KeyInput(Key.S, RawInputModifiers.Alt);
+            await UITest.AssertHasText("Second Menu Item");
+            await UITest.KeyInput(Key.Escape);
+            await UITest.AssertHasNoText("Second Menu Item");
+            await UITest.KeyInput(Key.Left);
+        }
     }
 }

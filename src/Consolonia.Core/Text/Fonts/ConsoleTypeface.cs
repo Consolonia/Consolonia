@@ -14,7 +14,7 @@ namespace Consolonia.Core.Text.Fonts
     /// <summary>
     ///     This represents a psuedo-typeface for console rendering.
     /// </summary>
-    public sealed class ConsoleTypeface : IGlyphTypeface, ITextShaperImpl, IGlyphRunRender
+    public sealed class ConsoleTypeface : IConsoleTypeface
     {
         private static readonly object GlyphCacheSync = new();
         private static readonly Dictionary<ushort, string> GlyphTextByIndex = new();
@@ -152,7 +152,8 @@ namespace Consolonia.Core.Text.Fonts
 
         public ShapedBuffer ShapeText(ReadOnlyMemory<char> text, TextShaperOptions options)
         {
-            if (!(options.Typeface is ConsoleTypeface))
+            if (options.GlyphTypeface.PlatformTypeface is not ConsolePlatformTypeface consolePlatformTypeface ||
+                !ReferenceEquals(consolePlatformTypeface.ConsoleTypeface, this))
                 throw new ArgumentException("TextShaperOptions.Typeface must be of type ConsoleTypeface.",
                     nameof(options));
 
@@ -162,13 +163,13 @@ namespace Consolonia.Core.Text.Fonts
                 console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
 
             var shapedBuffer = new ShapedBuffer(text, graphemes.Count,
-                this, 1, 0 /*todo: must be 1 for right to left?*/);
-            for (ushort i = 0; i < shapedBuffer.Length; i++)
+                options.GlyphTypeface, Metrics.DesignEmHeight, options.BidiLevel);
+            for (int i = 0; i < shapedBuffer.Length; i++)
             {
                 Grapheme grapheme = graphemes[i];
                 ushort glyphIndex = GetGlyphIndex(grapheme.Glyph);
                 int glyphAdvance = GetGlyphAdvance(glyphIndex);
-                shapedBuffer[i] = new GlyphInfo(glyphIndex, grapheme.Cluster, glyphAdvance);
+                shapedBuffer[i] = new GlyphInfo(glyphIndex, grapheme.Cluster, glyphAdvance, default);
             }
 
             return shapedBuffer;
