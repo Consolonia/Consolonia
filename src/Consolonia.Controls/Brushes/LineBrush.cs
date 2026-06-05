@@ -24,6 +24,9 @@ namespace Consolonia.Controls.Brushes
 
         static LineBrush()
         {
+            // Enable animating a LineBrush (e.g. an animated Border.BorderBrush) by interpolating its inner brush.
+            LineBrushAnimator.EnsureRegistered();
+
             BrushProperty.Changed.AddClassHandler<LineBrush>((brush, args) =>
             {
                 if (args.OldValue is AvaloniaObject oldBrush)

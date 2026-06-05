@@ -91,12 +91,16 @@
                     HorizontalAlignment="Left"
                     Padding="2,0">
                 <Border.BorderBrush>
+                    <console:LineBrush LineStyle="DoubleLine">
+                        <console:LineBrush.Brush>
                     <LinearGradientBrush StartPoint="0%,0%"
                                          EndPoint="100%,0%"
                                          SpreadMethod="Reflect">
                         <GradientStop Offset="0" Color="#ff5495" />
                         <GradientStop Offset="1" Color="#feeb84" />
                     </LinearGradientBrush>
+                        </console:LineBrush.Brush>
+                    </console:LineBrush>
                 </Border.BorderBrush>
                 <TextBlock Text="This is an animated border." />
                 <Border.Styles>
@@ -107,32 +111,44 @@
                                        PlaybackDirection="Normal">
                                 <KeyFrame Cue="0%">
                                     <Setter Property="BorderBrush">
+                                        <console:LineBrush LineStyle="DoubleLine">
+                                            <console:LineBrush.Brush>
                                         <LinearGradientBrush StartPoint="0%,0%"
                                                              EndPoint="100%,0%"
                                                              SpreadMethod="Reflect">
                                             <GradientStop Offset="0" Color="#ff5495" />
                                             <GradientStop Offset="1" Color="#feeb84" />
                                         </LinearGradientBrush>
+                                            </console:LineBrush.Brush>
+                                        </console:LineBrush>
                                     </Setter>
                                 </KeyFrame>
                                 <KeyFrame Cue="50%">
                                     <Setter Property="BorderBrush">
+                                        <console:LineBrush LineStyle="DoubleLine">
+                                            <console:LineBrush.Brush>
                                         <LinearGradientBrush StartPoint="100%,0%"
                                                              EndPoint="200%,0%"
                                                              SpreadMethod="Reflect">
                                             <GradientStop Offset="0" Color="#ff5495" />
                                             <GradientStop Offset="1" Color="#feeb84" />
                                         </LinearGradientBrush>
+                                            </console:LineBrush.Brush>
+                                        </console:LineBrush>
                                     </Setter>
                                 </KeyFrame>
                                 <KeyFrame Cue="100%">
                                     <Setter Property="BorderBrush">
+                                        <console:LineBrush LineStyle="DoubleLine">
+                                            <console:LineBrush.Brush>
                                         <LinearGradientBrush StartPoint="200%,0%"
                                                              EndPoint="300%,0%"
                                                              SpreadMethod="Reflect">
                                             <GradientStop Offset="0" Color="#ff5495" />
                                             <GradientStop Offset="1" Color="#feeb84" />
                                         </LinearGradientBrush>
+                                            </console:LineBrush.Brush>
+                                        </console:LineBrush>
                                     </Setter>
                                 </KeyFrame>
                             </Animation>
