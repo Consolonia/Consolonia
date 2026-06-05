@@ -12,7 +12,7 @@
                 <Border BorderThickness="1"
                         BorderBrush="Red">
                     <TextBlock Text="Default"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
                 <Border BorderThickness="1">
                     <Border.BorderBrush>
@@ -20,7 +20,7 @@
                                            Brush="Green" />
                     </Border.BorderBrush>
                     <TextBlock Text="LineStyle=SingleLine"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
                 <Border BorderThickness="1">
                     <Border.BorderBrush>
@@ -28,7 +28,7 @@
                                            Brush="Blue" />
                     </Border.BorderBrush>
                     <TextBlock Text="LineStyle=DoubleLine"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
                 <Border BorderThickness="1">
                     <Border.BorderBrush>
@@ -36,7 +36,7 @@
                                            Brush="DarkGreen" />
                     </Border.BorderBrush>
                     <TextBlock Text="LineStyle=Edge"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
                 <Border BorderThickness="1">
                     <Border.BorderBrush>
@@ -44,7 +44,7 @@
                                            Brush="Purple" />
                     </Border.BorderBrush>
                     <TextBlock Text="LineStyle=EdgeWide"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
                 <Border BorderThickness="1">
                     <Border.BorderBrush>
@@ -52,7 +52,7 @@
                                            Brush="DarkGray" />
                     </Border.BorderBrush>
                     <TextBlock Text="LineStyle=Bold"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
             </WrapPanel>
             <WrapPanel>
@@ -62,7 +62,7 @@
                                            Brush="DarkGreen" />
                     </Border.BorderBrush>
                     <TextBlock Text="LineStyle=SingleLine SingleLine DoubleLine DoubleLine"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
                 <Border BorderThickness="1">
                     <Border.BorderBrush>
@@ -83,9 +83,63 @@
                                            Brush="Red" />
                     </Border.BorderBrush>
                     <TextBlock Text="Partial borders"
-                               Background="AntiqueWhite" />
+                               Background="{DynamicResource SystemControlBackgroundBaseMediumBrush}" />
                 </Border>
             </WrapPanel>
+            <Border Name="AnimBorder"
+                    BorderThickness="1"
+                    HorizontalAlignment="Left"
+                    Padding="2,0">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0%,0%"
+                                         EndPoint="100%,0%"
+                                         SpreadMethod="Reflect">
+                        <GradientStop Offset="0" Color="#ff5495" />
+                        <GradientStop Offset="1" Color="#feeb84" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+                <TextBlock Text="This is an animated border." />
+                <Border.Styles>
+                    <Style Selector="Border#AnimBorder">
+                        <Style.Animations>
+                            <Animation Duration="0:0:2"
+                                       IterationCount="Infinite"
+                                       PlaybackDirection="Normal">
+                                <KeyFrame Cue="0%">
+                                    <Setter Property="BorderBrush">
+                                        <LinearGradientBrush StartPoint="0%,0%"
+                                                             EndPoint="100%,0%"
+                                                             SpreadMethod="Reflect">
+                                            <GradientStop Offset="0" Color="#ff5495" />
+                                            <GradientStop Offset="1" Color="#feeb84" />
+                                        </LinearGradientBrush>
+                                    </Setter>
+                                </KeyFrame>
+                                <KeyFrame Cue="50%">
+                                    <Setter Property="BorderBrush">
+                                        <LinearGradientBrush StartPoint="100%,0%"
+                                                             EndPoint="200%,0%"
+                                                             SpreadMethod="Reflect">
+                                            <GradientStop Offset="0" Color="#ff5495" />
+                                            <GradientStop Offset="1" Color="#feeb84" />
+                                        </LinearGradientBrush>
+                                    </Setter>
+                                </KeyFrame>
+                                <KeyFrame Cue="100%">
+                                    <Setter Property="BorderBrush">
+                                        <LinearGradientBrush StartPoint="200%,0%"
+                                                             EndPoint="300%,0%"
+                                                             SpreadMethod="Reflect">
+                                            <GradientStop Offset="0" Color="#ff5495" />
+                                            <GradientStop Offset="1" Color="#feeb84" />
+                                        </LinearGradientBrush>
+                                    </Setter>
+                                </KeyFrame>
+                            </Animation>
+                        </Style.Animations>
+                    </Style>
+                </Border.Styles>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
