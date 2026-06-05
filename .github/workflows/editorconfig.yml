@@ -64,7 +64,8 @@ jobs:
         uses: muno92/resharper_inspectcode@1.12.0
         with:
           solutionPath: ./src/${{ env.SOLUTION_NAME }}
-          exclude: "**Consolonia.GuiCS/**.*;**Consolonia.Gallery/**.*"
+          # Avalonia XAML is validated by the build; ReSharper 2025.2.1 reports valid v12 bindings as errors.
+          exclude: "**Consolonia.GuiCS/**.*;**Consolonia.Gallery/**.*;**/*.axaml"
           version: '2025.2.1'
           minimumSeverity: 'warning'
 
