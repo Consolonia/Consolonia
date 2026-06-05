@@ -135,7 +135,7 @@ namespace Consolonia.Core.Text.Fonts
             _fallbackTypeface.Dispose();
         }
 
-        private sealed class SystemFontFallbackTypeface : IPlatformTypeface, IFontMemory
+        private sealed class SystemFontFallbackTypeface : IPlatformTypeface
         {
             private readonly IConsoleTypeface _consoleTypeface;
             private readonly byte[] _fontData;
@@ -212,7 +212,7 @@ namespace Consolonia.Core.Text.Fonts
             {
             }
 
-            private sealed class ConsoleOnlyFallbackTypeface : IPlatformTypeface, IFontMemory
+            private sealed class ConsoleOnlyFallbackTypeface : IPlatformTypeface
             {
                 private readonly IConsoleTypeface _consoleTypeface;
 

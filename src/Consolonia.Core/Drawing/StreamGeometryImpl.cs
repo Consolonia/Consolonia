@@ -138,7 +138,6 @@ namespace Consolonia.Core.Drawing
                 _lastPoint = startPoint;
             }
 
-            /// <inheritdoc />
             public void LineTo(Point point)
             {
                 // our strokes are oriented from UpperLeft corner to Right or Down
@@ -149,7 +148,6 @@ namespace Consolonia.Core.Drawing
                 _lastPoint = point;
             }
 
-            /// <inheritdoc />
             public void EndFigure(bool isClosed)
             {
                 Rect bound = _geometryImpl._strokes.Aggregate(new Rect(), (rect, line) => rect.Union(line.Bounds));

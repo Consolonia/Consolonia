@@ -21,12 +21,13 @@ namespace Consolonia.Core.Drawing
 
         public IRenderTarget CreateRenderTarget(IEnumerable<IPlatformRenderSurface> surfaces)
         {
-            if (!HasSingleConsoleWindowSurface(surfaces))
+            IPlatformRenderSurface[] surfaceArray = surfaces.ToArray();
+            if (!HasSingleConsoleWindowSurface(surfaceArray))
                 throw new ArgumentException(
                     $"{nameof(RenderTarget)} requires exactly one {nameof(ConsoleWindowImpl)} surface.",
                     nameof(surfaces));
 
-            return new RenderTarget(surfaces);
+            return new RenderTarget(surfaceArray);
         }
 
         public IDrawingContextLayerImpl CreateOffscreenRenderTarget(PixelSize pixelSize, Vector dpi,

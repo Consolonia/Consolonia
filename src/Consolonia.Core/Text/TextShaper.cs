@@ -34,9 +34,7 @@ namespace Consolonia.Core.Text
                 return consolePlatformTypeface.ConsoleTypeface;
 
             if (_fallback != null)
-                return _fallback.CreateTypeface(glyphTypeface) ??
-                       throw new InvalidOperationException(
-                           $"Fallback text shaper returned null for glyph typeface '{glyphTypeface.FamilyName}'.");
+                return _fallback.CreateTypeface(glyphTypeface);
 
             throw new KeyNotFoundException(
                 "Unsupported glyph typeface and no fallback text shaper is configured.");

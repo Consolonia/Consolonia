@@ -352,7 +352,8 @@ namespace Consolonia.Core.Infrastructure
 
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
-            if (args.Sender != _inputRoot) return;
+            // ReSharper disable once SuspiciousTypeConversion.Global
+            if (!ReferenceEquals(args.Sender, _inputRoot)) return;
             if (args.GetNewValue<bool>()) return;
 
             SetShowAccessKeys(_inputRoot, true);

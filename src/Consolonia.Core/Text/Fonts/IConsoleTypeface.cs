@@ -4,7 +4,7 @@ using Avalonia.Media.TextFormatting;
 
 namespace Consolonia.Core.Text.Fonts
 {
-    internal interface IConsoleTypeface : ITextShaperTypeface, IGlyphRunRender, IDisposable
+    internal interface IConsoleTypeface : ITextShaperTypeface, IGlyphRunRender
     {
         string FamilyName { get; }
 

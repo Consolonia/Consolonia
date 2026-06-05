@@ -43,6 +43,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                             if (!(bool)eventArgs.NewValue!)
                                 Dispatcher.UIThread.Post(() =>
                                 {
+                                    // ReSharper disable once ConstantConditionalAccessQualifier
                                     var focusedControl =
                                         TopLevel.GetTopLevel(visual)?.FocusManager?.GetFocusedElement() as Control;
 

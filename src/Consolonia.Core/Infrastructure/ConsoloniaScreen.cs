@@ -48,7 +48,7 @@ namespace Consolonia.Core.Infrastructure
 
         private static Screen CreateScreen(PixelRect rect)
         {
-            var screen = new PlatformScreen(null);
+            var screen = new PlatformScreen(ConsolePlatformHandle.Instance);
             SetScreenProperty(screen, nameof(Screen.DisplayName), "Console");
             SetScreenProperty(screen, nameof(Screen.Scaling), 1d);
             SetScreenProperty(screen, nameof(Screen.Bounds), rect);
@@ -62,6 +62,15 @@ namespace Consolonia.Core.Infrastructure
             var property = typeof(Screen).GetProperty(propertyName) ??
                            throw new InvalidOperationException($"Screen property '{propertyName}' not found.");
             property.SetValue(screen, value);
+        }
+
+        private sealed class ConsolePlatformHandle : IPlatformHandle
+        {
+            public static readonly ConsolePlatformHandle Instance = new();
+
+            public nint Handle => 0;
+
+            public string HandleDescriptor => "Consolonia";
         }
     }
 }
