@@ -203,5 +203,86 @@ namespace Consolonia.Core.Tests
             // corner is past the radius => clamped to White.
             Assert.AreEqual(White, ColorAt(brush, 0, 0, bounds));
         }
+
+        // Gradient stops may be declared in any offset order; sampling must pick the nearest enclosing stops
+        // regardless of declaration order.
+        [Test]
+        public void UnsortedGradientStopsMatchSortedOrder()
+        {
+            var unsorted = new LinearGradientBrush
+            {
+                StartPoint = Rel(0, 0),
+                EndPoint = Rel(1, 0),
+                GradientStops =
+                {
+                    new GradientStop(Green, 0.5),
+                    new GradientStop(Blue, 1),
+                    new GradientStop(Red, 0)
+                }
+            };
+            var sorted = new LinearGradientBrush
+            {
+                StartPoint = Rel(0, 0),
+                EndPoint = Rel(1, 0),
+                GradientStops =
+                {
+                    new GradientStop(Red, 0),
+                    new GradientStop(Green, 0.5),
+                    new GradientStop(Blue, 1)
+                }
+            };
+            var bounds = new PixelRect(0, 0, 4, 1);
+
+            for (int x = 0; x < 4; x++)
+                Assert.AreEqual(ColorAt(sorted, x, 0, bounds), ColorAt(unsorted, x, 0, bounds),
+                    $"unsorted differs from sorted at x={x}");
+
+            // x=1: t=0.375 between Red@0 and Green@0.5, ratio 0.75 => R=64, G=191, B=0.
+            Assert.AreEqual(Color.FromArgb(255, 64, 191, 0), ColorAt(unsorted, 1, 0, bounds));
+        }
+
+        // Brush opacity scales the resulting alpha while leaving the RGB channels untouched.
+        [Test]
+        public void BrushOpacityScalesAlphaOnInterpolatedStops()
+        {
+            var bounds = new PixelRect(0, 0, 4, 1);
+
+            var opaque = new LinearGradientBrush
+            {
+                StartPoint = Rel(0, 0),
+                EndPoint = Rel(1, 0),
+                GradientStops = { new GradientStop(Red, 0), new GradientStop(Blue, 1) }
+            };
+            var translucent = new LinearGradientBrush
+            {
+                StartPoint = Rel(0, 0),
+                EndPoint = Rel(1, 0),
+                Opacity = 0.5,
+                GradientStops = { new GradientStop(Red, 0), new GradientStop(Blue, 1) }
+            };
+
+            // x=1: t=0.375, Red->Blue => (A=255, R=159, G=0, B=96).
+            Assert.AreEqual(Color.FromArgb(255, 159, 0, 96), ColorAt(opaque, 1, 0, bounds));
+            // Opacity 0.5 halves the alpha (round(255*0.5)=128); RGB unchanged.
+            Assert.AreEqual(Color.FromArgb(128, 159, 0, 96), ColorAt(translucent, 1, 0, bounds));
+        }
+
+        // Opacity must also apply on the padded path (where the sample falls outside the covered stop range).
+        [Test]
+        public void BrushOpacityAppliesOnPaddedStops()
+        {
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = Rel(0, 0),
+                EndPoint = Rel(1, 0),
+                Opacity = 0.25,
+                SpreadMethod = GradientSpreadMethod.Pad,
+                GradientStops = { new GradientStop(Red, 0.25), new GradientStop(Blue, 0.75) }
+            };
+            var bounds = new PixelRect(0, 0, 4, 1);
+
+            // x=0: t=0.125 < 0.25 => padded to Red, alpha scaled by 0.25 (round(255*0.25)=64).
+            Assert.AreEqual(Color.FromArgb(64, 255, 0, 0), ColorAt(brush, 0, 0, bounds));
+        }
     }
 }

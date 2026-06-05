@@ -135,6 +135,9 @@ namespace Consolonia.Core.Drawing
         private static Color GetGradientColor(IGradientBrush brush, double position)
         {
             IReadOnlyList<IGradientStop> stops = brush.GradientStops;
+
+
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalse
             if (stops == null || stops.Count == 0)
                 return Colors.Transparent;
 
@@ -167,12 +170,18 @@ namespace Consolonia.Core.Drawing
             if (before == after)
                 return ApplyOpacity(before.Color, brush.Opacity);
 
+            // Avoid possible division by zero.
+            if (Math.Abs(after.Offset - before.Offset) < double.Epsilon)
+                return ApplyOpacity(before.Color, brush.Opacity);
+            
             double ratio = (position - before.Offset) / (after.Offset - before.Offset);
+
             var color = Color.FromArgb(
                 Lerp(before.Color.A, after.Color.A, ratio),
                 Lerp(before.Color.R, after.Color.R, ratio),
                 Lerp(before.Color.G, after.Color.G, ratio),
                 Lerp(before.Color.B, after.Color.B, ratio));
+
             return ApplyOpacity(color, brush.Opacity);
         }
 
@@ -195,6 +204,12 @@ namespace Consolonia.Core.Drawing
             }
         }
 
+        /// <summary>
+        ///     Scales a color's alpha channel by the brush opacity, leaving the RGB channels unchanged.
+        /// </summary>
+        /// <param name="color">The color to apply opacity to.</param>
+        /// <param name="opacity">The brush opacity, clamped to [0, 1].</param>
+        /// <returns>The color with its alpha scaled by <paramref name="opacity" />.</returns>
         private static Color ApplyOpacity(Color color, double opacity)
         {
             if (opacity >= 1.0)
@@ -203,6 +218,13 @@ namespace Consolonia.Core.Drawing
             return Color.FromArgb((byte)Math.Round(color.A * opacity), color.R, color.G, color.B);
         }
 
+        /// <summary>
+        ///     Linearly interpolates a single byte channel and rounds to the nearest value.
+        /// </summary>
+        /// <param name="from">The channel value at ratio 0.</param>
+        /// <param name="to">The channel value at ratio 1.</param>
+        /// <param name="ratio">The interpolation ratio, normally in [0, 1].</param>
+        /// <returns>The interpolated channel value.</returns>
         private static byte Lerp(byte from, byte to, double ratio)
         {
             return (byte)Math.Round(from + ratio * (to - from));
