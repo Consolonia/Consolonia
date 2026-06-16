@@ -7,7 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />                
+        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,6 +21,12 @@
       </Compile>
       <Compile Update="Drawing\DrawingContextImpl.Boxes.cs">
         <DependentUpon>DrawingContextImpl.cs</DependentUpon>
+      </Compile>
+      <Compile Update="Drawing\AnsiArt\AnsiParser.CsiMatcher.cs">
+        <DependentUpon>AnsiParser.cs</DependentUpon>
+      </Compile>
+      <Compile Update="Drawing\DrawingContextImpl.AnsiArt.cs">
+        <DependentUpon>DrawingContextImpl.Bitmaps.cs</DependentUpon>
       </Compile>
     </ItemGroup>
 

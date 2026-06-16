@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
+using Consolonia.Core.Drawing.AnsiArt;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
 using Consolonia.Core.Text;
@@ -125,6 +126,12 @@ namespace Consolonia.Core.Drawing
 
         public IBitmapImpl LoadBitmap(string fileName)
         {
+            if (fileName.EndsWith(".ans", StringComparison.OrdinalIgnoreCase))
+            {
+                using FileStream stream = File.OpenRead(fileName);
+                return new PixelBufferBitmapImpl(AnsiParser.Parse(stream));
+            }
+
             if (_fallback != null)
             {
                 IBitmapImpl bitmap = _fallback.LoadBitmap(fileName);
@@ -137,6 +144,9 @@ namespace Consolonia.Core.Drawing
 
         public IBitmapImpl LoadBitmap(Stream stream)
         {
+            if (IsAnsi(stream))
+                return new PixelBufferBitmapImpl(AnsiParser.Parse(stream));
+
             if (_fallback != null)
             {
                 IBitmapImpl bitmap = _fallback.LoadBitmap(stream);
@@ -145,6 +155,28 @@ namespace Consolonia.Core.Drawing
 
             return ConsoloniaPlatform.RaiseNotSupported<IBitmapImpl>(NotSupportedRequestCode.BitmapsNotSupported, this,
                 nameof(LoadBitmap));
+        }
+
+        private static bool IsAnsi(Stream stream)
+        {
+            if (!stream.CanSeek)
+                return false;
+
+            long position = stream.Position;
+            try
+            {
+                byte[] buffer = new byte[256];
+                int read = stream.Read(buffer, 0, buffer.Length);
+                for (int i = 0; i < read - 1; i++)
+                    if (buffer[i] == 0x1B && buffer[i + 1] == '[')
+                        return true;
+
+                return false;
+            }
+            finally
+            {
+                stream.Position = position;
+            }
         }
 
         public IWriteableBitmapImpl LoadWriteableBitmapToHeight(Stream stream, int height,
