@@ -39,7 +39,7 @@ namespace Consolonia.Core.Dummy
         {
         }
 
-        public IDrawingContextImpl CreateDrawingContext(bool _)
+        public IDrawingContextImpl CreateDrawingContext()
         {
             throw new NotImplementedException();
         }
@@ -77,7 +77,8 @@ namespace Consolonia.Core.Dummy
         {
             Version++;
             IntPtr mem = Marshal.AllocHGlobal(PixelSize.Width * PixelSize.Height * 4);
-            return new LockedFramebuffer(mem, PixelSize, PixelSize.Width * 4, Dpi, PixelFormat.Rgba8888,
+            return new LockedFramebuffer(mem, PixelSize, PixelSize.Width * 4, Dpi, Format ?? PixelFormat.Bgra8888,
+                Avalonia.Platform.AlphaFormat.Opaque,
                 () => Marshal.FreeHGlobal(mem));
         }
     }

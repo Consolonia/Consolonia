@@ -30,14 +30,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [OneTimeSetUp]
         public void Setup()
         {
-            var console = new UnitTestConsole(new PixelBufferSize(100, 100));
-            AvaloniaLocator.Current = new AvaloniaLocator()
-                .Bind<IConsoleOutput>().ToConstant(console)
-                .Bind<IConsoleCapabilities>().ToConstant(console);
-
+            var console = new UnitTestConsole(new PixelBufferSize(80, 25));
             _scope = AvaloniaLocator.EnterScope();
             _lifetime = ApplicationStartup.CreateLifetime(AppBuilder.Configure<ContextApp2>()
-                .UseConsole(new DummyConsole())
+                .UseConsole(console)
                 .UseConsolonia()
                 .UseConsoleColorMode(new RgbConsoleColorMode())
                 .WithConsoleFonts()
@@ -47,6 +43,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     UnsafeRendering = false
                 })
                 .LogToException(), []);
+            console.SetupLifetime(_lifetime);
         }
 
         [OneTimeTearDown]

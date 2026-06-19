@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Fonts;
 using Avalonia.Media.TextFormatting;
 using Consolonia.Controls;
+using Consolonia.Core.Text;
 using Consolonia.Core.Text.Fonts;
 using NUnit.Framework;
 
@@ -11,11 +16,118 @@ namespace Consolonia.Core.Tests
     [TestFixture]
     public class AsciiArtTypefaceTests
     {
+        private GlyphTypeface _testGlyphTypeface;
+
         [SetUp]
         public void Setup()
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
                 { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
+            _testGlyphTypeface = new FontManagerImpl().CreateGlyphTypeface(new ConsoleTypeface());
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _testGlyphTypeface?.Dispose();
+            _testGlyphTypeface = null;
+        }
+
+        [Test]
+        public void ConsoleGlyphTypefaceMetricsMatchConsoleCell()
+        {
+            var glyphTypeface = new FontManagerImpl().CreateGlyphTypeface(new ConsoleTypeface());
+            try
+            {
+                FontMetrics metrics = glyphTypeface.Metrics;
+
+                Assert.AreEqual(1, metrics.DesignEmHeight);
+                Assert.AreEqual(-1, metrics.Ascent);
+                Assert.AreEqual(0, metrics.Descent);
+                Assert.AreEqual(0, metrics.LineGap);
+            }
+            finally
+            {
+                glyphTypeface.Dispose();
+            }
+        }
+
+        [Test]
+        public void TextShaperUsesConsoleTypefaceForConsoleGlyphTypeface()
+        {
+            var consoleTypeface = new ConsoleTypeface();
+            var glyphTypeface = new FontManagerImpl().CreateGlyphTypeface(consoleTypeface);
+            try
+            {
+                var textShaper = new Consolonia.Core.Text.TextShaper();
+
+                Assert.AreSame(consoleTypeface, textShaper.CreateTypeface(glyphTypeface));
+
+                using ShapedBuffer shapedBuffer = textShaper.ShapeText("A👍".AsMemory(),
+                    new TextShaperOptions(glyphTypeface, glyphTypeface.Metrics.DesignEmHeight));
+
+                Assert.AreEqual(2, shapedBuffer.Length);
+                Assert.AreEqual(1, shapedBuffer[0].GlyphAdvance);
+                Assert.AreEqual(2, shapedBuffer[1].GlyphAdvance);
+                Assert.AreSame(glyphTypeface, shapedBuffer.GlyphTypeface);
+            }
+            finally
+            {
+                glyphTypeface.Dispose();
+            }
+        }
+
+        [Test]
+        public void ConsolePlatformTypefaceNormalizesFallbackMetricTables()
+        {
+            var fallbackTypeface = new TablePlatformTypeface(new Dictionary<string, ReadOnlyMemory<byte>>
+            {
+                ["head"] = CreateTable(20),
+                ["hhea"] = CreateTable(10),
+                ["OS/2"] = CreateTable(78),
+                ["post"] = CreateTable(12)
+            });
+            var platformTypeface = new ConsolePlatformTypeface(new ConsoleTypeface(), fallbackTypeface);
+
+            AssertInt16(platformTypeface, new OpenTypeTag('h', 'e', 'a', 'd'), 18, 1);
+            AssertInt16(platformTypeface, new OpenTypeTag('h', 'h', 'e', 'a'), 4, 1);
+            AssertInt16(platformTypeface, new OpenTypeTag('h', 'h', 'e', 'a'), 6, 0);
+            AssertInt16(platformTypeface, new OpenTypeTag('h', 'h', 'e', 'a'), 8, 0);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 26, 1);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 28, -1);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 68, 1);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 70, 0);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 72, 0);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 74, 1);
+            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 76, 0);
+            AssertInt16(platformTypeface, new OpenTypeTag('p', 'o', 's', 't'), 8, -1);
+            AssertInt16(platformTypeface, new OpenTypeTag('p', 'o', 's', 't'), 10, 1);
+        }
+
+        [Test]
+        public void ConsolePlatformTypefaceDisposeDoesNotClearConsoleGlyphCache()
+        {
+            var consoleTypeface = new ConsoleTypeface();
+            ushort glyphIndex = consoleTypeface.GetGlyphIndex("A");
+            var fallbackTypeface = new TablePlatformTypeface();
+            var platformTypeface = new ConsolePlatformTypeface(consoleTypeface, fallbackTypeface);
+
+            platformTypeface.Dispose();
+
+            Assert.IsTrue(fallbackTypeface.Disposed);
+            Assert.AreEqual("A", consoleTypeface.GetGlyphText(glyphIndex));
+        }
+
+        [TestCase(0)]
+        [TestCase(short.MaxValue + 3)]
+        public void LoadRejectsFigletHeightsThatDoNotFitConsoleMetrics(int height)
+        {
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes($"flf2a$ {height} 0 0 0 0"));
+
+            InvalidDataException exception =
+                Assert.Throws<InvalidDataException>(() => AsciiArtTypefaceLoader.Load(stream, "InvalidHeight"));
+
+            StringAssert.Contains("height must be between 1", exception.Message);
         }
 
         [Test]
@@ -268,7 +380,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["***"]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["**"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            var options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -292,7 +404,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*  ", "*  ", "*  "]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["  *", "  *", "  *"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            var options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -487,7 +599,7 @@ namespace Consolonia.Core.Tests
             };
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            var options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("A".AsMemory(), options);
@@ -534,6 +646,69 @@ namespace Consolonia.Core.Tests
             Assert.AreEqual(FontStyle.Italic, typeface.Style);
             Assert.AreEqual(FontStretch.Condensed, typeface.Stretch);
             Assert.AreEqual(FontSimulations.Bold, typeface.FontSimulations);
+        }
+
+        private TextShaperOptions CreateTextShaperOptions()
+        {
+            return new TextShaperOptions(_testGlyphTypeface, 1);
+        }
+
+        private static byte[] CreateTable(int length)
+        {
+            var table = new byte[length];
+            for (int i = 0; i < table.Length; i++) table[i] = 0xCC;
+            return table;
+        }
+
+        private static void AssertInt16(ConsolePlatformTypeface typeface, OpenTypeTag tag, int offset, short expected)
+        {
+            Assert.IsTrue(typeface.TryGetTable(tag, out ReadOnlyMemory<byte> table));
+            ushort expectedValue = unchecked((ushort)expected);
+            Assert.AreEqual((byte)(expectedValue >> 8), table.Span[offset]);
+            Assert.AreEqual((byte)expectedValue, table.Span[offset + 1]);
+        }
+
+        private sealed class TablePlatformTypeface : IPlatformTypeface
+        {
+            private readonly IReadOnlyDictionary<string, ReadOnlyMemory<byte>> _tables;
+
+            public TablePlatformTypeface()
+                : this(new Dictionary<string, ReadOnlyMemory<byte>>())
+            {
+            }
+
+            public TablePlatformTypeface(IReadOnlyDictionary<string, ReadOnlyMemory<byte>> tables)
+            {
+                _tables = tables;
+            }
+
+            public bool Disposed { get; private set; }
+
+            public string FamilyName => "Fallback";
+
+            public FontWeight Weight => FontWeight.Normal;
+
+            public FontStyle Style => FontStyle.Normal;
+
+            public FontStretch Stretch => FontStretch.Normal;
+
+            public FontSimulations FontSimulations => FontSimulations.None;
+
+            public bool TryGetStream(out Stream stream)
+            {
+                stream = null;
+                return false;
+            }
+
+            public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
+            {
+                return _tables.TryGetValue(tag.ToString(), out table);
+            }
+
+            public void Dispose()
+            {
+                Disposed = true;
+            }
         }
     }
 }

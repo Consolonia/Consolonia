@@ -7,7 +7,7 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <Panel Background="{DynamicResource ThemeTransparentBrush}">
-                    <VisualLayerManager IsPopup="True">
+                    <VisualLayerManager Name="PART_VisualLayerManager">
                         <ContentPresenter Name="PART_ContentPresenter"
                                           Background="{TemplateBinding Background}"
                                           ContentTemplate="{TemplateBinding ContentTemplate}"

@@ -77,7 +77,8 @@ namespace Consolonia.Core.Drawing
                     return;
             }
 
-            var glyphTypefaceRender = (IGlyphRunRender)glyphRun.GlyphTypeface;
+            IGlyphRunRender glyphTypefaceRender = glyphRunImpl.ConsoleTypeface;
+
             Color foregroundColor = solidColorBrush.Color;
             var startPosition = new Point().Transform(Transform).ToPixelPoint();
             glyphTypefaceRender.DrawGlyphRun(this, startPosition, glyphRunImpl, foregroundColor,
@@ -164,6 +165,15 @@ namespace Consolonia.Core.Drawing
         public void PopRenderOptions()
         {
             _renderOptions.Pop();
+        }
+
+        public void PushTextOptions(TextOptions textOptions)
+        {
+            // Avalonia pushes text options around each text draw. Text is already shaped into glyph runs here.
+        }
+
+        public void PopTextOptions()
+        {
         }
 
         public object GetFeature(Type t)

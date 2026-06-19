@@ -83,6 +83,8 @@ namespace Consolonia.Core.Infrastructure
         CubicBezierToNotSupported = 62748,
         QuadraticBezierToNotSupported = 62749,
         BitmapsNotSupported = 62750,
-        VerticalTextDecorationNotSupported = 62751
+        VerticalTextDecorationNotSupported = 62751,
+        TextShapingNotSupported = 62752,
+        TextShaperTypefaceNotSupported = 62753
     }
 }

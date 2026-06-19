@@ -10,6 +10,7 @@ using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor;
 using Consolonia.Core.Infrastructure;
+using TextShaper = Consolonia.Core.Text.TextShaper;
 
 // ReSharper disable UnusedMember.Global //todo: how to disable it for public methods??
 // ReSharper disable CheckNamespace
@@ -66,8 +67,17 @@ namespace Consolonia
         public static AppBuilder UseConsolonia(this AppBuilder builder)
         {
             Action? initialize = builder.RenderingSubsystemInitializer;
+            Action? initializeTextShaping = builder.TextShapingSubsystemInitializer;
 
             return builder
+                .UseTextShapingSubsystem(() =>
+                {
+                    initializeTextShaping?.Invoke();
+
+                    var fallback = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
+                    AvaloniaLocator.CurrentMutable
+                        .Bind<ITextShaperImpl>().ToConstant(new TextShaper(fallback));
+                }, nameof(TextShaper))
                 .UseStandardRuntimePlatformSubsystem()
                 .UseWindowingSubsystem(() => new ConsoloniaPlatform().Initialize(), nameof(ConsoloniaPlatform))
                 .UseRenderingSubsystem(() =>

@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
+using System.Linq;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -37,19 +39,13 @@ namespace Consolonia.Gallery.Tests.Base
                 controlsListView!.ChangeTo(Args);
             });
 
-            await UITest.WaitRendered();
-
-            await UITest.KeyInput(Key.Tab); // focusing first element within gallery item (if present)
-
-            bool focusStillOnTheList = false;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 ControlsListView controlsListView = GetControlsListAndMainWindow();
-                focusStillOnTheList = controlsListView.GalleryGrid.IsKeyboardFocusWithin;
+                FocusFirstGalleryControl(controlsListView);
             });
 
-            if (focusStillOnTheList) // todo: F393122D-9623-4535-A87A-F031C2769386 Avalonia bug, ListBox does not receive focus at first time as supposed (but sometimes does)
-                await UITest.KeyInput(Key.Tab);
+            await UITest.WaitRendered();
             return;
 
             ControlsListView GetControlsListAndMainWindow()
@@ -60,6 +56,24 @@ namespace Consolonia.Gallery.Tests.Base
                     .MainWindow!;
                 var controlsListView = mainWindow.FindDescendantOfType<ControlsListView>();
                 return controlsListView;
+            }
+
+            static void FocusFirstGalleryControl(ControlsListView controlsListView)
+            {
+                Control focusTarget = controlsListView.GetVisualDescendants()
+                    .OfType<Control>()
+                    .FirstOrDefault(IsGalleryContentFocusTarget);
+
+                focusTarget?.Focus(NavigationMethod.Tab);
+
+                static bool IsGalleryContentFocusTarget(Control control)
+                {
+                    return control.Focusable &&
+                           control.IsEffectivelyVisible &&
+                           control is not ListBox { Name: nameof(ControlsListView.GalleryGrid) } &&
+                           !control.GetVisualAncestors().OfType<ListBox>()
+                               .Any(listBox => listBox.Name == nameof(ControlsListView.GalleryGrid));
+                }
             }
         }
     }

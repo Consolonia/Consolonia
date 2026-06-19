@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Selection;
-using ReactiveUI;
+using AvaloniaSelectionMode = Avalonia.Controls.SelectionMode;
 
 // ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -28,15 +28,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             Selection = new SelectionModel<string>();
             Selection.Select(1);
 
-            SelectionMode = this.WhenAnyValue(
-                x => x.Multiple,
-                x => x.Toggle,
-                x => x.AlwaysSelected,
-                (m, t, a) =>
-                    (m ? Avalonia.Controls.SelectionMode.Multiple : 0) |
-                    (t ? Avalonia.Controls.SelectionMode.Toggle : 0) |
-                    (a ? Avalonia.Controls.SelectionMode.AlwaysSelected : 0));
-
             AddItemCommand = MiniCommand.Create(() => Items.Add(GenerateItem()));
 
             RemoveItemCommand = MiniCommand.Create(() =>
@@ -58,24 +49,39 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
         public ObservableCollection<string> Items { get; }
         public SelectionModel<string> Selection { get; }
-        public IObservable<SelectionMode> SelectionMode { get; }
+        public AvaloniaSelectionMode SelectionMode =>
+            (Multiple ? AvaloniaSelectionMode.Multiple : 0) |
+            (Toggle ? AvaloniaSelectionMode.Toggle : 0) |
+            (AlwaysSelected ? AvaloniaSelectionMode.AlwaysSelected : 0);
 
         public bool Multiple
         {
             get => _multiple;
-            set => RaiseAndSetIfChanged(ref _multiple, value);
+            set
+            {
+                if (RaiseAndSetIfChanged(ref _multiple, value))
+                    RaisePropertyChanged(nameof(SelectionMode));
+            }
         }
 
         public bool Toggle
         {
             get => _toggle;
-            set => RaiseAndSetIfChanged(ref _toggle, value);
+            set
+            {
+                if (RaiseAndSetIfChanged(ref _toggle, value))
+                    RaisePropertyChanged(nameof(SelectionMode));
+            }
         }
 
         public bool AlwaysSelected
         {
             get => _alwaysSelected;
-            set => RaiseAndSetIfChanged(ref _alwaysSelected, value);
+            set
+            {
+                if (RaiseAndSetIfChanged(ref _alwaysSelected, value))
+                    RaisePropertyChanged(nameof(SelectionMode));
+            }
         }
 
         public bool AutoScrollToSelectedItem

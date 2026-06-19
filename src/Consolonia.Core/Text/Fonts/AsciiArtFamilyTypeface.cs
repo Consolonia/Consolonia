@@ -12,9 +12,9 @@ namespace Consolonia.Core.Text.Fonts
     /// <summary>
     ///     Typeface which is made up of multiple design em height typefaces
     /// </summary>
-    public class AsciiArtFamilyTypeface : IGlyphTypeface, ITextShaperImpl, IGlyphRunRender
+    public class AsciiArtFamilyTypeface : IConsoleTypeface
     {
-        private readonly Dictionary<int, IGlyphTypeface> _typefaces = new();
+        private readonly Dictionary<int, IConsoleTypeface> _typefaces = new();
         private bool _disposedValue;
 
         public AsciiArtFamilyTypeface(string name)
@@ -22,14 +22,12 @@ namespace Consolonia.Core.Text.Fonts
             FamilyName = name;
         }
 
-        public IGlyphTypeface PrimaryTypeface => _typefaces[_typefaces.Keys.Max()];
+        internal IConsoleTypeface PrimaryTypeface => _typefaces[_typefaces.Keys.Max()];
 
         void IGlyphRunRender.DrawGlyphRun(DrawingContextImpl context, PixelPoint position, GlyphRunImpl glyphRun,
             Color foreground, out PixelRect rectToRefresh)
         {
-            IGlyphTypeface typeface = GetTypeface((int)glyphRun.FontRenderingEmSize);
-            var typefaceDrawing = typeface as IGlyphRunRender;
-            ArgumentNullException.ThrowIfNull(typefaceDrawing);
+            IGlyphRunRender typefaceDrawing = GetTypeface((int)glyphRun.FontRenderingEmSize);
             typefaceDrawing.DrawGlyphRun(context, position, glyphRun, foreground, out rectToRefresh);
         }
 
@@ -93,19 +91,17 @@ namespace Consolonia.Core.Text.Fonts
 
         public ShapedBuffer ShapeText(ReadOnlyMemory<char> text, TextShaperOptions options)
         {
-            IGlyphTypeface typeface = GetTypeface((int)options.FontRenderingEmSize);
-            var textShaper = typeface as ITextShaperImpl;
-            ArgumentNullException.ThrowIfNull(textShaper);
-            return textShaper.ShapeText(text, options);
+            IConsoleTypeface typeface = GetTypeface((int)options.FontRenderingEmSize);
+            return typeface.ShapeText(text, options);
         }
 
-        public void AddTypeface(IGlyphTypeface typeface)
+        internal void AddTypeface(IConsoleTypeface typeface)
         {
             ArgumentNullException.ThrowIfNull(typeface);
             _typefaces[typeface.Metrics.DesignEmHeight] = typeface;
         }
 
-        public IGlyphTypeface GetTypeface(int designEmHeight)
+        internal IConsoleTypeface GetTypeface(int designEmHeight)
         {
             if (_typefaces.Count == 0) throw new InvalidOperationException($"No typefaces available in {FamilyName}.");
 
@@ -120,7 +116,7 @@ namespace Consolonia.Core.Text.Fonts
             {
                 if (disposing)
                 {
-                    foreach (IGlyphTypeface typeface in _typefaces.Values) typeface.Dispose();
+                    foreach (IConsoleTypeface typeface in _typefaces.Values) typeface.Dispose();
                     _typefaces.Clear();
                 }
 

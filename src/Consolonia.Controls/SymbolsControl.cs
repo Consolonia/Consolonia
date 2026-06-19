@@ -68,22 +68,20 @@ namespace Consolonia.Controls
             {
                 _text = value;
 
-                var platformRender = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
                 var textShaper = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
-                var fontManager = AvaloniaLocator.Current.GetService<IFontManagerImpl>();
-                fontManager.TryCreateGlyphTypeface(FontManager.Current.DefaultFontFamily.Name, FontStyle.Normal,
-                    FontWeight.Normal,
-                    FontStretch.Normal, out IGlyphTypeface typeface);
+                FontManager.Current.TryGetGlyphTypeface(Typeface.Default, out GlyphTypeface typeface);
                 ArgumentNullException.ThrowIfNull(typeface);
                 ShapedBuffer glyphs =
                     textShaper.ShapeText(value.AsMemory(),
                         new TextShaperOptions(typeface, typeface.Metrics.DesignEmHeight));
-                IGlyphRunImpl glyphRunImpl = platformRender.CreateGlyphRun(typeface, 1, glyphs, default);
-                _shapedText = new GlyphRun(glyphRunImpl.GlyphTypeface,
-                    glyphRunImpl.FontRenderingEmSize,
+                var shapedText = new GlyphRun(typeface,
+                    glyphs.FontRenderingEmSize,
                     _text.AsMemory(),
-                    glyphs,
-                    default(Point));
+                    glyphs.ToArray(),
+                    default(Point),
+                    glyphs.BidiLevel);
+                _shapedText?.Dispose();
+                _shapedText = shapedText;
             }
         }
 

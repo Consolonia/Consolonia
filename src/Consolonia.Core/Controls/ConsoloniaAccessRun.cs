@@ -25,7 +25,7 @@ namespace Consolonia.Core.Controls
 
         private void OnShowAccessKeyChanged(bool newValue)
         {
-            PseudolassesExtensions.Set(Classes, ShowAccessKeyPseudoClass, newValue);
+            PseudoClassesExtensions.Set(Classes, ShowAccessKeyPseudoClass, newValue);
         }
 
         protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)

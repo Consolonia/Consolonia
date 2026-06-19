@@ -18,7 +18,8 @@
                                               IsCaretShown="{TemplateBinding IsFocused}">
                             <ContentPresenter Name="PART_HeaderPresenter"
                                               Content="{TemplateBinding Header}"
-                                              Margin="{TemplateBinding Padding}" />
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
                         </console:CaretControl>
                         <Popup Name="PART_Popup"
                                IsLightDismissEnabled="True"

@@ -1,6 +1,7 @@
 // DUPFINDER_ignore
 
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
@@ -511,15 +512,15 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         private static readonly object[] BoxVariations =
         {
             new object[] { null, EmptyBoxChars },
-            new object[] { new Pen(Brushes.Red), SingleBoxChars },
+            new object[] { CreatePenFactory(Brushes.Red), SingleBoxChars },
             new object[]
-                { new Pen(new LineBrush { Brush = Brushes.Red, LineStyle = LineStyle.SingleLine }), SingleBoxChars },
+                { CreateLinePenFactory(Brushes.Red, LineStyle.SingleLine), SingleBoxChars },
             new object[]
-                { new Pen(new LineBrush { Brush = Brushes.Red, LineStyle = LineStyle.DoubleLine }), DoubleBoxChars },
-            new object[] { new Pen(new LineBrush { Brush = Brushes.Red, LineStyle = LineStyle.Edge }), EdgeBoxChars },
+                { CreateLinePenFactory(Brushes.Red, LineStyle.DoubleLine), DoubleBoxChars },
+            new object[] { CreateLinePenFactory(Brushes.Red, LineStyle.Edge), EdgeBoxChars },
             new object[]
-                { new Pen(new LineBrush { Brush = Brushes.Red, LineStyle = LineStyle.EdgeWide }), EdgeWideBoxChars },
-            new object[] { new Pen(new LineBrush { Brush = Brushes.Red, LineStyle = LineStyle.Bold }), BoldBoxChars }
+                { CreateLinePenFactory(Brushes.Red, LineStyle.EdgeWide), EdgeWideBoxChars },
+            new object[] { CreateLinePenFactory(Brushes.Red, LineStyle.Bold), BoldBoxChars }
         };
 
         // NOTE: <Rectangle with stroke in avalonia has interesting semantics
@@ -592,8 +593,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
     </StackPanel>
         */
         [TestCaseSource(nameof(BoxVariations))]
-        public void DrawRectangleWithPen(IPen pen, char[] boxChars)
+        public void DrawRectangleWithPen(Func<IPen> createPen, char[] boxChars)
         {
+            IPen pen = createPen?.Invoke();
             using var
                 consoleTopLevelImpl =
                     new ConsoleWindowImpl(); //todo: low: this and other initializations can be moved to test initialization
@@ -791,16 +793,22 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 }
         }
 
+        private static Func<IPen> CreatePenFactory(IBrush brush)
+        {
+            return () => new Pen(brush);
+        }
+
+        private static Func<IPen> CreateLinePenFactory(IBrush brush, LineStyle lineStyle)
+        {
+            return () => new Pen(new LineBrush { Brush = brush, LineStyle = lineStyle });
+        }
+
         internal static void DrawText(DrawingContextImpl dc, ushort x, ushort y, string text, IBrush brush)
         {
             SetOrigin(dc, x, y);
             var platformRender = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
             var textShaper = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
-            var fontManager = AvaloniaLocator.Current.GetService<IFontManagerImpl>();
-            fontManager.TryCreateGlyphTypeface(FontManager.Current.DefaultFontFamily.Name, FontStyle.Normal,
-                FontWeight.Normal,
-                FontStretch.Normal,
-                out IGlyphTypeface typeface);
+            FontManager.Current.TryGetGlyphTypeface(Typeface.Default, out GlyphTypeface typeface);
             ArgumentNullException.ThrowIfNull(typeface);
             ShapedBuffer glyphs =
                 textShaper.ShapeText(text.AsMemory(), new TextShaperOptions(typeface, typeface.Metrics.DesignEmHeight));
@@ -810,7 +818,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             //    glyphs,
             //    default(Point),
             //    0);
-            IGlyphRunImpl glyphRunImpl = platformRender.CreateGlyphRun(typeface, 1, glyphs, default);
+            IGlyphRunImpl glyphRunImpl = platformRender.CreateGlyphRun(typeface, glyphs.FontRenderingEmSize,
+                glyphs.ToList(), default);
             dc.DrawGlyphRun(brush, glyphRunImpl);
         }
 
@@ -819,7 +828,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(-.5, 0, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.SingleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.SingleLine),
                 """
                 ─┐                                                                              
                  │                                                                              
@@ -830,7 +839,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0.5, 0.5, 1, 1),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.SingleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.SingleLine),
                 """
                 ┌┐                                                                              
                 └┘
@@ -839,7 +848,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(-1.5, 0, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.SingleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.SingleLine),
                 """
                 ┐                                                                               
                 │                                                                               
@@ -849,7 +858,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(-.5, 0, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.DoubleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.DoubleLine),
                 """
                 ═╗                                                                              
                  ║                                                                              
@@ -859,7 +868,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(-.5, 0, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.Edge }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.Edge),
                 """
                 ▁                                                                               
                  ▏                                                                              
@@ -869,7 +878,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(-1.5, 0, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.Edge }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.Edge),
                 """
 
                 ▏                                                                               
@@ -879,7 +888,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(-.5, 0, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.EdgeWide }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.EdgeWide),
                 """
                 ▄▖                                                                              
                  ▌                                                                              
@@ -889,7 +898,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0, -.5, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.SingleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.SingleLine),
                 """
                 │ │                                                                             
                 └─┘                                                                             
@@ -898,7 +907,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0, -1.5, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.SingleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.SingleLine),
                 """
                 └─┘                                                                             
                 """
@@ -906,7 +915,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0, -.5, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.DoubleLine }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.DoubleLine),
                 """
                 ║ ║                                                                             
                 ╚═╝                                                                             
@@ -915,7 +924,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0, -.5, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.Edge }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.Edge),
                 """
                 ▕ ▏                                                                             
                  ▔                                                                              
@@ -924,7 +933,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0, -1.5, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.Edge }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.Edge),
                 """
                  ▔                                                                              
                 """
@@ -932,7 +941,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             new object[]
             {
                 new Rect(0, -.5, 2, 2),
-                new Pen(new LineBrush { Brush = Brushes.Black, LineStyle = LineStyle.EdgeWide }),
+                CreateLinePenFactory(Brushes.Black, LineStyle.EdgeWide),
                 """
                 ▐ ▌                                                                             
                 ▝▀▘                                                                             
@@ -942,8 +951,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
 
         [TestCaseSource(nameof(OverlapBoxVariations))]
-        public void DrawBoxOverEdge(Rect rect, IPen pen, string expected)
+        public void DrawBoxOverEdge(Rect rect, Func<IPen> createPen, string expected)
         {
+            IPen pen = createPen();
             using var consoleTopLevelImpl = new ConsoleWindowImpl();
             PixelBuffer buffer = consoleTopLevelImpl.PixelBuffer;
             var dc = new DrawingContextImpl(consoleTopLevelImpl);

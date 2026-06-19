@@ -43,21 +43,22 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                             if (!(bool)eventArgs.NewValue!)
                                 Dispatcher.UIThread.Post(() =>
                                 {
-                                    var focusedControl =
-                                        (Control)AvaloniaLocator.Current.GetRequiredService<IFocusManager>()!
-                                            .GetFocusedElement();
+                                    TopLevel topLevel = TopLevel.GetTopLevel(visual);
+                                    if (topLevel == null)
+                                        return;
 
-                                    if (focusedControl != null)
-                                    {
-                                        IEnumerable<ILogical> focusedTree = focusedControl.GetLogicalAncestors();
-                                        IEnumerable<MenuItem> menuItems =
-                                            visual.GetLogicalAncestors().OfType<MenuItem>();
+                                    var focusedControl = topLevel.FocusManager.GetFocusedElement() as Control;
 
-                                        foreach (MenuItem menuItem in menuItems
-                                                     .Where(item => !focusedTree.Contains(item))
-                                                     .ToArray())
-                                            menuItem.Close();
-                                    }
+                                    IEnumerable<ILogical> focusedTree = focusedControl == null
+                                        ? Enumerable.Empty<ILogical>()
+                                        : focusedControl.GetLogicalAncestors().Prepend(focusedControl);
+                                    IEnumerable<MenuItem> menuItems =
+                                        visual.GetLogicalAncestors().OfType<MenuItem>();
+
+                                    foreach (MenuItem menuItem in menuItems
+                                                 .Where(item => !focusedTree.Contains(item))
+                                                 .ToArray())
+                                        menuItem.Close();
                                 });
                         }));
                     visual.SetValue(DisposablesProperty, new[] { disposable });

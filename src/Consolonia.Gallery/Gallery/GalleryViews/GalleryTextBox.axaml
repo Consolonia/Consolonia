@@ -28,16 +28,16 @@
             </TextBox>
             <TextBox IsReadOnly="True"
                      Text="This is read only" />
-            <TextBox Watermark="ReadOnly watermark"
+            <TextBox PlaceholderText="ReadOnly watermark"
                      IsReadOnly="True" />
             <TextBox IsEnabled="False"
                      Text="This is disabled" />
             <TextBox IsEnabled="False"
-                     Watermark="This is disabled watermark" />
-            <TextBox Watermark="Numeric Watermark"
+                     PlaceholderText="This is disabled watermark" />
+            <TextBox PlaceholderText="Numeric Watermark"
                      x:Name="NumericWatermark" />
-            <TextBox Watermark="Floating Watermark"
-                     UseFloatingWatermark="True"
+            <TextBox PlaceholderText="Floating Watermark"
+                     UseFloatingPlaceholder="True"
                      Text="Lorem ipsum dolor sit amet, consectetur adipiscing elit." />
 
             <MaskedTextBox Width="20"
@@ -50,8 +50,8 @@
                 </DataValidationErrors.Error>
             </TextBox>
 
-            <TextBox Watermark="Password Box"
-                     UseFloatingWatermark="True"
+            <TextBox PlaceholderText="Password Box"
+                     UseFloatingPlaceholder="True"
                      PasswordChar="*"
                      Text="Password" />
             <TextBox Text="Left aligned text"

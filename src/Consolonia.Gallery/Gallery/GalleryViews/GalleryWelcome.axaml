@@ -106,7 +106,7 @@
                                    TextAlignment="Center"
                                    Margin="0,0,0,1" />
                         <TextBox Text="Enabled" />
-                        <TextBox Watermark="Placeholder"
+                        <TextBox PlaceholderText="Placeholder"
                                  Margin="0,1,0,0" />
                         <TextBox Text="Disabled"
                                  IsEnabled="False"
@@ -119,7 +119,7 @@
                         <TextBox PasswordChar="*"
                                  Text="Enabled" />
                         <TextBox PasswordChar="*"
-                                 Watermark="Placeholder"
+                                 PlaceholderText="Placeholder"
                                  Margin="0,1,0,0" />
                         <TextBox PasswordChar="*"
                                  Text="Disabled"

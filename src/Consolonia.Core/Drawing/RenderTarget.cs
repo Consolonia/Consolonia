@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
+using Avalonia.Platform.Surfaces;
 using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -15,7 +16,7 @@ using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
-    internal class RenderTarget : IDrawingContextLayerImpl
+    internal class RenderTarget : IDrawingContextLayerImpl, IRenderTarget
     {
         private readonly IConsoleOutput _console;
 
@@ -55,7 +56,7 @@ namespace Consolonia.Core.Drawing
             InitializeCacheInternal();
         }
 
-        public RenderTarget(IEnumerable<object> surfaces)
+        public RenderTarget(IEnumerable<IPlatformRenderSurface> surfaces)
             : this(surfaces.OfType<ConsoleWindowImpl>()
                 .Single())
         {
@@ -100,10 +101,30 @@ namespace Consolonia.Core.Drawing
 
         public bool IsCorrupted => false;
 
-        public IDrawingContextImpl CreateDrawingContext(bool useScaledDrawing)
+        public RenderTargetProperties Properties => new()
         {
-            if (useScaledDrawing)
-                throw new NotImplementedException("Consolonia doesn't support useScaledDrawing");
+            RetainsPreviousFrameContents = true,
+            IsSuitableForDirectRendering = false
+        };
+
+        public PlatformRenderTargetState PlatformRenderTargetState => new()
+        {
+            IsReady = true,
+            IsCorrupted = false
+        };
+
+        public IDrawingContextImpl CreateDrawingContext(IRenderTarget.RenderTargetSceneInfo sceneInfo,
+            out RenderTargetDrawingContextProperties properties)
+        {
+            properties = new RenderTargetDrawingContextProperties
+            {
+                PreviousFrameIsRetained = true
+            };
+            return new DrawingContextImpl(_consoleTopLevelImpl);
+        }
+
+        public IDrawingContextImpl CreateDrawingContext()
+        {
             return new DrawingContextImpl(_consoleTopLevelImpl);
         }
 

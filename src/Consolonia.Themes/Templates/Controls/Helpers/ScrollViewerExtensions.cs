@@ -22,7 +22,8 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
             ScrollBarsWidthProperty.Changed.SubscribeAction(args =>
             {
                 var scrollViewer = (ScrollViewer)args.Sender;
-                var grid = (Grid)scrollViewer.GetTemplateChildren()
+                var grid = scrollViewer.GetTemplateDescendants()
+                    .OfType<Grid>()
                     .SingleOrDefault(control => control.Name == "PART_Root");
                 if (grid != null)
                 {
@@ -33,9 +34,11 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                     void OnScrollViewerOnTemplateApplied(object sender, TemplateAppliedEventArgs eventArgs)
                     {
                         scrollViewer.TemplateApplied -= OnScrollViewerOnTemplateApplied;
-                        grid = (Grid)scrollViewer.GetTemplateChildren()
+                        grid = scrollViewer.GetTemplateDescendants()
+                            .OfType<Grid>()
                             .SingleOrDefault(control => control.Name == "PART_Root");
-                        Apply();
+                        if (grid != null)
+                            Apply();
                     }
 
                     scrollViewer.TemplateApplied += OnScrollViewerOnTemplateApplied;

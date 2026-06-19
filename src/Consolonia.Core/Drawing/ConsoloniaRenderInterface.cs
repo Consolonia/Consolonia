@@ -288,7 +288,7 @@ namespace Consolonia.Core.Drawing
                 nameof(LoadBitmap));
         }
 
-        public IGlyphRunImpl CreateGlyphRun(IGlyphTypeface glyphTypeface,
+        public IGlyphRunImpl CreateGlyphRun(GlyphTypeface glyphTypeface,
             double fontRenderingEmSize,
             IReadOnlyList<GlyphInfo> glyphInfos,
             Point baselineOrigin)

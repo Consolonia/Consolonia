@@ -25,9 +25,9 @@ namespace Consolonia.Core.Drawing
 
         public int Version => InnerBitmap.Version;
 
-        public PixelFormat? Format => (InnerBitmap as IReadableBitmapImpl).Format;
+        public PixelFormat? Format => (InnerBitmap as IReadableBitmapImpl)?.Format;
 
-        public AlphaFormat? AlphaFormat => (InnerBitmap as IReadableBitmapWithAlphaImpl).AlphaFormat;
+        public AlphaFormat? AlphaFormat => (InnerBitmap as IReadableBitmapImpl)?.AlphaFormat;
 
         public void Dispose()
         {

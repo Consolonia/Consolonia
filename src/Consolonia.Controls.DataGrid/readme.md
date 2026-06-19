@@ -1,7 +1,7 @@
 ![logo](https://raw.githubusercontent.com/tomlm/ConsoloniaContent/main/Logo.png)
 
 # Consolonia.Controls.DataGrid
-DataGrid templates, styles, and helpers for Consolonia with multi‑theme support (Avalonia 11). Extracted from `Consolonia.Themes` into a standalone, reusable package.
+DataGrid templates, styles, and helpers for Consolonia with multi‑theme support (Avalonia 12). Extracted from `Consolonia.Themes` into a standalone, reusable package.
 
 ## What’s inside
 - Base templates for `DataGrid`, `DataGridRow`, `DataGridCell`, `DataGridColumnHeader`, headers presenter, scrollbars, grid lines, and separators.
@@ -21,7 +21,7 @@ Install-Package Consolonia.Controls.DataGrid
 ```
 
 Target framework: `net8.0`
-Requires: `Avalonia` and `Avalonia.Controls.DataGrid` version `$(AvaloniaVersion)` (kept in repo props), `Consolonia.Core`, `Consolonia.Controls`.
+Requires: `Avalonia` version `12.0.3`, `Avalonia.Controls.DataGrid` version `12.0.0`, `Consolonia.Core`, `Consolonia.Controls`.
 
 ## How to use
 There are two common ways to consume the templates.
@@ -75,7 +75,7 @@ xmlns:console="https://github.com/consolonia"
   - `IsSelected` (attached, `bool`) — set by styles to signal row selection for caret/visual logic.
 
 ## Compatibility
-- Avalonia: 11.3.x (pinned in repo to `$(AvaloniaVersion)`).
+- Avalonia: 12.0.x (pinned in repo to `12.0.3`).
 - Consolonia: same minor as this package (see `Directory.Build.props` `VersionPrefix`).
 - Runtime: `net8.0`.
 

@@ -15,6 +15,8 @@ namespace Consolonia.Gallery
         static App()
         {
             // we want tests and UI to be executed with same culture
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
         }
 
