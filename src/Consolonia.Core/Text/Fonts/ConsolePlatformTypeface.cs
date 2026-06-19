@@ -32,6 +32,8 @@ namespace Consolonia.Core.Text.Fonts
 
         internal static IPlatformTypeface CreateSystemFontFallbackTypeface(IConsoleTypeface consoleTypeface)
         {
+            // Avalonia 12 requires OpenType metadata to construct GlyphTypeface. Consolonia still renders
+            // through IConsoleTypeface; these platform fonts only provide metric tables and streams.
             return SystemFontFallbackTypeface.Create(consoleTypeface);
         }
 

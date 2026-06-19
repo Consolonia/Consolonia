@@ -41,7 +41,7 @@ jobs:
         
       - name: install-resharper
         run: |
-          dotnet tool install --global JetBrains.ReSharper.GlobalTools --version 2025.2.1
+          dotnet tool install --global JetBrains.ReSharper.GlobalTools --version 2026.1.3
         continue-on-error: true # todo: need to check whether has changes
 
       - name: resharper-cleanup
@@ -64,9 +64,8 @@ jobs:
         uses: muno92/resharper_inspectcode@1.12.0
         with:
           solutionPath: ./src/${{ env.SOLUTION_NAME }}
-          # Avalonia XAML is validated by the build; ReSharper 2025.2.1 reports valid v12 bindings as errors.
-          exclude: "**Consolonia.GuiCS/**.*;**Consolonia.Gallery/**.*;**/*.axaml"
-          version: '2025.2.1'
+          exclude: "**Consolonia.GuiCS/**.*;**Consolonia.Gallery/**.*"
+          version: '2026.1.3'
           minimumSeverity: 'warning'
 
       - name: Save Metadata

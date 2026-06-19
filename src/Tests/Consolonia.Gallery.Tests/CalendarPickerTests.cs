@@ -12,11 +12,13 @@ namespace Consolonia.Gallery.Tests
         [Test]
         public async Task PerformSingleTest()
         {
-            await UITest.AssertHasMatch(@"0?2/16/2022|2022-02-16");
+            await UITest.AssertHasMatch(@"02/16/2022|2022-02-16");
             await UITest.KeyInput(Key.Enter);
             await UITest.AssertHasText("February", "2022", "13 14 15 16 17 18 19");
             await UITest.KeyInput(Key.Right);
-            await UITest.AssertHasMatch(@"0?2/17/2022|2022-02-17");
+            await UITest.AssertHasMatch(@"02/17/2022|2022-02-17");
+            await UITest.KeyInput(Key.Left);
+            await UITest.AssertHasMatch(@"02/16/2022|2022-02-16");
         }
     }
 }

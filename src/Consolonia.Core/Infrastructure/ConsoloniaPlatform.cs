@@ -41,6 +41,7 @@ namespace Consolonia.Core.Infrastructure
                 throw new ArgumentException("The z-order span must be at least as long as the windows span.",
                     nameof(zOrder));
 
+            // Consolonia platform windows share one console plane; Avalonia only needs stable relative order here.
             for (int i = 0; i < windows.Length; i++)
                 zOrder[i] = i + 1;
         }

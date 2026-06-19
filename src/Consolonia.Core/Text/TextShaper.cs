@@ -1,8 +1,8 @@
 using System;
-using System.Collections.Generic;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
+using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text.Fonts;
 
 namespace Consolonia.Core.Text
@@ -24,8 +24,8 @@ namespace Consolonia.Core.Text
             if (_fallback != null)
                 return _fallback.ShapeText(text, options);
 
-            throw new KeyNotFoundException(
-                "Unsupported glyph typeface and no fallback text shaper is configured.");
+            return ConsoloniaPlatform.RaiseNotSupported<ShapedBuffer>(
+                NotSupportedRequestCode.TextShapingNotSupported, this, text, options);
         }
 
         public ITextShaperTypeface CreateTypeface(GlyphTypeface glyphTypeface)
@@ -36,8 +36,8 @@ namespace Consolonia.Core.Text
             if (_fallback != null)
                 return _fallback.CreateTypeface(glyphTypeface);
 
-            throw new KeyNotFoundException(
-                "Unsupported glyph typeface and no fallback text shaper is configured.");
+            return ConsoloniaPlatform.RaiseNotSupported<ITextShaperTypeface>(
+                NotSupportedRequestCode.TextShaperTypefaceNotSupported, this, glyphTypeface);
         }
     }
 }

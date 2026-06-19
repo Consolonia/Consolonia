@@ -122,11 +122,6 @@ namespace Consolonia.Core.Text
             return ConsolePlatformTypeface.CreateSystemFontFallbackTypeface(consoleTypeface);
         }
 
-        public bool TryCreateGlyphTypeface(Stream stream, out IPlatformTypeface glyphTypeface)
-        {
-            return TryCreateGlyphTypeface(stream, FontSimulations.None, out glyphTypeface);
-        }
-
         public static string ConsoleDefaultFontFamily()
         {
             return "ConsoleDefault";

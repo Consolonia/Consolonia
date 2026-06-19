@@ -77,7 +77,7 @@ namespace Consolonia.Controls
                 var shapedText = new GlyphRun(typeface,
                     glyphs.FontRenderingEmSize,
                     _text.AsMemory(),
-                    glyphs.ToList(),
+                    glyphs.ToArray(),
                     default(Point),
                     glyphs.BidiLevel);
                 _shapedText?.Dispose();

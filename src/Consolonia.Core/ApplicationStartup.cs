@@ -75,9 +75,6 @@ namespace Consolonia
                     initializeTextShaping?.Invoke();
 
                     var fallback = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
-                    if (fallback is TextShaper)
-                        return;
-
                     AvaloniaLocator.CurrentMutable
                         .Bind<ITextShaperImpl>().ToConstant(new TextShaper(fallback));
                 }, nameof(TextShaper))

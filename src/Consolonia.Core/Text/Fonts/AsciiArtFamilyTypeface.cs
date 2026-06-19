@@ -27,9 +27,7 @@ namespace Consolonia.Core.Text.Fonts
         void IGlyphRunRender.DrawGlyphRun(DrawingContextImpl context, PixelPoint position, GlyphRunImpl glyphRun,
             Color foreground, out PixelRect rectToRefresh)
         {
-            IConsoleTypeface typeface = GetTypeface((int)glyphRun.FontRenderingEmSize);
-            var typefaceDrawing = typeface as IGlyphRunRender;
-            ArgumentNullException.ThrowIfNull(typefaceDrawing);
+            IGlyphRunRender typefaceDrawing = GetTypeface((int)glyphRun.FontRenderingEmSize);
             typefaceDrawing.DrawGlyphRun(context, position, glyphRun, foreground, out rectToRefresh);
         }
 

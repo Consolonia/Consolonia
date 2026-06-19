@@ -76,6 +76,7 @@ jobs:
           fi
           dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true $VERSION_SUFFIX_ARG
       - name: Push
+        # Pull requests from forks do not receive NUGET_KEY, so alpha publishing only works from same-repository PR branches.
         if: ${{ env.IS_RELEASE_PUBLISH == 'true' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && env.VERSION_SUFFIX != '') }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
 

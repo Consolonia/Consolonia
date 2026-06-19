@@ -52,7 +52,7 @@ namespace Consolonia.Core.Drawing
             if (surfaces == null)
                 return false;
 
-            return surfaces.OfType<ConsoleWindowImpl>().Take(2).Count() == 1;
+            return surfaces.OfType<ConsoleWindowImpl>().Count() == 1;
         }
     }
 }

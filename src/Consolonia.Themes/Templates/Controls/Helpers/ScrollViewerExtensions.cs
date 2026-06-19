@@ -24,7 +24,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                 var scrollViewer = (ScrollViewer)args.Sender;
                 var grid = scrollViewer.GetTemplateDescendants()
                     .OfType<Grid>()
-                    .FirstOrDefault(control => control.Name == "PART_Root");
+                    .SingleOrDefault(control => control.Name == "PART_Root");
                 if (grid != null)
                 {
                     Apply();
@@ -36,7 +36,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                         scrollViewer.TemplateApplied -= OnScrollViewerOnTemplateApplied;
                         grid = scrollViewer.GetTemplateDescendants()
                             .OfType<Grid>()
-                            .FirstOrDefault(control => control.Name == "PART_Root");
+                            .SingleOrDefault(control => control.Name == "PART_Root");
                         if (grid != null)
                             Apply();
                     }
