@@ -1,13 +1,11 @@
 using System;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading;
 using Avalonia.Animation;
 using Avalonia.Logging;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 
-// ReSharper disable CheckNamespace
 namespace Consolonia.Controls.Brushes
 {
     /// <summary>
@@ -53,7 +51,6 @@ namespace Consolonia.Controls.Brushes
                     try
                     {
                         Register();
-                        Thread.MemoryBarrier();
                         _registered = true;
                     }
                     catch (Exception e)
@@ -63,6 +60,7 @@ namespace Consolonia.Controls.Brushes
                             "Failed to register {Animator}: {Message}",
                             nameof(LineBrushAnimator),
                             e.Message);
+                        throw;
                     }
                 }
             }
@@ -172,7 +170,7 @@ namespace Consolonia.Controls.Brushes
             Type funcIAnimatorType = tupleType.GetGenericArguments()[2]; // Func<IAnimator>
             Type iAnimatorType = funcIAnimatorType.GetGenericArguments()[0]; // internal IAnimator
 
-            Func<Type, bool> match = type => typeof(LineBrush).IsAssignableFrom(type);
+            bool Match(Type type) => typeof(LineBrush).IsAssignableFrom(type);
 
             // Build a Func<IAnimator> factory whose return type (IAnimator) we cannot name, via an expression tree.
             MethodInfo create = typeof(LineBrushAnimator).GetMethod(nameof(CreateWrapperInstance),
@@ -181,7 +179,7 @@ namespace Consolonia.Controls.Brushes
                 .Lambda(funcIAnimatorType, Expression.Convert(Expression.Call(create), iAnimatorType))
                 .Compile();
 
-            object entry = Activator.CreateInstance(tupleType, match, typeof(LineBrushAnimator), factory)!;
+            object entry = Activator.CreateInstance(tupleType, (Func<Type, bool>) Match, typeof(LineBrushAnimator), factory)!;
 
             // Insert at the front so a LineBrush is matched before the solid/gradient fallbacks.
             listType.GetMethod("Insert")!.Invoke(list, new[] { 0, entry });
