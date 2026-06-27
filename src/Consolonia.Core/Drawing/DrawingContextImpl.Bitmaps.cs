@@ -21,8 +21,14 @@ namespace Consolonia.Core.Drawing
     {
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
         {
-            if (source is DummyBitmap)
-                return;
+            switch (source)
+            {
+                case DummyBitmap:
+                    return;
+                case PixelBufferBitmapImpl pixelBufferBitmap:
+                    DrawPixelBufferBitmap(pixelBufferBitmap, sourceRect, destRect);
+                    return;
+            }
 
             var targetRect = new Rect(Transform.Transform(destRect.TopLeft),
                     Transform.Transform(destRect.BottomRight))
