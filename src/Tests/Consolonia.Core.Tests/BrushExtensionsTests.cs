@@ -1,9 +1,10 @@
+// DUPFINDER_ignore
+
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Consolonia.Controls.Brushes;
 using Consolonia.Core.Drawing;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests

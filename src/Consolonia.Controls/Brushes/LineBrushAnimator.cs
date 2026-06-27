@@ -5,6 +5,7 @@ using Avalonia.Animation;
 using Avalonia.Logging;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Media.Transformation;
 
 namespace Consolonia.Controls.Brushes
 {
@@ -40,7 +41,7 @@ namespace Consolonia.Controls.Brushes
 #pragma warning disable CA1031
         /// <summary>
         ///     Registers the animator with Avalonia so that <see cref="LineBrush" /> values animate. Safe to call
-        ///     multiple times; only the first call has an effect, and any failure is logged rather than thrown.
+        ///     multiple times; only the first call has an effect.
         /// </summary>
         public static void EnsureRegistered()
         {
@@ -50,8 +51,10 @@ namespace Consolonia.Controls.Brushes
                 {
                     try
                     {
-                        Register();
+                        // Set '_registered' first to render later calls harmless.
+                        // (If it failed once, it's going to fail again, and we already logged the error.)
                         _registered = true;
+                        Register();
                     }
                     catch (Exception e)
                     {
@@ -117,7 +120,12 @@ namespace Consolonia.Controls.Brushes
             }
 
             if (oldInner is ISolidColorBrush oldSolid && newInner is ISolidColorBrush newSolid)
-                return new ImmutableSolidColorBrush(InterpolateColor(progress, oldSolid.Color, newSolid.Color));
+            {
+                return new ImmutableSolidColorBrush(
+                    InterpolateColor(progress, oldSolid.Color, newSolid.Color),
+                    InterpolateOpacity(progress, oldSolid.Opacity, newSolid.Opacity),
+                    InterpolateTransform(progress, oldSolid.Transform, newSolid.Transform));
+            }
 
             // Mixed or unsupported inner brushes (or gradient animation unavailable): fall back to a discrete switch.
             return progress >= 0.5 ? newInner : oldInner;
@@ -137,6 +145,45 @@ namespace Consolonia.Controls.Brushes
                 Lerp(from.R, to.R, progress),
                 Lerp(from.G, to.G, progress),
                 Lerp(from.B, to.B, progress));
+        }
+
+        /// <summary>
+        ///     Linearly interpolates a brush's opacity.
+        /// </summary>
+        /// <param name="progress">The animation progress, from 0 (<paramref name="from" />) to 1 (<paramref name="to" />).</param>
+        /// <param name="from">The opacity being animated from.</param>
+        /// <param name="to">The opacity being animated to.</param>
+        /// <returns>The interpolated opacity.</returns>
+        private static double InterpolateOpacity(double progress, double from, double to)
+        {
+            return from + (to - from) * progress;
+        }
+
+        /// <summary>
+        ///     Interpolates a brush's transform by returning a snapshot that represents a linear interpolation
+        ///     between the old and new transforms according to the current animation's <paramref name="progress" />.
+        /// </summary>
+        /// <param name="progress">
+        ///     The animation progress, from 0 (<paramref name="oldTransform" />) to 1
+        ///     (<paramref name="newTransform" />).
+        /// </param>
+        /// <param name="oldTransform">The previous transform.</param>
+        /// <param name="newTransform">The newly applied transform.</param>
+        /// <returns>The interpolated transform.</returns>
+        private static ImmutableTransform InterpolateTransform(
+            double progress, ITransform oldTransform, ITransform newTransform)
+        {
+            if (oldTransform is TransformOperations oldTransformOperations &&
+                newTransform is TransformOperations newTransformOperations)
+            {
+                return new ImmutableTransform(
+                    TransformOperations.Interpolate(oldTransformOperations, newTransformOperations, progress).Value);
+            }
+
+            if (oldTransform is not null)
+                return new ImmutableTransform(oldTransform.Value);
+            
+            return null;
         }
 
         /// <summary>
