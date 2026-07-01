@@ -149,7 +149,6 @@ namespace Consolonia.Core.Drawing
             IGradientStop after = null;
 
             foreach (IGradientStop stop in stops)
-            {
                 if (stop.Offset <= position)
                 {
                     if (before == null || stop.Offset >= before.Offset)
@@ -160,7 +159,6 @@ namespace Consolonia.Core.Drawing
                     if (after == null || stop.Offset <= after.Offset)
                         after = stop;
                 }
-            }
 
             // Pad to the first/last stop color outside the covered offset range.
             if (before == null)
@@ -173,10 +171,10 @@ namespace Consolonia.Core.Drawing
             // Avoid possible division by zero.
             if (Math.Abs(after.Offset - before.Offset) < double.Epsilon)
                 return ApplyOpacity(before.Color, brush.Opacity);
-            
+
             double ratio = (position - before.Offset) / (after.Offset - before.Offset);
 
-            var color = Color.FromArgb(
+            Color color = Color.FromArgb(
                 Lerp(before.Color.A, after.Color.A, ratio),
                 Lerp(before.Color.R, after.Color.R, ratio),
                 Lerp(before.Color.G, after.Color.G, ratio),

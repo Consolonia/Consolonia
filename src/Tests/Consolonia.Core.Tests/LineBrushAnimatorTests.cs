@@ -6,7 +6,6 @@ using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
-using Consolonia.Controls;
 using Consolonia.Controls.Brushes;
 using NUnit.Framework;
 

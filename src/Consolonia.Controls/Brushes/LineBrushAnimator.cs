@@ -38,6 +38,12 @@ namespace Consolonia.Controls.Brushes
         private static readonly object RegistrationGate = new();
         private static bool _registered;
 
+        // Avalonia drives a registered brush animator through the IAnimator returned by ICustomAnimator.CreateWrapper.
+        // CreateWrapper's return type (IAnimator) is internal, so it is invoked reflectively and surfaced as object.
+        private static readonly MethodInfo CreateWrapperMethod =
+            typeof(ICustomAnimator).GetMethod("CreateWrapper",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!;
+
 #pragma warning disable CA1031
         /// <summary>
         ///     Registers the animator with Avalonia so that <see cref="LineBrush" /> values animate. Safe to call
@@ -48,7 +54,6 @@ namespace Consolonia.Controls.Brushes
             lock (RegistrationGate)
             {
                 if (!_registered)
-                {
                     try
                     {
                         // Set '_registered' first to render later calls harmless.
@@ -65,7 +70,6 @@ namespace Consolonia.Controls.Brushes
                             e.Message);
                         throw;
                     }
-                }
             }
         }
 #pragma warning restore CA1031
@@ -74,7 +78,10 @@ namespace Consolonia.Controls.Brushes
         ///     Interpolates between two <see cref="LineBrush" /> keyframe values by interpolating their inner brushes
         ///     and switching the (non-interpolatable) line style at the halfway point.
         /// </summary>
-        /// <param name="progress">The animation progress, from 0 (<paramref name="oldValue" />) to 1 (<paramref name="newValue" />).</param>
+        /// <param name="progress">
+        ///     The animation progress, from 0 (<paramref name="oldValue" />) to 1 (<paramref name="newValue" />
+        ///     ).
+        /// </param>
         /// <param name="oldValue">The value being animated from.</param>
         /// <param name="newValue">The value being animated to.</param>
         /// <returns>
@@ -84,10 +91,8 @@ namespace Consolonia.Controls.Brushes
         public override IBrush Interpolate(double progress, IBrush oldValue, IBrush newValue)
         {
             if (oldValue is not LineBrush oldLine || newValue is not LineBrush newLine)
-            {
                 // Not a pair of LineBrushes (e.g. animating to/from a plain brush): fall back to a discrete switch.
                 return progress >= 0.5 ? newValue : oldValue;
-            }
 
             IBrush interpolatedBrush = InterpolateInner(progress, oldLine.Brush, newLine.Brush);
 
@@ -114,18 +119,14 @@ namespace Consolonia.Controls.Brushes
         {
             if (oldInner is IGradientBrush oldGradient &&
                 newInner is IGradientBrush newGradient &&
-                GradientInterpolator is {} interpolator)
-            {
+                GradientInterpolator is { } interpolator)
                 return interpolator(progress, oldGradient, newGradient);
-            }
 
             if (oldInner is ISolidColorBrush oldSolid && newInner is ISolidColorBrush newSolid)
-            {
                 return new ImmutableSolidColorBrush(
                     InterpolateColor(progress, oldSolid.Color, newSolid.Color),
                     InterpolateOpacity(progress, oldSolid.Opacity, newSolid.Opacity),
                     InterpolateTransform(progress, oldSolid.Transform, newSolid.Transform));
-            }
 
             // Mixed or unsupported inner brushes (or gradient animation unavailable): fall back to a discrete switch.
             return progress >= 0.5 ? newInner : oldInner;
@@ -175,14 +176,12 @@ namespace Consolonia.Controls.Brushes
         {
             if (oldTransform is TransformOperations oldTransformOperations &&
                 newTransform is TransformOperations newTransformOperations)
-            {
                 return new ImmutableTransform(
                     TransformOperations.Interpolate(oldTransformOperations, newTransformOperations, progress).Value);
-            }
 
             if (oldTransform is not null)
                 return new ImmutableTransform(oldTransform.Value);
-            
+
             return null;
         }
 
@@ -212,12 +211,16 @@ namespace Consolonia.Controls.Brushes
                                   ?? throw new MissingFieldException(baseBrushAnimator.FullName, "_brushAnimators");
 
             object list = listField.GetValue(null)!;
-            Type listType = listField.FieldType; // List<(Func<Type,bool> Match, Type AnimatorType, Func<IAnimator> Factory)>
+            Type listType =
+                listField.FieldType; // List<(Func<Type,bool> Match, Type AnimatorType, Func<IAnimator> Factory)>
             Type tupleType = listType.GetGenericArguments()[0];
             Type funcIAnimatorType = tupleType.GetGenericArguments()[2]; // Func<IAnimator>
             Type iAnimatorType = funcIAnimatorType.GetGenericArguments()[0]; // internal IAnimator
 
-            bool Match(Type type) => typeof(LineBrush).IsAssignableFrom(type);
+            bool Match(Type type)
+            {
+                return typeof(LineBrush).IsAssignableFrom(type);
+            }
 
             // Build a Func<IAnimator> factory whose return type (IAnimator) we cannot name, via an expression tree.
             MethodInfo create = typeof(LineBrushAnimator).GetMethod(nameof(CreateWrapperInstance),
@@ -226,17 +229,12 @@ namespace Consolonia.Controls.Brushes
                 .Lambda(funcIAnimatorType, Expression.Convert(Expression.Call(create), iAnimatorType))
                 .Compile();
 
-            object entry = Activator.CreateInstance(tupleType, (Func<Type, bool>) Match, typeof(LineBrushAnimator), factory)!;
+            object entry =
+                Activator.CreateInstance(tupleType, (Func<Type, bool>)Match, typeof(LineBrushAnimator), factory)!;
 
             // Insert at the front so a LineBrush is matched before the solid/gradient fallbacks.
             listType.GetMethod("Insert")!.Invoke(list, new[] { 0, entry });
         }
-
-        // Avalonia drives a registered brush animator through the IAnimator returned by ICustomAnimator.CreateWrapper.
-        // CreateWrapper's return type (IAnimator) is internal, so it is invoked reflectively and surfaced as object.
-        private static readonly MethodInfo CreateWrapperMethod =
-            typeof(ICustomAnimator).GetMethod("CreateWrapper",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         /// <summary>
         ///     Creates the <c>IAnimator</c> wrapper that Avalonia drives, returned as <see cref="object" /> because its

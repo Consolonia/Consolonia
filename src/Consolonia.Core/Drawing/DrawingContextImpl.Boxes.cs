@@ -215,7 +215,7 @@ namespace Consolonia.Core.Drawing
 
             // The four edges share one gradient that spans the whole rectangle, so pass the rectangle bounds
             // as the gradient bounds rather than letting each edge sample its own (1-cell-thick) extent.
-            PixelRect borderBounds = rectangleRect.ToPixelRect();
+            var borderBounds = rectangleRect.ToPixelRect();
 
             // NOTE: Line takes in untransformed Point, not PixelPoint and will be transformed inside DrawLineInternal
             DrawLineInternal(pen, new Line(rect.TopLeft, /*vertical: */ false, (int)rect.Width),
@@ -435,7 +435,8 @@ namespace Consolonia.Core.Drawing
 
             pattern = line.Vertical ? VerticalLinePattern : HorizontalLinePattern;
             symbol = new Symbol(GetBoxPatternFromLineStyle(pattern, lineStyle));
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, brush, gradientBounds, line.Length - 1); //line
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, brush, gradientBounds,
+                line.Length - 1); //line
 
             pattern = line.Vertical ? VerticalEndPattern : HorizontalEndPattern;
             symbol = new Symbol(GetBoxPatternFromLineStyle(pattern, lineStyle));
@@ -603,7 +604,7 @@ namespace Consolonia.Core.Drawing
             for (ushort i = lineStart; i < lineEnd; i++)
             {
                 Color lineColor = brush.ColorAt(head, gradientBounds);
-                Pixel newPixel = new Pixel(new PixelForeground(symbol, lineColor));
+                var newPixel = new Pixel(new PixelForeground(symbol, lineColor));
 
                 _pixelBuffer[head] = _pixelBuffer[head].Blend(newPixel);
 
