@@ -791,6 +791,99 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 }
         }
 
+        [Test]
+        public void FillRectangleWithHorizontalGradientMapsToShapeBounds()
+        {
+            using var consoleTopLevelImpl = new ConsoleWindowImpl();
+            PixelBuffer buffer = consoleTopLevelImpl.PixelBuffer;
+            var dc = new DrawingContextImpl(consoleTopLevelImpl);
+
+            // No clip pushed: the clip is the whole buffer, yet the gradient must still sweep across the
+            // rectangle's own 4-cell width (it is mapped onto the shape, not the clip).
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(Color.FromRgb(255, 255, 255), 0),
+                    new GradientStop(Color.FromRgb(255, 0, 0), 1)
+                }
+            };
+            dc.DrawRectangle(brush, null, new Rect(0, 0, 4, 1));
+
+            Assert.AreEqual(Color.FromArgb(255, 255, 223, 223), buffer[0, 0].Background.Color);
+            Assert.AreEqual(Color.FromArgb(255, 255, 159, 159), buffer[1, 0].Background.Color);
+            Assert.AreEqual(Color.FromArgb(255, 255, 96, 96), buffer[2, 0].Background.Color);
+            Assert.AreEqual(Color.FromArgb(255, 255, 32, 32), buffer[3, 0].Background.Color);
+        }
+
+        [Test]
+        public void DrawRectangleBorderGradientSpansWholeRectangle()
+        {
+            using var consoleTopLevelImpl = new ConsoleWindowImpl();
+            PixelBuffer buffer = consoleTopLevelImpl.PixelBuffer;
+            var dc = new DrawingContextImpl(consoleTopLevelImpl);
+
+            // No clip pushed: a gradient border must still sweep across the rectangle's own width, so the
+            // four edges share one gradient mapped onto the rectangle bounds (not each edge's 1-cell extent).
+            var pen = new Pen(new LineBrush
+            {
+                Brush = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                    EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                    GradientStops =
+                    {
+                        new GradientStop(Color.FromRgb(255, 255, 255), 0),
+                        new GradientStop(Color.FromRgb(255, 0, 0), 1)
+                    }
+                },
+                LineStyle = LineStyle.SingleLine
+            });
+            dc.DrawRectangle(null, pen, new Rect(0, 0, 6, 3));
+
+            // A width-6 rect draws its right/bottom edges at x=6/y=3. Gradient bounds = the rect (width 6),
+            // so t=(x+0.5)/6 across the top edge: '┌' at x=0 is light, '┐' at x=6 clamps to red.
+            Assert.IsTrue(buffer[0, 0].Foreground.Symbol.Character == '┌');
+            Assert.IsTrue(buffer[6, 0].Foreground.Symbol.Character == '┐');
+            Assert.AreEqual(Color.FromArgb(255, 255, 234, 234), buffer[0, 0].Foreground.Color);
+            Assert.AreEqual(Color.FromArgb(255, 255, 0, 0), buffer[6, 0].Foreground.Color);
+            Assert.AreNotEqual(buffer[0, 0].Foreground.Color, buffer[6, 0].Foreground.Color);
+
+            // bottom edge shares the same horizontal gradient => same colors at the same X.
+            Assert.IsTrue(buffer[0, 3].Foreground.Symbol.Character == '└');
+            Assert.AreEqual(buffer[0, 0].Foreground.Color, buffer[0, 3].Foreground.Color);
+            Assert.AreEqual(buffer[6, 0].Foreground.Color, buffer[6, 3].Foreground.Color);
+        }
+
+        [Test]
+        public void DrawLineWithGradientBrushSamplesPerCell()
+        {
+            using var consoleTopLevelImpl = new ConsoleWindowImpl();
+            PixelBuffer buffer = consoleTopLevelImpl.PixelBuffer;
+            var dc = new DrawingContextImpl(consoleTopLevelImpl);
+
+            dc.PushClip(new Rect(0, 0, 6, 1));
+            var brush = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(Color.FromRgb(255, 255, 255), 0),
+                    new GradientStop(Color.FromRgb(255, 0, 0), 1)
+                }
+            };
+            dc.DrawLine(new Pen(brush), new Point(0, 0), new Point(6, 0));
+
+            // line chars are drawn with a per-cell sampled foreground color
+            Assert.IsTrue(buffer[0, 0].Foreground.Symbol.Character == '─');
+            Assert.AreEqual(Color.FromArgb(255, 255, 234, 234), buffer[0, 0].Foreground.Color);
+            Assert.AreEqual(Color.FromArgb(255, 255, 21, 21), buffer[5, 0].Foreground.Color);
+            Assert.AreNotEqual(buffer[0, 0].Foreground.Color, buffer[5, 0].Foreground.Color);
+        }
+
         internal static void DrawText(DrawingContextImpl dc, ushort x, ushort y, string text, IBrush brush)
         {
             SetOrigin(dc, x, y);
