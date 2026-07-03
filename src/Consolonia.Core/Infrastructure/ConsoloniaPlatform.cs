@@ -53,7 +53,6 @@ namespace Consolonia.Core.Infrastructure
 
         public void Initialize()
         {
-            var fallbackFontManager = AvaloniaLocator.Current.GetService<IFontManagerImpl>();
             var renderTimer = new SleepLoopRenderTimer(30);
 
             NotSupported += InternalWorkaroundsIgnore;
@@ -68,7 +67,7 @@ namespace Consolonia.Core.Infrastructure
                 .Bind<IDispatcherImpl>().ToConstant(new ManagedDispatcherImpl(null))
                 .Bind<PlatformHotkeyConfiguration>().ToConstant(new PlatformHotkeyConfiguration(KeyModifiers.Control))
                 .Bind<IKeyboardDevice>().ToConstant(new ConsoleKeyboardDevice())
-                .Bind<IFontManagerImpl>().ToConstant(new FontManagerImpl(fallbackFontManager))
+                .Bind<IFontManagerImpl>().ToConstant(new FontManagerImpl())
                 .Bind<IMouseDevice>().ToConstant(new MouseDevice())
                 .Bind<ICursorFactory>().ToConstant(new ConsoleCursorFactory())
                 .Bind<IPlatformIconLoader>().ToConstant(new DummyIconLoader())

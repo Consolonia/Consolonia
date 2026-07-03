@@ -206,44 +206,10 @@ namespace Consolonia.Core.Text.Fonts
             GC.SuppressFinalize(this);
         }
 
-        private bool TryCreateGlyphTypeface(IConsoleTypeface consoleTypeface, out GlyphTypeface glyphTypeface)
+        private static bool TryCreateGlyphTypeface(IConsoleTypeface consoleTypeface, out GlyphTypeface glyphTypeface)
         {
-            try
-            {
-                glyphTypeface = CreateGlyphTypeface(consoleTypeface);
-                return true;
-            }
-            catch (InvalidOperationException)
-            {
-                glyphTypeface = null;
-                return false;
-            }
-        }
-
-        private GlyphTypeface CreateGlyphTypeface(IConsoleTypeface consoleTypeface)
-        {
-            if (FontManager is FontManagerImpl fontManager)
-                return fontManager.CreateGlyphTypeface(consoleTypeface);
-
-            return new GlyphTypeface(new ConsolePlatformTypeface(consoleTypeface, CreateFallbackTypeface(consoleTypeface)));
-        }
-
-        private IPlatformTypeface CreateFallbackTypeface(IConsoleTypeface consoleTypeface)
-        {
-            if (FontManager != null)
-            {
-                string fallbackFamily = FontManager.GetDefaultFontFamilyName();
-                if (!string.IsNullOrEmpty(fallbackFamily) &&
-                    FontManager.TryCreateGlyphTypeface(fallbackFamily, consoleTypeface.Style, consoleTypeface.Weight,
-                        consoleTypeface.Stretch, out IPlatformTypeface fallbackTypeface))
-                    return fallbackTypeface;
-
-                if (FontManager.TryMatchCharacter(' ', consoleTypeface.Style, consoleTypeface.Weight,
-                        consoleTypeface.Stretch, fallbackFamily, CultureInfo.CurrentCulture, out fallbackTypeface))
-                    return fallbackTypeface;
-            }
-
-            return ConsolePlatformTypeface.CreateSystemFontFallbackTypeface(consoleTypeface);
+            glyphTypeface = FontManagerImpl.CreateGlyphTypeface(consoleTypeface);
+            return true;
         }
     }
 }

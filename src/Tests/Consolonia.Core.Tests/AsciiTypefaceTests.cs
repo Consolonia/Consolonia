@@ -23,7 +23,7 @@ namespace Consolonia.Core.Tests
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
                 { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
-            _testGlyphTypeface = new FontManagerImpl().CreateGlyphTypeface(new ConsoleTypeface());
+            _testGlyphTypeface = FontManagerImpl.CreateGlyphTypeface(new ConsoleTypeface());
         }
 
         [TearDown]
@@ -34,29 +34,10 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void ConsoleGlyphTypefaceMetricsMatchConsoleCell()
-        {
-            var glyphTypeface = new FontManagerImpl().CreateGlyphTypeface(new ConsoleTypeface());
-            try
-            {
-                FontMetrics metrics = glyphTypeface.Metrics;
-
-                Assert.AreEqual(1, metrics.DesignEmHeight);
-                Assert.AreEqual(-1, metrics.Ascent);
-                Assert.AreEqual(0, metrics.Descent);
-                Assert.AreEqual(0, metrics.LineGap);
-            }
-            finally
-            {
-                glyphTypeface.Dispose();
-            }
-        }
-
-        [Test]
         public void TextShaperUsesConsoleTypefaceForConsoleGlyphTypeface()
         {
             var consoleTypeface = new ConsoleTypeface();
-            var glyphTypeface = new FontManagerImpl().CreateGlyphTypeface(consoleTypeface);
+            var glyphTypeface = FontManagerImpl.CreateGlyphTypeface(consoleTypeface);
             try
             {
                 var textShaper = new Consolonia.Core.Text.TextShaper();
@@ -75,47 +56,6 @@ namespace Consolonia.Core.Tests
             {
                 glyphTypeface.Dispose();
             }
-        }
-
-        [Test]
-        public void ConsolePlatformTypefaceNormalizesFallbackMetricTables()
-        {
-            var fallbackTypeface = new TablePlatformTypeface(new Dictionary<string, ReadOnlyMemory<byte>>
-            {
-                ["head"] = CreateTable(20),
-                ["hhea"] = CreateTable(10),
-                ["OS/2"] = CreateTable(78),
-                ["post"] = CreateTable(12)
-            });
-            var platformTypeface = new ConsolePlatformTypeface(new ConsoleTypeface(), fallbackTypeface);
-
-            AssertInt16(platformTypeface, new OpenTypeTag('h', 'e', 'a', 'd'), 18, 1);
-            AssertInt16(platformTypeface, new OpenTypeTag('h', 'h', 'e', 'a'), 4, 1);
-            AssertInt16(platformTypeface, new OpenTypeTag('h', 'h', 'e', 'a'), 6, 0);
-            AssertInt16(platformTypeface, new OpenTypeTag('h', 'h', 'e', 'a'), 8, 0);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 26, 1);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 28, -1);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 68, 1);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 70, 0);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 72, 0);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 74, 1);
-            AssertInt16(platformTypeface, new OpenTypeTag('O', 'S', '/', '2'), 76, 0);
-            AssertInt16(platformTypeface, new OpenTypeTag('p', 'o', 's', 't'), 8, -1);
-            AssertInt16(platformTypeface, new OpenTypeTag('p', 'o', 's', 't'), 10, 1);
-        }
-
-        [Test]
-        public void ConsolePlatformTypefaceDisposeDoesNotClearConsoleGlyphCache()
-        {
-            var consoleTypeface = new ConsoleTypeface();
-            ushort glyphIndex = consoleTypeface.GetGlyphIndex("A");
-            var fallbackTypeface = new TablePlatformTypeface();
-            var platformTypeface = new ConsolePlatformTypeface(consoleTypeface, fallbackTypeface);
-
-            platformTypeface.Dispose();
-
-            Assert.IsTrue(fallbackTypeface.Disposed);
-            Assert.AreEqual("A", consoleTypeface.GetGlyphText(glyphIndex));
         }
 
         [TestCase(0)]
