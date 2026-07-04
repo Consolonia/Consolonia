@@ -34,10 +34,12 @@ namespace Consolonia.Core.Text.Fonts
             return false;
         }
 
-public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
-{
-    switch (tag)
-    {
+        public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
+        {
+            FontMetrics metrics = ConsoleTypeface.Metrics;
+
+            switch (tag)
+            {
         case /* cmap */ 1668112752u:
             table = new ReadOnlyMemory<byte>([
                 0x00, 0x00,             // version = 0
@@ -63,31 +65,35 @@ public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
             return true;
 
         case /* hhea */ 1751672161u:
-            table = new ReadOnlyMemory<byte>([
-                0x00, 0x01, 0x00, 0x00, // version = 1.0
+        {
+            var hhea = new byte[36];
+            hhea[1] = 0x01; // version = 1.0
 
-                0x00, 0x01, // ascender = 1 → Ascent = -1
-                0x00, 0x00, // descender = 0
-                0x00, 0x00, // lineGap = 0
+            var ascender = (short)-metrics.Ascent;
+            hhea[4] = (byte)(ascender >> 8);
+            hhea[5] = (byte)ascender;
 
-                0x00, 0x01, // advanceWidthMax = 1
-                0x00, 0x00, // minLeftSideBearing
-                0x00, 0x00, // minRightSideBearing
-                0x00, 0x01, // xMaxExtent
+            var descender = (short)-metrics.Descent;
+            hhea[6] = (byte)(descender >> 8);
+            hhea[7] = (byte)descender;
 
-                0x00, 0x01, // caretSlopeRise
-                0x00, 0x00, // caretSlopeRun
-                0x00, 0x00, // caretOffset
+            var lineGap = (short)metrics.LineGap;
+            hhea[8] = (byte)(lineGap >> 8);
+            hhea[9] = (byte)lineGap;
 
-                0x00, 0x00, // reserved
-                0x00, 0x00, // reserved
-                0x00, 0x00, // reserved
-                0x00, 0x00, // reserved
+            var advanceWidthMax = (ushort)metrics.DesignEmHeight;
+            hhea[10] = (byte)(advanceWidthMax >> 8);
+            hhea[11] = (byte)advanceWidthMax;
 
-                0x00, 0x00, // metricDataFormat
-                0x00, 0x01, // numberOfHMetrics
-            ]);
+            hhea[16] = (byte)(advanceWidthMax >> 8);
+            hhea[17] = (byte)advanceWidthMax; // xMaxExtent
+
+            hhea[19] = 0x01; // caretSlopeRise
+
+            hhea[35] = 0x01; // numberOfHMetrics
+            table = hhea;
             return true;
+        }
 
         case /* OS/2 */ 1330851634u:
         {
@@ -95,55 +101,64 @@ public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
 
             os2[1] = 0x01; // version = 1
 
-            os2[2] = 0x00;
-            os2[3] = 0x01; // xAvgCharWidth = 1
+            var xAvgCharWidth = (short)metrics.DesignEmHeight;
+            os2[2] = (byte)(xAvgCharWidth >> 8);
+            os2[3] = (byte)xAvgCharWidth;
 
-            os2[4] = 0x01;
-            os2[5] = 0x90; // weightClass = 400
+            var weightClass = (ushort)ConsoleTypeface.Weight;
+            os2[4] = (byte)(weightClass >> 8);
+            os2[5] = (byte)weightClass;
 
-            os2[6] = 0x00;
             os2[7] = 0x05; // widthClass = 5
 
-            os2[26] = (byte)(DrawingContextImpl.StrikethroughThickness >> 8);
-            os2[27] = (byte)DrawingContextImpl.StrikethroughThickness;
+            var strikethroughThickness = (short)metrics.StrikethroughThickness;
+            os2[26] = (byte)(strikethroughThickness >> 8);
+            os2[27] = (byte)strikethroughThickness;
 
-            os2[28] = 0x00;
-            os2[29] = 0x01; // strikeoutPosition = 1 → -1
+            var strikethroughPosition = (short)-metrics.StrikethroughPosition;
+            os2[28] = (byte)(strikethroughPosition >> 8);
+            os2[29] = (byte)strikethroughPosition;
 
-            os2[62] = 0x00;
             os2[63] = 0xC0; // REGULAR | USE_TYPO_METRICS
 
-            os2[68] = 0x00;
-            os2[69] = 0x01; // typoAscender = 1
+            var typoAscender = (short)-metrics.Ascent;
+            os2[68] = (byte)(typoAscender >> 8);
+            os2[69] = (byte)typoAscender;
 
-            os2[70] = 0x00;
-            os2[71] = 0x00; // typoDescender = 0
+            var typoDescender = (short)-metrics.Descent;
+            os2[70] = (byte)(typoDescender >> 8);
+            os2[71] = (byte)typoDescender;
 
-            os2[72] = 0x00;
-            os2[73] = 0x00; // typoLineGap = 0
+            var typoLineGap = (short)metrics.LineGap;
+            os2[72] = (byte)(typoLineGap >> 8);
+            os2[73] = (byte)typoLineGap;
 
-            os2[74] = 0x00;
-            os2[75] = 0x01; // winAscent = 1
+            var winAscent = (ushort)-metrics.Ascent;
+            os2[74] = (byte)(winAscent >> 8);
+            os2[75] = (byte)winAscent;
 
-            os2[76] = 0x00;
-            os2[77] = 0x00; // winDescent = 0
+            var winDescent = (ushort)metrics.Descent;
+            os2[76] = (byte)(winDescent >> 8);
+            os2[77] = (byte)winDescent;
 
-            table = new ReadOnlyMemory<byte>(os2);
+            table = os2;
             return true;
         }
 
         case /* hmtx */ 1752003704u:
+        {
+            var advanceWidth = (ushort)metrics.DesignEmHeight;
             table = new ReadOnlyMemory<byte>([
-                0x00, 0x01, // advanceWidth = 1
-                0x00, 0x00, // leftSideBearing = 0
+                (byte)(advanceWidth >> 8), (byte)advanceWidth, // advanceWidth
+                0x00, 0x00 // leftSideBearing = 0
             ]);
             return true;
+        }
 
         case /* head */ 1751474532u:
         {
             var head = new byte[54];
 
-            head[0] = 0x00;
             head[1] = 0x01; // version = 1.0
 
             head[12] = 0x5F;
@@ -151,10 +166,11 @@ public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
             head[14] = 0x3C;
             head[15] = 0xF5; // magicNumber
 
-            head[18] = 0x00;
-            head[19] = 0x01; // unitsPerEm = 1
+            var unitsPerEm = (ushort)metrics.DesignEmHeight;
+            head[18] = (byte)(unitsPerEm >> 8);
+            head[19] = (byte)unitsPerEm;
 
-            table = new ReadOnlyMemory<byte>(head);
+            table = head;
             return true;
         }
 
@@ -162,18 +178,19 @@ public bool TryGetTable(OpenTypeTag tag, out ReadOnlyMemory<byte> table)
         {
             var post = new byte[32];
 
-            post[0] = 0x00;
             post[1] = 0x03; // version = 3.0
 
-            post[8] = 0x00;
-            post[9] = 0x01; // underlinePosition = 1 → -1
+            var underlinePosition = (short)-metrics.UnderlinePosition;
+            post[8] = (byte)(underlinePosition >> 8);
+            post[9] = (byte)underlinePosition;
 
-            post[10] = DrawingContextImpl.UnderlineThickness >> 8;
-            post[11] = DrawingContextImpl.UnderlineThickness;
+            var underlineThickness = (short)metrics.UnderlineThickness;
+            post[10] = (byte)(underlineThickness >> 8);
+            post[11] = (byte)underlineThickness;
 
-            post[15] = 0x01; // isFixedPitch = true
+            post[15] = metrics.IsFixedPitch ? (byte)0x01 : (byte)0x00;
 
-            table = new ReadOnlyMemory<byte>(post);
+            table = post;
             return true;
         }
 
