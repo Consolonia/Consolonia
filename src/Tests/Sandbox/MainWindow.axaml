@@ -2,9 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Sandbox.MainWindow"
         Title="Sandbox">
-    <StackPanel>
-        <Button Content="E_xit"
-                Click="OnExit"
-                HorizontalAlignment="Left" />
+    <StackPanel Orientation="Vertical">
+        <TextBlock Background="Red">The text!</TextBlock>
+        <!--<Button>The button</Button>-->
     </StackPanel>
 </Window>

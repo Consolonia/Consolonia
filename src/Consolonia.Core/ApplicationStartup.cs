@@ -73,10 +73,9 @@ namespace Consolonia
                 .UseTextShapingSubsystem(() =>
                 {
                     initializeTextShaping?.Invoke();
-
-                    var fallback = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
+                    
                     AvaloniaLocator.CurrentMutable
-                        .Bind<ITextShaperImpl>().ToConstant(new TextShaper(fallback));
+                        .Bind<ITextShaperImpl>().ToConstant(new TextShaper());
                 }, nameof(TextShaper))
                 .UseStandardRuntimePlatformSubsystem()
                 .UseWindowingSubsystem(() => new ConsoloniaPlatform().Initialize(), nameof(ConsoloniaPlatform))
