@@ -40,6 +40,63 @@ namespace Consolonia.Core.Text.Fonts
 
             switch (tag)
             {
+                case /* name */ 1851878757u:
+                {
+                    byte[] familyNameBytes = Encoding.BigEndianUnicode.GetBytes(ConsoleTypeface.FamilyName);
+                    string subfamilyName = ConsoleTypeface.Style != FontStyle.Normal ? ConsoleTypeface.Style.ToString() :
+                        ConsoleTypeface.Weight != FontWeight.Normal ? ConsoleTypeface.Weight.ToString() : "Regular";
+                    byte[] subfamilyNameBytes = Encoding.BigEndianUnicode.GetBytes(subfamilyName);
+                    string fullName = $"{ConsoleTypeface.FamilyName} {subfamilyName}";
+                    byte[] fullNameBytes = Encoding.BigEndianUnicode.GetBytes(fullName);
+
+                    const int nameRecordsCount = 3;
+                    const int stringOffset = 6 + nameRecordsCount * 12;
+                    var nameTable = new byte[stringOffset + familyNameBytes.Length + subfamilyNameBytes.Length +
+                                             fullNameBytes.Length];
+
+                    // Header
+                    nameTable[1] = 0x00; // format = 0
+                    nameTable[2] = (byte)(nameRecordsCount >> 8);
+                    nameTable[3] = (byte)nameRecordsCount;
+                    nameTable[4] = (byte)(stringOffset >> 8);
+                    nameTable[5] = (byte)stringOffset;
+
+                    int currentStringOffset = 0;
+
+                    // NameRecord 1: Family Name
+                    AddNameRecord(nameTable, 6, 1, familyNameBytes.Length, currentStringOffset);
+                    Array.Copy(familyNameBytes, 0, nameTable, stringOffset + currentStringOffset,
+                        familyNameBytes.Length);
+                    currentStringOffset += familyNameBytes.Length;
+
+                    // NameRecord 2: Subfamily Name
+                    AddNameRecord(nameTable, 18, 2, subfamilyNameBytes.Length, currentStringOffset);
+                    Array.Copy(subfamilyNameBytes, 0, nameTable, stringOffset + currentStringOffset,
+                        subfamilyNameBytes.Length);
+                    currentStringOffset += subfamilyNameBytes.Length;
+
+                    // NameRecord 3: Full Name
+                    AddNameRecord(nameTable, 30, 4, fullNameBytes.Length, currentStringOffset);
+                    Array.Copy(fullNameBytes, 0, nameTable, stringOffset + currentStringOffset, fullNameBytes.Length);
+
+                    table = nameTable;
+                    return true;
+
+                    static void AddNameRecord(byte[] bytes, int recordOffset, ushort nameId, int length,
+                        int stringOffsetInsideStorage)
+                    {
+                        bytes[recordOffset + 1] = 0x03; // platformID = Windows
+                        bytes[recordOffset + 3] = 0x01; // encodingID = Unicode BMP
+                        bytes[recordOffset + 4] = 0x04;
+                        bytes[recordOffset + 5] = 0x09; // languageID = English - US
+                        bytes[recordOffset + 6] = (byte)(nameId >> 8);
+                        bytes[recordOffset + 7] = (byte)nameId;
+                        bytes[recordOffset + 8] = (byte)(length >> 8);
+                        bytes[recordOffset + 9] = (byte)length;
+                        bytes[recordOffset + 10] = (byte)(stringOffsetInsideStorage >> 8);
+                        bytes[recordOffset + 11] = (byte)stringOffsetInsideStorage;
+                    }
+                }
         case /* cmap */ 1668112752u:
             table = new ReadOnlyMemory<byte>([
                 0x00, 0x00,             // version = 0
