@@ -808,8 +808,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             SetOrigin(dc, x, y);
             var platformRender = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
             var textShaper = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
-            FontManager.Current.TryGetGlyphTypeface(Typeface.Default, out GlyphTypeface typeface);
-            //ArgumentNullException.ThrowIfNull(typeface);
+            if(!FontManager.Current.TryGetGlyphTypeface(Typeface.Default, out GlyphTypeface typeface))
+                throw new InvalidOperationException("Could not get GlyphTypeface");
+            
             ShapedBuffer glyphs =
                 textShaper.ShapeText(text.AsMemory(), new TextShaperOptions(typeface, typeface.Metrics.DesignEmHeight));
             //var shapedText = new GlyphRun(typeface,

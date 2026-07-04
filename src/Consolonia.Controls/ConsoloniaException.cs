@@ -1,7 +1,8 @@
 using System;
 
-namespace Consolonia.Core.Infrastructure
+namespace Consolonia.Controls
 {
+    //todo: this project seems not needed at all
     public class ConsoloniaException : ApplicationException
     {
         // ReSharper disable UnusedMember.Global

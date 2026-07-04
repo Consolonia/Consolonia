@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using Consolonia.Controls;
 using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Helpers
