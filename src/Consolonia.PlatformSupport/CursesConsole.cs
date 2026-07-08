@@ -220,6 +220,8 @@ namespace Consolonia.PlatformSupport
             { 'Q', Avalonia.Input.Key.F2 },
             { 'R', Avalonia.Input.Key.F3 },
             { 'S', Avalonia.Input.Key.F4 },
+            { 'Z', Avalonia.Input.Key.Tab },
+            { 'E', Avalonia.Input.Key.Clear },
         };
 
         /// <summary>
@@ -496,7 +498,8 @@ namespace Consolonia.PlatformSupport
             return termProgram.Equals("kitty", StringComparison.OrdinalIgnoreCase) ||
                    termProgram.Equals("WezTerm", StringComparison.OrdinalIgnoreCase) ||
                    termProgram.Equals("ghostty", StringComparison.OrdinalIgnoreCase) ||
-                   term.Contains("kitty", StringComparison.OrdinalIgnoreCase);
+                   term.Contains("kitty", StringComparison.OrdinalIgnoreCase) ||
+                   !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KITTY_WINDOW_ID"));
         }
 
         private void HandleCsiKeyboardEvent((int keyCode, int modifiers, int eventType, char terminator) csiEvent)
@@ -523,6 +526,7 @@ namespace Consolonia.PlatformSupport
             {
                 // Legacy CSI letter sequence (arrows, Home, End, F1-F4)
                 key = letterKey;
+                if (terminator == 'Z') rawModifiers |= RawInputModifiers.Shift;
             }
             else if (terminator == '~' && CsiTildeKeyMap.TryGetValue(keyCode, out Avalonia.Input.Key tildeKey))
             {
@@ -581,7 +585,7 @@ namespace Consolonia.PlatformSupport
                 return;
             }
 
-            RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64, !isDown);
+            RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
             if (eventType != 3) // For press events, also raise key up
             {
                 Thread.Yield();
@@ -721,21 +725,11 @@ namespace Consolonia.PlatformSupport
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
 
-            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde)
-            if (_isKittyKeyboardEnabled)
-            {
-                yield return new SafeLockMatcher(
-                    new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
-            }
-
             // SGR extended mouse sequences: ESC [ < button ; x ; y M/m
             yield return new SafeLockMatcher(
                 new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
 
-            // Old protocol matchers are only needed when Kitty keyboard protocol is NOT active
-            if (!_isKittyKeyboardEnabled)
-            {
-                (string, Key)[] fSequences =
+            (string, Key)[] fSequences =
                 [
                     // Ctrl+Alt+(F1 - F4)
                     (@"\x1B[1;7P", Key.CtrlMask | Key.AltMask | MapCursesKey(80 + 185)),
@@ -789,10 +783,16 @@ namespace Consolonia.PlatformSupport
                     (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End)
                 ];
 
-                foreach ((string, Key) fSequence in fSequences)
-                    yield return new SafeLockMatcher(
-                        new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
-                            fSequence.Item1, fSequence.Item1), 0, 0, 0);
+            foreach ((string, Key) fSequence in fSequences)
+                yield return new SafeLockMatcher(
+                    new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
+                        fSequence.Item1, fSequence.Item1), 0, 0, 0);
+
+            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde)
+            // This is now always enabled to handle enhanced CSI sequences that some terminals
+            // might send even if we didn't explicitly enable the protocol, or if detection failed.
+            yield return new SafeLockMatcher(
+                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
 
                 // escape of ESC
                 yield return new SafeLockMatcher(
@@ -926,17 +926,7 @@ namespace Consolonia.PlatformSupport
 
                     RaiseKeyPressInternal(k);
                 }), Curses.KEY_CODE_YES);
-            }
-            else
-            {
-                // When Kitty keyboard protocol is active, we only need resize detection
-                yield return new SafeLockMatcher(new GenericMatcher<int>(wch =>
-                {
-                    if (wch == Curses.KeyResize)
-                        CheckSize();
-                }), Curses.KEY_CODE_YES);
-            }
-
+            
             // text detection
             var textInputMatcher = new SafeLockMatcher(new TextInputMatcher<int>(tuple =>
             {

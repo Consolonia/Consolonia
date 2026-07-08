@@ -28,12 +28,12 @@ namespace Consolonia.Core.Helpers.InputProcessing
         //   ESC [ letter  (bare functional key, e.g. ESC[A for Up arrow)
         // Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         private static readonly Regex CompletePattern =
-            new(@"^\x1B\[(\d+)?(;(\d+)(:(\d+))?)?([A-DFHPQRSu~])$");
+            new(@"^\x1B\[(\d+)?([;:](\d+)([;:](\d+))?)?([A-DFHPQRSu~ZE])$");
 
         /// <summary>
         ///     Valid terminator characters for CSI functional key sequences.
         /// </summary>
-        private const string ValidTerminators = "ABCDFHPQRSu~";
+        private const string ValidTerminators = "ABCDFHPQRSu~ZE";
 
         public override AppendResult Append(T input)
         {
@@ -47,9 +47,17 @@ namespace Consolonia.Core.Helpers.InputProcessing
             if (match.Success)
             {
                 int keyCode = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
+                char terminator = match.Groups[6].Value[0];
+
+                // Don't match bracketed paste mode sequences, let PasteBlockMatcher handle them
+                if (terminator == '~' && (keyCode == 200 || keyCode == 201))
+                {
+                    _accumulator.Clear();
+                    return AppendResult.NoMatch;
+                }
+
                 int modifiers = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : 1;
                 int eventType = match.Groups[5].Success ? int.Parse(match.Groups[5].Value) : 1;
-                char terminator = match.Groups[6].Value[0];
 
                 Complete((keyCode, modifiers, eventType, terminator));
                 _accumulator.Clear();
@@ -93,9 +101,9 @@ namespace Consolonia.Core.Helpers.InputProcessing
                 while (i < s.Length && char.IsAsciiDigit(s[i])) i++;
                 if (i >= s.Length) return true;
 
-                // After digits, expect ; or a terminator
+                // After digits, expect ; or : or a terminator
                 if (ValidTerminators.Contains(s[i])) return i == s.Length - 1; // complete, last char
-                if (s[i] != ';') return false;
+                if (s[i] != ';' && s[i] != ':') return false;
                 i++;
                 if (i >= s.Length) return true;
 
@@ -104,9 +112,9 @@ namespace Consolonia.Core.Helpers.InputProcessing
                 while (i < s.Length && char.IsAsciiDigit(s[i])) i++;
                 if (i >= s.Length) return true;
 
-                // After modifiers, expect : or a terminator
+                // After modifiers, expect : or ; or a terminator
                 if (ValidTerminators.Contains(s[i])) return i == s.Length - 1;
-                if (s[i] != ':') return false;
+                if (s[i] != ':' && s[i] != ';') return false;
                 i++;
                 if (i >= s.Length) return true;
 

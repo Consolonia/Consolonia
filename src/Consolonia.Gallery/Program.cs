@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Logging;
+using Consolonia.Core.Helpers.Logging;
 using Consolonia.Fonts;
 using Consolonia.ManagedWindows.Storage;
 
@@ -29,8 +31,8 @@ namespace Consolonia.Gallery
         public static AppBuilder BuildAvaloniaApp()
         {
             return AppBuilder.Configure<App>()
-                /*.LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Input))*/
-                .LogToException()
+                .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Input))
+                /*.LogToException()*/
                 // adding skia to have bitmap support
                 .UseSkia()
                 .UseConsoloniaStorage()
