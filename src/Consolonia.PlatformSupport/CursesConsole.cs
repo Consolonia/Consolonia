@@ -725,6 +725,11 @@ namespace Consolonia.PlatformSupport
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
 
+            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde)
+            // Placed early to catch enhanced CSI sequences before other matchers interfere.
+            yield return new SafeLockMatcher(
+                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
+
             // SGR extended mouse sequences: ESC [ < button ; x ; y M/m
             yield return new SafeLockMatcher(
                 new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
@@ -791,12 +796,6 @@ namespace Consolonia.PlatformSupport
                 yield return new SafeLockMatcher(
                     new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
                         fSequence.Item1, fSequence.Item1), 0, 0, 0);
-
-            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde)
-            // This is now always enabled to handle enhanced CSI sequences that some terminals
-            // might send even if we didn't explicitly enable the protocol, or if detection failed.
-            yield return new SafeLockMatcher(
-                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
 
                 // escape of ESC
                 yield return new SafeLockMatcher(

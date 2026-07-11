@@ -135,9 +135,11 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override bool TryFlush()
         {
-            // CSI sequences are auto-flushed on completion, so we just indicate
-            // we have pending data to prevent lower-priority matchers from flushing
-            return _accumulator.Length != 0;
+            // Always return false: CSI sequences are auto-flushed on completion,
+            // and returning true here would block lower-priority matchers (like
+            // SgrMouseMatcher) from flushing when this matcher has partial data.
+            // The Reset() no-op ensures our accumulated data survives resets.
+            return false;
         }
 
         public override void Reset()
