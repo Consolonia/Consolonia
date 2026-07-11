@@ -25,5 +25,6 @@
         <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
         <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
         <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.0.4" />
+        <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     </ItemGroup>
 </Project>
