@@ -67,6 +67,8 @@ namespace Consolonia.Controls.Brushes
                             "Failed to register {Animator}: {Message}",
                             nameof(LineBrushAnimator),
                             e.Message);
+
+                        //900BD231-6E80-41AB-92C7-BA6394157057
                         throw;
                     }
             }
@@ -252,7 +254,6 @@ namespace Consolonia.Controls.Brushes
         ///     The bound interpolator, or <c>null</c> if it cannot be resolved (in which case gradient inner brushes
         ///     fall back to a discrete switch).
         /// </returns>
-#pragma warning disable CA1031 // binding to an Avalonia internal; degrade to discrete switching on failure
         private static Func<double, IGradientBrush, IGradientBrush, IGradientBrush> CreateGradientInterpolator()
         {
             try
@@ -271,9 +272,9 @@ namespace Consolonia.Controls.Brushes
                 Logger.TryGet(LogEventLevel.Warning, LogArea.Animations)?.Log(null,
                     "{Animator} could not bind the gradient interpolator: {Message}", nameof(LineBrushAnimator),
                     e.Message);
-                return null;
+                //repeating: 900BD231-6E80-41AB-92C7-BA6394157057
+                throw;
             }
-#pragma warning restore CA1031
         }
     }
 }
