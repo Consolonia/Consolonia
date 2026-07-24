@@ -44,7 +44,6 @@ namespace Consolonia.Controls.Brushes
             typeof(ICustomAnimator).GetMethod("CreateWrapper",
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-#pragma warning disable CA1031
         /// <summary>
         ///     Registers the animator with Avalonia so that <see cref="LineBrush" /> values animate. Safe to call
         ///     multiple times; only the first call has an effect.
@@ -72,7 +71,6 @@ namespace Consolonia.Controls.Brushes
                     }
             }
         }
-#pragma warning restore CA1031
 
         /// <summary>
         ///     Interpolates between two <see cref="LineBrush" /> keyframe values by interpolating their inner brushes
