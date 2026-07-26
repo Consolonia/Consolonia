@@ -20,7 +20,7 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasNoText("Item 27");
 
             await UITest.KeyInput(Key.PageDown);
-            await UITest.AssertHasText("Item 26");
+            await UITest.AssertHasText("Item 27");
         }
 
         [Test]
