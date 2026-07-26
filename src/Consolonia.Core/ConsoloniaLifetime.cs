@@ -195,7 +195,7 @@ namespace Consolonia
                     if (MainWindow != null && MainWindow.PlatformImpl != null)
                     {
                         var consoleTopLevelImpl = (ConsoleWindowImpl)MainWindow.PlatformImpl;
-                        ArgumentNullException.ThrowIfNull(consoleTopLevelImpl, nameof(consoleTopLevelImpl));
+                        ArgumentNullException.ThrowIfNull(consoleTopLevelImpl);
                         consoleTopLevelImpl.Dispose();
                     }
                 }

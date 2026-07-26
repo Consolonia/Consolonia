@@ -69,8 +69,10 @@ namespace Consolonia.Controls
                 _text = value;
 
                 var textShaper = AvaloniaLocator.Current.GetService<ITextShaperImpl>();
-                FontManager.Current.TryGetGlyphTypeface(Typeface.Default, out GlyphTypeface typeface);
-                ArgumentNullException.ThrowIfNull(typeface);
+                
+                if(!FontManager.Current.TryGetGlyphTypeface(Typeface.Default, out GlyphTypeface typeface))
+                    throw new ConsoloniaException("Could not get glyph typeface");
+                
                 ShapedBuffer glyphs =
                     textShaper.ShapeText(value.AsMemory(),
                         new TextShaperOptions(typeface, typeface.Metrics.DesignEmHeight));

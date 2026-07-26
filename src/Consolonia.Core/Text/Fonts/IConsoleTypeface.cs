@@ -16,7 +16,7 @@ namespace Consolonia.Core.Text.Fonts
 
         int GlyphCount { get; }
 
-        FontMetrics Metrics { get; }
+        FontMetrics Metrics { get; } // todo: in case of simple font we are already having metrics inside Typeface loaded by Avalonia, then why do we need it here and this entire abstraction. Why can't we use Avalonian GlyphTypeface?
 
         FontSimulations FontSimulations { get; }
 
