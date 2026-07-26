@@ -40,25 +40,15 @@ namespace Consolonia.Gallery.Tests
         [Test]
         public async Task ThemeMenuSwitchesTheme()
         {
-            try
-            {
-                await UITest.KeyInput(Key.T, RawInputModifiers.Alt);
-                await UITest.AssertHasText("Modern", "TurboVision");
-                await UITest.KeyInput(Key.Down, Key.Down, Key.Enter);
+            await UITest.KeyInput(Key.T, RawInputModifiers.Alt);
+            await UITest.AssertHasText("Modern", "TurboVision");
+            await UITest.KeyInput(Key.Down, Key.Down, Key.Enter);
 
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                    Assert.IsInstanceOf<TurboVisionTheme>(Application.Current!.Styles[0]));
-            }
-            finally
-            {
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    Application.Current!.Styles.RemoveAt(0);
-                    Application.Current.Styles.Insert(0, new ModernTheme());
-                });
-
-                await UITest.WaitRendered();
-            }
+            Assert.IsInstanceOf<TurboVisionTheme>(Application.Current!.Styles[0]);
+            
+            // restore to modern
+            await UITest.KeyInput(Key.T, RawInputModifiers.Alt);
+            await UITest.KeyInput(Key.Enter);
         }
     }
 }
