@@ -103,7 +103,7 @@ namespace Consolonia.Core.Drawing
 
         public RenderTargetProperties Properties => new()
         {
-            RetainsPreviousFrameContents = true,
+            RetainsPreviousFrameContents = true, //todo: check meaning of this properties
             IsSuitableForDirectRendering = false
         };
 
