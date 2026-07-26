@@ -24,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
     ///     ConsoleWindowImpl - An IWindowImpl which uses a PixelBuffer to render.
     /// </summary>
 #pragma warning disable CA1711 // Identifiers should not have incorrect suffix
-    public class ConsoleWindowImpl : IWindowImpl, IPlatformRenderSurface
+    public sealed class ConsoleWindowImpl : IWindowImpl, IPlatformRenderSurface
 #pragma warning restore CA1711 // Identifiers should not have incorrect suffix
     {
         private static bool _singletonGuard;
@@ -134,9 +134,7 @@ namespace Consolonia.Core.Infrastructure
 
         public double RenderScaling => 1;
 
-        [SuppressMessage("Performance", "CA1819:Properties should not return arrays",
-            Justification = "Required by Avalonia's ITopLevelImpl interface.")]
-        public IPlatformRenderSurface[] Surfaces => [this];
+        IPlatformRenderSurface[] ITopLevelImpl.Surfaces => [this];
 
         public bool IsReady => true;
 
@@ -506,7 +504,7 @@ namespace Consolonia.Core.Infrastructure
             };
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
@@ -582,7 +580,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
 
-        protected virtual void OnCursorChanged(ConsoleCursor obj)
+        private void OnCursorChanged(ConsoleCursor obj)
         {
             CursorChanged?.Invoke(obj);
         }
