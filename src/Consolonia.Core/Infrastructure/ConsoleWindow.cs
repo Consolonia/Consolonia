@@ -13,7 +13,9 @@ using Avalonia.Input.Raw;
 using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
 using Avalonia.Platform.Storage;
+using Avalonia.Rendering;
 using Avalonia.Rendering.Composition;
+using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Window = Avalonia.Controls.Window;
@@ -73,7 +75,12 @@ namespace Consolonia.Core.Infrastructure
         {
             _inputRoot = inputRoot;
             if (_accessKeysAlwaysOn)
+            Dispatcher.UIThread.Post(_ =>
+            {
+                // When input root is set it's not initialized yet, so posting thru dispatcher to wait for initialization
                 SetShowAccessKeys(_inputRoot, true);
+            },null, DispatcherPriority.Default);
+
         }
 
         public Point PointToClient(PixelPoint point)
@@ -350,8 +357,9 @@ namespace Consolonia.Core.Infrastructure
 
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
+            var presentationSource = (IPresentationSource)_inputRoot;
             // ReSharper disable once SuspiciousTypeConversion.Global
-            if (!ReferenceEquals(args.Sender, _inputRoot)) return;
+            if (!ReferenceEquals(args.Sender, presentationSource.RootVisual.Parent)) return;
             if (args.GetNewValue<bool>()) return;
 
             SetShowAccessKeys(_inputRoot, true);
@@ -575,8 +583,10 @@ namespace Consolonia.Core.Infrastructure
 
         private static void SetShowAccessKeys(IInputRoot inputRoot, bool value)
         {
-            if (inputRoot is AvaloniaObject avaloniaObject)
-                avaloniaObject.SetValue(AccessText.ShowAccessKeyProperty, value);
+            ((IPresentationSource)inputRoot)
+                .RootVisual // TopLevelhost
+                .Parent // Main Window
+                .SetValue(AccessText.ShowAccessKeyProperty, value);
         }
 
 
