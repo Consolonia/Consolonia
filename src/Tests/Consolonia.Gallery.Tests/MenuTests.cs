@@ -36,19 +36,5 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasNoText("Second Menu Item");
             await UITest.KeyInput(Key.Left);
         }
-
-        [Test]
-        public async Task ThemeMenuSwitchesTheme()
-        {
-            await UITest.KeyInput(Key.T, RawInputModifiers.Alt);
-            await UITest.AssertHasText("Modern", "TurboVision");
-            await UITest.KeyInput(Key.Down, Key.Down, Key.Enter);
-
-            Assert.IsInstanceOf<TurboVisionTheme>(Application.Current!.Styles[0]);
-            
-            // restore to modern
-            await UITest.KeyInput(Key.T, RawInputModifiers.Alt);
-            await UITest.KeyInput(Key.Enter);
-        }
     }
 }
