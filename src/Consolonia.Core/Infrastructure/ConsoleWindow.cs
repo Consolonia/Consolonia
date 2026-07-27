@@ -155,7 +155,7 @@ namespace Consolonia.Core.Infrastructure
 
         public Action<WindowTransparencyLevel> TransparencyLevelChanged { get; set; }
 
-        public Compositor Compositor => _compositor ??= new Compositor(null);
+        public Compositor Compositor { get; } = new(null);
         public Action Closed { get; set; }
         public Action LostFocus { get; set; }
 
