@@ -35,25 +35,24 @@ namespace Consolonia.Gallery.Tests
 
             await UITest.AssertHasText(headerLines);
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await UITest.WaitRendered();
+            
+            string[] screenLines = UITest.PixelBuffer.PrintBuffer()
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            int previousRow = -1;
+
+            foreach (string headerLine in headerLines)
             {
-                string[] screenLines = UITest.PixelBuffer.PrintBuffer()
-                    .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-                int previousRow = -1;
+                int row = Array.FindIndex(screenLines,
+                    line => line.Contains(headerLine, StringComparison.Ordinal));
+                Assert.GreaterOrEqual(row, 0, $"Could not find '{headerLine}' in the rendered screen.");
 
-                foreach (string headerLine in headerLines)
-                {
-                    int row = Array.FindIndex(screenLines,
-                        line => line.Contains(headerLine, StringComparison.Ordinal));
-                    Assert.GreaterOrEqual(row, 0, $"Could not find '{headerLine}' in the rendered screen.");
+                if (previousRow >= 0)
+                    Assert.AreEqual(previousRow + 1, row,
+                        $"Expected '{headerLine}' to render directly below the previous header line.");
 
-                    if (previousRow >= 0)
-                        Assert.AreEqual(previousRow + 1, row,
-                            $"Expected '{headerLine}' to render directly below the previous header line.");
-
-                    previousRow = row;
-                }
-            });
+                previousRow = row;
+            }
         }
 
         [Test]
