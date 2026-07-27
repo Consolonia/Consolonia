@@ -164,8 +164,7 @@ namespace Consolonia.Gallery.View
             mainWindow.Content = null; // otherwise Avalonia sets some trash template to WindowsPanel
 
             // NOTE: this assumes first style object is the old theme!
-            Application.Current.Styles.RemoveAt(0);
-            Application.Current.Styles.Insert(0, selectedTheme switch
+            Application.Current.Styles[0] = selectedTheme switch
             {
                 ThemesList.Modern => new ModernTheme(),
                 ThemesList.ModernContrast => new ModernContrastTheme(),
@@ -174,7 +173,7 @@ namespace Consolonia.Gallery.View
                 ThemesList.TurboVisionGray => new TurboVisionGrayTheme(),
                 ThemesList.TurboVisionElegant => new TurboVisionElegantTheme(),
                 _ => throw new InvalidDataException("Unknown theme name")
-            });
+            };
 
             ViewModel.SelectedTheme = themeName;
 
