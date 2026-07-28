@@ -47,18 +47,17 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                                     if (topLevel == null)
                                         return;
 
-                                    var focusedControl = topLevel.FocusManager.GetFocusedElement() as Control;
+                                    if (topLevel.FocusManager.GetFocusedElement() is Visual focusedControl)
+                                    {
+                                        IEnumerable<ILogical> focusedTree = focusedControl.GetLogicalAncestors();
+                                        IEnumerable<MenuItem> menuItems =
+                                            visual.GetLogicalAncestors().OfType<MenuItem>();
 
-                                    IEnumerable<ILogical> focusedTree = focusedControl == null
-                                        ? Enumerable.Empty<ILogical>()
-                                        : focusedControl.GetLogicalAncestors().Prepend(focusedControl);
-                                    IEnumerable<MenuItem> menuItems =
-                                        visual.GetLogicalAncestors().OfType<MenuItem>();
-
-                                    foreach (MenuItem menuItem in menuItems
-                                                 .Where(item => !focusedTree.Contains(item))
-                                                 .ToArray())
-                                        menuItem.Close();
+                                        foreach (MenuItem menuItem in menuItems
+                                                     .Where(item => !focusedTree.Contains(item))
+                                                     .ToArray())
+                                            menuItem.Close();
+                                    }
                                 });
                         }));
                     visual.SetValue(DisposablesProperty, new[] { disposable });
