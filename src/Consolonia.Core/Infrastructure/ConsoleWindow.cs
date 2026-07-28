@@ -34,7 +34,6 @@ namespace Consolonia.Core.Infrastructure
         private readonly bool _accessKeysAlwaysOn;
         private readonly IDisposable _accessKeysAlwaysOnDisposable;
         private readonly IKeyboardDevice _myKeyboardDevice;
-        private Compositor _compositor;
         private Point _cursorPosition = new(0, 0);
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
         private bool _disposedValue;
