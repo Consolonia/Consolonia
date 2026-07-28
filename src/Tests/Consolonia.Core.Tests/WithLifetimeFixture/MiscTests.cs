@@ -41,8 +41,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.AreEqual("Console", screen.DisplayName);
             Assert.AreEqual(bounds, screen.Bounds);
             Assert.AreEqual(bounds, screen.WorkingArea);
-            Assert.DoesNotThrow(() => screen.GetHashCode());
-            Assert.DoesNotThrow(() => screen.Equals(screen));
+            Assert.DoesNotThrow(() =>
+            {
+                int unused = screen.GetHashCode();
+            });
+            Assert.DoesNotThrow(() =>
+            {
+                bool unused = screen.Equals(screen);
+            });
         }
     }
 }
