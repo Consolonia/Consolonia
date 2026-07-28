@@ -12,11 +12,12 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
     // Wheel mouse values are hard coded.
     public class ConsoleScrollContentPresenter : ScrollContentPresenter
     {
+        private const double MinWheelDeltaTolerance = 1e-6;
+
         // Cache MethodInfo for private base method to avoid repeated reflection lookup.
         private static readonly MethodInfo SnapOffsetMethod =
             typeof(ScrollContentPresenter).GetMethod("SnapOffset",
                 BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy);
-        private const double MinWheelDeltaTolerance = 1e-6;
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {

@@ -1,10 +1,7 @@
 using System.Threading.Tasks;
-using Avalonia;
 using Avalonia.Input;
-using Avalonia.Threading;
 using Consolonia.Gallery.Tests.Base;
 using Consolonia.NUnit;
-using Consolonia.Themes;
 using NUnit.Framework;
 
 namespace Consolonia.Gallery.Tests

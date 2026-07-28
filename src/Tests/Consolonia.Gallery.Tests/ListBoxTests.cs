@@ -1,8 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Input;
-using Avalonia.Threading;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Gallery.Gallery.GalleryViews;
 using Consolonia.Gallery.Tests.Base;
 using Consolonia.NUnit;
@@ -36,7 +34,7 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasText(headerLines);
 
             await UITest.WaitRendered();
-            
+
             string[] screenLines = UITest.PixelBuffer.PrintBuffer()
                 .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             int previousRow = -1;
@@ -59,7 +57,7 @@ namespace Consolonia.Gallery.Tests
         public void SelectionModeReflectsOptionFlags()
         {
             var viewModel = new ListBoxPageViewModel();
-            var selectionModeChanged = false;
+            bool selectionModeChanged = false;
             viewModel.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName == nameof(ListBoxPageViewModel.SelectionMode))

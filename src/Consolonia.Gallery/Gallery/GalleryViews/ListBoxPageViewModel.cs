@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using Avalonia.Controls;
 using Avalonia.Controls.Selection;
 using AvaloniaSelectionMode = Avalonia.Controls.SelectionMode;
 
@@ -49,6 +48,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
         public ObservableCollection<string> Items { get; }
         public SelectionModel<string> Selection { get; }
+
         public AvaloniaSelectionMode SelectionMode =>
             (Multiple ? AvaloniaSelectionMode.Multiple : 0) |
             (Toggle ? AvaloniaSelectionMode.Toggle : 0) |

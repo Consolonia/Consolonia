@@ -1,23 +1,20 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Avalonia;
 using Avalonia.Media;
-using Avalonia.Media.Fonts;
 using Avalonia.Media.TextFormatting;
 using Consolonia.Controls;
 using Consolonia.Core.Text;
 using Consolonia.Core.Text.Fonts;
 using NUnit.Framework;
+using TextShaper = Consolonia.Core.Text.TextShaper;
 
 namespace Consolonia.Core.Tests
 {
     [TestFixture]
     public class AsciiArtTypefaceTests
     {
-        private GlyphTypeface _testGlyphTypeface;
-
         [SetUp]
         public void Setup()
         {
@@ -33,14 +30,16 @@ namespace Consolonia.Core.Tests
             _testGlyphTypeface = null;
         }
 
+        private GlyphTypeface _testGlyphTypeface;
+
         [Test]
         public void TextShaperUsesConsoleTypefaceForConsoleGlyphTypeface()
         {
             var consoleTypeface = new ConsoleTypeface();
-            var glyphTypeface = FontManagerImpl.CreateGlyphTypeface(consoleTypeface);
+            GlyphTypeface glyphTypeface = FontManagerImpl.CreateGlyphTypeface(consoleTypeface);
             try
             {
-                var textShaper = new Consolonia.Core.Text.TextShaper();
+                var textShaper = new TextShaper();
 
                 Assert.AreSame(consoleTypeface, textShaper.CreateTypeface(glyphTypeface));
 
@@ -64,7 +63,7 @@ namespace Consolonia.Core.Tests
         {
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes($"flf2a$ {height} 0 0 0 0"));
 
-            InvalidDataException exception =
+            var exception =
                 Assert.Throws<InvalidDataException>(() => AsciiArtTypefaceLoader.Load(stream, "InvalidHeight"));
 
             StringAssert.Contains("height must be between 1", exception.Message);
@@ -320,7 +319,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["***"]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["**"]));
 
-            var options = CreateTextShaperOptions();
+            TextShaperOptions options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -344,7 +343,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*  ", "*  ", "*  "]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["  *", "  *", "  *"]));
 
-            var options = CreateTextShaperOptions();
+            TextShaperOptions options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -539,7 +538,7 @@ namespace Consolonia.Core.Tests
             };
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*"]));
 
-            var options = CreateTextShaperOptions();
+            TextShaperOptions options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("A".AsMemory(), options);

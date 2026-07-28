@@ -1,9 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Platform;
-using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
-using Consolonia.Core.Dummy;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Fonts;
 using Consolonia.NUnit;

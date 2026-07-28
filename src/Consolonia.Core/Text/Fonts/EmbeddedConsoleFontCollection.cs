@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Fonts;
 using Avalonia.Platform;
@@ -57,18 +56,11 @@ namespace Consolonia.Core.Text.Fonts
             return _fontFamilies.GetEnumerator();
         }
 
-        public void Initialize(IFontManagerImpl fontManager)
-        {
-            FontManager = fontManager;
-        }
-
         public bool TryGetGlyphTypeface(string familyName, FontStyle style, FontWeight weight, FontStretch stretch,
             out GlyphTypeface glyphTypeface)
         {
             if (_typefaceByName.TryGetValue(familyName, out IConsoleTypeface consoleTypeface))
-            {
                 return TryCreateGlyphTypeface(consoleTypeface, out glyphTypeface);
-            }
 
             if (_fontFamilyUris.TryGetValue(familyName, out Uri[] uris))
             {
@@ -86,6 +78,11 @@ namespace Consolonia.Core.Text.Fonts
 
             glyphTypeface = null;
             return false;
+        }
+
+        public void Initialize(IFontManagerImpl fontManager)
+        {
+            FontManager = fontManager;
         }
 
         // Resharper disable AssignNullToNotNullAttribute  - I just can't seem to get Resharper to understand the out parameter here
@@ -114,8 +111,7 @@ namespace Consolonia.Core.Text.Fonts
             {
                 familyTypefaces = new[]
                 {
-                    new Typeface(new FontFamily(Key, $"#{familyName}"), FontStyle.Normal, FontWeight.Normal,
-                        FontStretch.Normal)
+                    new Typeface(new FontFamily(Key, $"#{familyName}"))
                 };
                 return true;
             }

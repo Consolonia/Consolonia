@@ -43,7 +43,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                             if (!(bool)eventArgs.NewValue!)
                                 Dispatcher.UIThread.Post(() =>
                                 {
-                                    TopLevel topLevel = TopLevel.GetTopLevel(visual);
+                                    var topLevel = TopLevel.GetTopLevel(visual);
                                     if (topLevel == null)
                                         return;
 

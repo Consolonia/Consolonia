@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Platform;
@@ -59,8 +60,8 @@ namespace Consolonia.Core.Infrastructure
 
         private static void SetScreenProperty<T>(Screen screen, string propertyName, T value)
         {
-            var property = typeof(Screen).GetProperty(propertyName) ??
-                           throw new InvalidOperationException($"Screen property '{propertyName}' not found.");
+            PropertyInfo property = typeof(Screen).GetProperty(propertyName) ??
+                                    throw new InvalidOperationException($"Screen property '{propertyName}' not found.");
             property.SetValue(screen, value);
         }
 

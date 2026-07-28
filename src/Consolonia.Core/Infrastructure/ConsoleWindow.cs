@@ -11,8 +11,8 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Input.Raw;
 using Avalonia.Platform;
-using Avalonia.Platform.Surfaces;
 using Avalonia.Platform.Storage;
+using Avalonia.Platform.Surfaces;
 using Avalonia.Rendering;
 using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
@@ -70,16 +70,17 @@ namespace Consolonia.Core.Infrastructure
 
         private IMouseDevice MouseDevice { get; }
 
+        public bool IsReady => true;
+
         public void SetInputRoot(IInputRoot inputRoot)
         {
             _inputRoot = inputRoot;
             if (_accessKeysAlwaysOn)
-            Dispatcher.UIThread.Post(_ =>
-            {
-                // When input root is set it's not initialized yet, so posting thru dispatcher to wait for initialization
-                SetShowAccessKeys(_inputRoot, true);
-            },null, DispatcherPriority.Default);
-
+                Dispatcher.UIThread.Post(_ =>
+                {
+                    // When input root is set it's not initialized yet, so posting thru dispatcher to wait for initialization
+                    SetShowAccessKeys(_inputRoot, true);
+                }, null, DispatcherPriority.Default);
         }
 
         public Point PointToClient(PixelPoint point)
@@ -141,8 +142,6 @@ namespace Consolonia.Core.Infrastructure
         public double RenderScaling => 1;
 
         IPlatformRenderSurface[] ITopLevelImpl.Surfaces => [this];
-
-        public bool IsReady => true;
 
         public Action<RawInputEventArgs> Input { get; set; }
 
@@ -457,7 +456,7 @@ namespace Consolonia.Core.Infrastructure
             PhysicalKey physicalKey = GetPhysicalKey(key);
             string keySymbol = GetKeySymbol(keyChar, rawInputModifiers, physicalKey);
             return new RawKeyEventArgs(_myKeyboardDevice, timeStamp, _inputRoot, type, key, rawInputModifiers,
-                physicalKey, keySymbol, KeyDeviceType.Keyboard);
+                physicalKey, keySymbol);
         }
 
         private static string GetKeySymbol(char keyChar, RawInputModifiers rawInputModifiers, PhysicalKey physicalKey)

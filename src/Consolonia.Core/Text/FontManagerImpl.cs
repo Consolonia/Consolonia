@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -59,7 +58,6 @@ namespace Consolonia.Core.Text
         {
             glyphTypeface = new ConsolePlatformTypeface(new ConsoleTypeface());
             return true;
-
         }
 
 
@@ -87,7 +85,7 @@ namespace Consolonia.Core.Text
         {
             return new ConsolePlatformTypeface(consoleTypeface);
         }
-        
+
         public static string ConsoleDefaultFontFamily()
         {
             return "ConsoleDefault";

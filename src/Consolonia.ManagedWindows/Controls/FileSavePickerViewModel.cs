@@ -16,7 +16,7 @@ namespace Consolonia.ManagedWindows.Controls
         public FileSavePickerViewModel(FilePickerSaveOptions options)
             : base(options)
         {
-            ArgumentNullException.ThrowIfNull(options, nameof(options));
+            ArgumentNullException.ThrowIfNull(options);
             PropertyChanged += FileSavePickerViewModel_PropertyChanged;
         }
 

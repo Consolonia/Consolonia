@@ -4,7 +4,6 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
-using Avalonia.Platform;
 using Consolonia.Core.Drawing;
 
 namespace Consolonia.Core.Text.Fonts

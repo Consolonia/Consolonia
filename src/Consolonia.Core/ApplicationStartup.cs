@@ -73,7 +73,7 @@ namespace Consolonia
                 .UseTextShapingSubsystem(() =>
                 {
                     initializeTextShaping?.Invoke();
-                    
+
                     AvaloniaLocator.CurrentMutable
                         .Bind<ITextShaperImpl>().ToConstant(new TextShaper());
                 }, nameof(TextShaper))

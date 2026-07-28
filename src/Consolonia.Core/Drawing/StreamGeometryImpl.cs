@@ -138,16 +138,6 @@ namespace Consolonia.Core.Drawing
                 _lastPoint = startPoint;
             }
 
-            public void LineTo(Point point)
-            {
-                // our strokes are oriented from UpperLeft corner to Right or Down
-                if (_lastPoint.X > point.X || _lastPoint.Y > point.Y)
-                    _geometryImpl._strokes.Add(new Line(point, _lastPoint));
-                else
-                    _geometryImpl._strokes.Add(new Line(_lastPoint, point));
-                _lastPoint = point;
-            }
-
             public void EndFigure(bool isClosed)
             {
                 Rect bound = _geometryImpl._strokes.Aggregate(new Rect(), (rect, line) => rect.Union(line.Bounds));
@@ -168,6 +158,16 @@ namespace Consolonia.Core.Drawing
 
             public void Dispose()
             {
+            }
+
+            public void LineTo(Point point)
+            {
+                // our strokes are oriented from UpperLeft corner to Right or Down
+                if (_lastPoint.X > point.X || _lastPoint.Y > point.Y)
+                    _geometryImpl._strokes.Add(new Line(point, _lastPoint));
+                else
+                    _geometryImpl._strokes.Add(new Line(_lastPoint, point));
+                _lastPoint = point;
             }
 
             /// <summary>

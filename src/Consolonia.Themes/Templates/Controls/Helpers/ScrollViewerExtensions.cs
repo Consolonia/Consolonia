@@ -22,7 +22,7 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
             ScrollBarsWidthProperty.Changed.SubscribeAction(args =>
             {
                 var scrollViewer = (ScrollViewer)args.Sender;
-                var grid = scrollViewer.GetTemplateDescendants()
+                Grid grid = scrollViewer.GetTemplateDescendants()
                     .OfType<Grid>()
                     .SingleOrDefault(control => control.Name == "PART_Root");
                 if (grid != null)

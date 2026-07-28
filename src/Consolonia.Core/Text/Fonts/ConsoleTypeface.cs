@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
-using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -169,7 +168,7 @@ namespace Consolonia.Core.Text.Fonts
                 Grapheme grapheme = graphemes[i];
                 ushort glyphIndex = GetGlyphIndex(grapheme.Glyph);
                 int glyphAdvance = GetGlyphAdvance(glyphIndex);
-                shapedBuffer[i] = new GlyphInfo(glyphIndex, grapheme.Cluster, glyphAdvance, default);
+                shapedBuffer[i] = new GlyphInfo(glyphIndex, grapheme.Cluster, glyphAdvance);
             }
 
             return shapedBuffer;

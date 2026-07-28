@@ -5,7 +5,6 @@ using System.Text;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
-using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -206,7 +205,7 @@ namespace Consolonia.Core.Text.Fonts
                     options.BidiLevel);
 
             for (int i = 0; i < shapedBuffer.Length; i++)
-                shapedBuffer[i] = new GlyphInfo(glyphIndices[i], i, advances[i], default);
+                shapedBuffer[i] = new GlyphInfo(glyphIndices[i], i, advances[i]);
             return shapedBuffer;
         }
 

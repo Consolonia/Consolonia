@@ -27,6 +27,8 @@ namespace Consolonia.Core.Text
 
         public IReadOnlyList<GlyphInfo> GlyphInfos { get; }
 
+        public IConsoleTypeface ConsoleTypeface { get; }
+
         public void Dispose()
         {
         }
@@ -36,8 +38,6 @@ namespace Consolonia.Core.Text
             // empty intersections defaults to entire span.
             return new List<float>();
         }
-
-        public IConsoleTypeface ConsoleTypeface { get; }
 
         public double FontRenderingEmSize { get; }
         public Point BaselineOrigin { get; }
