@@ -14,7 +14,6 @@ namespace Consolonia.Core.Text
             IReadOnlyList<GlyphInfo> glyphInfos, Point baselineOrigin)
         {
             FontRenderingEmSize = fontRenderingEmSize;
-            GlyphTypeface = glyphTypeface;
             ConsoleTypeface = (glyphTypeface.PlatformTypeface as ConsolePlatformTypeface)?.ConsoleTypeface;
             BaselineOrigin = baselineOrigin;
             GlyphInfos = glyphInfos;
@@ -37,8 +36,6 @@ namespace Consolonia.Core.Text
             // empty intersections defaults to entire span.
             return new List<float>();
         }
-
-        public GlyphTypeface GlyphTypeface { get; }
 
         public IConsoleTypeface ConsoleTypeface { get; }
 
