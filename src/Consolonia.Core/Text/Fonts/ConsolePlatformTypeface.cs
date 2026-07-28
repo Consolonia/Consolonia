@@ -36,10 +36,8 @@ namespace Consolonia.Core.Text.Fonts
                 {
                     byte[] familyNameBytes = Encoding.BigEndianUnicode.GetBytes(ConsoleTypeface.FamilyName);
                     string subfamilyName = ConsoleTypeface.Style != FontStyle.Normal
-                        ?
-                        ConsoleTypeface.Style.ToString()
-                        :
-                        ConsoleTypeface.Weight != FontWeight.Normal
+                        ? ConsoleTypeface.Style.ToString()
+                        : ConsoleTypeface.Weight != FontWeight.Normal
                             ? ConsoleTypeface.Weight.ToString()
                             : "Regular";
                     byte[] subfamilyNameBytes = Encoding.BigEndianUnicode.GetBytes(subfamilyName);
