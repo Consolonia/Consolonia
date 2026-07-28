@@ -55,7 +55,7 @@
         <Style Selector="^:selected /template/ Border#root">
             <!--TurboVision approach-->
             <Setter Property="Background"
-                    Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                    Value="{DynamicResource ThemeChooserBackgroundBrush}" />
             <Setter Property="(TemplatedControl.Foreground)"
                     Value="{DynamicResource ThemeChooserForegroundBrush}" />
         </Style>
