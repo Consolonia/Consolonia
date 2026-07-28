@@ -339,7 +339,7 @@ namespace Consolonia.Core.Infrastructure
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(true);
-            GC.SuppressFinalize(this);
+            // currently class is sealed: GC.SuppressFinalize(this);
         }
 
         public void SetCanMinimize(bool value)
