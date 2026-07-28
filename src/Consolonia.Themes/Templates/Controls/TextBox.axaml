@@ -64,7 +64,7 @@
                                     <Panel>
                                         <!--I don't understand why 1 is not sufficient as a padding for caret of width 1-->
                                         <Panel Margin="0,0,2,0">
-                                            <console:ConsoloniaTextPresenter Name="PART_TextPresenter"
+                                            <console:ConsoloniaTextPresenter x:Name="PART_TextPresenter"
                                                                              Margin="{TemplateBinding Padding}"
                                                                              CaretIndex="{TemplateBinding CaretIndex}"
                                                                              PasswordChar="{TemplateBinding PasswordChar}"
