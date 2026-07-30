@@ -1,5 +1,6 @@
 using System.Threading;
 using Avalonia.Logging;
+using Consolonia.Controls;
 
 namespace Consolonia.Core.Infrastructure
 // ReSharper disable once ArrangeNamespaceBody

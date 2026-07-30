@@ -44,7 +44,8 @@
                                               Content="{TemplateBinding Header}"
                                               Margin="{TemplateBinding Padding}"
                                               VerticalAlignment="Center"
-                                              Grid.Column="2" />
+                                              Grid.Column="2"
+                                              RecognizesAccessKey="True" />
                             <TextBlock x:Name="PART_InputGestureText"
                                        Grid.Column="3"
                                        Margin="1,0"

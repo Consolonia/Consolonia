@@ -3,7 +3,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Utilities;
 using Consolonia.Controls;
 using Consolonia.Core.Infrastructure;
 
@@ -54,8 +53,8 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
             Point point = e.GetPosition(tb) - new Point(padding.Left, padding.Top);
 
             point = new Point(
-                MathUtilities.Clamp(point.X, 0, Math.Max(tb.TextLayout.WidthIncludingTrailingWhitespace, 0)),
-                MathUtilities.Clamp(point.Y, 0, Math.Max(tb.TextLayout.Height, 0)));
+                Math.Clamp(point.X, 0, Math.Max(tb.TextLayout.WidthIncludingTrailingWhitespace, 0)),
+                Math.Clamp(point.Y, 0, Math.Max(tb.TextLayout.Height, 0)));
 
             TextHitTestResult hit = tb.TextLayout.HitTestPoint(point);
             int textPosition = hit.TextPosition;

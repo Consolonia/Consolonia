@@ -18,7 +18,8 @@
                                               IsCaretShown="{TemplateBinding IsFocused}">
                             <ContentPresenter Name="PART_HeaderPresenter"
                                               Content="{TemplateBinding Header}"
-                                              Margin="{TemplateBinding Padding}" />
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
                         </console:CaretControl>
                         <Popup Name="PART_Popup"
                                IsLightDismissEnabled="True"
@@ -54,7 +55,7 @@
         <Style Selector="^:selected /template/ Border#root">
             <!--TurboVision approach-->
             <Setter Property="Background"
-                    Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                    Value="{DynamicResource ThemeChooserBackgroundBrush}" />
             <Setter Property="(TemplatedControl.Foreground)"
                     Value="{DynamicResource ThemeChooserForegroundBrush}" />
         </Style>

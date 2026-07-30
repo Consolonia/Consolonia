@@ -1,7 +1,8 @@
 using System;
-using System.Collections.Generic;
+using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
+using Consolonia.Core.Text.Fonts;
 
 namespace Consolonia.Core.Text
 {
@@ -9,10 +10,13 @@ namespace Consolonia.Core.Text
     {
         public ShapedBuffer ShapeText(ReadOnlyMemory<char> text, TextShaperOptions options)
         {
-            if (options.Typeface is ITextShaperImpl textShaper) return textShaper.ShapeText(text, options);
+            return ((ConsolePlatformTypeface)options.GlyphTypeface.PlatformTypeface).ConsoleTypeface.ShapeText(text,
+                options);
+        }
 
-            throw new KeyNotFoundException(
-                "Unsupported console glyph typeface, we only work with ITextShaperImpl typefaces.");
+        public ITextShaperTypeface CreateTypeface(GlyphTypeface glyphTypeface)
+        {
+            return ((ConsolePlatformTypeface)glyphTypeface.PlatformTypeface).ConsoleTypeface;
         }
     }
 }

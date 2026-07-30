@@ -167,7 +167,7 @@
                                    NumberFormat="{Binding #CultureSelector.SelectedItem, Converter={x:Static local:GalleryNumericUpDown.CultureConverter}}"
                                    VerticalAlignment="Center"
                                    Value="{Binding DecimalValue}"
-                                   Watermark="Enter text"
+                                   PlaceholderText="Enter text"
                                    FormatString="{Binding SelectedFormat.Value}" />
                 </StackPanel>
 
@@ -184,7 +184,7 @@
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
                                    Value="{Binding DoubleValue}"
-                                   Watermark="Enter text"
+                                   PlaceholderText="Enter text"
                                    FormatString="{Binding SelectedFormat.Value}" />
                 </StackPanel>
 
@@ -200,7 +200,7 @@
                                    Increment="0.5"
                                    HorizontalAlignment="Left"
                                    VerticalAlignment="Center"
-                                   Watermark="Enter text"
+                                   PlaceholderText="Enter text"
                                    FormatString="{Binding SelectedFormat.Value}">
                         <DataValidationErrors.Error>
                             <sys:Exception />

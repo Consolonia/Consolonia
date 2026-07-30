@@ -12,7 +12,6 @@ using Consolonia.Controls.Brushes;
 using Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor;
 using Consolonia.Core.Dummy;
 using Consolonia.Core.Text;
-using TextShaper = Consolonia.Core.Text.TextShaper;
 
 namespace Consolonia.Core.Infrastructure
 {
@@ -36,6 +35,11 @@ namespace Consolonia.Core.Infrastructure
             throw new NotImplementedException();
         }
 
+        public void GetWindowsZOrder(ReadOnlySpan<IWindowImpl> windows, Span<long> zOrder)
+        {
+            throw new NotSupportedException();
+        }
+
         public ITopLevelImpl CreateEmbeddableTopLevel()
         {
             throw new NotImplementedException();
@@ -43,6 +47,8 @@ namespace Consolonia.Core.Infrastructure
 
         public void Initialize()
         {
+            var renderTimer = new SleepLoopRenderTimer(30);
+
             NotSupported += InternalWorkaroundsIgnore;
             NotSupported += KeyInputIgnore;
             NotSupported += RenderNotSupportedIgnore;
@@ -50,14 +56,12 @@ namespace Consolonia.Core.Infrastructure
             AvaloniaLocator.CurrentMutable.BindToSelf(this)
                 .Bind<IWindowingPlatform>().ToConstant(this)
                 /*todo: need replacement? .Bind<IPlatformThreadingInterface>().ToSingleton<ConsoloniaPlatformThreadingInterface>()*/
-                .Bind<IRenderTimer>().ToConstant(new SleepLoopRenderTimer(30))
+                .Bind<IRenderTimer>().ToConstant(renderTimer)
+                .Bind<IRenderLoop>().ToConstant(RenderLoop.FromTimer(renderTimer))
                 .Bind<IDispatcherImpl>().ToConstant(new ManagedDispatcherImpl(null))
-                /*SleepLoopRenderTimer : IRenderTimer*/
-                /*.Bind<IRenderLoop>().ToConstant(new RenderLoop()) todo: is internal now*/
                 .Bind<PlatformHotkeyConfiguration>().ToConstant(new PlatformHotkeyConfiguration(KeyModifiers.Control))
                 .Bind<IKeyboardDevice>().ToConstant(new ConsoleKeyboardDevice())
                 .Bind<IFontManagerImpl>().ToConstant(new FontManagerImpl())
-                .Bind<ITextShaperImpl>().ToConstant(new TextShaper())
                 .Bind<IMouseDevice>().ToConstant(new MouseDevice())
                 .Bind<ICursorFactory>().ToConstant(new ConsoleCursorFactory())
                 .Bind<IPlatformIconLoader>().ToConstant(new DummyIconLoader())
