@@ -169,6 +169,9 @@ namespace Consolonia.NUnit
             _lifetime = lifetime;
         }
 
+        public void StartInputLoop()
+        {
+        }
 
 #pragma warning disable CS0067
         public event Action Resized;

@@ -90,6 +90,7 @@ namespace Consolonia
 
             MainWindow.Show();
 
+            Console.StartInputLoop();
             try
             {
                 Dispatcher.UIThread.MainLoop(_cts.Token);

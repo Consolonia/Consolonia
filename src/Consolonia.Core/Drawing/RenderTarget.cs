@@ -4,14 +4,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
-using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
@@ -24,9 +25,10 @@ namespace Consolonia.Core.Drawing
 
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
+        
         private ConsoleCursor _consoleCursor;
-
-        private bool _renderPending;
+        private readonly Snapshot.Regions _cursorDirtyRegions = new();
+        private Timer _cursorTimer;
 #if FPS
         private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
         private int _framesThisSecond;
@@ -35,12 +37,18 @@ namespace Consolonia.Core.Drawing
 #endif
         internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
-            _console = AvaloniaLocator.Current.GetService<IConsoleOutput>()!;
+            _console = AvaloniaLocator.Current.GetRequiredService<IConsoleOutput>();
             _consoleTopLevelImpl = consoleTopLevelImpl;
             InitializeCacheInternal();
             _consoleTopLevelImpl.Resized += OnResized;
             _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
             _consoleTopLevelImpl.ClearScreenRequested += OnClearScreenRequested;
+            _cursorTimer = new Timer(_ =>
+                {
+                    _cursorTimer.Stop();
+                    RenderToDevice(_cursorDirtyRegions);
+                }, null, Timeout.Infinite,
+                Timeout.Infinite);
         }
 
         private void InitializeCacheInternal()
@@ -64,11 +72,13 @@ namespace Consolonia.Core.Drawing
 
         public PixelBuffer Buffer => _consoleTopLevelImpl.PixelBuffer;
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void Dispose()
         {
             _consoleTopLevelImpl.Resized -= OnResized;
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
             _consoleTopLevelImpl.ClearScreenRequested -= OnClearScreenRequested;
+            _cursorTimer.Dispose();
         }
 
         public void Save(string fileName, int? quality = null)
@@ -90,7 +100,7 @@ namespace Consolonia.Core.Drawing
         {
             try
             {
-                RenderToDevice();
+                RenderToDevice(_consoleTopLevelImpl.DirtyRegions);
             }
             catch (InvalidDrawingContextException)
             {
@@ -150,11 +160,12 @@ namespace Consolonia.Core.Drawing
 
 
         [MethodImpl(MethodImplOptions.Synchronized)]
-        private void RenderToDevice()
+        private void RenderToDevice(Snapshot.Regions regions)
         {
-            _renderPending = false;
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
-            Snapshot dirtyRegions = _consoleTopLevelImpl.DirtyRegions.GetSnapshotAndClear();
+            Snapshot dirtyRegions = regions.GetSnapshotAndClear();
+            dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
+            if (dirtyRegions.IsEmpty) return;
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -174,9 +185,10 @@ namespace Consolonia.Core.Drawing
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
 
-            for (ushort y = 0; y < pixelBuffer.Height; y++)
+            for (ushort y = dirtyRegions.MinY; y < dirtyRegions.MaxY; y++)
             {
                 bool isWide = false;
+                // we can not run only from MinX to MaxX because of wide characters
                 for (ushort x = 0; x < pixelBuffer.Width; x++)
                 {
                     Pixel pixel = pixelBuffer[x, y];
@@ -317,12 +329,15 @@ namespace Consolonia.Core.Drawing
             Color result = contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
             return result;
         }
-
+        
+        [MethodImpl(MethodImplOptions.Synchronized)]
         private void OnCursorChanged(ConsoleCursor consoleCursor)
         {
             if (_consoleCursor.CompareTo(consoleCursor) == 0)
                 return;
 
+            _cursorTimer.Stop();
+            
             ConsoleCursor oldConsoleCursor = _consoleCursor;
             _consoleCursor = consoleCursor;
 
@@ -331,23 +346,11 @@ namespace Consolonia.Core.Drawing
                 oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
             var newCursorRect = new PixelRect(consoleCursor.Coordinate.X - 1,
                 consoleCursor.Coordinate.Y, consoleCursor.Width + 1, 1);
-            _consoleTopLevelImpl.DirtyRegions.AddRect(oldCursorRect);
-            _consoleTopLevelImpl.DirtyRegions.AddRect(newCursorRect);
+            
+            _cursorDirtyRegions.AddRect(oldCursorRect);
+            _cursorDirtyRegions.AddRect(newCursorRect);
 
-            if (!_renderPending)
-            {
-                _renderPending = true;
-
-                // this gates rendering of cursor to (60fps) to avoid excessive rendering when moving cursor fast
-                DispatcherTimer.RunOnce(() =>
-                {
-                    if (_renderPending)
-                    {
-                        _renderPending = false;
-                        RenderToDevice();
-                    }
-                }, TimeSpan.FromMilliseconds(16), DispatcherPriority.UiThreadRender);
-            }
+            _cursorTimer.StartOnce(16);
         }
     }
 }

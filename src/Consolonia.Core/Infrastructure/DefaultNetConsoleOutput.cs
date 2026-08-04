@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Controls;
@@ -33,12 +34,14 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetTitle(string title)
         {
             WaitPauseTaskIfNecessary();
             Console.Title = title;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
             WaitPauseTaskIfNecessary();
@@ -53,6 +56,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
             WaitPauseTaskIfNecessary();
@@ -60,6 +64,7 @@ namespace Consolonia.Core.Infrastructure
             return new PixelBufferCoordinate((ushort)left, (ushort)top);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             // Width 0 is the trailing placeholder cell of a previously rendered wide glyph.
@@ -104,6 +109,7 @@ namespace Consolonia.Core.Infrastructure
                 _currentPosition.Y);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void Flush()
         {
             if (_stringBuilder.Length == 0)
@@ -116,12 +122,14 @@ namespace Consolonia.Core.Infrastructure
             _stringBuilder.Clear();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WriteText(string str)
         {
             WaitPauseTaskIfNecessary();
             Console.Write(str);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
             WaitPauseTaskIfNecessary();
@@ -147,18 +155,21 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void HideCaret()
         {
             WaitPauseTaskIfNecessary();
             Console.CursorVisible = false;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void ShowCaret()
         {
             WaitPauseTaskIfNecessary();
             Console.CursorVisible = true;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void PrepareConsole()
         {
             Console.OutputEncoding = Encoding.UTF8;
@@ -177,12 +188,14 @@ namespace Consolonia.Core.Infrastructure
             Console.Clear();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void RestoreConsole()
         {
             Console.ForegroundColor = _originalForeground;
             Console.BackgroundColor = _originalBackground;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void ClearScreen()
         {
             WaitPauseTaskIfNecessary();

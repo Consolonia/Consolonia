@@ -7,7 +7,9 @@
 //
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -133,6 +135,7 @@ namespace Consolonia.PlatformSupport
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
         private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
+        private readonly ParametrizedLogger _errorLogger = Log.CreateInputLogger(LogEventLevel.Error);
 
         private Curses.Window _cursesWindow;
         private int _eraseCharacter;
@@ -162,30 +165,31 @@ namespace Consolonia.PlatformSupport
         {
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-
-            StartEventLoop();
-        }
-
-        private void StartEventLoop()
-        {
+            
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
+        }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void StartInputLoop()
+        {
+            StartEventLoop();
+        }
+        
+        private void StartEventLoop()
+        {
             Task _ = Task.Run(async () =>
             {
                 await Helper.WaitDispatcherInitialized();
-
+                
                 _inputBuffer.StartReading();
 
                 while (!Disposed)
                     try
                     {
                         (int, int)[] inputs = _inputBuffer.Dequeue();
-                        await DispatchInputAsync(() =>
-                        {
-                            _keyModifiers = new KeyModifiers();
-                            _inputProcessor.ProcessChunk(inputs);
-                        });
+                        _keyModifiers = new KeyModifiers();
+                        _inputProcessor.ProcessChunk(inputs);
                     }
                     catch (Exception exception)
                     {
@@ -197,6 +201,11 @@ namespace Consolonia.PlatformSupport
         }
 
         private readonly List<(int code, int wch)> _rowInputBuffer = new(1000); //todo: low magic number
+        
+        /// <summary>
+        /// We have to read mouse events immediately once we've got mouse codes. Because the mouse queue is of the opposite direction in ncurses
+        /// </summary>
+        private readonly ConcurrentQueue<Curses.MouseEvent> _mouseEvents = new();
 
         /// <summary>
         ///     https://github.com/gui-cs/Terminal.Gui/blob/v2_develop/Terminal.Gui/ConsoleDrivers/CursesDriver/CursesDriver.cs#L790
@@ -218,11 +227,30 @@ namespace Consolonia.PlatformSupport
                 int code = Curses.get_wch(out int wch);
                 if (code != Curses.ERR)
                 {
-                    _rowInputBuffer.Add((code, wch));
+                    
+
+                    // Pair KEY_MOUSE with its event on THIS thread, immediately.
+                    if (code == Curses.KEY_CODE_YES && wch == Curses.KeyMouse)
+                    {
+                        if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                        {
+                            _mouseEvents.Enqueue(ev);
+                            _rowInputBuffer.Add((code, wch));
+                        }
+                        else
+                        {
+                            /*coding agents assure this is valid if error returned here*/
+                            _errorLogger.Log2("Error getting mouse event");
+                        }
+                    }
+                    else
+                    {
+                        _rowInputBuffer.Add((code, wch));
+                    }
 
                     if (_rowInputBuffer.Count == 1)
                         Curses.timeout(SequenceCollectTimeout);
-
+                    
                     //check if was escape, wait for one more escape
                     if (code != Curses.KEY_CODE_YES && wch == 27)
                     {
@@ -253,6 +281,7 @@ namespace Consolonia.PlatformSupport
             return [.. _rowInputBuffer];
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
@@ -368,7 +397,7 @@ namespace Consolonia.PlatformSupport
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
         }
 
-
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void RestoreConsole()
         {
             base.RestoreConsole();
@@ -400,6 +429,7 @@ namespace Consolonia.PlatformSupport
             return Version.Parse(versionOnly) >= Version.Parse("6.4");
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void PauseIO(Task task)
         {
             base.PauseIO(task);
@@ -556,14 +586,15 @@ namespace Consolonia.PlatformSupport
                         CheckSize();
                         return;
                     case Curses.KeyMouse:
-                        if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                        if (_mouseEvents.TryDequeue(out Curses.MouseEvent ev))
                         {
                             _verboseLogger.Log2(
                                 $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
                             HandleMouseInput(ev);
+                            return;
                         }
 
-                        return;
+                        throw new ConsoloniaException("Mouse event was produced but queue was empty");
                 }
 
                 Key k = MapCursesKey(wch);

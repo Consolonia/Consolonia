@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
@@ -15,7 +16,8 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     /// <remarks>
     ///     This implements disposable and eventing for IConsoleInput and
-    ///     wraps around internal IConsoleOutput
+    ///     wraps around internal IConsoleOutput.
+    ///  Thread-safe
     /// </remarks>
     public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
@@ -65,6 +67,7 @@ namespace Consolonia.Core.Infrastructure
         protected async Task DispatchInputAsync(Action action)
 #pragma warning restore CA1822
         {
+            //todo: key and mouse input now can be dispatched on any thread (from avalonia 12)
             await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Input);
         }
 
@@ -74,6 +77,7 @@ namespace Consolonia.Core.Infrastructure
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
         public event Action<bool> FocusEvent;
         public event Action<string, ulong, CanBeHandledEventArgs> TextInputEvent;
+        public abstract void StartInputLoop();
 
         protected void RaiseMouseEvent(RawPointerEventType eventType, Point point, Vector? wheelDelta,
             RawInputModifiers modifiers)
@@ -101,10 +105,12 @@ namespace Consolonia.Core.Infrastructure
         #endregion
 
         #region IConsoleOutput
-
+        
         public PixelBufferSize Size
         {
+            [MethodImpl(MethodImplOptions.Synchronized)]
             get => _consoleOutput.Size;
+            [MethodImpl(MethodImplOptions.Synchronized)]
             set
             {
                 // ReSharper disable once UsageOfDefaultStructEquality //todo: low use special equality interfaces
@@ -121,63 +127,75 @@ namespace Consolonia.Core.Infrastructure
 
         public event Action Resized;
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void ClearScreen()
         {
             _consoleOutput.ClearScreen();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
             return _consoleOutput.GetCaretPosition();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void HideCaret()
         {
             _consoleOutput.HideCaret();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void PrepareConsole()
         {
             _consoleOutput.PrepareConsole();
             Capabilities |= _consoleOutput.Capabilities;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             _consoleOutput.WritePixel(position, in pixel);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void RestoreConsole()
         {
             _consoleOutput.RestoreConsole();
             _consoleOutput.Flush();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
             _consoleOutput.SetCaretPosition(bufferPoint);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
             _consoleOutput.SetCaretStyle(caretStyle);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetTitle(string title)
         {
             _consoleOutput.SetTitle(title);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void ShowCaret()
         {
             _consoleOutput.ShowCaret();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WriteText(string str)
         {
             _consoleOutput.WriteText(str);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         protected bool CheckSize()
         {
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;
@@ -199,6 +217,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void Dispose()
         {
 #pragma warning disable CA1063 // Implement IDisposable Correctly
@@ -209,6 +228,7 @@ namespace Consolonia.Core.Infrastructure
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
             _consoleOutput.Flush();
