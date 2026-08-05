@@ -171,10 +171,10 @@ namespace Consolonia.Core.Drawing
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
 
-            for (ushort y = dirtyRegions.MinY; y < dirtyRegions.MaxY; y++)
+            for (ushort y = 0; y < pixelBuffer.Height; y++)
             {
                 bool isWide = false;
-                // we can not run only from MinX to MaxX because of wide characters
+                // we can not run only from MinX to MaxX because of wide characters, also we can not run MinY/MaxY because we need to detect caret
                 for (ushort x = 0; x < pixelBuffer.Width; x++)
                 {
                     Pixel pixel = pixelBuffer[x, y];
