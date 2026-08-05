@@ -258,8 +258,6 @@ namespace Consolonia.Core.Drawing
                             continue;
                     }
 
-                    //todo: indexOutOfRange during resize
-
                     _console.WritePixel(new PixelBufferCoordinate(x, y), in pixel);
 
                     _cache[x, y] = pixel;
