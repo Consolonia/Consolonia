@@ -321,9 +321,9 @@ namespace Consolonia.Core.Drawing
                 return;
 
             // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-            if(_cursorTimer == null)
+            if (_cursorTimer == null)
                 return;
-            
+
             _cursorTimer.Stop();
 
             ConsoleCursor oldConsoleCursor = _consoleCursor;
