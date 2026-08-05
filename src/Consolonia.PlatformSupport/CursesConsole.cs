@@ -583,7 +583,10 @@ namespace Consolonia.PlatformSupport
                 switch (wch)
                 {
                     case Curses.KeyResize:
-                        CheckSize();
+                        _ = DispatchInputAsync(() =>
+                        {
+                            CheckSize();
+                        });
                         return;
                     case Curses.KeyMouse:
                         if (_mouseEvents.TryDequeue(out Curses.MouseEvent ev))

@@ -108,6 +108,7 @@ namespace Consolonia.Core.Infrastructure
         
         public PixelBufferSize Size
         {
+            [MethodImpl(MethodImplOptions.Synchronized)]
             get => _consoleOutput.Size;
             set
             {
@@ -131,19 +132,16 @@ namespace Consolonia.Core.Infrastructure
 
         public event Action Resized;
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void ClearScreen()
         {
             _consoleOutput.ClearScreen();
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
             return _consoleOutput.GetCaretPosition();
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void HideCaret()
         {
             _consoleOutput.HideCaret();
@@ -156,7 +154,6 @@ namespace Consolonia.Core.Infrastructure
             Capabilities |= _consoleOutput.Capabilities;
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             _consoleOutput.WritePixel(position, in pixel);
@@ -169,36 +166,31 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.Flush();
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
             _consoleOutput.SetCaretPosition(bufferPoint);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
             _consoleOutput.SetCaretStyle(caretStyle);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void SetTitle(string title)
         {
             _consoleOutput.SetTitle(title);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void ShowCaret()
         {
             _consoleOutput.ShowCaret();
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WriteText(string str)
         {
             _consoleOutput.WriteText(str);
         }
-
+        
         protected bool CheckSize()
         {
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;
@@ -231,7 +223,6 @@ namespace Consolonia.Core.Infrastructure
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
             _consoleOutput.Flush();

@@ -144,8 +144,7 @@ namespace Consolonia.Core.Drawing
             Snapshot dirtyRegions = regions.GetSnapshotAndClear();
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;
-
-            // checking whether width or height of pixelBuffer is different now from the cache
+            
             if(pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
                 InitializeCacheInternal();
             
