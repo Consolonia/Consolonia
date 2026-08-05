@@ -171,6 +171,10 @@ namespace Consolonia.PlatformSupport
             PrepareConsole();
         }
 
+        // todo: synchronization mess has been introduced in this PR. we are fighting race between dispatcher and local locks.
+        // It's not clear for each object what is safe and what is not and safe for what exactly. Some operations are supposed to
+        // be executed only from Dispatcher thread, while others form random. Some of them having race between each other while others race itself
+        // only. Would be great if someone could bring an approach of synchornization which is simple to track and understand.
         [MethodImpl(MethodImplOptions.Synchronized)]
         public override void StartInputLoop()
         {

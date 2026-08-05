@@ -112,9 +112,7 @@ namespace Consolonia.Core.Infrastructure
             get => _consoleOutput.Size;
             set
             {
-#pragma warning disable CA2002 // we are using Synchronized for simplicity
                 lock (this)
-#pragma warning restore CA2002
                 {
                     // ReSharper disable once UsageOfDefaultStructEquality //todo: low use special equality interfaces
                     if (_consoleOutput.Size.Equals(value))
