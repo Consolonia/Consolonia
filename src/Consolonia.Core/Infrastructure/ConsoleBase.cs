@@ -108,16 +108,20 @@ namespace Consolonia.Core.Infrastructure
         
         public PixelBufferSize Size
         {
-            [MethodImpl(MethodImplOptions.Synchronized)]
             get => _consoleOutput.Size;
-            [MethodImpl(MethodImplOptions.Synchronized)]
             set
             {
-                // ReSharper disable once UsageOfDefaultStructEquality //todo: low use special equality interfaces
-                if (_consoleOutput.Size.Equals(value))
-                    return;
+#pragma warning disable CA2002 // we are using Synchronized for simplicity
+                lock (this)
+#pragma warning restore CA2002
+                {
+                    // ReSharper disable once UsageOfDefaultStructEquality //todo: low use special equality interfaces
+                    if (_consoleOutput.Size.Equals(value))
+                        return;
 
-                _consoleOutput.Size = value;
+                    _consoleOutput.Size = value;
+                }
+
                 Resized?.Invoke();
             }
         }
@@ -195,7 +199,6 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.WriteText(str);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
         protected bool CheckSize()
         {
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;
