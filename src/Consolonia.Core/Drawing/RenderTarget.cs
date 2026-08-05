@@ -27,7 +27,7 @@ namespace Consolonia.Core.Drawing
 
         private ConsoleCursor _consoleCursor;
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
-        private readonly Timer _cursorTimer;
+        private Timer _cursorTimer;
 #if FPS
         private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
         private int _framesThisSecond;
@@ -42,8 +42,13 @@ namespace Consolonia.Core.Drawing
             _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
             _cursorTimer = new Timer(_ =>
                 {
-                    _cursorTimer.Stop();
-                    RenderToDevice(_cursorDirtyRegions);
+                    lock (this)
+                    {
+                        if (_cursorTimer == null)
+                            return;
+                        _cursorTimer.Stop();
+                        RenderToDevice(_cursorDirtyRegions);
+                    }
                 }, null, Timeout.Infinite,
                 Timeout.Infinite);
         }
@@ -64,6 +69,7 @@ namespace Consolonia.Core.Drawing
         {
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
             _cursorTimer.Dispose();
+            _cursorTimer = null!;
         }
 
         public void Save(string fileName, int? quality = null)
