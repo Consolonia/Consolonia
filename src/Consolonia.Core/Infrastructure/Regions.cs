@@ -9,12 +9,6 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     internal class Snapshot
     {
-        public ushort MinY { get; private set; }
-        public ushort MaxY { get; private set; }
-        public ushort MinX { get; private set; }
-        public ushort MaxX { get; private set; }
-        
-        public bool IsEmpty => _rectangles.Count == 0;
         private IReadOnlyList<PixelRect> _rectangles;
 
         private Snapshot(IReadOnlyList<PixelRect> rectangles)
@@ -23,6 +17,13 @@ namespace Consolonia.Core.Infrastructure
 
             CalculateMinMax();
         }
+
+        public ushort MinY { get; private set; }
+        public ushort MaxY { get; private set; }
+        public ushort MinX { get; private set; }
+        public ushort MaxX { get; private set; }
+
+        public bool IsEmpty => _rectangles.Count == 0;
 
         private void InitializeMinMax()
         {
@@ -35,7 +36,7 @@ namespace Consolonia.Core.Infrastructure
         private void CalculateMinMax()
         {
             InitializeMinMax();
-            
+
             for (int i = 0; i < _rectangles.Count; i++)
             {
                 PixelRect rect = _rectangles[i];
@@ -75,6 +76,20 @@ namespace Consolonia.Core.Infrastructure
         public bool Contains(ushort x, ushort y, bool inclusive)
         {
             return Contains(new PixelPoint(x, y), inclusive);
+        }
+
+        public void Intersect(int x, int y, ushort width, ushort height)
+        {
+            var result = new List<PixelRect>();
+            foreach (PixelRect rectangle in _rectangles)
+            {
+                PixelRect intersected = rectangle.Intersect(new PixelRect(x, y, width, height));
+                if (!intersected.IsEmpty())
+                    result.Add(intersected);
+            }
+
+            _rectangles = result.AsReadOnly();
+            CalculateMinMax();
         }
 
         /// <summary>
@@ -117,20 +132,6 @@ namespace Consolonia.Core.Infrastructure
                     return snapshot;
                 }
             }
-        }
-
-        public void Intersect(int x, int y, ushort width, ushort height)
-        {
-            var result = new List<PixelRect>();
-            foreach (PixelRect rectangle in _rectangles)
-            {
-                PixelRect intersected = rectangle.Intersect(new PixelRect(x, y, width, height));
-                if(!intersected.IsEmpty())
-                    result.Add(intersected);
-            } 
-            
-            _rectangles = result.AsReadOnly();
-            CalculateMinMax();
         }
     }
 }

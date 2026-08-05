@@ -17,7 +17,7 @@ namespace Consolonia.Core.Infrastructure
     /// <remarks>
     ///     This implements disposable and eventing for IConsoleInput and
     ///     wraps around internal IConsoleOutput.
-    ///  Thread-safe
+    ///     Thread-safe
     /// </remarks>
     public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
@@ -105,7 +105,7 @@ namespace Consolonia.Core.Infrastructure
         #endregion
 
         #region IConsoleOutput
-        
+
         public PixelBufferSize Size
         {
             [MethodImpl(MethodImplOptions.Synchronized)]
@@ -190,7 +190,7 @@ namespace Consolonia.Core.Infrastructure
         {
             _consoleOutput.WriteText(str);
         }
-        
+
         protected bool CheckSize()
         {
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;

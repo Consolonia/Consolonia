@@ -17,7 +17,7 @@ namespace Consolonia.Core.Helpers
         {
             timer.Change(ms, Timeout.Infinite);
         }
-        
+
         public static void Stop(this Timer timer)
         {
             timer.Change(Timeout.Infinite, Timeout.Infinite);

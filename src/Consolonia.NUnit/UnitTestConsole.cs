@@ -94,6 +94,10 @@ namespace Consolonia.NUnit
         {
         }
 
+        public void StartInputLoop()
+        {
+        }
+
         public void Dispose()
         {
             _lifetime = null;
@@ -167,10 +171,6 @@ namespace Consolonia.NUnit
         public void SetupLifetime(ConsoloniaLifetime lifetime)
         {
             _lifetime = lifetime;
-        }
-
-        public void StartInputLoop()
-        {
         }
 
 #pragma warning disable CS0067

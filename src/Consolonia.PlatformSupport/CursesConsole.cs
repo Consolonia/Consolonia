@@ -132,10 +132,11 @@ namespace Consolonia.PlatformSupport
                 (RawPointerEventType.Wheel, EventClass.Wheel)
             ]);
 
+        private readonly ParametrizedLogger _errorLogger = Log.CreateInputLogger(LogEventLevel.Error);
+
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
         private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
-        private readonly ParametrizedLogger _errorLogger = Log.CreateInputLogger(LogEventLevel.Error);
 
         private Curses.Window _cursesWindow;
         private int _eraseCharacter;
@@ -165,7 +166,7 @@ namespace Consolonia.PlatformSupport
         {
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-            
+
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
         }
@@ -175,13 +176,13 @@ namespace Consolonia.PlatformSupport
         {
             StartEventLoop();
         }
-        
+
         private void StartEventLoop()
         {
             Task _ = Task.Run(async () =>
             {
                 await Helper.WaitDispatcherInitialized();
-                
+
                 _inputBuffer.StartReading();
 
                 while (!Disposed)
@@ -201,9 +202,10 @@ namespace Consolonia.PlatformSupport
         }
 
         private readonly List<(int code, int wch)> _rowInputBuffer = new(1000); //todo: low magic number
-        
+
         /// <summary>
-        /// We have to read mouse events immediately once we've got mouse codes. Because the mouse queue is of the opposite direction in ncurses
+        ///     We have to read mouse events immediately once we've got mouse codes. Because the mouse queue is of the opposite
+        ///     direction in ncurses
         /// </summary>
         private readonly ConcurrentQueue<Curses.MouseEvent> _mouseEvents = new();
 
@@ -227,8 +229,6 @@ namespace Consolonia.PlatformSupport
                 int code = Curses.get_wch(out int wch);
                 if (code != Curses.ERR)
                 {
-                    
-
                     // Pair KEY_MOUSE with its event on THIS thread, immediately.
                     if (code == Curses.KEY_CODE_YES && wch == Curses.KeyMouse)
                     {
@@ -250,7 +250,7 @@ namespace Consolonia.PlatformSupport
 
                     if (_rowInputBuffer.Count == 1)
                         Curses.timeout(SequenceCollectTimeout);
-                    
+
                     //check if was escape, wait for one more escape
                     if (code != Curses.KEY_CODE_YES && wch == 27)
                     {
@@ -583,10 +583,7 @@ namespace Consolonia.PlatformSupport
                 switch (wch)
                 {
                     case Curses.KeyResize:
-                        _ = DispatchInputAsync(() =>
-                        {
-                            CheckSize();
-                        });
+                        _ = DispatchInputAsync(() => { CheckSize(); });
                         return;
                     case Curses.KeyMouse:
                         if (_mouseEvents.TryDequeue(out Curses.MouseEvent ev))

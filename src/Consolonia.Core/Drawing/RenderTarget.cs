@@ -6,7 +6,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
@@ -25,10 +24,10 @@ namespace Consolonia.Core.Drawing
 
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
-        
+
         private ConsoleCursor _consoleCursor;
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
-        private Timer _cursorTimer;
+        private readonly Timer _cursorTimer;
 #if FPS
         private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
         private int _framesThisSecond;
@@ -144,10 +143,10 @@ namespace Consolonia.Core.Drawing
             Snapshot dirtyRegions = regions.GetSnapshotAndClear();
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;
-            
-            if(pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
+
+            if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
                 InitializeCacheInternal();
-            
+
 #if FPS
             var now = _stopwatch.Elapsed;
             var elapsed = now - _lastFpsUpdate;
@@ -308,7 +307,7 @@ namespace Consolonia.Core.Drawing
             Color result = contrastWithWhite > contrastWithBlack ? Colors.White : Colors.Black;
             return result;
         }
-        
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void OnCursorChanged(ConsoleCursor consoleCursor)
         {
@@ -316,7 +315,7 @@ namespace Consolonia.Core.Drawing
                 return;
 
             _cursorTimer.Stop();
-            
+
             ConsoleCursor oldConsoleCursor = _consoleCursor;
             _consoleCursor = consoleCursor;
 
@@ -325,7 +324,7 @@ namespace Consolonia.Core.Drawing
                 oldConsoleCursor.Coordinate.Y, oldConsoleCursor.Width + 1, 1);
             var newCursorRect = new PixelRect(consoleCursor.Coordinate.X - 1,
                 consoleCursor.Coordinate.Y, consoleCursor.Width + 1, 1);
-            
+
             _cursorDirtyRegions.AddRect(oldCursorRect);
             _cursorDirtyRegions.AddRect(newCursorRect);
 

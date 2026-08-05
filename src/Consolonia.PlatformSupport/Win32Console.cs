@@ -119,7 +119,7 @@ namespace Consolonia.PlatformSupport
         {
             StartEventLoop();
         }
-        
+
         private void StartEventLoop()
         {
             Task.Run(async () =>

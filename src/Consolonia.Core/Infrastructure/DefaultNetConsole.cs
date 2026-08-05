@@ -74,7 +74,7 @@ namespace Consolonia.Core.Infrastructure
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
         }
-        
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public override void StartInputLoop()
         {

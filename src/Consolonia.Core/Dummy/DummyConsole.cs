@@ -19,7 +19,6 @@ namespace Consolonia.Core.Dummy
 
         public override void StartInputLoop()
         {
-            
         }
     }
 

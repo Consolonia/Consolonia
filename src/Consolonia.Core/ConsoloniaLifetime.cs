@@ -168,7 +168,8 @@ namespace Consolonia
             {
                 Dispatcher.UIThread.Post(() =>
                 {
-                    consoleWindow.Paint(new Rect(0, 0, consoleWindow.ClientSize.Width, consoleWindow.ClientSize.Height));
+                    consoleWindow.Paint(new Rect(0, 0, consoleWindow.ClientSize.Width,
+                        consoleWindow.ClientSize.Height));
                     MainWindow.InvalidateVisual();
                 });
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
