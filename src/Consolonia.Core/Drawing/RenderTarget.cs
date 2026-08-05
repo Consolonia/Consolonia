@@ -40,9 +40,7 @@ namespace Consolonia.Core.Drawing
             _console = AvaloniaLocator.Current.GetRequiredService<IConsoleOutput>();
             _consoleTopLevelImpl = consoleTopLevelImpl;
             InitializeCacheInternal();
-            _consoleTopLevelImpl.Resized += OnResized;
             _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
-            _consoleTopLevelImpl.ClearScreenRequested += OnClearScreenRequested;
             _cursorTimer = new Timer(_ =>
                 {
                     _cursorTimer.Stop();
@@ -56,28 +54,16 @@ namespace Consolonia.Core.Drawing
             _cache = InitializeCache(_consoleTopLevelImpl.PixelBuffer.Width, _consoleTopLevelImpl.PixelBuffer.Height);
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        private void OnClearScreenRequested()
-        {
-            _console.ClearScreen();
-            _console.Flush();
-            InitializeCacheInternal();
-        }
-
         public RenderTarget(IEnumerable<IPlatformRenderSurface> surfaces)
             : this(surfaces.OfType<ConsoleWindowImpl>()
                 .Single())
         {
         }
 
-        public PixelBuffer Buffer => _consoleTopLevelImpl.PixelBuffer;
-
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void Dispose()
         {
-            _consoleTopLevelImpl.Resized -= OnResized;
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
-            _consoleTopLevelImpl.ClearScreenRequested -= OnClearScreenRequested;
             _cursorTimer.Dispose();
         }
 
@@ -138,14 +124,6 @@ namespace Consolonia.Core.Drawing
             return new DrawingContextImpl(_consoleTopLevelImpl);
         }
 
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        private void OnResized(Size size, WindowResizeReason reason)
-        {
-            // todo: should we check the reason?
-            InitializeCacheInternal();
-        }
-
         private static Pixel?[,] InitializeCache(ushort width, ushort height)
         {
             var cache = new Pixel?[width, height];
@@ -167,6 +145,10 @@ namespace Consolonia.Core.Drawing
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;
 
+            // checking whether width or height of pixelBuffer is different now from the cache
+            if(pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
+                InitializeCacheInternal();
+            
 #if FPS
             var now = _stopwatch.Elapsed;
             var elapsed = now - _lastFpsUpdate;
