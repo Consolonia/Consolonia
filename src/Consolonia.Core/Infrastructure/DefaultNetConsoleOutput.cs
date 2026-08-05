@@ -39,7 +39,7 @@ namespace Consolonia.Core.Infrastructure
             WaitPauseTaskIfNecessary();
             Console.Title = title;
         }
-        
+
         public virtual void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
             WaitPauseTaskIfNecessary();
@@ -56,7 +56,7 @@ namespace Consolonia.Core.Infrastructure
                 }
             }
         }
-        
+
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
             WaitPauseTaskIfNecessary();
@@ -111,7 +111,7 @@ namespace Consolonia.Core.Infrastructure
             _currentPosition = new PixelBufferCoordinate((ushort)(_currentPosition.X + pixel.Width),
                 _currentPosition.Y);
         }
-        
+
         public virtual void Flush()
         {
             WaitPauseTaskIfNecessary();
@@ -125,14 +125,14 @@ namespace Consolonia.Core.Infrastructure
                 _stringBuilder.Clear();
             }
         }
-        
+
         public virtual void WriteText(string str)
         {
             WaitPauseTaskIfNecessary();
-            
+
             Console.Write(str);
         }
-        
+
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
             WaitPauseTaskIfNecessary();
