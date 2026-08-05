@@ -27,7 +27,7 @@ namespace Consolonia.Core.Drawing
 
         private ConsoleCursor _consoleCursor;
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
-        private Timer _cursorTimer;
+        private Timer? _cursorTimer;
 #if FPS
         private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
         private int _framesThisSecond;
@@ -68,8 +68,8 @@ namespace Consolonia.Core.Drawing
         public void Dispose()
         {
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
-            _cursorTimer.Dispose();
-            _cursorTimer = null!;
+            _cursorTimer!.Dispose();
+            _cursorTimer = null;
         }
 
         public void Save(string fileName, int? quality = null)
@@ -320,6 +320,10 @@ namespace Consolonia.Core.Drawing
             if (_consoleCursor.CompareTo(consoleCursor) == 0)
                 return;
 
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+            if(_cursorTimer == null)
+                return;
+            
             _cursorTimer.Stop();
 
             ConsoleCursor oldConsoleCursor = _consoleCursor;
