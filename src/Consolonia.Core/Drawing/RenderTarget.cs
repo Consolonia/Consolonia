@@ -39,7 +39,6 @@ namespace Consolonia.Core.Drawing
             _console = AvaloniaLocator.Current.GetRequiredService<IConsoleOutput>();
             _consoleTopLevelImpl = consoleTopLevelImpl;
             InitializeCacheInternal();
-            _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
             _cursorTimer = new Timer(_ =>
                 {
                     lock (this)
@@ -51,6 +50,7 @@ namespace Consolonia.Core.Drawing
                     }
                 }, null, Timeout.Infinite,
                 Timeout.Infinite);
+            _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
         }
 
         private void InitializeCacheInternal()
