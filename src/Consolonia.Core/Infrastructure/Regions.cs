@@ -9,10 +9,10 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     internal class Snapshot
     {
-        public ushort MinY { get; private set; } = ushort.MaxValue;
-        public ushort MaxY { get; private set; } = ushort.MinValue;
-        public ushort MinX { get; private set; } = ushort.MaxValue;
-        public ushort MaxX { get; private set; } = ushort.MinValue;
+        public ushort MinY { get; private set; }
+        public ushort MaxY { get; private set; }
+        public ushort MinX { get; private set; }
+        public ushort MaxX { get; private set; }
         
         public bool IsEmpty => _rectangles.Count == 0;
         private IReadOnlyList<PixelRect> _rectangles;
@@ -24,8 +24,18 @@ namespace Consolonia.Core.Infrastructure
             CalculateMinMax();
         }
 
+        private void InitializeMinMax()
+        {
+            MinY = ushort.MaxValue;
+            MaxY = ushort.MinValue;
+            MinX = ushort.MaxValue;
+            MaxX = ushort.MinValue;
+        }
+
         private void CalculateMinMax()
         {
+            InitializeMinMax();
+            
             for (int i = 0; i < _rectangles.Count; i++)
             {
                 PixelRect rect = _rectangles[i];
