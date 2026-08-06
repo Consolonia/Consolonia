@@ -157,7 +157,7 @@ namespace Consolonia.Core.Tests
                 }
 
             using var _ = (IDisposable)apply!.Invoke(animation,
-                new[] { border, clock, new AlwaysTrueObservable(), null, false})!;
+                new[] { border, clock, new AlwaysTrueObservable(), null, false })!;
 
             Assert.IsNotNull(apply, "apply");
             Assert.IsNotNull(pulse, "pulse");
