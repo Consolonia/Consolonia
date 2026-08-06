@@ -150,14 +150,14 @@ namespace Consolonia.Core.Tests
             MethodInfo apply = null;
             foreach (MethodInfo m in typeof(Animation).GetMethods(
                          BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                if (m.Name == "Apply" && m.GetParameters().Length == 4)
+                if (m.Name == "Apply" && m.GetParameters().Length == 5)
                 {
                     apply = m;
                     break;
                 }
 
             using var _ = (IDisposable)apply!.Invoke(animation,
-                new[] { border, clock, new AlwaysTrueObservable(), null })!;
+                new[] { border, clock, new AlwaysTrueObservable(), null, false})!;
 
             Assert.IsNotNull(apply, "apply");
             Assert.IsNotNull(pulse, "pulse");
