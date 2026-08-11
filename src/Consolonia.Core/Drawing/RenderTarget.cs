@@ -16,7 +16,7 @@ using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
-    internal class RenderTarget : IDrawingContextLayerImpl, IRenderTarget
+    internal class RenderTarget : IRenderTarget
     {
         private readonly IConsoleOutput _console;
 
@@ -28,13 +28,20 @@ namespace Consolonia.Core.Drawing
         private ConsoleCursor _consoleCursor;
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
+
+        /// <summary>
+        ///     DrawingContextImpl contains number of fields which are initialized every time. We just keep a single instance
+        ///     hoping it can be re-used with each drawing
+        /// </summary>
+        private DrawingContextImpl? _drawingContextImpl;
+
 #if FPS
         private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
         private int _framesThisSecond;
         private int _fps;
         private TimeSpan _lastFpsUpdate;
 #endif
-        internal RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
+        private RenderTarget(ConsoleWindowImpl consoleTopLevelImpl)
         {
             _console = AvaloniaLocator.Current.GetRequiredService<IConsoleOutput>();
             _consoleTopLevelImpl = consoleTopLevelImpl;
@@ -85,9 +92,8 @@ namespace Consolonia.Core.Drawing
         public const double AvaloniaHardcodedDpi = 96;
         public Vector Dpi { get; } = new(AvaloniaHardcodedDpi, AvaloniaHardcodedDpi);
         public PixelSize PixelSize { get; } = new(1, 1);
-        public int Version => 0;
 
-        void IDrawingContextLayerImpl.Blit(IDrawingContextImpl context)
+        internal void RenderToDevice()
         {
             try
             {
@@ -98,14 +104,10 @@ namespace Consolonia.Core.Drawing
             }
         }
 
-        bool IDrawingContextLayerImpl.CanBlit => true;
-
-        public bool IsCorrupted => false;
-
         public RenderTargetProperties Properties => new()
         {
-            RetainsPreviousFrameContents = true, //todo: check meaning of this properties
-            IsSuitableForDirectRendering = false
+            RetainsPreviousFrameContents = true, // both to true means no need to create a layer
+            IsSuitableForDirectRendering = true
         };
 
         public PlatformRenderTargetState PlatformRenderTargetState => new()
@@ -119,14 +121,12 @@ namespace Consolonia.Core.Drawing
         {
             properties = new RenderTargetDrawingContextProperties
             {
-                PreviousFrameIsRetained = true
+                PreviousFrameIsRetained = true // otherwise full redrawing happens
             };
-            return new DrawingContextImpl(_consoleTopLevelImpl);
-        }
 
-        public IDrawingContextImpl CreateDrawingContext()
-        {
-            return new DrawingContextImpl(_consoleTopLevelImpl);
+            _drawingContextImpl ??= new DrawingContextImpl(_consoleTopLevelImpl, this);
+
+            return _drawingContextImpl;
         }
 
         private static Pixel?[,] InitializeCache(ushort width, ushort height)

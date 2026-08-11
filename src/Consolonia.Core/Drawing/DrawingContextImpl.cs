@@ -23,19 +23,22 @@ namespace Consolonia.Core.Drawing
 
         // ReSharper disable once CollectionNeverQueried.Local
         private readonly Stack<RenderOptions> _renderOptions = new();
+        private readonly RenderTarget _renderTarget;
         private Matrix _transform = Matrix.Identity;
 
-        public DrawingContextImpl(ConsoleWindowImpl consoleWindowImpl)
+        public DrawingContextImpl(ConsoleWindowImpl consoleWindowImpl, RenderTarget renderTarget)
         {
             _consoleWindowImpl = consoleWindowImpl;
+            _renderTarget = renderTarget;
             _pixelBuffer = consoleWindowImpl.PixelBuffer;
             _clipStack.Push(_pixelBuffer.Size);
         }
 
         private PixelRect CurrentClip => _clipStack.Peek();
 
-        public void Dispose()
+        void IDisposable.Dispose()
         {
+            _renderTarget.RenderToDevice();
         }
 
         public void Clear(Color color)
@@ -89,7 +92,7 @@ namespace Consolonia.Core.Drawing
 
         public IDrawingContextLayerImpl CreateLayer(PixelSize size)
         {
-            return new RenderTarget(_consoleWindowImpl);
+            throw new NotSupportedException(); // todo: check if we have any benefits with layers
         }
 
         public void PushClip(Rect clip)
