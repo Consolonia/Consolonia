@@ -28,12 +28,13 @@ namespace Consolonia.Core.Drawing
         private ConsoleCursor _consoleCursor;
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
-        
+
         /// <summary>
-        /// DrawingContextImpl contains number of fields which are initialized every time. We just keep a single instance hoping it can be re-used with each drawing
+        ///     DrawingContextImpl contains number of fields which are initialized every time. We just keep a single instance
+        ///     hoping it can be re-used with each drawing
         /// </summary>
         private DrawingContextImpl? _drawingContextImpl;
-        
+
 #if FPS
         private readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
         private int _framesThisSecond;
@@ -122,9 +123,9 @@ namespace Consolonia.Core.Drawing
             {
                 PreviousFrameIsRetained = true // otherwise full redrawing happens
             };
-            
+
             _drawingContextImpl ??= new DrawingContextImpl(_consoleTopLevelImpl, this);
-            
+
             return _drawingContextImpl;
         }
 

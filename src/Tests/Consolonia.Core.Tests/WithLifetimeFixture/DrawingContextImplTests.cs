@@ -20,10 +20,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
     [TestFixture]
     public sealed class DrawingContextImplTests : IDisposable
     {
-        private ConsoleWindowImpl _consoleTopLevelImpl;
-        private PixelBuffer _buffer;
-        private DrawingContextImpl _dc;
-
         [SetUp]
         public void Setup()
         {
@@ -41,6 +37,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _consoleTopLevelImpl?.Dispose();
             _consoleTopLevelImpl = null;
         }
+
+        private ConsoleWindowImpl _consoleTopLevelImpl;
+        private PixelBuffer _buffer;
+        private DrawingContextImpl _dc;
 
         [Test]
         public void BufferInitialized()
@@ -91,7 +91,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawDoubleWide()
         {
-
             for (ushort x = 0; x < 10; x++) DrawText(_dc, x, 0, x.ToString(), Brushes.White);
             DrawText(_dc, 5, 0, "🏳️‍🌈", Brushes.Blue);
             for (ushort x = 0; x < 10; x++)
@@ -120,7 +119,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawOverDoubleWideFirstChar()
         {
-
             for (ushort x = 0; x < 10; x++) DrawText(_dc, x, 0, x.ToString(), Brushes.White);
             DrawText(_dc, 5, 0, "🏳️‍🌈", Brushes.Blue);
             DrawText(_dc, 5, 0, "X", Brushes.Red);
@@ -149,7 +147,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawOverDoubleWideSecondChar()
         {
-
             for (ushort x = 0; x < 10; x++) DrawText(_dc, x, 0, x.ToString(), Brushes.White);
             DrawText(_dc, 5, 0, "🏳️‍🌈", Brushes.Blue);
             DrawText(_dc, 6, 0, "X", Brushes.Red);
@@ -239,7 +236,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawLineStrikethrough()
         {
-
             DrawText(_dc, 1, 0, "hello", Brushes.Blue);
             SetOrigin(_dc, 1, 0);
             _dc.DrawLine(new Pen(Brushes.White, DrawingContextImpl.StrikethroughThickness), new Point(0, 0),
@@ -256,7 +252,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawLineUnderline()
         {
-
             DrawText(_dc, 1, 1, "hello", Brushes.Blue);
             SetOrigin(_dc, 1, 1);
             _dc.DrawLine(new Pen(Brushes.White, DrawingContextImpl.UnderlineThickness), new Point(0, 0),
@@ -315,7 +310,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawLinesCrossingMakeCross()
         {
-
             SetOrigin(_dc, 1, 1);
             for (int y = 0; y < 5; y += 2)
                 _dc.DrawLine(new Pen(Brushes.White), new Point(0, y), new Point(4, y));
@@ -772,7 +766,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void FillRectangleWithHorizontalGradientMapsToShapeBounds()
         {
-
             // No clip pushed: the clip is the whole buffer, yet the gradient must still sweep across the
             // rectangle's own 4-cell width (it is mapped onto the shape, not the clip).
             var brush = new LinearGradientBrush
@@ -796,7 +789,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawRectangleBorderGradientSpansWholeRectangle()
         {
-
             // No clip pushed: a gradient border must still sweep across the rectangle's own width, so the
             // four edges share one gradient mapped onto the rectangle bounds (not each edge's 1-cell extent).
             var pen = new Pen(new LineBrush
@@ -832,7 +824,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void DrawLineWithGradientBrushSamplesPerCell()
         {
-
             _dc.PushClip(new Rect(0, 0, 6, 1));
             var brush = new LinearGradientBrush
             {
