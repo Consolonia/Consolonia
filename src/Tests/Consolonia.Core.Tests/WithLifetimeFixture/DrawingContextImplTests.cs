@@ -18,7 +18,7 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     [TestFixture]
-    public class DrawingContextImplTests : IDisposable
+    public sealed class DrawingContextImplTests : IDisposable
     {
         private ConsoleWindowImpl _consoleTopLevelImpl;
         private PixelBuffer _buffer;
