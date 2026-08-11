@@ -18,7 +18,7 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     [TestFixture]
-    public class DrawingContextImplTests
+    public class DrawingContextImplTests : IDisposable
     {
         private ConsoleWindowImpl _consoleTopLevelImpl;
         private PixelBuffer _buffer;
@@ -39,6 +39,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void TearDown()
         {
             _consoleTopLevelImpl?.Dispose();
+            _consoleTopLevelImpl = null;
         }
 
         [Test]
@@ -1059,6 +1060,11 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             dc.Transform = new Matrix(1, 0, 0, 1, x, y);
             return new PixelBufferCoordinate(x, y);
+        }
+
+        public void Dispose()
+        {
+            _consoleTopLevelImpl?.Dispose();
         }
     }
 }
