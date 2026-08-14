@@ -9,8 +9,11 @@ namespace Consolonia.Gallery.Tests
     [TestFixture]
     internal class ExpanderTests : GalleryTestsBaseBase
     {
+        // Each test gets a freshly spun up application (see ConsoloniaAppTestBase), and
+        // GalleryTestsBaseBase.Setup() already leaves focus on the first tabbable element (the "Up"
+        // expander), so the tests below navigate relative to that same starting point instead of relying
+        // on cumulative focus state left over by a previously executed test.
         [Test]
-        [Order(1)]
         public async Task TestStart()
         {
             await UITest.AssertHasMatch("Up.*▴", @"Down.*▾", @"⏴.*Left", @"Right.*⏵");
@@ -18,14 +21,11 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasNoText("Right content");
             await UITest.AssertHasNoText("Left content");
             await UITest.AssertHasNoText("Bottom content");
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
         }
 
         [Test]
-        [Order(2)]
         public async Task TestUp()
         {
-            await UITest.KeyInput(Key.Tab);
             await UITest.AssertHasMatch("Up.*▴");
             await UITest.AssertHasNoText("Top content");
 
@@ -36,14 +36,11 @@ namespace Consolonia.Gallery.Tests
             await UITest.KeyInput(Key.Space);
             await UITest.AssertHasMatch("Up.*▴");
             await UITest.AssertHasNoText("Top content");
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
         }
 
         [Test]
-        [Order(3)]
         public async Task TestDown()
         {
-            await UITest.KeyInput(Key.Tab);
             await UITest.KeyInput(Key.Tab);
             await UITest.AssertHasMatch("Down.*▾");
             await UITest.AssertHasNoText("Bottom content");
@@ -55,15 +52,11 @@ namespace Consolonia.Gallery.Tests
             await UITest.KeyInput(Key.Space);
             await UITest.AssertHasMatch("Down.*▾");
             await UITest.AssertHasNoText("Bottom content");
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
         }
 
         [Test]
-        [Order(4)]
         public async Task TestLeft()
         {
-            await UITest.KeyInput(Key.Tab);
             await UITest.KeyInput(Key.Tab);
             await UITest.KeyInput(Key.Tab);
             await UITest.AssertHasMatch("⏴.*Left");
@@ -76,16 +69,11 @@ namespace Consolonia.Gallery.Tests
             await UITest.KeyInput(Key.Space);
             await UITest.AssertHasMatch("⏴.*Left");
             await UITest.AssertHasNoText("Left content");
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
         }
 
         [Test]
-        [Order(5)]
         public async Task TestRight()
         {
-            await UITest.KeyInput(Key.Tab);
             await UITest.KeyInput(Key.Tab);
             await UITest.KeyInput(Key.Tab);
             await UITest.KeyInput(Key.Tab);
@@ -99,10 +87,6 @@ namespace Consolonia.Gallery.Tests
             await UITest.KeyInput(Key.Space);
             await UITest.AssertHasMatch("Right.*⏵");
             await UITest.AssertHasNoText("Right content");
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
-            await UITest.KeyInput(1, Key.Tab, RawInputModifiers.Shift);
         }
     }
 }
