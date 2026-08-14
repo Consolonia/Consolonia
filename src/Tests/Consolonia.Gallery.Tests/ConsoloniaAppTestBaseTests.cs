@@ -56,7 +56,7 @@ namespace Consolonia.Gallery.Tests
             var expectedException = new InvalidOperationException("Expected test failure");
             Task failedTask = ConsoloniaAppTestThread.Queue(() => throw expectedException);
 
-            InvalidOperationException actualException =
+            var actualException =
                 Assert.ThrowsAsync<InvalidOperationException>(async () => await failedTask)!;
             Assert.That(actualException, Is.SameAs(expectedException));
 

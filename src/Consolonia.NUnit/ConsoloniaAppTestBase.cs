@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
@@ -17,29 +18,17 @@ namespace Consolonia.NUnit
 {
     internal static class ConsoloniaAppTestThread
     {
-        private sealed class WorkItem
-        {
-            public WorkItem(Action action)
-            {
-                Action = action;
-                Completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-
-            public Action Action { get; }
-            public TaskCompletionSource Completion { get; }
-        }
-
         // Avalonia dispatchers and cached render resources keep their creating thread affinity.
         private static readonly BlockingCollection<WorkItem> WorkItems = new();
 
         [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-            Justification = "The worker boundary must report every action failure without terminating the shared thread.")]
+            Justification =
+                "The worker boundary must report every action failure without terminating the shared thread.")]
         static ConsoloniaAppTestThread()
         {
             var thread = new Thread(() =>
             {
                 foreach (WorkItem workItem in WorkItems.GetConsumingEnumerable())
-                {
                     try
                     {
                         workItem.Action();
@@ -49,7 +38,6 @@ namespace Consolonia.NUnit
                     {
                         workItem.Completion.TrySetException(exception);
                     }
-                }
             })
             {
                 IsBackground = true,
@@ -63,6 +51,18 @@ namespace Consolonia.NUnit
             var workItem = new WorkItem(action);
             WorkItems.Add(workItem);
             return workItem.Completion.Task;
+        }
+
+        private sealed class WorkItem
+        {
+            public WorkItem(Action action)
+            {
+                Action = action;
+                Completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            public Action Action { get; }
+            public TaskCompletionSource Completion { get; }
         }
     }
 
@@ -104,7 +104,8 @@ namespace Consolonia.NUnit
             var uiTest = new UnitTestConsole(_size);
             UITest = uiTest;
             var setupTaskSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var disposeTaskCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disposeTaskCompletionSource =
+                new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _disposeTaskCompletionSource = disposeTaskCompletionSource;
 
             Task workerTask = ConsoloniaAppTestThread.Queue(() =>
@@ -129,7 +130,7 @@ namespace Consolonia.NUnit
             {
                 if (task.Exception is { } exception)
                 {
-                    var failures = exception.Flatten().InnerExceptions;
+                    ReadOnlyCollection<Exception> failures = exception.Flatten().InnerExceptions;
                     setupTaskSource.TrySetException(failures);
                     disposeTaskCompletionSource.TrySetException(failures);
                 }
