@@ -1,3 +1,5 @@
+using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -41,6 +43,28 @@ namespace Consolonia.Gallery.Tests
                 desktop.MainWindow = new Window();
 
             base.OnFrameworkInitializationCompleted();
+        }
+    }
+
+    [NonParallelizable]
+    internal class ConsoloniaAppTestThreadTests
+    {
+        [Test]
+        [Timeout(5000)]
+        public async Task ContinuesProcessingAfterWorkItemFailure()
+        {
+            var expectedException = new InvalidOperationException("Expected test failure");
+            Task failedTask = ConsoloniaAppTestThread.Queue(() => throw expectedException);
+
+            InvalidOperationException actualException =
+                Assert.ThrowsAsync<InvalidOperationException>(async () => await failedTask)!;
+            Assert.That(actualException, Is.SameAs(expectedException));
+
+            bool nextWorkItemRan = false;
+            Task successfulTask = ConsoloniaAppTestThread.Queue(() => nextWorkItemRan = true);
+
+            await successfulTask;
+            Assert.That(nextWorkItemRan, Is.True);
         }
     }
 }

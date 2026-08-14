@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -15,15 +17,39 @@ namespace Consolonia.NUnit
 {
     internal static class ConsoloniaAppTestThread
     {
-        // Avalonia dispatchers and cached render resources keep their creating thread affinity.
-        private static readonly BlockingCollection<Action> WorkItems = new();
+        private sealed class WorkItem
+        {
+            public WorkItem(Action action)
+            {
+                Action = action;
+                Completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
 
+            public Action Action { get; }
+            public TaskCompletionSource Completion { get; }
+        }
+
+        // Avalonia dispatchers and cached render resources keep their creating thread affinity.
+        private static readonly BlockingCollection<WorkItem> WorkItems = new();
+
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "The worker boundary must report every action failure without terminating the shared thread.")]
         static ConsoloniaAppTestThread()
         {
             var thread = new Thread(() =>
             {
-                foreach (Action action in WorkItems.GetConsumingEnumerable())
-                    action();
+                foreach (WorkItem workItem in WorkItems.GetConsumingEnumerable())
+                {
+                    try
+                    {
+                        workItem.Action();
+                        workItem.Completion.TrySetResult();
+                    }
+                    catch (Exception exception)
+                    {
+                        workItem.Completion.TrySetException(exception);
+                    }
+                }
             })
             {
                 IsBackground = true,
@@ -32,9 +58,11 @@ namespace Consolonia.NUnit
             thread.Start();
         }
 
-        public static void Queue(Action action)
+        public static Task Queue(Action action)
         {
-            WorkItems.Add(action);
+            var workItem = new WorkItem(action);
+            WorkItems.Add(workItem);
+            return workItem.Completion.Task;
         }
     }
 
@@ -73,40 +101,49 @@ namespace Consolonia.NUnit
         [SetUp]
         public async Task GlobalSetup()
         {
-            UITest = new UnitTestConsole(_size);
-            var setupTaskSource = new TaskCompletionSource();
+            var uiTest = new UnitTestConsole(_size);
+            UITest = uiTest;
+            var setupTaskSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disposeTaskCompletionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposeTaskCompletionSource = disposeTaskCompletionSource;
 
-            ConsoloniaAppTestThread.Queue(() =>
+            Task workerTask = ConsoloniaAppTestThread.Queue(() =>
             {
-                _disposeTaskCompletionSource = new TaskCompletionSource();
-                ResetDispatcher("ResetBeforeUnitTests");
-                _ = Dispatcher.CurrentDispatcher;
-                _scope = AvaloniaLocator.EnterScope();
-                _lifetime = ApplicationStartup.CreateLifetime(CreateAppBuilder(), Args);
-                UITest.SetupLifetime(_lifetime);
-                setupTaskSource.SetResult();
-                _lifetime.Start(Args);
-
-                // Resetting static of AppBuilderBase
-                typeof(AppBuilder).GetField("s_setupWasAlreadyCalled",
-                        BindingFlags.Static | BindingFlags.NonPublic)!
-                    .SetValue(null, false);
-                _lifetime.Dispose();
-                _lifetime = null;
-                UITest.Dispose();
-                UITest = null;
-                ResetDispatcher("ResetForUnitTests");
-                _scope.Dispose();
-                _scope = null;
-                ResetDispatcher("ResetBeforeUnitTests");
-                _disposeTaskCompletionSource.SetResult();
+                try
+                {
+                    ResetDispatcher("ResetBeforeUnitTests");
+                    _ = Dispatcher.CurrentDispatcher;
+                    _scope = AvaloniaLocator.EnterScope();
+                    _lifetime = ApplicationStartup.CreateLifetime(CreateAppBuilder(), Args);
+                    uiTest.SetupLifetime(_lifetime);
+                    setupTaskSource.TrySetResult();
+                    _lifetime.Start(Args);
+                }
+                finally
+                {
+                    CleanupTestApplication();
+                }
             });
+
+            _ = workerTask.ContinueWith(task =>
+            {
+                if (task.Exception is { } exception)
+                {
+                    var failures = exception.Flatten().InnerExceptions;
+                    setupTaskSource.TrySetException(failures);
+                    disposeTaskCompletionSource.TrySetException(failures);
+                }
+                else
+                {
+                    disposeTaskCompletionSource.TrySetResult();
+                }
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 
             await setupTaskSource.Task.ConfigureAwait(true);
 
             // Waiting Main Window To appear
             CancellationToken cancellationToken = new CancellationTokenSource(60000 /*todo: magic number*/).Token;
-            await Task.Run(async () =>
+            Task mainWindowTask = Task.Run(async () =>
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -118,19 +155,68 @@ namespace Consolonia.NUnit
                     if (windowFound)
                         return;
                 }
-            }, cancellationToken).ConfigureAwait(true);
+            }, cancellationToken);
+            await AwaitWhileWorkerIsRunning(mainWindowTask, workerTask).ConfigureAwait(true);
 
             // Waiting all jobs to finish
-            await UITest.WaitRendered().ConfigureAwait(true);
+            await AwaitWhileWorkerIsRunning(uiTest.WaitRendered(), workerTask).ConfigureAwait(true);
         }
 
         [TearDown]
         public async Task GlobalTearDown()
         {
             ConsoloniaLifetime lifetime = _lifetime;
-            await Dispatcher.UIThread.InvokeAsync(() => { lifetime.Shutdown(); }).GetTask().ConfigureAwait(true);
+            if (lifetime is not null)
+                await Dispatcher.UIThread.InvokeAsync(() => { lifetime.Shutdown(); }).GetTask().ConfigureAwait(true);
 
             await _disposeTaskCompletionSource.Task.ConfigureAwait(true);
+        }
+
+        [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "Cleanup must attempt every resource after any individual cleanup failure.")]
+        private void CleanupTestApplication()
+        {
+            Exception cleanupException = null;
+
+            void Cleanup(Action action)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception exception)
+                {
+                    cleanupException ??= exception;
+                }
+            }
+
+            // Resetting static of AppBuilderBase
+            Cleanup(() => typeof(AppBuilder).GetField("s_setupWasAlreadyCalled",
+                    BindingFlags.Static | BindingFlags.NonPublic)!
+                .SetValue(null, false));
+            Cleanup(() => _lifetime?.Dispose());
+            _lifetime = null;
+            Cleanup(() => UITest?.Dispose());
+            UITest = null;
+            Cleanup(() => ResetDispatcher("ResetForUnitTests"));
+            Cleanup(() => _scope?.Dispose());
+            _scope = null;
+            Cleanup(() => ResetDispatcher("ResetBeforeUnitTests"));
+
+            if (cleanupException is not null)
+                ExceptionDispatchInfo.Capture(cleanupException).Throw();
+        }
+
+        private static async Task AwaitWhileWorkerIsRunning(Task operation, Task workerTask)
+        {
+            Task completedTask = await Task.WhenAny(operation, workerTask).ConfigureAwait(true);
+            if (completedTask == workerTask)
+            {
+                await workerTask.ConfigureAwait(true);
+                throw new InvalidOperationException("Application lifetime ended during test setup.");
+            }
+
+            await operation.ConfigureAwait(true);
         }
 
         private static void ResetDispatcher(string methodName)
