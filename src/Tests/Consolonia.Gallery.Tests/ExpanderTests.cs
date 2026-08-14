@@ -9,10 +9,6 @@ namespace Consolonia.Gallery.Tests
     [TestFixture]
     internal class ExpanderTests : GalleryTestsBaseBase
     {
-        // Each test gets a freshly spun up application (see ConsoloniaAppTestBase), and
-        // GalleryTestsBaseBase.Setup() already leaves focus on the first tabbable element (the "Up"
-        // expander), so the tests below navigate relative to that same starting point instead of relying
-        // on cumulative focus state left over by a previously executed test.
         [Test]
         public async Task TestStart()
         {
