@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,31 @@ using NUnit.Framework;
 
 namespace Consolonia.NUnit
 {
+    internal static class ConsoloniaAppTestThread
+    {
+        // Avalonia dispatchers and cached render resources keep their creating thread affinity.
+        private static readonly BlockingCollection<Action> WorkItems = new();
+
+        static ConsoloniaAppTestThread()
+        {
+            var thread = new Thread(() =>
+            {
+                foreach (Action action in WorkItems.GetConsumingEnumerable())
+                    action();
+            })
+            {
+                IsBackground = true,
+                Name = nameof(ConsoloniaAppTestThread)
+            };
+            thread.Start();
+        }
+
+        public static void Queue(Action action)
+        {
+            WorkItems.Add(action);
+        }
+    }
+
     [NonParallelizable /*todo: switch to semaphore like https://stackoverflow.com/a/6427425/2362847 to allow other tests to execute in parallel*/]
 #pragma warning disable CA1001 // we are relying on TearDown by NUnit
     public abstract class ConsoloniaAppTestBase<TApp>
@@ -44,20 +70,17 @@ namespace Consolonia.NUnit
                 .LogToException();
         }
 
-        [OneTimeSetUp]
+        [SetUp]
         public async Task GlobalSetup()
         {
-            if (UITest != null)
-                return;
-
-            AppDomain.CurrentDomain.ProcessExit += GlobalTearDown;
-
             UITest = new UnitTestConsole(_size);
             var setupTaskSource = new TaskCompletionSource();
 
-            ThreadPool.QueueUserWorkItem(_ =>
+            ConsoloniaAppTestThread.Queue(() =>
             {
                 _disposeTaskCompletionSource = new TaskCompletionSource();
+                ResetDispatcher("ResetBeforeUnitTests");
+                _ = Dispatcher.CurrentDispatcher;
                 _scope = AvaloniaLocator.EnterScope();
                 _lifetime = ApplicationStartup.CreateLifetime(CreateAppBuilder(), Args);
                 UITest.SetupLifetime(_lifetime);
@@ -68,6 +91,14 @@ namespace Consolonia.NUnit
                 typeof(AppBuilder).GetField("s_setupWasAlreadyCalled",
                         BindingFlags.Static | BindingFlags.NonPublic)!
                     .SetValue(null, false);
+                _lifetime.Dispose();
+                _lifetime = null;
+                UITest.Dispose();
+                UITest = null;
+                ResetDispatcher("ResetForUnitTests");
+                _scope.Dispose();
+                _scope = null;
+                ResetDispatcher("ResetBeforeUnitTests");
                 _disposeTaskCompletionSource.SetResult();
             });
 
@@ -93,20 +124,20 @@ namespace Consolonia.NUnit
             await UITest.WaitRendered().ConfigureAwait(true);
         }
 
-        private async void GlobalTearDown(object sender, EventArgs eventArgs)
+        [TearDown]
+        public async Task GlobalTearDown()
         {
-            AppDomain.CurrentDomain.ProcessExit -= GlobalTearDown;
-
             ConsoloniaLifetime lifetime = _lifetime;
             await Dispatcher.UIThread.InvokeAsync(() => { lifetime.Shutdown(); }).GetTask().ConfigureAwait(true);
 
-            _lifetime.Dispose();
-            _lifetime = null;
-            _scope.Dispose();
-            _scope = null;
-            UITest.Dispose();
-            UITest = null;
             await _disposeTaskCompletionSource.Task.ConfigureAwait(true);
+        }
+
+        private static void ResetDispatcher(string methodName)
+        {
+            // Avalonia uses these internal hooks for its own per-test application isolation.
+            typeof(Dispatcher).GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic)!
+                .Invoke(null, null);
         }
 
         // ReSharper disable StaticMemberInGenericType
