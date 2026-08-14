@@ -17,35 +17,10 @@ namespace Consolonia.NUnit
     public abstract class ConsoloniaAppTestBase<TApp>
         where TApp : Application, new()
     {
-        // Claude:
-        // ReSharper disable StaticMemberInGenericType
-        // A single dedicated (background) thread is reused for every test of a given TApp, and only the
-        // Application/Dispatcher C# objects running on top of it are recreated per test. Avalonia's
-        // Dispatcher.UIThread is a process wide singleton bound to whichever physical thread first touches
-        // it, and once shut down it cannot be reused on a *different* thread, so we can't just spin up a
-        // brand-new ThreadPool thread for every test (see https://github.com/Consolonia/Consolonia/issues/679).
-        // This mirrors how Avalonia's own HeadlessUnitTestSession keeps one persistent dispatcher thread
-        // for the whole test session.
-        private static readonly BlockingCollection<Action> AppThreadQueue = new();
-
-        static ConsoloniaAppTestBase()
-        {
-            var thread = new Thread(() =>
-            {
-                foreach (Action action in AppThreadQueue.GetConsumingEnumerable()) action();
-            })
-            {
-                IsBackground = true,
-                Name = $"{nameof(ConsoloniaAppTestBase<TApp>)}<{typeof(TApp).Name}> UI Thread"
-            };
-            thread.Start();
-        }
-        // ReSharper restore StaticMemberInGenericType
-
         private readonly PixelBufferSize _size;
-        private IDisposable _scope;
         private TaskCompletionSource _disposeTaskCompletionSource;
         private ConsoloniaLifetime _lifetime;
+        private IDisposable _scope;
 
         protected ConsoloniaAppTestBase(PixelBufferSize size)
         {
@@ -88,7 +63,7 @@ namespace Consolonia.NUnit
             AppThreadQueue.Add(() =>
             {
                 _disposeTaskCompletionSource = new TaskCompletionSource();
-                
+
                 ResetDispatcherForUnitTests();
 
                 _scope = AvaloniaLocator.EnterScope();
@@ -138,7 +113,7 @@ namespace Consolonia.NUnit
             }).GetTask().ConfigureAwait(true);
 
             _lifetime = null;
-            
+
             await _disposeTaskCompletionSource.Task.ConfigureAwait(true);
             _disposeTaskCompletionSource = null;
 
@@ -148,5 +123,30 @@ namespace Consolonia.NUnit
             UITest.Dispose();
             UITest = null;
         }
+
+        // Claude:
+        // ReSharper disable StaticMemberInGenericType
+        // A single dedicated (background) thread is reused for every test of a given TApp, and only the
+        // Application/Dispatcher C# objects running on top of it are recreated per test. Avalonia's
+        // Dispatcher.UIThread is a process wide singleton bound to whichever physical thread first touches
+        // it, and once shut down it cannot be reused on a *different* thread, so we can't just spin up a
+        // brand-new ThreadPool thread for every test (see https://github.com/Consolonia/Consolonia/issues/679).
+        // This mirrors how Avalonia's own HeadlessUnitTestSession keeps one persistent dispatcher thread
+        // for the whole test session.
+        private static readonly BlockingCollection<Action> AppThreadQueue = new();
+
+        static ConsoloniaAppTestBase()
+        {
+            var thread = new Thread(() =>
+            {
+                foreach (Action action in AppThreadQueue.GetConsumingEnumerable()) action();
+            })
+            {
+                IsBackground = true,
+                Name = $"{nameof(ConsoloniaAppTestBase<TApp>)}<{typeof(TApp).Name}> UI Thread"
+            };
+            thread.Start();
+        }
+        // ReSharper restore StaticMemberInGenericType
     }
 }
