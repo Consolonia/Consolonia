@@ -276,7 +276,10 @@ namespace Consolonia.PlatformSupport
                 else
                 {
                     if (_rowInputBuffer.Count == 0)
+                    {
+                        Curses.timeout(NoInputTimeout);
                         continue;
+                    }
 
                     break;
                 }
