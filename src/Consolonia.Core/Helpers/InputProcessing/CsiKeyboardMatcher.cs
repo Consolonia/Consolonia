@@ -16,7 +16,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         Action<(int keyCode, int modifiers, int eventType, char terminator)> onComplete,
         Func<T, Rune> toRune)
         : RegexAccumulatorMatcher<T, (int keyCode, int modifiers, int eventType, char terminator)>(onComplete, toRune,
-            PatternRegex())
+            CsiPatternRegex())
     {
         private const string KeyCodeGroupName = "keyCode";
         private const string ModifiersGroupName = "modifiers";
@@ -77,6 +77,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// </summary>
         [GeneratedRegex(
             @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?((?<{Separator1GroupName}>[;:])(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCSITerminators}])?)?$")]
-        private static partial Regex PatternRegex();
+        private static partial Regex CsiPatternRegex();
     }
 }

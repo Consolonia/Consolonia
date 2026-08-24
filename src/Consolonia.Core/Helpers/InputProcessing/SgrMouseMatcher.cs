@@ -12,7 +12,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
     public partial class SgrMouseMatcher<T>(
         Action<(int button, int x, int y, bool isRelease)> onComplete,
         Func<T, Rune> toRune)
-        : RegexAccumulatorMatcher<T, (int button, int x, int y, bool isRelease)>(onComplete, toRune, PatternRegex())
+        : RegexAccumulatorMatcher<T, (int button, int x, int y, bool isRelease)>(onComplete, toRune, SgrPatternRegex())
     {
         private const string ButtonGroupName = "button";
         private const string XGroupName = "x";
@@ -45,6 +45,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// </summary>
         [GeneratedRegex(
             @$"^\x1B(\[(<(?<{ButtonGroupName}>\d+)?(;(?<{XGroupName}>\d+)?(;(?<{YGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[Mm])?)?)?$")]
-        private static partial Regex PatternRegex();
+        private static partial Regex SgrPatternRegex();
     }
 }
