@@ -154,8 +154,9 @@ namespace Consolonia.PlatformSupport
                 {
                     WriteText(Esc.QueryKittyKeyboardFlags);
                     WriteText("\u001b[c"); // sentinel: Device Attributes query
+                    Flush(); // the queries must actually reach the terminal, otherwise it never responds
 
-                    Curses.timeout(100); //todo: here is the issue
+                    Curses.timeout(100);
 
                     var response = new StringBuilder();
                     while (response.Length < 64)
