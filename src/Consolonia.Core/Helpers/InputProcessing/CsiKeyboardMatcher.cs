@@ -18,19 +18,31 @@ namespace Consolonia.Core.Helpers.InputProcessing
         : RegexAccumulatorMatcher<T, (int keyCode, int modifiers, int eventType, char terminator)>(onComplete, toRune,
             PatternRegex())
     {
+        private const string KeyCodeGroupName = "keyCode";
+        private const string ModifiersGroupName = "modifiers";
+        private const string EventTypeGroupName = "eventType";
+        private const string Separator1GroupName = "sep1";
+        private const string Separator2GroupName = "sep2";
+
         protected override (int keyCode, int modifiers, int eventType, char terminator)? OnTerminatorMatched(
             Match match)
         {
             Group terminatorGroup = match.Groups[TerminatorGroupName];
-            int keyCode = match.Groups["keyCode"].Success ? int.Parse(match.Groups["keyCode"].Value) : 0;
+            int keyCode = match.Groups[KeyCodeGroupName].Success
+                ? int.Parse(match.Groups[KeyCodeGroupName].Value)
+                : 0;
             char terminator = terminatorGroup.Value[0];
 
             // Don't match bracketed paste mode sequences, let PasteBlockMatcher handle them
             if (terminator == '~' && keyCode is 200 or 201)
                 return null;
 
-            int modifiers = match.Groups["modifiers"].Success ? int.Parse(match.Groups["modifiers"].Value) : 1;
-            int eventType = match.Groups["eventType"].Success ? int.Parse(match.Groups["eventType"].Value) : 1;
+            int modifiers = match.Groups[ModifiersGroupName].Success
+                ? int.Parse(match.Groups[ModifiersGroupName].Value)
+                : 1;
+            int eventType = match.Groups[EventTypeGroupName].Success
+                ? int.Parse(match.Groups[EventTypeGroupName].Value)
+                : 1;
 
             return (keyCode, modifiers, eventType, terminator);
         }
@@ -64,7 +76,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
         [GeneratedRegex(
-            @$"^\x1B(\[(?<keyCode>\d+)?((?<sep1>[;:])(?<modifiers>\d+)?((?<sep2>[;:])(?<eventType>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCSITerminators}])?)?$")]
+            @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?((?<{Separator1GroupName}>[;:])(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCSITerminators}])?)?$")]
         private static partial Regex PatternRegex();
     }
 }

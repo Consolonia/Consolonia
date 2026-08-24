@@ -14,11 +14,15 @@ namespace Consolonia.Core.Helpers.InputProcessing
         Func<T, Rune> toRune)
         : RegexAccumulatorMatcher<T, (int button, int x, int y, bool isRelease)>(onComplete, toRune, PatternRegex())
     {
+        private const string ButtonGroupName = "button";
+        private const string XGroupName = "x";
+        private const string YGroupName = "y";
+
         protected override (int button, int x, int y, bool isRelease)? OnTerminatorMatched(Match match)
         {
-            int button = int.Parse(match.Groups["button"].Value);
-            int x = int.Parse(match.Groups["x"].Value);
-            int y = int.Parse(match.Groups["y"].Value);
+            int button = int.Parse(match.Groups[ButtonGroupName].Value);
+            int x = int.Parse(match.Groups[XGroupName].Value);
+            int y = int.Parse(match.Groups[YGroupName].Value);
             bool isRelease = match.Groups[TerminatorGroupName].Value == "m";
 
             return (button, x, y, isRelease);
@@ -40,7 +44,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// in the sequence are already present, preserving the correct ordering.
         /// </summary>
         [GeneratedRegex(
-            @$"^\x1B(\[(<(?<button>\d+)?(;(?<x>\d+)?(;(?<y>\d+)?)?)?(?<{TerminatorGroupName}>[Mm])?)?)?$")]
+            @$"^\x1B(\[(<(?<{ButtonGroupName}>\d+)?(;(?<{XGroupName}>\d+)?(;(?<{YGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[Mm])?)?)?$")]
         private static partial Regex PatternRegex();
     }
 }
