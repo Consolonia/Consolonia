@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Consolonia.Core.Helpers.InputProcessing;
+using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
 using Consolonia.Core.Text;
 using Unix.Terminal;
@@ -218,9 +219,6 @@ namespace Consolonia.PlatformSupport
                 }
                 case 'u' when keyCode is >= 32 and < 127:
                 {
-                    // Printable ASCII via CSI u
-                    character = (char)keyCode;
-
                     switch (keyCode)
                     {
                         // Map to Avalonia Key enum
@@ -238,8 +236,7 @@ namespace Consolonia.PlatformSupport
                             key = Key.Space;
                             break;
                         default:
-                            // Map punctuation characters to Avalonia Key
-                            key = character switch
+                            key = (char)keyCode switch
                             {
                                 '.' => Key.OemPeriod,
                                 ',' => Key.OemComma,
@@ -260,8 +257,9 @@ namespace Consolonia.PlatformSupport
                     break;
                 }
                 default:
-                    // Unknown keycode or terminator
-                    return;
+                    key = ConsoloniaPlatform.RaiseNotSupported<Key>(NotSupportedRequestCode.InputNotSupported,
+                        csiEvent);
+                    break;
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
