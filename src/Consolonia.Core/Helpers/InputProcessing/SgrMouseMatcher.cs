@@ -55,7 +55,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override bool TryFlush()
         {
-            return _accumulator.Length != 0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works.
+            return _accumulator.Length != 0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works. However I have no idea why to pretend flushing if something accumulated
         }
 
         public override void Reset()

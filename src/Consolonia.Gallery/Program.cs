@@ -3,8 +3,6 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
-using Avalonia.Logging;
-using Consolonia.Core.Helpers.Logging;
 using Consolonia.Fonts;
 using Consolonia.ManagedWindows.Storage;
 
@@ -16,8 +14,6 @@ namespace Consolonia.Gallery
         [STAThread]
         private static void Main(string[] args)
         {
-            // Thread.Sleep(20000);
-            
             TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
             {
                 if (Debugger.IsAttached) Debugger.Break();
