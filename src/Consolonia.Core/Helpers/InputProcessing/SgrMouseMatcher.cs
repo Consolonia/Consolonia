@@ -79,27 +79,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// in the sequence are already present, preserving the correct ordering.
         /// </summary>
         [GeneratedRegex(
-            """
-             ^\x1B                     # ESC
-             (
-               \[                      # [
-               (
-                 <                     # <
-                 (?<button>\d+)?          # button digits
-                 (
-                   ;                     # separator before x
-                   (?<x>\d+)?             # x digits
-                   (
-                     ;                   # separator before y
-                     (?<y>\d+)?           # y digits
-                   )?
-                 )?
-                 (?<terminator>[Mm])?     # terminator letter
-               )?
-             )?
-             $
-             """,
-            RegexOptions.IgnorePatternWhitespace)]
+            @"^\x1B(\[(<(?<button>\d+)?(;(?<x>\d+)?(;(?<y>\d+)?)?)?(?<terminator>[Mm])?)?)?$")]
         private static partial Regex GetPatternRegex();
     }
 }
