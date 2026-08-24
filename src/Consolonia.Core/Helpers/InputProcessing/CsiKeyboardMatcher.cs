@@ -30,8 +30,8 @@ namespace Consolonia.Core.Helpers.InputProcessing
             Match match = GetCompletionPatternRegex().Match(current);
             if (match.Success)
             {
-                int keyCode = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
-                char terminator = match.Groups[6].Value[0];
+                int keyCode = match.Groups["keyCode"].Success ? int.Parse(match.Groups["keyCode"].Value) : 0;
+                char terminator = match.Groups["terminator"].Value[0];
 
                 // Don't match bracketed paste mode sequences, let PasteBlockMatcher handle them
                 if (terminator == '~' && keyCode is 200 or 201)
@@ -40,8 +40,8 @@ namespace Consolonia.Core.Helpers.InputProcessing
                     return AppendResult.NoMatch;
                 }
 
-                int modifiers = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : 1;
-                int eventType = match.Groups[5].Success ? int.Parse(match.Groups[5].Value) : 1;
+                int modifiers = match.Groups["modifiers"].Success ? int.Parse(match.Groups["modifiers"].Value) : 1;
+                int eventType = match.Groups["eventType"].Success ? int.Parse(match.Groups["eventType"].Value) : 1;
 
                 Complete((keyCode, modifiers, eventType, terminator));
                 _accumulator.Clear();
@@ -151,7 +151,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         ///   ESC [ letter  (bare functional key, e.g. ESC[A for Up arrow)
         /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
-        [GeneratedRegex(@$"^\x1B\[(\d+)?([;:](\d+)([;:](\d+))?)?([{ValidCSITerminators}])$")]
+        [GeneratedRegex(@$"^\x1B\[(?<keyCode>\d+)?([;:](?<modifiers>\d+)([;:](?<eventType>\d+))?)?(?<terminator>[{ValidCSITerminators}])$")]
         private static partial Regex GetCompletionPatternRegex();
     }
 }
