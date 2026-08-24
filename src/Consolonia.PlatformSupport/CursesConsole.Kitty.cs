@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Avalonia;
 using Avalonia.Input;
+using Avalonia.Input.Raw;
+using Consolonia.Core.Helpers.InputProcessing;
 using Consolonia.Core.InternalHelpers;
 using Consolonia.Core.Text;
 using Unix.Terminal;
@@ -16,16 +20,12 @@ namespace Consolonia.PlatformSupport
     public partial class CursesConsole
     {
         private bool _isKittyKeyboardEnabled;
-
-
         #region FlagTranslatorAllowers
         private enum KittyKeyCode;
         private enum CsiLetterKeyCode;
         private enum CsiTildeKeyCode;
         #endregion
-
         
-
         private static readonly FlagTranslator<KittyKeyCode, Key>
             KittyKeyFlagTranslator = new([
                 ((KittyKeyCode)27, Key.Escape),
@@ -270,6 +270,101 @@ namespace Consolonia.PlatformSupport
                 Thread.Yield();
                 RaiseKeyPress(key, character, rawModifiers, false, (ulong)Environment.TickCount64);
             }
+        }
+
+        private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
+        {
+            const double velocity = 1;
+            // SGR mouse coordinates are 1-based
+            var point = new Point(mouseEvent.x - 1, mouseEvent.y - 1);
+
+            int buttonCode = mouseEvent.button;
+
+            var modifiers = RawInputModifiers.None;
+            if ((buttonCode & 4) != 0) modifiers |= RawInputModifiers.Shift;
+            if ((buttonCode & 8) != 0) modifiers |= RawInputModifiers.Alt;
+            if ((buttonCode & 16) != 0) modifiers |= RawInputModifiers.Control;
+
+            // Determine event type
+            int buttonIndex = buttonCode & 3;
+            bool isMotion = (buttonCode & 32) != 0;
+            bool isWheel = (buttonCode & 64) != 0;
+
+            if (isWheel)
+            {
+                double delta = buttonIndex == 0 ? velocity : -velocity;
+                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, delta), modifiers);
+            }
+            else if (isMotion)
+            {
+                // Add button modifier for drag
+                RawInputModifiers buttonModifier = buttonIndex switch
+                {
+                    0 => RawInputModifiers.LeftMouseButton,
+                    1 => RawInputModifiers.MiddleMouseButton,
+                    2 => RawInputModifiers.RightMouseButton,
+                    _ => RawInputModifiers.None
+                };
+
+                RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers | buttonModifier | _moveModifers);
+            }
+            else if (mouseEvent.isRelease)
+            {
+                RawInputModifiers buttonModifier = buttonIndex switch
+                {
+                    0 => RawInputModifiers.LeftMouseButton,
+                    1 => RawInputModifiers.MiddleMouseButton,
+                    2 => RawInputModifiers.RightMouseButton,
+                    _ => RawInputModifiers.None
+                };
+                RawPointerEventType eventType = buttonIndex switch
+                {
+                    0 => RawPointerEventType.LeftButtonUp,
+                    1 => RawPointerEventType.MiddleButtonUp,
+                    2 => RawPointerEventType.RightButtonUp,
+                    _ => RawPointerEventType.LeftButtonUp
+                };
+
+                _moveModifers = RawInputModifiers.None;
+                RaiseMouseEvent(eventType, point, null, modifiers | buttonModifier);
+            }
+            else
+            {
+                // Button press
+                RawInputModifiers buttonModifier = buttonIndex switch
+                {
+                    0 => RawInputModifiers.LeftMouseButton,
+                    1 => RawInputModifiers.MiddleMouseButton,
+                    2 => RawInputModifiers.RightMouseButton,
+                    _ => RawInputModifiers.None
+                };
+                RawPointerEventType eventType = buttonIndex switch
+                {
+                    0 => RawPointerEventType.LeftButtonDown,
+                    1 => RawPointerEventType.MiddleButtonDown,
+                    2 => RawPointerEventType.RightButtonDown,
+                    _ => RawPointerEventType.LeftButtonDown
+                };
+
+                _moveModifers = modifiers | buttonModifier;
+                RaiseMouseEvent(eventType, point, null, modifiers | buttonModifier);
+            }
+        }
+
+        /// <summary>
+        ///     Matchers for Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde) and
+        ///     SGR extended mouse sequences (ESC [ &lt; button ; x ; y M/m)
+        /// </summary>
+        private IEnumerable<IMatcher<(int, int)>> GetKittyMatchers()
+        {
+            if (!_isKittyKeyboardEnabled)
+                yield break;
+
+            yield return new SafeLockMatcher(
+                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
+
+            yield return new SafeLockMatcher(
+                new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
         }
     }
 }

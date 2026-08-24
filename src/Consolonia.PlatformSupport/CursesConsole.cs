@@ -422,88 +422,6 @@ namespace Consolonia.PlatformSupport
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
         }
 
-        private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
-        {
-            const double velocity = 1;
-
-            // SGR mouse coordinates are 1-based, convert to 0-based
-            var point = new Point(mouseEvent.x - 1, mouseEvent.y - 1);
-
-            int buttonCode = mouseEvent.button;
-
-            // Decode modifiers from button code
-            RawInputModifiers modifiers = RawInputModifiers.None;
-            if ((buttonCode & 4) != 0) modifiers |= RawInputModifiers.Shift;
-            if ((buttonCode & 8) != 0) modifiers |= RawInputModifiers.Alt;
-            if ((buttonCode & 16) != 0) modifiers |= RawInputModifiers.Control;
-
-            // Determine event type
-            int buttonIndex = buttonCode & 3;
-            bool isMotion = (buttonCode & 32) != 0;
-            bool isWheel = (buttonCode & 64) != 0;
-
-            if (isWheel)
-            {
-                // Wheel events: buttonIndex 0 = scroll up, 1 = scroll down
-                double delta = buttonIndex == 0 ? velocity : -velocity;
-                RaiseMouseEvent(RawPointerEventType.Wheel, point, new Vector(0, delta), modifiers);
-            }
-            else if (isMotion)
-            {
-                // Add button modifier for drag
-                RawInputModifiers buttonModifier = buttonIndex switch
-                {
-                    0 => RawInputModifiers.LeftMouseButton,
-                    1 => RawInputModifiers.MiddleMouseButton,
-                    2 => RawInputModifiers.RightMouseButton,
-                    _ => RawInputModifiers.None
-                };
-
-                RaiseMouseEvent(RawPointerEventType.Move, point, null, modifiers | buttonModifier | _moveModifers);
-            }
-            else if (mouseEvent.isRelease)
-            {
-                RawInputModifiers buttonModifier = buttonIndex switch
-                {
-                    0 => RawInputModifiers.LeftMouseButton,
-                    1 => RawInputModifiers.MiddleMouseButton,
-                    2 => RawInputModifiers.RightMouseButton,
-                    _ => RawInputModifiers.None
-                };
-                RawPointerEventType eventType = buttonIndex switch
-                {
-                    0 => RawPointerEventType.LeftButtonUp,
-                    1 => RawPointerEventType.MiddleButtonUp,
-                    2 => RawPointerEventType.RightButtonUp,
-                    _ => RawPointerEventType.LeftButtonUp
-                };
-
-                _moveModifers = RawInputModifiers.None;
-                RaiseMouseEvent(eventType, point, null, modifiers | buttonModifier);
-            }
-            else
-            {
-                // Button press
-                RawInputModifiers buttonModifier = buttonIndex switch
-                {
-                    0 => RawInputModifiers.LeftMouseButton,
-                    1 => RawInputModifiers.MiddleMouseButton,
-                    2 => RawInputModifiers.RightMouseButton,
-                    _ => RawInputModifiers.None
-                };
-                RawPointerEventType eventType = buttonIndex switch
-                {
-                    0 => RawPointerEventType.LeftButtonDown,
-                    1 => RawPointerEventType.MiddleButtonDown,
-                    2 => RawPointerEventType.RightButtonDown,
-                    _ => RawPointerEventType.LeftButtonDown
-                };
-
-                _moveModifers = modifiers | buttonModifier;
-                RaiseMouseEvent(eventType, point, null, modifiers | buttonModifier);
-            }
-        }
-
         [MethodImpl(MethodImplOptions.Synchronized)]
         public override void RestoreConsole()
         {
@@ -556,14 +474,11 @@ namespace Consolonia.PlatformSupport
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
 
-            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde)
-            // Placed early to catch enhanced CSI sequences before other matchers interfere.
-            yield return new SafeLockMatcher(
-                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
-
-            // SGR extended mouse sequences: ESC [ < button ; x ; y M/m
-            yield return new SafeLockMatcher(
-                new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
+            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde) and
+            // SGR extended mouse sequences (ESC [ < button ; x ; y M/m), only when the
+            // Kitty keyboard protocol was actually negotiated with the terminal.
+            foreach (IMatcher<(int, int)> matcher in GetKittyMatchers())
+                yield return matcher;
 
             (string, Key)[] fSequences =
             [
