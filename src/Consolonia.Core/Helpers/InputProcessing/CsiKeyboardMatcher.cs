@@ -58,7 +58,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// <summary>
         ///     Valid terminator characters for CSI functional key sequences.
         /// </summary>
-        private const string ValidCSITerminators = "ABCDFHPQRSu~ZE";
+        private const string ValidCsiTerminators = "ABCDFHPQRSu~ZE";
 
         /// <summary>
         ///   Matches all CSI keyboard formats, both complete sequences and valid partial prefixes
@@ -76,7 +76,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
         [GeneratedRegex(
-            @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?((?<{Separator1GroupName}>[;:])(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCSITerminators}])?)?$")]
+            @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?((?<{Separator1GroupName}>[;:])(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCsiTerminators}])?)?$")]
         private static partial Regex CsiPatternRegex();
     }
 }
