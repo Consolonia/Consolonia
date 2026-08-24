@@ -12,60 +12,21 @@ namespace Consolonia.Core.Helpers.InputProcessing
     public partial class SgrMouseMatcher<T>(
         Action<(int button, int x, int y, bool isRelease)> onComplete,
         Func<T, Rune> toRune)
-        : MatcherWithComplete<T, (int button, int x, int y, bool isRelease)>(onComplete)
+        : RegexAccumulatorMatcher<T, (int button, int x, int y, bool isRelease)>(onComplete, toRune, PatternRegex())
     {
-        private readonly StringBuilder _accumulator = new();
-
-        public override AppendResult Append(T input)
+        protected override (int button, int x, int y, bool isRelease)? OnTerminatorMatched(Match match)
         {
-            Rune rune = toRune(input);
-            _accumulator.Append(rune);
-
-            string current = _accumulator.ToString();
-
-            // Match against the combined pattern: it matches both complete SGR mouse sequences
-            // (terminator group present) and valid partial prefixes (terminator group absent).
-            Match match = GetPatternRegex().Match(current);
-            if (!match.Success)
-            {
-                // Not a match, remove the last character
-                _accumulator.Length--;
-                if (_accumulator.Length > 0)
-                {
-                    // We had accumulated some chars but this one broke the pattern
-                    _accumulator.Clear();
-                }
-
-                return AppendResult.NoMatch;
-            }
-
-            if (!match.Groups["terminator"].Success)
-                // Valid prefix, but not complete yet
-                return AppendResult.Match;
-
             int button = int.Parse(match.Groups["button"].Value);
             int x = int.Parse(match.Groups["x"].Value);
             int y = int.Parse(match.Groups["y"].Value);
-            bool isRelease = match.Groups["terminator"].Value == "m";
+            bool isRelease = match.Groups[TerminatorGroupName].Value == "m";
 
-            Complete((button, x, y, isRelease));
-            _accumulator.Clear();
-            return AppendResult.AutoFlushed;
+            return (button, x, y, isRelease);
         }
 
         public override bool TryFlush()
         {
-            return _accumulator.Length != 0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works. However I have no idea why to pretend flushing if something accumulated
-        }
-
-        public override void Reset()
-        {
-            // Intentionally not clearing - same pattern as StartsEndsWithMatcher
-        }
-
-        public override string GetDebugInfo()
-        {
-            return $"{GetType().Name} {{{(_accumulator.Length == 0 ? "_" : _accumulator.ToString())}}}";
+            return Accumulator.Length != 0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works. However I have no idea why to pretend flushing if something accumulated
         }
 
         /// <summary>
@@ -79,7 +40,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// in the sequence are already present, preserving the correct ordering.
         /// </summary>
         [GeneratedRegex(
-            @"^\x1B(\[(<(?<button>\d+)?(;(?<x>\d+)?(;(?<y>\d+)?)?)?(?<terminator>[Mm])?)?)?$")]
-        private static partial Regex GetPatternRegex();
+            @$"^\x1B(\[(<(?<button>\d+)?(;(?<x>\d+)?(;(?<y>\d+)?)?)?(?<{TerminatorGroupName}>[Mm])?)?)?$")]
+        private static partial Regex PatternRegex();
     }
 }

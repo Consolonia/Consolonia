@@ -15,52 +15,24 @@ namespace Consolonia.Core.Helpers.InputProcessing
     public partial class CsiKeyboardMatcher<T>(
         Action<(int keyCode, int modifiers, int eventType, char terminator)> onComplete,
         Func<T, Rune> toRune)
-        : MatcherWithComplete<T, (int keyCode, int modifiers, int eventType, char terminator)>(onComplete)
+        : RegexAccumulatorMatcher<T, (int keyCode, int modifiers, int eventType, char terminator)>(onComplete, toRune,
+            PatternRegex())
     {
-        private readonly StringBuilder _accumulator = new();
-
-        public override AppendResult Append(T input)
+        protected override (int keyCode, int modifiers, int eventType, char terminator)? OnTerminatorMatched(
+            Match match)
         {
-            Rune rune = toRune(input);
-            _accumulator.Append(rune);
-
-            string current = _accumulator.ToString();
-            
-            Match match = GetPatternRegex().Match(current);
-            if (!match.Success)
-            {
-                // Not a match, remove the last character
-                _accumulator.Length--;
-                if (_accumulator.Length > 0)
-                {
-                    // We had accumulated some chars but this one broke the pattern
-                    _accumulator.Clear();
-                }
-
-                return AppendResult.NoMatch;
-            }
-
-            Group terminatorGroup = match.Groups["terminator"];
-            if (!terminatorGroup.Success)
-                // Valid prefix, but not complete yet
-                return AppendResult.Match;
-
+            Group terminatorGroup = match.Groups[TerminatorGroupName];
             int keyCode = match.Groups["keyCode"].Success ? int.Parse(match.Groups["keyCode"].Value) : 0;
             char terminator = terminatorGroup.Value[0];
 
             // Don't match bracketed paste mode sequences, let PasteBlockMatcher handle them
             if (terminator == '~' && keyCode is 200 or 201)
-            {
-                _accumulator.Clear();
-                return AppendResult.NoMatch;
-            }
+                return null;
 
             int modifiers = match.Groups["modifiers"].Success ? int.Parse(match.Groups["modifiers"].Value) : 1;
             int eventType = match.Groups["eventType"].Success ? int.Parse(match.Groups["eventType"].Value) : 1;
 
-            Complete((keyCode, modifiers, eventType, terminator));
-            _accumulator.Clear();
-            return AppendResult.AutoFlushed;
+            return (keyCode, modifiers, eventType, terminator);
         }
 
         public override bool TryFlush()
@@ -69,17 +41,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
             // and returning true here would block lower-priority matchers (like
             // SgrMouseMatcher) from flushing when this matcher has partial data.
             return false;
-        }
-
-        public override void Reset()
-        {
-            // Intentionally not clearing - same pattern as StartsEndsWithMatcher
-            // to prevent false resets from lower-priority matchers
-        }
-
-        public override string GetDebugInfo()
-        {
-            return $"{GetType().Name} {{{(_accumulator.Length == 0 ? "_" : _accumulator.ToString())}}}";
         }
 
         /// <summary>
@@ -103,7 +64,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
         [GeneratedRegex(
-            @$"^\x1B(\[(?<keyCode>\d+)?((?<sep1>[;:])(?<modifiers>\d+)?((?<sep2>[;:])(?<eventType>\d+)?)?)?(?<terminator>[{ValidCSITerminators}])?)?$")]
-        private static partial Regex GetPatternRegex();
+            @$"^\x1B(\[(?<keyCode>\d+)?((?<sep1>[;:])(?<modifiers>\d+)?((?<sep2>[;:])(?<eventType>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCSITerminators}])?)?$")]
+        private static partial Regex PatternRegex();
     }
 }
