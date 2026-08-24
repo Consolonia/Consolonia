@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -426,7 +427,7 @@ namespace Consolonia.PlatformSupport
                         TryEnableMouseButtonSupport();
 
             // Enable Kitty keyboard protocol if supported
-            if (IsKittyCompatibleTerminal())
+            if (QuerySupportsKittyKeyboardProtocol())
             {
                 WriteText(Esc.EnableKittyKeyboard);
                 _isKittyKeyboardEnabled = true;
@@ -523,19 +524,54 @@ namespace Consolonia.PlatformSupport
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
         }
 
-        /// <summary>
-        ///     Detects whether the terminal supports the Kitty keyboard protocol.
-        /// </summary>
-        private static bool IsKittyCompatibleTerminal()
-        {
-            string termProgram = Environment.GetEnvironmentVariable("TERM_PROGRAM") ?? string.Empty;
-            string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
+        private const int KittyQueryResponseTimeout = 100;
 
-            return termProgram.Equals("kitty", StringComparison.OrdinalIgnoreCase) ||
-                   termProgram.Equals("WezTerm", StringComparison.OrdinalIgnoreCase) ||
-                   termProgram.Equals("ghostty", StringComparison.OrdinalIgnoreCase) ||
-                   term.Contains("kitty", StringComparison.OrdinalIgnoreCase) ||
-                   !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KITTY_WINDOW_ID"));
+        /// <summary>
+        ///     Detects whether the terminal actually supports the Kitty keyboard protocol by
+        ///     sending "CSI ? u" (query current progressive enhancement flags) followed by a
+        ///     sentinel Device Attributes query ("CSI c"), then reading the reply.
+        ///     A terminal supporting the protocol replies with "CSI ? &lt;flags&gt; u" before/instead
+        ///     of (or in addition to) the Device Attributes response. This works correctly even
+        ///     through tmux/screen or over SSH, unlike relying solely on environment variables.
+        /// </summary>
+        private bool QuerySupportsKittyKeyboardProtocol()
+        {
+            if (IsTtyTerminal())
+                return false;
+
+            try
+            {
+                WriteText(Esc.QueryKittyKeyboardFlags);
+                WriteText("\u001b[c"); // sentinel: Device Attributes query
+
+                Curses.timeout(KittyQueryResponseTimeout);
+
+                var response = new StringBuilder();
+                while (response.Length < 64)
+                {
+                    int code = Curses.get_wch(out int wch);
+                    if (code == Curses.ERR)
+                        break; // timed out, no more data coming
+
+                    if (code != Curses.KEY_CODE_YES)
+                        response.Append((char)wch);
+
+                    string collected = response.ToString();
+                    if (Regex.IsMatch(collected, @"\x1b\[\?[0-9]*u"))
+                        return true;
+
+                    // Sentinel (Device Attributes) response arrived without a preceding
+                    // kitty keyboard response -> protocol is not supported.
+                    if (Regex.IsMatch(collected, @"\x1b\[\?[0-9;]*c"))
+                        break;
+                }
+
+                return false;
+            }
+            finally
+            {
+                Curses.timeout(NoInputTimeout);
+            }
         }
 
         private void HandleCsiKeyboardEvent((int keyCode, int modifiers, int eventType, char terminator) csiEvent)

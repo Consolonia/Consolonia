@@ -77,6 +77,10 @@ namespace Consolonia.Core.Text
         public const string EnableKittyKeyboard = "\u001b[>1u";
         public const string DisableKittyKeyboard = "\u001b[<u";
 
+        // Query current progressive enhancement flags. A terminal supporting the
+        // Kitty keyboard protocol will reply with "CSI ? <flags> u".
+        public const string QueryKittyKeyboardFlags = "\u001b[?u";
+
         // move cursor
         public static string MoveCursorUp(int n)
         {
