@@ -21,11 +21,14 @@ namespace Consolonia.PlatformSupport
     public partial class CursesConsole
     {
         private bool _isKittyKeyboardEnabled;
-        #region FlagTranslatorAllowers
+
+#region FlagTranslatorAllowers
+
         private enum KittyKeyCode;
         private enum CsiLetterKeyCode;
         private enum CsiTildeKeyCode;
-        #endregion
+        
+#endregion
         
         private static readonly FlagTranslator<KittyKeyCode, Key>
             KittyKeyFlagTranslator = new([
@@ -130,6 +133,9 @@ namespace Consolonia.PlatformSupport
             if (IsTtyTerminal())
                 return false;
 
+            // todo: this detetion is written by Claude Sonnet. In my opinion this is complete
+            // shitcode which can collapse.
+            // todo: also we timeout-driven approach we can fail so easily. From this todo lets propose a variable for kitty detection to kitty developers
             try
             {
                 WriteText(Esc.QueryKittyKeyboardFlags);
@@ -142,7 +148,7 @@ namespace Consolonia.PlatformSupport
                 {
                     int code = Curses.get_wch(out int wch);
                     if (code == Curses.ERR)
-                        break; // timed out, no more data coming
+                        break; // timed out
 
                     if (code != Curses.KEY_CODE_YES)
                         response.Append((char)wch);
@@ -208,7 +214,6 @@ namespace Consolonia.PlatformSupport
                     key = mappedKey;
                     character = keyCode switch
                     {
-                        // For Enter, Tab, Backspace, Space - set the character
                         13 => '\r',
                         9 => '\t',
                         127 => '\b',
@@ -221,7 +226,6 @@ namespace Consolonia.PlatformSupport
                 {
                     switch (keyCode)
                     {
-                        // Map to Avalonia Key enum
                         case >= 'a' and <= 'z':
                             key = Key.A + (keyCode - 'a');
                             break;
