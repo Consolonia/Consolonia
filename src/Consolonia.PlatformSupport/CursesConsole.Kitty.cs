@@ -2,9 +2,7 @@ using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using Avalonia;
 using Avalonia.Input;
-using Avalonia.Input.Raw;
 using Consolonia.Core.InternalHelpers;
 using Consolonia.Core.Text;
 using Unix.Terminal;
@@ -19,145 +17,114 @@ namespace Consolonia.PlatformSupport
     {
         private bool _isKittyKeyboardEnabled;
 
-        /// <summary>
-        ///     Dummy enum used only to satisfy <see cref="FlagTranslator{TInput,TOutput}" />'s
-        ///     Enum constraint, allowing plain numeric key codes to be looked up via
-        ///     <see cref="FlagTranslator{TInput,TOutput}.Translate(TInput,bool)" /> instead of a Dictionary.
-        /// </summary>
-        private enum KittyKeyCode
-        {
-        }
 
-        /// <summary>
-        ///     Kitty keyboard protocol special key codepoints mapped to Avalonia Key.
-        /// </summary>
-        private static readonly FlagTranslator<KittyKeyCode, Avalonia.Input.Key>
+        #region FlagTranslatorAllowers
+        private enum KittyKeyCode;
+        private enum CsiLetterKeyCode;
+        private enum CsiTildeKeyCode;
+        #endregion
+
+        
+
+        private static readonly FlagTranslator<KittyKeyCode, Key>
             KittyKeyFlagTranslator = new([
-                ((KittyKeyCode)27, Avalonia.Input.Key.Escape),
-                ((KittyKeyCode)13, Avalonia.Input.Key.Return),
-                ((KittyKeyCode)9, Avalonia.Input.Key.Tab),
-                ((KittyKeyCode)127, Avalonia.Input.Key.Back),
-                ((KittyKeyCode)57348, Avalonia.Input.Key.Insert),
-                ((KittyKeyCode)57349, Avalonia.Input.Key.Delete),
-                ((KittyKeyCode)57350, Avalonia.Input.Key.Left),
-                ((KittyKeyCode)57351, Avalonia.Input.Key.Right),
-                ((KittyKeyCode)57352, Avalonia.Input.Key.Up),
-                ((KittyKeyCode)57353, Avalonia.Input.Key.Down),
-                ((KittyKeyCode)57354, Avalonia.Input.Key.PageUp),
-                ((KittyKeyCode)57355, Avalonia.Input.Key.PageDown),
-                ((KittyKeyCode)57356, Avalonia.Input.Key.Home),
-                ((KittyKeyCode)57357, Avalonia.Input.Key.End),
-                ((KittyKeyCode)57358, Avalonia.Input.Key.CapsLock),
-                ((KittyKeyCode)57359, Avalonia.Input.Key.Scroll),
-                ((KittyKeyCode)57360, Avalonia.Input.Key.NumLock),
-                ((KittyKeyCode)57361, Avalonia.Input.Key.PrintScreen),
-                ((KittyKeyCode)57362, Avalonia.Input.Key.Pause),
-                ((KittyKeyCode)57363, Avalonia.Input.Key.Apps),
-                ((KittyKeyCode)57364, Avalonia.Input.Key.F1),
-                ((KittyKeyCode)57365, Avalonia.Input.Key.F2),
-                ((KittyKeyCode)57366, Avalonia.Input.Key.F3),
-                ((KittyKeyCode)57367, Avalonia.Input.Key.F4),
-                ((KittyKeyCode)57368, Avalonia.Input.Key.F5),
-                ((KittyKeyCode)57369, Avalonia.Input.Key.F6),
-                ((KittyKeyCode)57370, Avalonia.Input.Key.F7),
-                ((KittyKeyCode)57371, Avalonia.Input.Key.F8),
-                ((KittyKeyCode)57372, Avalonia.Input.Key.F9),
-                ((KittyKeyCode)57373, Avalonia.Input.Key.F10),
-                ((KittyKeyCode)57374, Avalonia.Input.Key.F11),
-                ((KittyKeyCode)57375, Avalonia.Input.Key.F12),
-                ((KittyKeyCode)57376, Avalonia.Input.Key.F13),
-                ((KittyKeyCode)57377, Avalonia.Input.Key.F14),
-                ((KittyKeyCode)57378, Avalonia.Input.Key.F15),
-                ((KittyKeyCode)57379, Avalonia.Input.Key.F16),
-                ((KittyKeyCode)57380, Avalonia.Input.Key.F17),
-                ((KittyKeyCode)57381, Avalonia.Input.Key.F18),
-                ((KittyKeyCode)57382, Avalonia.Input.Key.F19),
-                ((KittyKeyCode)57383, Avalonia.Input.Key.F20),
-                ((KittyKeyCode)57384, Avalonia.Input.Key.F21),
-                ((KittyKeyCode)57385, Avalonia.Input.Key.F22),
-                ((KittyKeyCode)57386, Avalonia.Input.Key.F23),
-                ((KittyKeyCode)57387, Avalonia.Input.Key.F24),
-                ((KittyKeyCode)57441, Avalonia.Input.Key.LeftShift),
-                ((KittyKeyCode)57442, Avalonia.Input.Key.LeftCtrl),
-                ((KittyKeyCode)57443, Avalonia.Input.Key.LeftAlt),
-                ((KittyKeyCode)57444, Avalonia.Input.Key.LWin),
-                ((KittyKeyCode)57447, Avalonia.Input.Key.RightShift),
-                ((KittyKeyCode)57448, Avalonia.Input.Key.RightCtrl),
-                ((KittyKeyCode)57449, Avalonia.Input.Key.RightAlt),
-                ((KittyKeyCode)57450, Avalonia.Input.Key.RWin)
+                ((KittyKeyCode)27, Key.Escape),
+                ((KittyKeyCode)13, Key.Return),
+                ((KittyKeyCode)9, Key.Tab),
+                ((KittyKeyCode)127, Key.Back),
+                ((KittyKeyCode)57348, Key.Insert),
+                ((KittyKeyCode)57349, Key.Delete),
+                ((KittyKeyCode)57350, Key.Left),
+                ((KittyKeyCode)57351, Key.Right),
+                ((KittyKeyCode)57352, Key.Up),
+                ((KittyKeyCode)57353, Key.Down),
+                ((KittyKeyCode)57354, Key.PageUp),
+                ((KittyKeyCode)57355, Key.PageDown),
+                ((KittyKeyCode)57356, Key.Home),
+                ((KittyKeyCode)57357, Key.End),
+                ((KittyKeyCode)57358, Key.CapsLock),
+                ((KittyKeyCode)57359, Key.Scroll),
+                ((KittyKeyCode)57360, Key.NumLock),
+                ((KittyKeyCode)57361, Key.PrintScreen),
+                ((KittyKeyCode)57362, Key.Pause),
+                ((KittyKeyCode)57363, Key.Apps),
+                ((KittyKeyCode)57364, Key.F1),
+                ((KittyKeyCode)57365, Key.F2),
+                ((KittyKeyCode)57366, Key.F3),
+                ((KittyKeyCode)57367, Key.F4),
+                ((KittyKeyCode)57368, Key.F5),
+                ((KittyKeyCode)57369, Key.F6),
+                ((KittyKeyCode)57370, Key.F7),
+                ((KittyKeyCode)57371, Key.F8),
+                ((KittyKeyCode)57372, Key.F9),
+                ((KittyKeyCode)57373, Key.F10),
+                ((KittyKeyCode)57374, Key.F11),
+                ((KittyKeyCode)57375, Key.F12),
+                ((KittyKeyCode)57376, Key.F13),
+                ((KittyKeyCode)57377, Key.F14),
+                ((KittyKeyCode)57378, Key.F15),
+                ((KittyKeyCode)57379, Key.F16),
+                ((KittyKeyCode)57380, Key.F17),
+                ((KittyKeyCode)57381, Key.F18),
+                ((KittyKeyCode)57382, Key.F19),
+                ((KittyKeyCode)57383, Key.F20),
+                ((KittyKeyCode)57384, Key.F21),
+                ((KittyKeyCode)57385, Key.F22),
+                ((KittyKeyCode)57386, Key.F23),
+                ((KittyKeyCode)57387, Key.F24),
+                ((KittyKeyCode)57441, Key.LeftShift),
+                ((KittyKeyCode)57442, Key.LeftCtrl),
+                ((KittyKeyCode)57443, Key.LeftAlt),
+                ((KittyKeyCode)57444, Key.LWin),
+                ((KittyKeyCode)57447, Key.RightShift),
+                ((KittyKeyCode)57448, Key.RightCtrl),
+                ((KittyKeyCode)57449, Key.RightAlt),
+                ((KittyKeyCode)57450, Key.RWin)
             ]);
 
         /// <summary>
-        ///     Dummy enum used only to satisfy <see cref="FlagTranslator{TInput,TOutput}" />'s
-        ///     Enum constraint, allowing plain char key codes to be looked up via
-        ///     <see cref="FlagTranslator{TInput,TOutput}.Translate(TInput,bool)" /> instead of a Dictionary.
+        ///     Legacy CSI letter terminators
         /// </summary>
-        private enum CsiLetterKeyCode
-        {
-        }
-
-        /// <summary>
-        ///     Legacy CSI letter terminators mapped to Avalonia Key.
-        ///     Used for arrow keys (A-D), Home (H), End (F), F1-F4 (P-S).
-        /// </summary>
-        private static readonly FlagTranslator<CsiLetterKeyCode, Avalonia.Input.Key>
+        private static readonly FlagTranslator<CsiLetterKeyCode, Key>
             CsiLetterKeyFlagTranslator = new([
-                ((CsiLetterKeyCode)'A', Avalonia.Input.Key.Up),
-                ((CsiLetterKeyCode)'B', Avalonia.Input.Key.Down),
-                ((CsiLetterKeyCode)'C', Avalonia.Input.Key.Right),
-                ((CsiLetterKeyCode)'D', Avalonia.Input.Key.Left),
-                ((CsiLetterKeyCode)'H', Avalonia.Input.Key.Home),
-                ((CsiLetterKeyCode)'F', Avalonia.Input.Key.End),
-                ((CsiLetterKeyCode)'P', Avalonia.Input.Key.F1),
-                ((CsiLetterKeyCode)'Q', Avalonia.Input.Key.F2),
-                ((CsiLetterKeyCode)'R', Avalonia.Input.Key.F3),
-                ((CsiLetterKeyCode)'S', Avalonia.Input.Key.F4),
-                ((CsiLetterKeyCode)'Z', Avalonia.Input.Key.Tab),
-                ((CsiLetterKeyCode)'E', Avalonia.Input.Key.Clear)
+                ((CsiLetterKeyCode)'A', Key.Up),
+                ((CsiLetterKeyCode)'B', Key.Down),
+                ((CsiLetterKeyCode)'C', Key.Right),
+                ((CsiLetterKeyCode)'D', Key.Left),
+                ((CsiLetterKeyCode)'H', Key.Home),
+                ((CsiLetterKeyCode)'F', Key.End),
+                ((CsiLetterKeyCode)'P', Key.F1),
+                ((CsiLetterKeyCode)'Q', Key.F2),
+                ((CsiLetterKeyCode)'R', Key.F3),
+                ((CsiLetterKeyCode)'S', Key.F4),
+                ((CsiLetterKeyCode)'Z', Key.Tab),
+                ((CsiLetterKeyCode)'E', Key.Clear)
             ]);
 
         /// <summary>
-        ///     Dummy enum used only to satisfy <see cref="FlagTranslator{TInput,TOutput}" />'s
-        ///     Enum constraint, allowing plain numeric key codes to be looked up via
-        ///     <see cref="FlagTranslator{TInput,TOutput}.Translate(TInput,bool)" /> instead of a Dictionary.
+        ///     Legacy CSI tilde key numbers
         /// </summary>
-        private enum CsiTildeKeyCode
-        {
-        }
-
-        /// <summary>
-        ///     Legacy CSI tilde key numbers mapped to Avalonia Key.
-        ///     Used for Insert, Delete, PageUp, PageDown, F5-F12.
-        /// </summary>
-        private static readonly FlagTranslator<CsiTildeKeyCode, Avalonia.Input.Key>
+        private static readonly FlagTranslator<CsiTildeKeyCode, Key>
             CsiTildeKeyFlagTranslator = new([
-                ((CsiTildeKeyCode)1, Avalonia.Input.Key.Home),
-                ((CsiTildeKeyCode)2, Avalonia.Input.Key.Insert),
-                ((CsiTildeKeyCode)3, Avalonia.Input.Key.Delete),
-                ((CsiTildeKeyCode)4, Avalonia.Input.Key.End),
-                ((CsiTildeKeyCode)5, Avalonia.Input.Key.PageUp),
-                ((CsiTildeKeyCode)6, Avalonia.Input.Key.PageDown),
-                ((CsiTildeKeyCode)15, Avalonia.Input.Key.F5),
-                ((CsiTildeKeyCode)17, Avalonia.Input.Key.F6),
-                ((CsiTildeKeyCode)18, Avalonia.Input.Key.F7),
-                ((CsiTildeKeyCode)19, Avalonia.Input.Key.F8),
-                ((CsiTildeKeyCode)20, Avalonia.Input.Key.F9),
-                ((CsiTildeKeyCode)21, Avalonia.Input.Key.F10),
-                ((CsiTildeKeyCode)23, Avalonia.Input.Key.F11),
-                ((CsiTildeKeyCode)24, Avalonia.Input.Key.F12)
+                ((CsiTildeKeyCode)1, Key.Home),
+                ((CsiTildeKeyCode)2, Key.Insert),
+                ((CsiTildeKeyCode)3, Key.Delete),
+                ((CsiTildeKeyCode)4, Key.End),
+                ((CsiTildeKeyCode)5, Key.PageUp),
+                ((CsiTildeKeyCode)6, Key.PageDown),
+                ((CsiTildeKeyCode)15, Key.F5),
+                ((CsiTildeKeyCode)17, Key.F6),
+                ((CsiTildeKeyCode)18, Key.F7),
+                ((CsiTildeKeyCode)19, Key.F8),
+                ((CsiTildeKeyCode)20, Key.F9),
+                ((CsiTildeKeyCode)21, Key.F10),
+                ((CsiTildeKeyCode)23, Key.F11),
+                ((CsiTildeKeyCode)24, Key.F12)
             ]);
 
-        private const int KittyQueryResponseTimeout = 100;
-
-        /// <summary>
-        ///     Detects whether the terminal actually supports the Kitty keyboard protocol by
-        ///     sending "CSI ? u" (query current progressive enhancement flags) followed by a
-        ///     sentinel Device Attributes query ("CSI c"), then reading the reply.
-        ///     A terminal supporting the protocol replies with "CSI ? &lt;flags&gt; u" before/instead
-        ///     of (or in addition to) the Device Attributes response. This works correctly even
-        ///     through tmux/screen or over SSH, unlike relying solely on environment variables.
-        /// </summary>
-        private bool QuerySupportsKittyKeyboardProtocol()
+        private const int KittyQueryResponseTimeout = 100; //todo: why 100
+        
+        private bool IsKittyKeyboardProtocol()
         {
             if (IsTtyTerminal())
                 return false;
@@ -214,76 +181,87 @@ namespace Consolonia.PlatformSupport
             if ((modifierValue & 4) != 0) rawModifiers |= RawInputModifiers.Control;
 
             // Try to map the keycode based on terminator type
-            Avalonia.Input.Key key;
+            Key key;
             char character = char.MinValue;
 
             if (terminator != 'u' && terminator != '~' &&
                 CsiLetterKeyFlagTranslator.Translate((CsiLetterKeyCode)terminator, true) is var letterKey &&
-                letterKey != Avalonia.Input.Key.None)
+                letterKey != Key.None)
             {
                 // Legacy CSI letter sequence (arrows, Home, End, F1-F4)
                 key = letterKey;
                 if (terminator == 'Z') rawModifiers |= RawInputModifiers.Shift;
             }
-            else if (terminator == '~' &&
-                     CsiTildeKeyFlagTranslator.Translate((CsiTildeKeyCode)keyCode, true) is var tildeKey &&
-                     tildeKey != Avalonia.Input.Key.None)
+            else switch (terminator)
             {
-                // Legacy CSI tilde sequence (Insert, Delete, PgUp, PgDn, F5-F12)
-                key = tildeKey;
-            }
-            else if (terminator == 'u' &&
-                     KittyKeyFlagTranslator.Translate((KittyKeyCode)keyCode, true) is var mappedKey &&
-                     mappedKey != Avalonia.Input.Key.None)
-            {
-                key = mappedKey;
-                // For Enter, Tab, Backspace, Space - set the character
-                if (keyCode == 13) character = '\r';
-                else if (keyCode == 9) character = '\t';
-                else if (keyCode == 127) character = '\b';
-                else if (keyCode == 27) character = '\x1B';
-            }
-            else if (terminator == 'u' && keyCode >= 32 && keyCode < 127)
-            {
-                // Printable ASCII via CSI u
-                character = (char)keyCode;
-
-                // Map to Avalonia Key enum
-                if (keyCode >= 'a' && keyCode <= 'z')
-                    key = Avalonia.Input.Key.A + (keyCode - 'a');
-                else if (keyCode >= 'A' && keyCode <= 'Z')
+                case '~' when
+                    CsiTildeKeyFlagTranslator.Translate((CsiTildeKeyCode)keyCode, true) is var tildeKey &&
+                    tildeKey != Key.None:
+                    // Legacy CSI tilde sequence (Insert, Delete, PgUp, PgDn, F5-F12)
+                    key = tildeKey;
+                    break;
+                case 'u' when
+                    KittyKeyFlagTranslator.Translate((KittyKeyCode)keyCode, true) is var mappedKey &&
+                    mappedKey != Key.None:
                 {
-                    key = Avalonia.Input.Key.A + (keyCode - 'A');
-                    rawModifiers |= RawInputModifiers.Shift;
-                }
-                else if (keyCode >= '0' && keyCode <= '9')
-                    key = Avalonia.Input.Key.D0 + (keyCode - '0');
-                else if (keyCode == ' ')
-                    key = Avalonia.Input.Key.Space;
-                else
-                {
-                    // Map punctuation characters to Avalonia Key
-                    key = character switch
+                    key = mappedKey;
+                    character = keyCode switch
                     {
-                        '.' => Avalonia.Input.Key.OemPeriod,
-                        ',' => Avalonia.Input.Key.OemComma,
-                        ';' => Avalonia.Input.Key.OemSemicolon,
-                        '/' => Avalonia.Input.Key.Oem2,
-                        '\\' => Avalonia.Input.Key.Oem5,
-                        '=' => Avalonia.Input.Key.OemPlus,
-                        '-' => Avalonia.Input.Key.OemMinus,
-                        '[' => Avalonia.Input.Key.Oem4,
-                        ']' => Avalonia.Input.Key.Oem6,
-                        '\'' => Avalonia.Input.Key.Oem7,
-                        '`' => Avalonia.Input.Key.Oem3,
-                        _ => Avalonia.Input.Key.None
+                        // For Enter, Tab, Backspace, Space - set the character
+                        13 => '\r',
+                        9 => '\t',
+                        127 => '\b',
+                        27 => '\x1B',
+                        _ => character
                     };
+                    break;
                 }
-            }
-            else
-            {
-                // Unknown keycode or terminator
-                return;
+                case 'u' when keyCode is >= 32 and < 127:
+                {
+                    // Printable ASCII via CSI u
+                    character = (char)keyCode;
+
+                    switch (keyCode)
+                    {
+                        // Map to Avalonia Key enum
+                        case >= 'a' and <= 'z':
+                            key = Key.A + (keyCode - 'a');
+                            break;
+                        case >= 'A' and <= 'Z':
+                            key = Key.A + (keyCode - 'A');
+                            rawModifiers |= RawInputModifiers.Shift;
+                            break;
+                        case >= '0' and <= '9':
+                            key = Key.D0 + (keyCode - '0');
+                            break;
+                        case ' ':
+                            key = Key.Space;
+                            break;
+                        default:
+                            // Map punctuation characters to Avalonia Key
+                            key = character switch
+                            {
+                                '.' => Key.OemPeriod,
+                                ',' => Key.OemComma,
+                                ';' => Key.OemSemicolon,
+                                '/' => Key.Oem2,
+                                '\\' => Key.Oem5,
+                                '=' => Key.OemPlus,
+                                '-' => Key.OemMinus,
+                                '[' => Key.Oem4,
+                                ']' => Key.Oem6,
+                                '\'' => Key.Oem7,
+                                '`' => Key.Oem3,
+                                _ => Key.None
+                            };
+                            break;
+                    }
+
+                    break;
+                }
+                default:
+                    // Unknown keycode or terminator
+                    return;
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);

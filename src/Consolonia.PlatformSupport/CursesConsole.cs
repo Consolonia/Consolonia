@@ -325,7 +325,7 @@ namespace Consolonia.PlatformSupport
                         TryEnableMouseButtonSupport();
 
             // Enable Kitty keyboard protocol if supported
-            if (QuerySupportsKittyKeyboardProtocol())
+            if (IsKittyKeyboardProtocol())
             {
                 WriteText(Esc.EnableKittyKeyboard);
                 _isKittyKeyboardEnabled = true;
