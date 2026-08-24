@@ -6,6 +6,7 @@ using System.Threading;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Consolonia.Controls;
 using Consolonia.Core.Helpers.InputProcessing;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
@@ -14,10 +15,6 @@ using Unix.Terminal;
 
 namespace Consolonia.PlatformSupport
 {
-    /// <summary>
-    ///     Kitty keyboard protocol support: detection (via "CSI ? u" query) and CSI keyboard
-    ///     sequence decoding (Kitty CSI u, legacy CSI letter, legacy CSI tilde).
-    /// </summary>
     public partial class CursesConsole
     {
         private bool _isKittyKeyboardEnabled;
@@ -126,49 +123,82 @@ namespace Consolonia.PlatformSupport
                 ((CsiTildeKeyCode)24, Key.F12)
             ]);
 
-        private const int KittyQueryResponseTimeout = 100; //todo: why 100
-        
-        private bool IsKittyKeyboardProtocol()
+        private void TryToSupportKitty()
         {
-            if (IsTtyTerminal())
-                return false;
-
-            // todo: this detetion is written by Claude Sonnet. In my opinion this is complete
-            // shitcode which can collapse.
-            // todo: also we timeout-driven approach we can fail so easily. From this todo lets propose a variable for kitty detection to kitty developers
-            try
+            if (QueryIsKittyKeyboardProtocol())
             {
-                WriteText(Esc.QueryKittyKeyboardFlags);
-                WriteText("\u001b[c"); // sentinel: Device Attributes query
+                WriteText(Esc.EnableKittyKeyboard);
+                _isKittyKeyboardEnabled = true;
 
-                Curses.timeout(KittyQueryResponseTimeout);
-
-                var response = new StringBuilder();
-                while (response.Length < 64)
+                // Kitty terminals support SGR mouse tracking directly
+                // Enable it even if ncurses couldn't set it up
+                if (!Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove))
                 {
-                    int code = Curses.get_wch(out int wch);
-                    if (code == Curses.ERR)
-                        break; // timed out
-
-                    if (code != Curses.KEY_CODE_YES)
-                        response.Append((char)wch);
-
-                    string collected = response.ToString();
-                    if (Regex.IsMatch(collected, @"\x1b\[\?[0-9]*u"))
-                        return true;
-
-                    // Sentinel (Device Attributes) response arrived without a preceding
-                    // kitty keyboard response -> protocol is not supported.
-                    if (Regex.IsMatch(collected, @"\x1b\[\?[0-9;]*c"))
-                        break;
+                    WriteText(Esc.EnableAllMouseEvents);
+                    WriteText(Esc.EnableExtendedMouseTracking);
+                    Capabilities |= ConsoleCapabilities.SupportsMouseButtons | ConsoleCapabilities.SupportsMouseMove;
+                    DetectSupportsMouseCursor();
                 }
+            }
 
-                return false;
-            }
-            finally
+            return;
+
+            bool QueryIsKittyKeyboardProtocol()
             {
-                Curses.timeout(NoInputTimeout);
+                if (IsTtyTerminal())
+                    return false;
+
+                // todo: this detetion is written by Claude Sonnet. In my opinion this is complete shitcode which can collapse.
+                // todo: also we timeout-driven approach we can fail so easily in general. From this todo lets propose a variable for kitty detection to kitty developers
+                try
+                {
+                    WriteText(Esc.QueryKittyKeyboardFlags);
+                    WriteText("\u001b[c"); // sentinel: Device Attributes query
+
+                    Curses.timeout(100); //todo: here is the issue
+
+                    var response = new StringBuilder();
+                    while (response.Length < 64)
+                    {
+                        int code = Curses.get_wch(out int wch);
+                        if (code == Curses.ERR)
+                            break; // timed out
+
+                        if (code != Curses.KEY_CODE_YES)
+                            response.Append((char)wch);
+
+                        string collected = response.ToString();
+                        if (KittySupportAnswerRegex().IsMatch(collected))
+                            return true;
+
+                        // Sentinel (Device Attributes) response arrived without a preceding
+                        // kitty keyboard response -> protocol is not supported.
+                        if (KittyDeviceAttributesAnswerRegex().IsMatch(collected))
+                            break;
+                    }
+
+                    return false;
+                }
+                finally
+                {
+                    Curses.timeout(NoInputTimeout);
+                }
             }
+
+        }
+        
+        private IEnumerable<IMatcher<(int, int)>> TryGetKittyMatchers()
+        {
+            if (!_isKittyKeyboardEnabled)
+                yield break;
+
+            // CSI sequences (CSI u, CSI letter, CSI tilde)
+            yield return new SafeLockMatcher(
+                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
+
+            // SGR extended mouse sequences (ESC [ &lt; button ; x ; y M/m)
+            yield return new SafeLockMatcher(
+                new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
         }
 
         private void HandleCsiKeyboardEvent((int keyCode, int modifiers, int eventType, char terminator) csiEvent)
@@ -182,7 +212,7 @@ namespace Consolonia.PlatformSupport
             bool isDown = eventType != 3;
 
             // Decode modifiers
-            RawInputModifiers rawModifiers = RawInputModifiers.None;
+            var rawModifiers = RawInputModifiers.None;
             if ((modifierValue & 1) != 0) rawModifiers |= RawInputModifiers.Shift;
             if ((modifierValue & 2) != 0) rawModifiers |= RawInputModifiers.Alt;
             if ((modifierValue & 4) != 0) rawModifiers |= RawInputModifiers.Control;
@@ -353,20 +383,9 @@ namespace Consolonia.PlatformSupport
             }
         }
 
-        /// <summary>
-        ///     Matchers for Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde) and
-        ///     SGR extended mouse sequences (ESC [ &lt; button ; x ; y M/m)
-        /// </summary>
-        private IEnumerable<IMatcher<(int, int)>> GetKittyMatchers()
-        {
-            if (!_isKittyKeyboardEnabled)
-                yield break;
-
-            yield return new SafeLockMatcher(
-                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
-
-            yield return new SafeLockMatcher(
-                new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
-        }
+        [GeneratedRegex(@"\x1b\[\?[0-9]*u")]
+        private static partial Regex KittySupportAnswerRegex();
+        [GeneratedRegex(@"\x1b\[\?[0-9;]*c")]
+        private static partial Regex KittyDeviceAttributesAnswerRegex();
     }
 }

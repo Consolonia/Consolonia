@@ -324,29 +324,13 @@ namespace Consolonia.PlatformSupport
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
 
-            // Enable Kitty keyboard protocol if supported
-            if (IsKittyKeyboardProtocol())
-            {
-                WriteText(Esc.EnableKittyKeyboard);
-                _isKittyKeyboardEnabled = true;
-
-                // Kitty terminals support SGR mouse tracking directly
-                // Enable it even if ncurses couldn't set it up
-                if (!Capabilities.HasFlag(ConsoleCapabilities.SupportsMouseMove))
-                {
-                    WriteText(Esc.EnableAllMouseEvents);
-                    WriteText(Esc.EnableExtendedMouseTracking);
-                    Capabilities |= ConsoleCapabilities.SupportsMouseButtons | ConsoleCapabilities.SupportsMouseMove;
-                    DetectSupportsMouseCursor();
-                }
-            }
-
-            // Curses.timeout(NoInputTimeout); now it does not matter as input function sets dynamic timeout
+            TryToSupportKitty();
+            
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
         }
-
+        
         private const Curses.Event BasicMouseEvents = Curses.Event.Button1Pressed | Curses.Event.Button1Released |
                                                       Curses.Event.Button2Pressed | Curses.Event.Button2Released |
                                                       Curses.Event.Button3Pressed | Curses.Event.Button3Released |
@@ -474,12 +458,9 @@ namespace Consolonia.PlatformSupport
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
 
-            // Kitty keyboard protocol CSI sequences (CSI u, CSI letter, CSI tilde) and
-            // SGR extended mouse sequences (ESC [ < button ; x ; y M/m), only when the
-            // Kitty keyboard protocol was actually negotiated with the terminal.
-            foreach (IMatcher<(int, int)> matcher in GetKittyMatchers())
+            foreach (IMatcher<(int, int)> matcher in TryGetKittyMatchers())
                 yield return matcher;
-
+            
             (string, Key)[] fSequences =
             [
                 // Ctrl+Alt+(F1 - F4)
@@ -543,76 +524,76 @@ namespace Consolonia.PlatformSupport
                     new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
                         fSequence.Item1, fSequence.Item1), 0, 0, 0);
 
-                // escape of ESC
-                yield return new SafeLockMatcher(
-                    new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.Esc); }, cp => new Rune(cp), @"^\x1B+$", 2), 0,
-                    0);
+            // escape of ESC
+            yield return new SafeLockMatcher(
+                new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.Esc); }, cp => new Rune(cp), @"^\x1B+$", 2), 0,
+                0);
 
-                // SHIFT+TAB is received as ESC then TAB, both locked by key 0: https://unix.stackexchange.com/a/238412
-                yield return new SafeLockMatcher(
-                    new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.BackTab); }, cp => new Rune(cp), @"^\x1B\t?$",
-                        2), 0, 0);
+            // SHIFT+TAB is received as ESC then TAB, both locked by key 0: https://unix.stackexchange.com/a/238412
+            yield return new SafeLockMatcher(
+                new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.BackTab); }, cp => new Rune(cp), @"^\x1B\t?$",
+                    2), 0, 0);
 
-                // The ESC-number handling, debatable.
-                yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
+            // The ESC-number handling, debatable.
+            yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
+            {
+                var k = Key.Unknown;
+                // Simulates the AltMask itself by pressing Alt + Space.
+                int wch = tuple.Item2[0];
+                int wch2 = tuple.Item2[1];
+
+                if (wch2 == (int)Key.Space)
                 {
-                    var k = Key.Unknown;
-                    // Simulates the AltMask itself by pressing Alt + Space.
-                    int wch = tuple.Item2[0];
-                    int wch2 = tuple.Item2[1];
+                    k = Key.AltMask;
+                }
+                else if (wch2 - (int)Key.Space >= (uint)Key.A && wch2 - (int)Key.Space <= (uint)Key.Z)
+                {
+                    k = (Key)((uint)Key.AltMask + (wch2 - (int)Key.Space));
+                }
+                else if (wch2 >= (uint)Key.A - 64 && wch2 <= (uint)Key.Z - 64)
+                {
+                    k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + (wch2 + 64));
+                }
+                else if (wch2 >= (uint)Key.D0 && wch2 <= (uint)Key.D9)
+                {
+                    k = (Key)((uint)Key.AltMask + (uint)Key.D0 + (wch2 - (uint)Key.D0));
+                }
+                else
+                {
+                    // Unfortunately there are no way to differentiate Ctrl+Alt+alfa and Ctrl+Shift+Alt+alfa.
+                    if (((Key)wch2 & Key.CtrlMask) != 0) _keyModifiers.Ctrl = true;
 
-                    if (wch2 == (int)Key.Space)
+                    if (wch2 == 0)
                     {
-                        k = Key.AltMask;
+                        k = Key.CtrlMask | Key.AltMask | Key.Space;
                     }
-                    else if (wch2 - (int)Key.Space >= (uint)Key.A && wch2 - (int)Key.Space <= (uint)Key.Z)
+                    // ReSharper disable once ConditionIsAlwaysTrueOrFalse todo: check why
+                    else if (wch >= (uint)Key.A && wch <= (uint)Key.Z)
                     {
-                        k = (Key)((uint)Key.AltMask + (wch2 - (int)Key.Space));
+                        _keyModifiers.Shift = true;
+                        _keyModifiers.Alt = true;
                     }
-                    else if (wch2 >= (uint)Key.A - 64 && wch2 <= (uint)Key.Z - 64)
+                    else if (wch2 < 256)
                     {
-                        k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + (wch2 + 64));
-                    }
-                    else if (wch2 >= (uint)Key.D0 && wch2 <= (uint)Key.D9)
-                    {
-                        k = (Key)((uint)Key.AltMask + (uint)Key.D0 + (wch2 - (uint)Key.D0));
+                        k = (Key)wch2;
+                        _keyModifiers.Alt = true;
                     }
                     else
                     {
-                        // Unfortunately there are no way to differentiate Ctrl+Alt+alfa and Ctrl+Shift+Alt+alfa.
-                        if (((Key)wch2 & Key.CtrlMask) != 0) _keyModifiers.Ctrl = true;
-
-                        if (wch2 == 0)
-                        {
-                            k = Key.CtrlMask | Key.AltMask | Key.Space;
-                        }
-                        // ReSharper disable once ConditionIsAlwaysTrueOrFalse todo: check why
-                        else if (wch >= (uint)Key.A && wch <= (uint)Key.Z)
-                        {
-                            _keyModifiers.Shift = true;
-                            _keyModifiers.Alt = true;
-                        }
-                        else if (wch2 < 256)
-                        {
-                            k = (Key)wch2;
-                            _keyModifiers.Alt = true;
-                        }
-                        else
-                        {
-                            k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + wch2);
-                        }
+                        k = (Key)((uint)(Key.AltMask | Key.CtrlMask) + wch2);
                     }
+                }
 
-                    RaiseKeyPressInternal(k);
-                }, cp => new Rune(cp), @"^\x1B[^\x1B\[]*$", 2), 0, 0);
+                RaiseKeyPressInternal(k);
+            }, cp => new Rune(cp), @"^\x1B[^\x1B\[]*$", 2), 0, 0);
 
-                // alt mask
-                yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
-                {
-                    int wch = tuple.Item2[0];
-                    Key k = Key.AltMask | MapCursesKey(wch);
-                    RaiseKeyPressInternal(k);
-                }, cp => new Rune(cp), @"^\x1B[^\x00]*$", 2), 0, Curses.KEY_CODE_YES);
+            // alt mask
+            yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
+            {
+                int wch = tuple.Item2[0];
+                Key k = Key.AltMask | MapCursesKey(wch);
+                RaiseKeyPressInternal(k);
+            }, cp => new Rune(cp), @"^\x1B[^\x00]*$", 2), 0, Curses.KEY_CODE_YES);
 
             // mouse and resize detection and some special processing
             yield return new SafeLockMatcher(new GenericMatcher<int>(wch =>
@@ -636,47 +617,47 @@ namespace Consolonia.PlatformSupport
 
                 Key k = MapCursesKey(wch);
 
-                    switch (wch)
-                    {
-                        case >= 277 and <= 288:
-                            // Shift+(F1 - F12)
-                            wch -= 12;
-                            k = Key.ShiftMask | MapCursesKey(wch);
-                            break;
-                        case >= 289 and <= 300:
-                            // Ctrl+(F1 - F12)
-                            wch -= 24;
-                            k = Key.CtrlMask | MapCursesKey(wch);
-                            break;
-                        case >= 301 and <= 312:
-                            // Ctrl+Shift+(F1 - F12)
-                            wch -= 36;
-                            k = Key.CtrlMask | Key.ShiftMask | MapCursesKey(wch);
-                            break;
-                        case >= 313 and <= 324:
-                            // Alt+(F1 - F12)
-                            wch -= 48;
-                            k = Key.AltMask | MapCursesKey(wch);
-                            break;
-                        case >= 325 and <= 327:
-                            // Shift+Alt+(F1 - F3)
-                            wch -= 60;
-                            k = Key.ShiftMask | Key.AltMask | MapCursesKey(wch);
-                            break;
-                        case >= 523 and <= 570:
-                            // Ctrl/Shift/Alt and navigation keys (arrow, home, end)
-                            string distro = Environment.GetEnvironmentVariable("WSL_DISTRO_NAME");
-                            if (!string.IsNullOrEmpty(distro))
-                                wch -= 1;
-                            else
-                                wch -= 9;
-                            k = MapCursesKey(wch); // has appropriate XxxMask internal
-                            break;
-                    }
+                switch (wch)
+                {
+                    case >= 277 and <= 288:
+                        // Shift+(F1 - F12)
+                        wch -= 12;
+                        k = Key.ShiftMask | MapCursesKey(wch);
+                        break;
+                    case >= 289 and <= 300:
+                        // Ctrl+(F1 - F12)
+                        wch -= 24;
+                        k = Key.CtrlMask | MapCursesKey(wch);
+                        break;
+                    case >= 301 and <= 312:
+                        // Ctrl+Shift+(F1 - F12)
+                        wch -= 36;
+                        k = Key.CtrlMask | Key.ShiftMask | MapCursesKey(wch);
+                        break;
+                    case >= 313 and <= 324:
+                        // Alt+(F1 - F12)
+                        wch -= 48;
+                        k = Key.AltMask | MapCursesKey(wch);
+                        break;
+                    case >= 325 and <= 327:
+                        // Shift+Alt+(F1 - F3)
+                        wch -= 60;
+                        k = Key.ShiftMask | Key.AltMask | MapCursesKey(wch);
+                        break;
+                    case >= 523 and <= 570:
+                        // Ctrl/Shift/Alt and navigation keys (arrow, home, end)
+                        string distro = Environment.GetEnvironmentVariable("WSL_DISTRO_NAME");
+                        if (!string.IsNullOrEmpty(distro))
+                            wch -= 1;
+                        else
+                            wch -= 9;
+                        k = MapCursesKey(wch); // has appropriate XxxMask internal
+                        break;
+                }
 
-                    RaiseKeyPressInternal(k);
-                }), Curses.KEY_CODE_YES);
-            
+                RaiseKeyPressInternal(k);
+            }), Curses.KEY_CODE_YES);
+
             // text detection
             var textInputMatcher = new SafeLockMatcher(new TextInputMatcher<int>(tuple =>
             {
