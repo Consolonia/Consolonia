@@ -7,10 +7,10 @@ namespace Consolonia.Core.Helpers.InputProcessing
     /// <summary>
     ///     Matches Kitty keyboard protocol CSI u sequences and legacy CSI functional key sequences.
     ///     Formats:
-    ///       CSI u:      ESC [ keycode ; modifiers u
-    ///       CSI tilde:  ESC [ number ; modifiers ~     (Insert, Delete, PgUp, PgDn, F5-F12)
-    ///       CSI letter: ESC [ 1 ; modifiers letter     (Arrows, Home, End, F1-F4)
-    ///       CSI letter: ESC [ letter                    (unmodified arrows, Home, End, F1-F4)
+    ///     CSI u:      ESC [ keycode ; modifiers u
+    ///     CSI tilde:  ESC [ number ; modifiers ~     (Insert, Delete, PgUp, PgDn, F5-F12)
+    ///     CSI letter: ESC [ 1 ; modifiers letter     (Arrows, Home, End, F1-F4)
+    ///     CSI letter: ESC [ letter                    (unmodified arrows, Home, End, F1-F4)
     /// </summary>
     public partial class CsiKeyboardMatcher<T>(
         Action<(int keyCode, int modifiers, int eventType, char terminator)> onComplete,
@@ -23,6 +23,11 @@ namespace Consolonia.Core.Helpers.InputProcessing
         private const string EventTypeGroupName = "eventType";
         private const string Separator1GroupName = "sep1";
         private const string Separator2GroupName = "sep2";
+
+        /// <summary>
+        ///     Valid terminator characters for CSI functional key sequences.
+        /// </summary>
+        private const string ValidCsiTerminators = "ABCDFHPQRSu~ZE";
 
         protected override (int keyCode, int modifiers, int eventType, char terminator)? OnTerminatorMatched(
             Match match)
@@ -56,24 +61,19 @@ namespace Consolonia.Core.Helpers.InputProcessing
         }
 
         /// <summary>
-        ///     Valid terminator characters for CSI functional key sequences.
-        /// </summary>
-        private const string ValidCsiTerminators = "ABCDFHPQRSu~ZE";
-
-        /// <summary>
-        ///   Matches all CSI keyboard formats, both complete sequences and valid partial prefixes
-        ///   accumulated so far (in which case the <c>terminator</c> group is not present):
-        ///   ESC [ number ; modifiers : eventtype u/~
-        ///   ESC [ number ; modifiers u/~
-        ///   ESC [ number u/~
-        ///   ESC [ 1 ; modifiers : eventtype letter
-        ///   ESC [ 1 ; modifiers letter
-        ///   ESC [ letter  (bare functional key, e.g. ESC[A for Up arrow)
-        ///   ESC [                            (valid prefix)
-        ///   ESC                              (valid prefix)
-        /// Groups are nested so that a later group can only be present if the earlier ones
-        /// in the sequence are already present, preserving the correct ordering.
-        /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
+        ///     Matches all CSI keyboard formats, both complete sequences and valid partial prefixes
+        ///     accumulated so far (in which case the <c>terminator</c> group is not present):
+        ///     ESC [ number ; modifiers : eventtype u/~
+        ///     ESC [ number ; modifiers u/~
+        ///     ESC [ number u/~
+        ///     ESC [ 1 ; modifiers : eventtype letter
+        ///     ESC [ 1 ; modifiers letter
+        ///     ESC [ letter  (bare functional key, e.g. ESC[A for Up arrow)
+        ///     ESC [                            (valid prefix)
+        ///     ESC                              (valid prefix)
+        ///     Groups are nested so that a later group can only be present if the earlier ones
+        ///     in the sequence are already present, preserving the correct ordering.
+        ///     Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
         [GeneratedRegex(
             @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?((?<{Separator1GroupName}>[;:])(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCsiTerminators}])?)?$")]

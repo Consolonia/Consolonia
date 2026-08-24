@@ -7,7 +7,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
     /// <summary>
     ///     Common base for matchers that accumulate input runes into a buffer and test the
     ///     buffer against a regex on every append, where the regex matches both complete
-    ///     sequences and valid partial prefixes (partial prefixes have no <see cref="TerminatorGroupName"/> group).
+    ///     sequences and valid partial prefixes (partial prefixes have no <see cref="TerminatorGroupName" /> group).
     /// </summary>
     public abstract class RegexAccumulatorMatcher<T, TComplete>(
         Action<TComplete> onComplete,
@@ -17,14 +17,10 @@ namespace Consolonia.Core.Helpers.InputProcessing
         where TComplete : struct
     {
         public const string TerminatorGroupName = "terminator";
-#pragma warning disable CA1051
-        protected readonly StringBuilder Accumulator = new();
-        protected readonly Regex PatternRegex = patternRegex;
-#pragma warning restore CA1051
 
         /// <summary>
-        ///     Called once a match with <see cref="TerminatorGroupName"/> group is found.
-        ///     Return <see langword="null" /> to indicate that <paramref name="match"/>
+        ///     Called once a match with <see cref="TerminatorGroupName" /> group is found.
+        ///     Return <see langword="null" /> to indicate that <paramref name="match" />
         ///     is not actually a match at the end of the day
         ///     Otherwise return a result
         /// </summary>
@@ -72,5 +68,9 @@ namespace Consolonia.Core.Helpers.InputProcessing
         {
             return $"{GetType().Name} {{{(Accumulator.Length == 0 ? "_" : Accumulator.ToString())}}}";
         }
+#pragma warning disable CA1051
+        protected readonly StringBuilder Accumulator = new();
+        protected readonly Regex PatternRegex = patternRegex;
+#pragma warning restore CA1051
     }
 }

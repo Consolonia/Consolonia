@@ -30,18 +30,20 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override bool TryFlush()
         {
-            return Accumulator.Length != 0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works. However I have no idea why to pretend flushing if something accumulated
+            return
+                Accumulator.Length !=
+                0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works. However I have no idea why to pretend flushing if something accumulated
         }
 
         /// <summary>
-        ///   Matches the SGR mouse format, both complete sequences and valid partial prefixes
-        ///   accumulated so far (in which case the <c>terminator</c> group is not present):
-        ///   ESC [ &lt; button ; x ; y M/m
-        ///   ESC [ &lt;                       (valid prefix)
-        ///   ESC [                            (valid prefix)
-        ///   ESC                              (valid prefix)
-        /// Groups are nested so that a later group can only be present if the earlier ones
-        /// in the sequence are already present, preserving the correct ordering.
+        ///     Matches the SGR mouse format, both complete sequences and valid partial prefixes
+        ///     accumulated so far (in which case the <c>terminator</c> group is not present):
+        ///     ESC [ &lt; button ; x ; y M/m
+        ///     ESC [ &lt;                       (valid prefix)
+        ///     ESC [                            (valid prefix)
+        ///     ESC                              (valid prefix)
+        ///     Groups are nested so that a later group can only be present if the earlier ones
+        ///     in the sequence are already present, preserving the correct ordering.
         /// </summary>
         [GeneratedRegex(
             @$"^\x1B(\[(<(?<{ButtonGroupName}>\d+)?(;(?<{XGroupName}>\d+)?(;(?<{YGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[Mm])?)?)?$")]

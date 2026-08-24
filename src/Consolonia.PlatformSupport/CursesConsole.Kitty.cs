@@ -17,16 +17,6 @@ namespace Consolonia.PlatformSupport
 {
     public partial class CursesConsole
     {
-        private bool _isKittyKeyboardEnabled;
-
-#region FlagTranslatorAllowers
-
-        private enum KittyKeyCode;
-        private enum CsiLetterKeyCode;
-        private enum CsiTildeKeyCode;
-        
-#endregion
-        
         private static readonly FlagTranslator<KittyKeyCode, Key>
             KittyKeyFlagTranslator = new([
                 ((KittyKeyCode)27, Key.Escape),
@@ -123,6 +113,8 @@ namespace Consolonia.PlatformSupport
                 ((CsiTildeKeyCode)24, Key.F12)
             ]);
 
+        private bool _isKittyKeyboardEnabled;
+
         private void TryToSupportKitty()
         {
             if (QueryIsKittyKeyboardProtocol())
@@ -185,9 +177,8 @@ namespace Consolonia.PlatformSupport
                     Curses.timeout(NoInputTimeout);
                 }
             }
-
         }
-        
+
         private IEnumerable<IMatcher<(int, int)>> TryGetKittyMatchers()
         {
             if (!_isKittyKeyboardEnabled)
@@ -230,71 +221,74 @@ namespace Consolonia.PlatformSupport
                 key = letterKey;
                 if (terminator == 'Z') rawModifiers |= RawInputModifiers.Shift;
             }
-            else switch (terminator)
+            else
             {
-                case '~' when
-                    CsiTildeKeyFlagTranslator.Translate((CsiTildeKeyCode)keyCode, true) is var tildeKey &&
-                    tildeKey != Key.None:
-                    // Legacy CSI tilde sequence (Insert, Delete, PgUp, PgDn, F5-F12)
-                    key = tildeKey;
-                    break;
-                case 'u' when
-                    KittyKeyFlagTranslator.Translate((KittyKeyCode)keyCode, true) is var mappedKey &&
-                    mappedKey != Key.None:
+                switch (terminator)
                 {
-                    key = mappedKey;
-                    character = keyCode switch
+                    case '~' when
+                        CsiTildeKeyFlagTranslator.Translate((CsiTildeKeyCode)keyCode, true) is var tildeKey &&
+                        tildeKey != Key.None:
+                        // Legacy CSI tilde sequence (Insert, Delete, PgUp, PgDn, F5-F12)
+                        key = tildeKey;
+                        break;
+                    case 'u' when
+                        KittyKeyFlagTranslator.Translate((KittyKeyCode)keyCode, true) is var mappedKey &&
+                        mappedKey != Key.None:
                     {
-                        13 => '\r',
-                        9 => '\t',
-                        127 => '\b',
-                        27 => '\x1B',
-                        _ => character
-                    };
-                    break;
-                }
-                case 'u' when keyCode is >= 32 and < 127:
-                {
-                    switch (keyCode)
-                    {
-                        case >= 'a' and <= 'z':
-                            key = Key.A + (keyCode - 'a');
-                            break;
-                        case >= 'A' and <= 'Z':
-                            key = Key.A + (keyCode - 'A');
-                            rawModifiers |= RawInputModifiers.Shift;
-                            break;
-                        case >= '0' and <= '9':
-                            key = Key.D0 + (keyCode - '0');
-                            break;
-                        case ' ':
-                            key = Key.Space;
-                            break;
-                        default:
-                            key = (char)keyCode switch
-                            {
-                                '.' => Key.OemPeriod,
-                                ',' => Key.OemComma,
-                                ';' => Key.OemSemicolon,
-                                '/' => Key.Oem2,
-                                '\\' => Key.Oem5,
-                                '=' => Key.OemPlus,
-                                '-' => Key.OemMinus,
-                                '[' => Key.Oem4,
-                                ']' => Key.Oem6,
-                                '\'' => Key.Oem7,
-                                '`' => Key.Oem3,
-                                _ => Key.None
-                            };
-                            break;
+                        key = mappedKey;
+                        character = keyCode switch
+                        {
+                            13 => '\r',
+                            9 => '\t',
+                            127 => '\b',
+                            27 => '\x1B',
+                            _ => character
+                        };
+                        break;
                     }
+                    case 'u' when keyCode is >= 32 and < 127:
+                    {
+                        switch (keyCode)
+                        {
+                            case >= 'a' and <= 'z':
+                                key = Key.A + (keyCode - 'a');
+                                break;
+                            case >= 'A' and <= 'Z':
+                                key = Key.A + (keyCode - 'A');
+                                rawModifiers |= RawInputModifiers.Shift;
+                                break;
+                            case >= '0' and <= '9':
+                                key = Key.D0 + (keyCode - '0');
+                                break;
+                            case ' ':
+                                key = Key.Space;
+                                break;
+                            default:
+                                key = (char)keyCode switch
+                                {
+                                    '.' => Key.OemPeriod,
+                                    ',' => Key.OemComma,
+                                    ';' => Key.OemSemicolon,
+                                    '/' => Key.Oem2,
+                                    '\\' => Key.Oem5,
+                                    '=' => Key.OemPlus,
+                                    '-' => Key.OemMinus,
+                                    '[' => Key.Oem4,
+                                    ']' => Key.Oem6,
+                                    '\'' => Key.Oem7,
+                                    '`' => Key.Oem3,
+                                    _ => Key.None
+                                };
+                                break;
+                        }
 
-                    break;
+                        break;
+                    }
+                    default:
+                        key = ConsoloniaPlatform.RaiseNotSupported<Key>(NotSupportedRequestCode.InputNotSupported,
+                            csiEvent);
+                        break;
                 }
-                default:
-                    key = ConsoloniaPlatform.RaiseNotSupported<Key>(NotSupportedRequestCode.InputNotSupported,
-                        csiEvent);
-                    break;
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
@@ -386,7 +380,18 @@ namespace Consolonia.PlatformSupport
 
         [GeneratedRegex(@"\x1b\[\?[0-9]*u")]
         private static partial Regex KittySupportAnswerRegex();
+
         [GeneratedRegex(@"\x1b\[\?[0-9;]*c")]
         private static partial Regex KittyDeviceAttributesAnswerRegex();
+
+        #region FlagTranslatorAllowers
+
+        private enum KittyKeyCode;
+
+        private enum CsiLetterKeyCode;
+
+        private enum CsiTildeKeyCode;
+
+        #endregion
     }
 }

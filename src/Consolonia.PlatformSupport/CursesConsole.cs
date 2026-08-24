@@ -166,7 +166,7 @@ namespace Consolonia.PlatformSupport
         {
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
-            
+
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
         }
@@ -324,12 +324,12 @@ namespace Consolonia.PlatformSupport
                         TryEnableMouseButtonSupport();
 
             TryToSupportKitty();
-            
+
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
         }
-        
+
         private const Curses.Event BasicMouseEvents = Curses.Event.Button1Pressed | Curses.Event.Button1Released |
                                                       Curses.Event.Button2Pressed | Curses.Event.Button2Released |
                                                       Curses.Event.Button3Pressed | Curses.Event.Button3Released |
@@ -459,7 +459,7 @@ namespace Consolonia.PlatformSupport
 
             foreach (IMatcher<(int, int)> matcher in TryGetKittyMatchers())
                 yield return matcher;
-            
+
             (string, Key)[] fSequences =
             [
                 // Ctrl+Alt+(F1 - F4)
