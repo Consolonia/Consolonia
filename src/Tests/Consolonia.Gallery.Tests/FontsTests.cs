@@ -43,9 +43,18 @@ namespace Consolonia.Gallery.Tests
 
         [Test]
         [Order(3)]
+        public async Task DisplaysCircleText()
+        {
+            await UITest.KeyInput(Key.Down);
+            await UITest.AssertHasText("Circle");
+        }
+
+
+        [Test]
+        [Order(4)]
         public async Task DisplaysDoomText()
         {
-            await UITest.KeyInput(4, Key.Down);
+            await UITest.KeyInput(3, Key.Down);
             await UITest.AssertHasText(
                 @" _   _       _ _         _    _             _     _ ",
                 @"| | | |     | | |       | |  | |           | |   | |",

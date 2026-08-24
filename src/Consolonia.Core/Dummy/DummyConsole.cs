@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -13,6 +14,10 @@ namespace Consolonia.Core.Dummy
 
         public DummyConsole(ushort width, ushort height)
             : base(new DummyConsoleOutput(width, height))
+        {
+        }
+
+        public override void StartInputLoop()
         {
         }
     }
@@ -46,6 +51,7 @@ namespace Consolonia.Core.Dummy
         {
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
             _caretPosition = bufferPoint;
@@ -87,11 +93,13 @@ namespace Consolonia.Core.Dummy
         {
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void ClearOutput()
         {
             SetCaretPosition(new PixelBufferCoordinate(0, 0));
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed)

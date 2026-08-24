@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -136,17 +135,14 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
                     _dropState.Text = contentStr;
                 }
-#pragma warning disable CS0618 // Type or member is obsolete
-                else if (e.Data.Contains(DataFormats.FileNames))
+                else if (e.DataTransfer.Formats.Contains(_customFormat))
                 {
-                    IEnumerable<string> files = e.Data.GetFileNames();
-                    _dropState.Text = string.Join(Environment.NewLine, files ?? Array.Empty<string>());
+                    string value = e.DataTransfer.Items
+                        .Select(item => item.TryGetRaw(_customFormat))
+                        .OfType<string>()
+                        .FirstOrDefault();
+                    _dropState.Text = "Custom: " + value;
                 }
-                else if (e.Data.Contains(_customFormat.Identifier))
-                {
-                    _dropState.Text = "Custom: " + e.Data.Get(_customFormat.Identifier);
-                }
-#pragma warning restore CS0618 // Type or member is obsolete
             }
 
             dragMe.PointerPressed += DoDrag;

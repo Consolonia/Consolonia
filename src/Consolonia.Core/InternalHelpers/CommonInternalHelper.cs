@@ -1,4 +1,4 @@
-using Consolonia.Core.Infrastructure;
+using Consolonia.Controls;
 
 namespace Consolonia.Core.InternalHelpers
 {

@@ -213,15 +213,19 @@ namespace Consolonia.Core.Drawing
                 or { Brush: null }
                 or { Brush: LineBrush { Brush: null } }) return;
 
+            // The four edges share one gradient that spans the whole rectangle, so pass the rectangle bounds
+            // as the gradient bounds rather than letting each edge sample its own (1-cell-thick) extent.
+            var borderBounds = rectangleRect.ToPixelRect();
+
             // NOTE: Line takes in untransformed Point, not PixelPoint and will be transformed inside DrawLineInternal
             DrawLineInternal(pen, new Line(rect.TopLeft, /*vertical: */ false, (int)rect.Width),
-                RectangleLinePosition.Top);
+                RectangleLinePosition.Top, borderBounds);
             DrawLineInternal(pen, new Line(rect.BottomLeft, /*vertical: */ false, (int)rect.Width),
-                RectangleLinePosition.Bottom);
+                RectangleLinePosition.Bottom, borderBounds);
             DrawLineInternal(pen, new Line(rect.TopLeft, /*vertical: */ true, (int)rect.Height),
-                RectangleLinePosition.Left);
+                RectangleLinePosition.Left, borderBounds);
             DrawLineInternal(pen, new Line(rect.TopRight, /*vertical: */ true, (int)rect.Height),
-                RectangleLinePosition.Right);
+                RectangleLinePosition.Right, borderBounds);
         }
 
         private static RectangleLinePosition[] InferStrokePositions(StreamGeometryImpl streamGeometry)
@@ -355,30 +359,25 @@ namespace Consolonia.Core.Drawing
             if (targetRect.IsEmpty())
                 return;
 
-            // Clamp to valid range to prevent out-of-bounds errors
-            ushort gradiantWidth = (ushort)Math.Max(1, pixelRect.Width);
-            ushort gradiantHeight = (ushort)Math.Max(1, pixelRect.Height);
-            ushort brushY = (ushort)(targetRect.Y - pixelRect.Y);
+            // The gradient is mapped onto the shape being filled, so it fills the shape regardless of how the
+            // clip limits which cells are actually painted.
+            PixelRect gradientBounds = pixelRect;
 
-            for (ushort y = (ushort)targetRect.Y; y < (ushort)targetRect.Bottom; y++, brushY++)
+            for (ushort y = (ushort)targetRect.Y; y < (ushort)targetRect.Bottom; y++)
+            for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++)
             {
-                ushort brushX = (ushort)(targetRect.X - pixelRect.X);
-                for (ushort x = (ushort)targetRect.X; x < targetRect.Right; x++, brushX++)
+                Pixel pixelAbove;
+                if (solidColorBrush == null)
                 {
-                    Pixel pixelAbove;
-                    if (solidColorBrush == null)
-                    {
-                        Color backgroundColor =
-                            brush.FromPosition(brushX, brushY, gradiantWidth, gradiantHeight);
-                        pixelAbove = new Pixel(new PixelBackground(backgroundColor));
-                    }
-                    else
-                    {
-                        pixelAbove = solidPixel;
-                    }
-
-                    _pixelBuffer[x, y] = _pixelBuffer[x, y].Blend(pixelAbove);
+                    Color backgroundColor = brush.ColorAt(new PixelPoint(x, y), gradientBounds);
+                    pixelAbove = new Pixel(new PixelBackground(backgroundColor));
                 }
+                else
+                {
+                    pixelAbove = solidPixel;
+                }
+
+                _pixelBuffer[x, y] = _pixelBuffer[x, y].Blend(pixelAbove);
             }
 
             _consoleWindowImpl.DirtyRegions.AddRect(targetRect);
@@ -390,16 +389,23 @@ namespace Consolonia.Core.Drawing
         /// <param name="pen">pen</param>
         /// <param name="line">line</param>
         /// <param name="linePosition">The relative rectangle line position</param>
-        private void DrawLineInternal(IPen pen, Line line, RectangleLinePosition linePosition)
+        /// <param name="gradientBounds">
+        ///     The bounds a gradient brush is mapped onto. When <c>null</c> the current clip is used; rectangle
+        ///     borders pass the whole rectangle so that all four edges share a single gradient.
+        /// </param>
+        private void DrawLineInternal(IPen pen, Line line, RectangleLinePosition linePosition,
+            PixelRect? gradientBounds = null)
         {
             if (pen.Thickness == 0) return;
 
             line = TransformLineInternal(line);
 
-            Color? foregroundColor =
-                ExtractColorOrNullWithPlatformCheck(pen, out LineStyles lineStyles);
-            if (foregroundColor == null)
+            IBrush lineBrush =
+                ExtractBrushOrNullWithPlatformCheck(pen, out LineStyles lineStyles);
+            if (lineBrush == null)
                 return;
+
+            PixelRect bounds = gradientBounds ?? CurrentClip;
 
             LineStyle lineStyle = linePosition switch
             {
@@ -411,12 +417,12 @@ namespace Consolonia.Core.Drawing
             };
 
             if (lineStyle is LineStyle.Edge or LineStyle.EdgeWide)
-                DrawEdgeLine(line, linePosition, lineStyle, (Color)foregroundColor);
+                DrawEdgeLine(line, linePosition, lineStyle, lineBrush, bounds);
             else
-                DrawBoxLine(line, lineStyle, (Color)foregroundColor);
+                DrawBoxLine(line, lineStyle, lineBrush, bounds);
         }
 
-        private void DrawBoxLine(Line line, LineStyle lineStyle, Color color)
+        private void DrawBoxLine(Line line, LineStyle lineStyle, IBrush brush, PixelRect gradientBounds)
         {
             if (line.Length == 0)
                 return;
@@ -425,18 +431,20 @@ namespace Consolonia.Core.Drawing
 
             byte pattern = line.Vertical ? VerticalStartPattern : HorizontalStartPattern;
             var symbol = new Symbol(GetBoxPatternFromLineStyle(pattern, lineStyle));
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, color, 1); //beginning
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, brush, gradientBounds, 1); //beginning
 
             pattern = line.Vertical ? VerticalLinePattern : HorizontalLinePattern;
             symbol = new Symbol(GetBoxPatternFromLineStyle(pattern, lineStyle));
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, color, line.Length - 1); //line
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, brush, gradientBounds,
+                line.Length - 1); //line
 
             pattern = line.Vertical ? VerticalEndPattern : HorizontalEndPattern;
             symbol = new Symbol(GetBoxPatternFromLineStyle(pattern, lineStyle));
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, color, 1); //ending
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in symbol, brush, gradientBounds, 1); //ending
         }
 
-        private void DrawEdgeLine(Line line, RectangleLinePosition linePosition, LineStyle lineStyle, Color color)
+        private void DrawEdgeLine(Line line, RectangleLinePosition linePosition, LineStyle lineStyle, IBrush brush,
+            PixelRect gradientBounds)
         {
             if (line.Length == 0)
                 return;
@@ -474,9 +482,9 @@ namespace Consolonia.Core.Drawing
             var head = line.PStart.ToPixelPoint();
 
             int length = line.Length;
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in startSymbol, color, 1);
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in middleSymbol, color, length - 1);
-            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in endSymbol, color, 1);
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in startSymbol, brush, gradientBounds, 1);
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in middleSymbol, brush, gradientBounds, length - 1);
+            DrawLineSymbolAndMoveHead(ref head, line.Vertical, in endSymbol, brush, gradientBounds, 1);
         }
 
         /// <summary>
@@ -495,27 +503,30 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Extract color from pen brush
+        ///     Extract the painting brush from a pen, along with its line styles.
         /// </summary>
+        /// <remarks>
+        ///     The returned brush is the brush used to color the line cells. It may be a solid color brush or a
+        ///     gradient brush; callers sample it per-cell via <see cref="BrushExtensions.ColorAt" />.
+        /// </remarks>
         /// <param name="pen"></param>
         /// <param name="lineStyles"></param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentOutOfRangeException"></exception>
-        private static Color? ExtractColorOrNullWithPlatformCheck(IPen pen, out LineStyles lineStyles)
+        /// <returns>The painting brush, or <c>null</c> if the pen is not supported.</returns>
+        private static IBrush ExtractBrushOrNullWithPlatformCheck(IPen pen, out LineStyles lineStyles)
         {
             lineStyles = null;
             if (pen is not
                 {
-                    Brush: LineBrush or ISolidColorBrush
+                    Brush: LineBrush or ISolidColorBrush or IGradientBrush
                     // Thickness: 1,
                     // DashStyle: null or { Dashes.Count: 0 },
                     //LineCap: PenLineCap.Flat,
                     //LineJoin: PenLineJoin.Miter
                 })
             {
-                (Color? color, lineStyles) = ConsoloniaPlatform.RaiseNotSupported<(Color?, LineStyles)>(
+                (IBrush unsupportedBrush, lineStyles) = ConsoloniaPlatform.RaiseNotSupported<(IBrush, LineStyles)>(
                     NotSupportedRequestCode.ExtractColorFromPenNotSupported, null, pen);
-                return color;
+                return unsupportedBrush;
             }
 
             IBrush brush = pen.Brush;
@@ -530,7 +541,12 @@ namespace Consolonia.Core.Drawing
                 lineStyles = new LineStyles();
             }
 
-            return ((ISolidColorBrush)brush).Color;
+            if (brush is ISolidColorBrush or IGradientBrush)
+                return brush;
+
+            // unwrapped brush is something we can't paint a line with (e.g. an image/visual brush)
+            return ConsoloniaPlatform.RaiseNotSupported<IBrush>(
+                NotSupportedRequestCode.ExtractColorFromPenNotSupported, null, pen);
         }
 
 
@@ -558,10 +574,11 @@ namespace Consolonia.Core.Drawing
         /// <param name="head">starting point IN PIXELPOINT COORDINATES THAT CAN BE NEGATIVE</param>
         /// <param name="isVertical">is vertical or horizontal head advancement</param>
         /// <param name="symbol">symbol to draw with</param>
-        /// <param name="lineColor">color to use</param>
+        /// <param name="brush">brush to color the line with; sampled per-cell so gradients are supported</param>
+        /// <param name="gradientBounds">the bounds a gradient brush is mapped onto</param>
         /// <param name="count">number of symbols to draw</param>
-        private void DrawLineSymbolAndMoveHead(ref PixelPoint head, bool isVertical, in Symbol symbol, Color lineColor,
-            int count)
+        private void DrawLineSymbolAndMoveHead(ref PixelPoint head, bool isVertical, in Symbol symbol, IBrush brush,
+            PixelRect gradientBounds, int count)
         {
             PixelRect lineBounds = isVertical
                 ? new PixelRect(head.X, head.Y, 1, count)
@@ -584,9 +601,11 @@ namespace Consolonia.Core.Drawing
             else
                 head = head.WithX(lineStart);
 
-            var newPixel = new Pixel(new PixelForeground(symbol, lineColor));
             for (ushort i = lineStart; i < lineEnd; i++)
             {
+                Color lineColor = brush.ColorAt(head, gradientBounds);
+                var newPixel = new Pixel(new PixelForeground(symbol, lineColor));
+
                 _pixelBuffer[head] = _pixelBuffer[head].Blend(newPixel);
 
                 if (isVertical)

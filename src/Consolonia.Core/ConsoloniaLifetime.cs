@@ -90,6 +90,7 @@ namespace Consolonia
 
             MainWindow.Show();
 
+            Console.StartInputLoop();
             try
             {
                 Dispatcher.UIThread.MainLoop(_cts.Token);
@@ -165,8 +166,12 @@ namespace Consolonia
 
             pauseTask.ContinueWith(_ =>
             {
-                consoleWindow.ClearScreen();
-                Dispatcher.UIThread.Post(() => { MainWindow.InvalidateVisual(); });
+                Dispatcher.UIThread.Post(() =>
+                {
+                    consoleWindow.Paint(new Rect(0, 0, consoleWindow.ClientSize.Width,
+                        consoleWindow.ClientSize.Height));
+                    MainWindow.InvalidateVisual();
+                });
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
 
             return Dispatcher.UIThread.InvokeAsync(() => { }).GetTask();
@@ -195,7 +200,7 @@ namespace Consolonia
                     if (MainWindow != null && MainWindow.PlatformImpl != null)
                     {
                         var consoleTopLevelImpl = (ConsoleWindowImpl)MainWindow.PlatformImpl;
-                        ArgumentNullException.ThrowIfNull(consoleTopLevelImpl, nameof(consoleTopLevelImpl));
+                        ArgumentNullException.ThrowIfNull(consoleTopLevelImpl);
                         consoleTopLevelImpl.Dispose();
                     }
                 }

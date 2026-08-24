@@ -43,11 +43,11 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                             if (!(bool)eventArgs.NewValue!)
                                 Dispatcher.UIThread.Post(() =>
                                 {
-                                    var focusedControl =
-                                        (Control)AvaloniaLocator.Current.GetRequiredService<IFocusManager>()!
-                                            .GetFocusedElement();
+                                    var topLevel = TopLevel.GetTopLevel(visual);
+                                    if (topLevel == null)
+                                        return;
 
-                                    if (focusedControl != null)
+                                    if (topLevel.FocusManager.GetFocusedElement() is Visual focusedControl)
                                     {
                                         IEnumerable<ILogical> focusedTree = focusedControl.GetLogicalAncestors();
                                         IEnumerable<MenuItem> menuItems =
