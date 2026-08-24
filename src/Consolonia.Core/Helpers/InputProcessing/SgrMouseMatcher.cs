@@ -83,17 +83,19 @@ namespace Consolonia.Core.Helpers.InputProcessing
              ^\x1B                     # ESC
              (
                \[                      # [
-               <                       # <
-               (?<button>\d+)?          # button digits
                (
-                 ;                     # separator before x
-                 (?<x>\d+)?             # x digits
+                 <                     # <
+                 (?<button>\d+)?          # button digits
                  (
-                   ;                   # separator before y
-                   (?<y>\d+)?           # y digits
+                   ;                     # separator before x
+                   (?<x>\d+)?             # x digits
+                   (
+                     ;                   # separator before y
+                     (?<y>\d+)?           # y digits
+                   )?
                  )?
+                 (?<terminator>[Mm])?     # terminator letter
                )?
-               (?<terminator>[Mm])?     # terminator letter
              )?
              $
              """,

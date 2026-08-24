@@ -165,11 +165,11 @@ namespace Consolonia.PlatformSupport
         public CursesConsole()
             : base(new AnsiConsoleOutput())
         {
-            _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
-            _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
+            
+            _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
+            _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
         }
 
         // todo: synchronization mess has been introduced in this PR. we are fighting race between dispatcher and local locks.

@@ -103,24 +103,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
         [GeneratedRegex(
-            $"""
-             ^\x1B                                  # ESC
-             (
-               \[                                   # [
-               (?<keyCode>\d+)?                      # keyCode digits
-               (
-                 (?<sep1>[;:])                       # separator before modifiers
-                 (?<modifiers>\d+)?                   # modifiers digits
-                 (
-                   (?<sep2>[;:])                      # separator before eventType
-                   (?<eventType>\d+)?                  # eventType digits
-                 )?
-               )?
-               (?<terminator>[{ValidCSITerminators}])? # terminator letter
-             )?
-             $
-             """,
-            RegexOptions.IgnorePatternWhitespace)]
+            @$"^\x1B(\[(?<keyCode>\d+)?((?<sep1>[;:])(?<modifiers>\d+)?((?<sep2>[;:])(?<eventType>\d+)?)?)?(?<terminator>[{ValidCSITerminators}])?)?$")]
         private static partial Regex GetPatternRegex();
     }
 }
