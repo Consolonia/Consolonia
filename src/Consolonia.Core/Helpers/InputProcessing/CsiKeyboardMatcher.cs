@@ -12,28 +12,12 @@ namespace Consolonia.Core.Helpers.InputProcessing
     ///       CSI letter: ESC [ 1 ; modifiers letter     (Arrows, Home, End, F1-F4)
     ///       CSI letter: ESC [ letter                    (unmodified arrows, Home, End, F1-F4)
     /// </summary>
-    public class CsiKeyboardMatcher<T>(
+    public partial class CsiKeyboardMatcher<T>(
         Action<(int keyCode, int modifiers, int eventType, char terminator)> onComplete,
         Func<T, Rune> toRune)
         : MatcherWithComplete<T, (int keyCode, int modifiers, int eventType, char terminator)>(onComplete)
     {
         private readonly StringBuilder _accumulator = new();
-
-        // Matches all CSI keyboard formats:
-        //   ESC [ number ; modifiers : eventtype u/~
-        //   ESC [ number ; modifiers u/~
-        //   ESC [ number u/~
-        //   ESC [ 1 ; modifiers : eventtype letter
-        //   ESC [ 1 ; modifiers letter
-        //   ESC [ letter  (bare functional key, e.g. ESC[A for Up arrow)
-        // Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
-        private static readonly Regex CompletePattern =
-            new(@"^\x1B\[(\d+)?([;:](\d+)([;:](\d+))?)?([A-DFHPQRSu~ZE])$");
-
-        /// <summary>
-        ///     Valid terminator characters for CSI functional key sequences.
-        /// </summary>
-        private const string ValidTerminators = "ABCDFHPQRSu~ZE";
 
         public override AppendResult Append(T input)
         {
@@ -43,14 +27,14 @@ namespace Consolonia.Core.Helpers.InputProcessing
             string current = _accumulator.ToString();
 
             // Check if it's a complete CSI sequence
-            Match match = CompletePattern.Match(current);
+            Match match = GetCompletionPatternRegex().Match(current);
             if (match.Success)
             {
                 int keyCode = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
                 char terminator = match.Groups[6].Value[0];
 
                 // Don't match bracketed paste mode sequences, let PasteBlockMatcher handle them
-                if (terminator == '~' && (keyCode == 200 || keyCode == 201))
+                if (terminator == '~' && keyCode is 200 or 201)
                 {
                     _accumulator.Clear();
                     return AppendResult.NoMatch;
@@ -64,7 +48,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
                 return AppendResult.AutoFlushed;
             }
 
-            // Check if it's a valid prefix of a CSI sequence
+            // Not a complete CSI sequence yet, but lets check if it's a valid prefix
             if (IsValidPrefix(current))
                 return AppendResult.Match;
 
@@ -79,13 +63,13 @@ namespace Consolonia.Core.Helpers.InputProcessing
             return AppendResult.NoMatch;
         }
 
-        private static bool IsValidPrefix(string s)
+        private static bool IsValidPrefix(string input)
         {
-            if (s.Length == 0) return false;
-            if (s[0] != '\x1B') return false;
-            if (s.Length == 1) return true;
-            if (s[1] != '[') return false;
-            if (s.Length == 2) return true;
+            if (input.Length == 0) return false;
+            if (input[0] != '\x1B') return false;
+            if (input.Length == 1) return true;
+            if (input[1] != '[') return false;
+            if (input.Length == 2) return true;
 
             int i = 2;
 
@@ -95,36 +79,36 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
             // If position 2 is a valid terminator letter, that would be a complete sequence, not a prefix
             // So for prefix checking, we only need to handle the digit case
-            if (char.IsAsciiDigit(s[i]))
+            if (char.IsAsciiDigit(input[i]))
             {
                 // Consume digits
-                while (i < s.Length && char.IsAsciiDigit(s[i])) i++;
-                if (i >= s.Length) return true;
+                while (i < input.Length && char.IsAsciiDigit(input[i])) i++;
+                if (i >= input.Length) return true;
 
                 // After digits, expect ; or : or a terminator
-                if (ValidTerminators.Contains(s[i])) return i == s.Length - 1; // complete, last char
-                if (s[i] != ';' && s[i] != ':') return false;
+                if (ValidCSITerminators.Contains(input[i])) return i == input.Length - 1; // complete, last char
+                if (input[i] != ';' && input[i] != ':') return false;
                 i++;
-                if (i >= s.Length) return true;
+                if (i >= input.Length) return true;
 
                 // Expect digits for modifiers
-                if (!char.IsAsciiDigit(s[i])) return false;
-                while (i < s.Length && char.IsAsciiDigit(s[i])) i++;
-                if (i >= s.Length) return true;
+                if (!char.IsAsciiDigit(input[i])) return false;
+                while (i < input.Length && char.IsAsciiDigit(input[i])) i++;
+                if (i >= input.Length) return true;
 
                 // After modifiers, expect : or ; or a terminator
-                if (ValidTerminators.Contains(s[i])) return i == s.Length - 1;
-                if (s[i] != ':' && s[i] != ';') return false;
+                if (ValidCSITerminators.Contains(input[i])) return i == input.Length - 1;
+                if (input[i] != ':' && input[i] != ';') return false;
                 i++;
-                if (i >= s.Length) return true;
+                if (i >= input.Length) return true;
 
                 // Expect digits for event type
-                if (!char.IsAsciiDigit(s[i])) return false;
-                while (i < s.Length && char.IsAsciiDigit(s[i])) i++;
-                if (i >= s.Length) return true;
+                if (!char.IsAsciiDigit(input[i])) return false;
+                while (i < input.Length && char.IsAsciiDigit(input[i])) i++;
+                if (i >= input.Length) return true;
 
                 // After event type, expect a terminator
-                if (ValidTerminators.Contains(s[i])) return i == s.Length - 1;
+                if (ValidCSITerminators.Contains(input[i])) return i == input.Length - 1;
 
                 return false;
             }
@@ -138,7 +122,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
             // Always return false: CSI sequences are auto-flushed on completion,
             // and returning true here would block lower-priority matchers (like
             // SgrMouseMatcher) from flushing when this matcher has partial data.
-            // The Reset() no-op ensures our accumulated data survives resets.
             return false;
         }
 
@@ -152,5 +135,23 @@ namespace Consolonia.Core.Helpers.InputProcessing
         {
             return $"{GetType().Name} {{{(_accumulator.Length == 0 ? "_" : _accumulator.ToString())}}}";
         }
+
+        /// <summary>
+        ///     Valid terminator characters for CSI functional key sequences.
+        /// </summary>
+        private const string ValidCSITerminators = "ABCDFHPQRSu~ZE";
+
+        /// <summary>
+        ///   Matches all CSI keyboard formats:
+        ///   ESC [ number ; modifiers : eventtype u/~
+        ///   ESC [ number ; modifiers u/~
+        ///   ESC [ number u/~
+        ///   ESC [ 1 ; modifiers : eventtype letter
+        ///   ESC [ 1 ; modifiers letter
+        ///   ESC [ letter  (bare functional key, e.g. ESC[A for Up arrow)
+        /// Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
+        /// </summary>
+        [GeneratedRegex(@$"^\x1B\[(\d+)?([;:](\d+)([;:](\d+))?)?([{ValidCSITerminators}])$")]
+        private static partial Regex GetCompletionPatternRegex();
     }
 }
