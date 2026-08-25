@@ -125,9 +125,7 @@ namespace Consolonia.Core.Drawing
             };
 
             if (_drawingContextImpl is null || _drawingContextImpl.PixelBuffer != _consoleTopLevelImpl.PixelBuffer)
-            {
                 _drawingContextImpl = new DrawingContextImpl(_consoleTopLevelImpl, this);
-            }
 
             return _drawingContextImpl;
         }

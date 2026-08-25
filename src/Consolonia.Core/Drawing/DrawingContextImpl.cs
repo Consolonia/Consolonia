@@ -19,8 +19,6 @@ namespace Consolonia.Core.Drawing
         private readonly Stack<PixelRect> _clipStack = new(100);
         private readonly ConsoleWindowImpl _consoleWindowImpl;
         private readonly PixelBuffer _pixelBuffer;
-        // ReSharper disable once ConvertToAutoPropertyWhenPossible Don't use this inside the class
-        internal PixelBuffer PixelBuffer => _pixelBuffer;
         private readonly Matrix _postTransform = Matrix.Identity;
 
         // ReSharper disable once CollectionNeverQueried.Local
@@ -35,6 +33,9 @@ namespace Consolonia.Core.Drawing
             _pixelBuffer = consoleWindowImpl.PixelBuffer;
             _clipStack.Push(_pixelBuffer.Size);
         }
+
+        // ReSharper disable once ConvertToAutoPropertyWhenPossible Don't use this inside the class
+        internal PixelBuffer PixelBuffer => _pixelBuffer;
 
         private PixelRect CurrentClip => _clipStack.Peek();
 
