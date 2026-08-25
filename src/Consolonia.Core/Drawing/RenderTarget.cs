@@ -124,7 +124,10 @@ namespace Consolonia.Core.Drawing
                 PreviousFrameIsRetained = true // otherwise full redrawing happens
             };
 
-            _drawingContextImpl ??= new DrawingContextImpl(_consoleTopLevelImpl, this);
+            if (_drawingContextImpl is null || _drawingContextImpl.PixelBuffer != _consoleTopLevelImpl.PixelBuffer)
+            {
+                _drawingContextImpl = new DrawingContextImpl(_consoleTopLevelImpl, this);
+            }
 
             return _drawingContextImpl;
         }
