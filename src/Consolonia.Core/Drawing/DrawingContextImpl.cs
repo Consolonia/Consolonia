@@ -34,6 +34,9 @@ namespace Consolonia.Core.Drawing
             _clipStack.Push(_pixelBuffer.Size);
         }
 
+        // ReSharper disable once ConvertToAutoPropertyWhenPossible Don't use this inside the class
+        internal PixelBuffer PixelBuffer => _pixelBuffer;
+
         private PixelRect CurrentClip => _clipStack.Peek();
 
         void IDisposable.Dispose()
