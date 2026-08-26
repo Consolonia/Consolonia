@@ -32,7 +32,7 @@ using KeyModifiers = Terminal.Gui.KeyModifiers;
 
 namespace Consolonia.PlatformSupport
 {
-    public class CursesConsole : ConsoleBase
+    public partial class CursesConsole : ConsoleBase
     {
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
@@ -164,11 +164,11 @@ namespace Consolonia.PlatformSupport
         public CursesConsole()
             : base(new AnsiConsoleOutput())
         {
-            _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
-            _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
+
+            _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
+            _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
         }
 
         // todo: synchronization mess has been introduced in this PR. we are fighting race between dispatcher and local locks.
@@ -276,7 +276,10 @@ namespace Consolonia.PlatformSupport
                 else
                 {
                     if (_rowInputBuffer.Count == 0)
+                    {
+                        Curses.timeout(NoInputTimeout);
                         continue;
+                    }
 
                     break;
                 }
@@ -320,7 +323,8 @@ namespace Consolonia.PlatformSupport
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
 
-            // Curses.timeout(NoInputTimeout); now it does not matter as input function sets dynamic timeout
+            TryToSupportKitty();
+
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
@@ -406,6 +410,12 @@ namespace Consolonia.PlatformSupport
         {
             base.RestoreConsole();
 
+            if (_isKittyKeyboardEnabled)
+            {
+                WriteText(Esc.DisableKittyKeyboard);
+                _isKittyKeyboardEnabled = false;
+            }
+
             WriteText(Esc.DisableAllMouseEvents);
             WriteText(Esc.DisableExtendedMouseTracking);
             WriteText(Esc.DisableBracketedPasteMode);
@@ -446,6 +456,9 @@ namespace Consolonia.PlatformSupport
             yield return new SafeLockMatcher(
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
+
+            foreach (IMatcher<(int, int)> matcher in TryGetKittyMatchers())
+                yield return matcher;
 
             (string, Key)[] fSequences =
             [

@@ -71,6 +71,14 @@ namespace Consolonia.Core.Text
         public const string EnableExtendedMouseTracking = "\u001b[?1006h";
         public const string DisableExtendedMouseTracking = "\u001b[?1006l";
 
+        // Enables CSI u encoding for keyboard events: CSI keycode ; modifiers u
+        public const string EnableKittyKeyboard = "\u001b[>1u";
+        public const string DisableKittyKeyboard = "\u001b[<u";
+
+        // Query current progressive enhancement flags. A terminal supporting the
+        // Kitty keyboard protocol will reply with "CSI ? <flags> u".
+        public const string QueryKittyKeyboardFlags = "\u001b[?u";
+
         // move cursor
         public static string MoveCursorUp(int n)
         {
