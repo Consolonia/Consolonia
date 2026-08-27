@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
@@ -121,6 +120,8 @@ namespace Consolonia.PlatformSupport
             {
                 WriteText(Esc.EnableKittyKeyboard);
                 _isKittyKeyboardEnabled = true;
+
+                Capabilities |= ConsoleCapabilities.SupportsAltSolo;
 
                 // Kitty terminals support SGR mouse tracking directly
                 // Enable it even if ncurses couldn't set it up
@@ -248,6 +249,7 @@ namespace Consolonia.PlatformSupport
                     }
                     case 'u' when keyCode is >= 32 and < 127:
                     {
+                        character = (char)keyCode;
                         switch (keyCode)
                         {
                             case >= 'a' and <= 'z':
@@ -292,11 +294,6 @@ namespace Consolonia.PlatformSupport
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
-            if (eventType != 3) // For press events, also raise key up
-            {
-                Thread.Yield();
-                RaiseKeyPress(key, character, rawModifiers, false, (ulong)Environment.TickCount64);
-            }
         }
 
         private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
