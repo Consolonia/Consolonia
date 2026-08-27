@@ -120,7 +120,7 @@ namespace Consolonia.PlatformSupport
             {
                 WriteText(Esc.EnableKittyKeyboard);
                 _isKittyKeyboardEnabled = true;
-                
+
                 Capabilities |= ConsoleCapabilities.SupportsAltSolo;
 
                 // Kitty terminals support SGR mouse tracking directly
@@ -292,7 +292,7 @@ namespace Consolonia.PlatformSupport
                         break;
                 }
             }
-            
+
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
         }
 
