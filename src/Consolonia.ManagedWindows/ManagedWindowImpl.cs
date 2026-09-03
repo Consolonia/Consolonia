@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
+using Avalonia.Rendering;
 using Avalonia.Rendering.Composition;
 using Iciclecreek.Avalonia.WindowManager;
 
@@ -39,7 +40,7 @@ namespace Consolonia.ManagedWindows
 
         public ManagedWindowImpl(IWindowImpl mainWindow)
         {
-            base.Content = new Panel();
+            Content = new Panel();
             _mainWindow = mainWindow;
 
             // ManagedWindow events → IWindowImpl callbacks
@@ -124,8 +125,10 @@ namespace Consolonia.ManagedWindows
             if (_contentAdopted)
                 return;
 
-            // In Avalonia 11.x, the inputRoot IS the Window
-            if (_inputRoot is not Window win)
+            // In Avalonia 12 the input root is a PresentationSource whose RootVisual is the
+            // TopLevelHost hosted by the Window (same shape ConsoleWindow.SetShowAccessKeys relies on).
+            if (_inputRoot is not IPresentationSource presentationSource ||
+                presentationSource.RootVisual?.Parent is not Window win)
                 return;
 
             // Bind properties from the Avalonia Window to this ManagedWindow
@@ -233,11 +236,11 @@ namespace Consolonia.ManagedWindows
             {
                 // Pass the parent ManagedWindowImpl so nested dialogs work correctly
                 var parent = _parentWindow as ManagedWindowImpl;
-                base.ShowDialog(parent);
+                ShowDialog(parent);
             }
             else
             {
-                base.Show();
+                Show();
             }
         }
 
@@ -273,14 +276,14 @@ namespace Consolonia.ManagedWindows
         public void SetIcon(IWindowIconImpl icon) { }
         public void SetWindowDecorations(WindowDecorations enabled) { }
         public void SetParent(IWindowImpl parent) => _parentWindow = parent;
-        public void SetEnabled(bool enable) => base.IsEnabled = enable;
+        public void SetEnabled(bool enable) => IsEnabled = enable;
 
         public void SetMinMaxSize(Size minSize, Size maxSize)
         {
-            base.MaxHeight = maxSize.Height;
-            base.MaxWidth = maxSize.Width;
-            base.MinHeight = minSize.Height;
-            base.MinWidth = minSize.Width;
+            MaxHeight = maxSize.Height;
+            MaxWidth = maxSize.Width;
+            MinHeight = minSize.Height;
+            MinWidth = minSize.Width;
         }
 
         public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint) { }
@@ -298,8 +301,7 @@ namespace Consolonia.ManagedWindows
             if (_disposing)
                 return;
             _disposing = true;
-            base.Close();
-            GC.SuppressFinalize(this);
+            Close();
         }
     }
 }
