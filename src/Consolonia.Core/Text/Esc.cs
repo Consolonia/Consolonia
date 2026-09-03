@@ -82,6 +82,10 @@ namespace Consolonia.Core.Text
         // Kitty keyboard protocol will reply with "CSI ? <flags> u".
         public const string QueryKittyKeyboardFlags = "\u001b[?u";
 
+        // Query Primary Device Attributes (DA1). The terminal replies with
+        // "CSI ? <class> ; <feature> ; ... c" where feature 4 indicates sixel graphics support.
+        public const string RequestDeviceAttributes = "\u001b[c";
+
         // move cursor
         public static string MoveCursorUp(int n)
         {

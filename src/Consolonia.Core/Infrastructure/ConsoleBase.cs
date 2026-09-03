@@ -34,7 +34,10 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput = consoleOutput;
 
             if (consoleOutput is AnsiConsoleOutput ansiConsoleOutput)
+            {
                 ansiConsoleOutput.GetConsoleCellSizeHandler = GetConsoleCellSize;
+                ansiConsoleOutput.RequestAnsiResponseHandler = RequestAnsiResponse;
+            }
 
             Size = consoleOutput.Size;
         }

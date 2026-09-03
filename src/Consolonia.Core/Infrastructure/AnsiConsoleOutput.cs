@@ -38,6 +38,8 @@ namespace Consolonia.Core.Infrastructure
 
         internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
 
+        internal Func<string, char, int, string> RequestAnsiResponseHandler { get; set; }
+
         public AnsiConsoleOutput()
         {
             Console.OutputEncoding = Encoding.UTF8;
@@ -255,6 +257,14 @@ namespace Consolonia.Core.Infrastructure
             (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ?? (8, 16);
             this.CellPixelHeight = cellH;
             this.CellPixelWidth = cellW;
+
+            // Detect sixel graphics support: terminals report feature 4 in the
+            // Primary Device Attributes (DA1) response, for example ESC[?62;4;22c
+            string deviceAttributes =
+                RequestAnsiResponseHandler?.Invoke(Esc.RequestDeviceAttributes, 'c', 200) ?? string.Empty;
+            if (DeviceAttributesIndicateSixelSupport(deviceAttributes))
+                Capabilities |= ConsoleCapabilities.SupportsSixel;
+
             BlackColorTTYWorkaround();
 
             ClearScreen();
@@ -319,6 +329,30 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        /// <summary>
+        ///     Parses a Primary Device Attributes (DA1) response such as "ESC[?62;4;22c".
+        ///     Feature parameter 4 (following the device class) indicates sixel graphics support.
+        /// </summary>
+        internal static bool DeviceAttributesIndicateSixelSupport(string deviceAttributesResponse)
+        {
+            if (string.IsNullOrEmpty(deviceAttributesResponse))
+                return false;
+
+            int start = deviceAttributesResponse.IndexOf('?');
+            int end = deviceAttributesResponse.LastIndexOf('c');
+            if (start < 0 || end <= start)
+                return false;
+
+            string[] parameters = deviceAttributesResponse[(start + 1)..end].Split(';');
+
+            // the first parameter is the device class, the rest are supported features
+            for (int i = 1; i < parameters.Length; i++)
+                if (parameters[i] == "4")
+                    return true;
+
+            return false;
         }
 
         /// <summary>
