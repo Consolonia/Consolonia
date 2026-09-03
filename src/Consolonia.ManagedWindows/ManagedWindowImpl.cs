@@ -30,6 +30,18 @@ namespace Consolonia.ManagedWindows
             AvaloniaProperty.RegisterAttached<ManagedWindowImpl, Window, string>("TextIcon");
 
         private readonly IWindowImpl _mainWindow;
+
+        /// <summary>
+        ///     Held so it can be taken off <see cref="_mainWindow" /> again in <see cref="Dispose" />.
+        /// </summary>
+        /// <remarks>
+        ///     Every other subscription in the constructor is to this object's own base events, so it
+        ///     dies with the object. This one is on the MAIN window, which outlives every dialog: an
+        ///     anonymous lambda there captures this instance and keeps it alive for the life of the
+        ///     application, so a dialog opened and closed a hundred times leaves a hundred handlers on
+        ///     the main window, all of them firing on every terminal resize into windows that are gone.
+        /// </remarks>
+        private readonly Action<Size, WindowResizeReason> _mainWindowResized;
         private Size _clientSize;
         private bool _contentAdopted;
         private bool _disposing;
@@ -65,7 +77,8 @@ namespace Consolonia.ManagedWindows
             };
 
             // Propagate terminal resize
-            _mainWindow.Resized += (size, reason) => ((ITopLevelImpl)this).Resized?.Invoke(size, reason);
+            _mainWindowResized = (size, reason) => ((ITopLevelImpl)this).Resized?.Invoke(size, reason);
+            _mainWindow.Resized += _mainWindowResized;
         }
 
         // --- ITopLevelImpl properties ---
@@ -288,6 +301,13 @@ namespace Consolonia.ManagedWindows
             if (_disposing)
                 return;
             _disposing = true;
+
+            // Before the close, so a resize arriving during it is not propagated into a window that
+            // is on its way out. Resized is a PROPERTY holding a delegate rather than an event, so
+            // this is Delegate.Remove: it takes off this instance's handler and leaves any other
+            // subscriber's in place.
+            _mainWindow.Resized -= _mainWindowResized;
+
             Close();
         }
 
