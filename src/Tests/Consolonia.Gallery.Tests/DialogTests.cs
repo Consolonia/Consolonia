@@ -23,6 +23,9 @@ namespace Consolonia.Gallery.Tests
             // The dialog closes asynchronously after Escape; poll instead of a fixed
             // delay so slow CI runners don't fail while the close is still in flight.
             await UITest.WaitForNoText("One More");
+            // Also wait for the window chrome to be gone, so the next fixture does not
+            // start asserting while the dialog's frame is still being repainted away.
+            await UITest.WaitForNoText(SomeDialogWindow.DialogTitle);
         }
     }
 }
