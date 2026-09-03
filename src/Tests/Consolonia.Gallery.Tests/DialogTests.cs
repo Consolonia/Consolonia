@@ -18,8 +18,9 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasText(SomeDialogWindow.DialogTitle);
             await UITest.AssertHasText("One More");
             await UITest.KeyInput(Key.Escape);
-            await Task.Delay(100);
-            await UITest.AssertHasNoText("One More");
+            // The dialog closes asynchronously after Escape; poll instead of a fixed
+            // delay so slow CI runners don't fail while the close is still in flight.
+            await UITest.WaitForNoText("One More");
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -37,6 +38,32 @@ namespace Consolonia.NUnit
                 false,
                 false,
                 (printBuffer, pattern) => $"Text '{pattern}' was found in the buffer: \r\n" + printBuffer);
+        }
+
+        /// <summary>
+        ///     Wait until a text pattern disappears from the console buffer, asserting failure after the timeout.
+        ///     Use instead of a fixed delay when the disappearance happens asynchronously (e.g. a window closing),
+        ///     so slow CI runners do not make the test flaky.
+        /// </summary>
+        /// <param name="unitTestConsole"></param>
+        /// <param name="pattern">Pattern to wait for disappearance of.</param>
+        /// <param name="timeoutMs">Maximum time to wait before asserting.</param>
+        /// <returns></returns>
+        public static async Task WaitForNoText(this UnitTestConsole unitTestConsole, string pattern,
+            int timeoutMs = 5000)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            while (stopwatch.ElapsedMilliseconds < timeoutMs)
+            {
+                bool found = await Dispatcher.UIThread.InvokeAsync(() =>
+                    IsMatch(unitTestConsole.PixelBuffer.PrintBuffer(), false, pattern));
+                if (!found)
+                    return;
+                await Task.Delay(50).ConfigureAwait(true);
+            }
+
+            // Produces the standard failure message with the buffer contents
+            await AssertHasNoText(unitTestConsole, pattern);
         }
 
         /// <summary>
