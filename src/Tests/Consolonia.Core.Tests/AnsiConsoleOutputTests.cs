@@ -28,5 +28,20 @@ namespace Consolonia.Core.Tests
         {
             return AnsiConsoleOutput.DeviceAttributesIndicateSixelSupport(deviceAttributesResponse);
         }
+
+        [TestCase("_Gi=31;OK", ExpectedResult = true,
+            TestName = "KittyGraphicsReplyIsDetected")]
+        [TestCase("_Gi=31;OK[?62;4;22c", ExpectedResult = true,
+            TestName = "KittyGraphicsReplyCombinedWithDeviceAttributesIsDetected")]
+        [TestCase("_Gi=31;EBADF:something went wrong", ExpectedResult = false,
+            TestName = "KittyGraphicsErrorReplyIsRejected")]
+        [TestCase("[?62;4;22c", ExpectedResult = false,
+            TestName = "DeviceAttributesAloneAreNotKittyGraphics")]
+        [TestCase("", ExpectedResult = false,
+            TestName = "EmptyKittyResponseIsRejected")]
+        public bool DetectsKittyGraphicsSupportFromProbeResponse(string response)
+        {
+            return AnsiConsoleOutput.ResponseIndicatesKittyGraphicsSupport(response);
+        }
     }
 }

@@ -150,6 +150,24 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
+        private Symbol(byte width, string verbatimComplex)
+        {
+            Character = char.MinValue;
+            Complex = verbatimComplex;
+            Width = width;
+            Pattern = 0;
+        }
+
+        /// <summary>
+        ///     Creates a symbol whose unicode sequence is stored verbatim, without variation-selector
+        ///     normalization. Used for terminal graphics placeholders (kitty) where the exact
+        ///     codepoint sequence is meaningful to the terminal.
+        /// </summary>
+        internal static Symbol FromVerbatim(string complex, byte width)
+        {
+            return new Symbol(width, complex);
+        }
+
 
         public bool Equals(Symbol other)
         {

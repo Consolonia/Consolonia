@@ -62,7 +62,15 @@ namespace Consolonia.Core.Drawing
         /// </summary>
         private BitmapRenderer CreateBitmapRenderer()
         {
-            if (_consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+            ConsoleCapabilities capabilities = _consoleWindowImpl.Console.Capabilities;
+
+            // Kitty placeholders carry the image id in the 24 bit foreground color of their cells,
+            // so they require truecolor output; the EGA color mode would destroy the id.
+            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
+                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
+                return new KittyBitmapRenderer(this);
+
+            if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
                 return new SixelBitmapRenderer(this);
 
             return new QuadPixelBitmapRenderer(this);
@@ -87,6 +95,62 @@ namespace Consolonia.Core.Drawing
             /// </summary>
             public abstract void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
                 PixelRect targetRect, PixelRect intersectedRect);
+
+            /// <summary>
+            ///     Copies the visible part of a rendered per-cell bitmap into the pixel buffer,
+            ///     tracking only the cells that actually changed as dirty (in horizontal runs).
+            /// </summary>
+            protected void CopyRenderedBitmapTrackingDirtyRegions(PixelBuffer renderedBitmap,
+                PixelRect intersectedRect, PixelRect visibleRectInTarget)
+            {
+                for (int y = 0; y < intersectedRect.Height; y++)
+                {
+                    int dirtyRunStart = -1;
+                    for (int x = 0; x < intersectedRect.Width; x++)
+                    {
+                        var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
+                        var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
+                        Pixel newPixel = renderedBitmap[sourcePoint];
+                        if (Context._pixelBuffer[destPoint] == newPixel)
+                        {
+                            if (dirtyRunStart >= 0)
+                            {
+                                Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                                    intersectedRect.X + dirtyRunStart,
+                                    intersectedRect.Y + y,
+                                    x - dirtyRunStart,
+                                    1));
+                                dirtyRunStart = -1;
+                            }
+
+                            continue;
+                        }
+
+                        Context._pixelBuffer[destPoint] = newPixel;
+                        if (dirtyRunStart < 0)
+                            dirtyRunStart = x;
+                    }
+
+                    if (dirtyRunStart >= 0)
+                    {
+                        Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                            intersectedRect.X + dirtyRunStart,
+                            intersectedRect.Y + y,
+                            intersectedRect.Width - dirtyRunStart,
+                            1));
+                    }
+                }
+            }
+
+            /// <summary>
+            ///     Unwraps the bitmap used as identity for render caches.
+            /// </summary>
+            protected static IBitmapImpl GetCacheBitmapImpl(IBitmapImpl bitmapImpl)
+            {
+                return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
+                    ? adjustedBitmap.InnerBitmap
+                    : bitmapImpl;
+            }
         }
 
         /// <summary>
@@ -168,43 +232,7 @@ namespace Consolonia.Core.Drawing
                     }
                 });
 
-                for (int y = 0; y < intersectedRect.Height; y++)
-                {
-                    int dirtyRunStart = -1;
-                    for (int x = 0; x < intersectedRect.Width; x++)
-                    {
-                        var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
-                        var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
-                        Pixel newPixel = renderedBitmap[sourcePoint];
-                        if (Context._pixelBuffer[destPoint] == newPixel)
-                        {
-                            if (dirtyRunStart >= 0)
-                            {
-                                Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
-                                    intersectedRect.X + dirtyRunStart,
-                                    intersectedRect.Y + y,
-                                    x - dirtyRunStart,
-                                    1));
-                                dirtyRunStart = -1;
-                            }
-
-                            continue;
-                        }
-
-                        Context._pixelBuffer[destPoint] = newPixel;
-                        if (dirtyRunStart < 0)
-                            dirtyRunStart = x;
-                    }
-
-                    if (dirtyRunStart >= 0)
-                    {
-                        Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
-                            intersectedRect.X + dirtyRunStart,
-                            intersectedRect.Y + y,
-                            intersectedRect.Width - dirtyRunStart,
-                            1));
-                    }
-                }
+                CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect, visibleRectInTarget);
             }
 
             private static byte[] CopyVisibleBitmapBytes(ReadOnlySpan<byte> pixelBytes, int rowBytes,
@@ -254,12 +282,165 @@ namespace Consolonia.Core.Drawing
                 perBitmap[key] = renderedBitmap;
                 return renderedBitmap;
             }
+        }
 
-            private static IBitmapImpl GetCacheBitmapImpl(IBitmapImpl bitmapImpl)
+        /// <summary>
+        ///     Renders a bitmap via the kitty graphics protocol using unicode placeholders.
+        ///     Pixels are transmitted to the terminal once per bitmap version; every covered cell then
+        ///     becomes an ordinary text cell referencing the image (U+10EEEE plus row/column diacritics,
+        ///     image id in the foreground color), so pixel buffer diffing and occlusion work unchanged
+        ///     while redraws cost no pixel retransmission.
+        /// </summary>
+        private sealed class KittyBitmapRenderer : BitmapRenderer
+        {
+            private static readonly
+                ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, KittyRenderedBitmap>>
+                RenderedBitmapCache = new();
+
+            // placements larger than the placeholder diacritics can address fall back to this renderer
+            private readonly BitmapRenderer _oversizeFallbackRenderer;
+
+            public KittyBitmapRenderer(DrawingContextImpl context)
+                : base(context)
             {
-                return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
-                    ? adjustedBitmap.InnerBitmap
-                    : bitmapImpl;
+                _oversizeFallbackRenderer =
+                    context._consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel)
+                        ? new SixelBitmapRenderer(context)
+                        : new QuadPixelBitmapRenderer(context);
+            }
+
+            public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelRect targetRect, PixelRect intersectedRect)
+            {
+                if (targetRect.Width > KittyGraphics.MaxPlacementSize ||
+                    targetRect.Height > KittyGraphics.MaxPlacementSize)
+                {
+                    _oversizeFallbackRenderer.Draw(source, renderInterface, targetRect, intersectedRect);
+                    return;
+                }
+
+                int cellPixelWidth = Context._consoleWindowImpl.Console.CellPixelWidth;
+                int cellPixelHeight = Context._consoleWindowImpl.Console.CellPixelHeight;
+
+                var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
+                    targetRect.Height * cellPixelHeight);
+                var visibleRectInTarget = new PixelRect(
+                    intersectedRect.X - targetRect.X,
+                    intersectedRect.Y - targetRect.Y,
+                    intersectedRect.Width,
+                    intersectedRect.Height);
+
+                PixelBuffer placeholderBuffer =
+                    GetOrCreatePlaceholderBuffer(source, renderInterface, targetRect, targetSize);
+
+                CopyRenderedBitmapTrackingDirtyRegions(placeholderBuffer, intersectedRect, visibleRectInTarget);
+            }
+
+            private PixelBuffer GetOrCreatePlaceholderBuffer(IBitmapImpl source,
+                IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
+            {
+                IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
+                var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
+                var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
+
+                if (perBitmap.TryGetValue(key, out KittyRenderedBitmap renderedBitmap))
+                    return renderedBitmap.Placeholders;
+
+                // A new version of this bitmap (for example the next frame of an animation) replaces
+                // stale uploads, so delete them in the terminal to free its image storage.
+                // Images of bitmaps which get garbage collected without a version change are cleaned
+                // up in bulk by KittyDeleteAllImages when the console is restored.
+                List<BitmapQuantizedCacheKey> staleKeys = null;
+                foreach (KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap> pair in perBitmap)
+                    if (pair.Key.Version != cacheSource.Version)
+                    {
+                        Context._consoleWindowImpl.Console.WriteText(
+                            KittyGraphics.BuildDeleteSequence(pair.Value.ImageId));
+                        (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(pair.Key);
+                    }
+
+                if (staleKeys != null)
+                    foreach (BitmapQuantizedCacheKey staleKey in staleKeys)
+                        perBitmap.Remove(staleKey);
+
+                renderedBitmap = TransmitAndCreatePlaceholders(source, renderInterface, targetRect, targetSize);
+                perBitmap[key] = renderedBitmap;
+                return renderedBitmap.Placeholders;
+            }
+
+            private KittyRenderedBitmap TransmitAndCreatePlaceholders(IBitmapImpl source,
+                IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
+            {
+                using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
+                    ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
+                    : null;
+
+                var readableBitmap = (IReadableBitmapImpl)(resizedBitmap ?? source);
+
+                byte[] rgba;
+                using (ILockedFramebuffer frameBuffer = readableBitmap.Lock())
+                {
+                    unsafe
+                    {
+                        ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                            ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
+                            frameBuffer.RowBytes * frameBuffer.Size.Height);
+
+                        rgba = ConvertBgraToRgba(pixelBytes, frameBuffer.RowBytes, targetSize);
+                    }
+                }
+
+                int imageId = KittyGraphics.AllocateImageId();
+                Context._consoleWindowImpl.Console.WriteText(
+                    KittyGraphics.BuildTransmitSequence(imageId, targetSize.Width, targetSize.Height, rgba));
+                Context._consoleWindowImpl.Console.WriteText(
+                    KittyGraphics.BuildVirtualPlacementSequence(imageId, targetRect.Width, targetRect.Height));
+
+                Color imageIdColor = KittyGraphics.GetImageIdColor(imageId);
+                var placeholderBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
+                for (int cellY = 0; cellY < targetRect.Height; cellY++)
+                    for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                        placeholderBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                            new PixelForeground(
+                                Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(cellY, cellX), 1),
+                                imageIdColor),
+                            PixelBackground.Transparent);
+
+                return new KittyRenderedBitmap(imageId, placeholderBuffer);
+            }
+
+            private static byte[] ConvertBgraToRgba(ReadOnlySpan<byte> bgra, int rowBytes, PixelSize size)
+            {
+                byte[] rgba = GC.AllocateUninitializedArray<byte>(size.Width * size.Height * 4);
+                for (int row = 0; row < size.Height; row++)
+                {
+                    int sourceOffset = row * rowBytes;
+                    int targetOffset = row * size.Width * 4;
+                    for (int x = 0; x < size.Width; x++)
+                    {
+                        rgba[targetOffset] = bgra[sourceOffset + 2];
+                        rgba[targetOffset + 1] = bgra[sourceOffset + 1];
+                        rgba[targetOffset + 2] = bgra[sourceOffset];
+                        rgba[targetOffset + 3] = bgra[sourceOffset + 3];
+                        sourceOffset += 4;
+                        targetOffset += 4;
+                    }
+                }
+
+                return rgba;
+            }
+
+            private sealed class KittyRenderedBitmap
+            {
+                public KittyRenderedBitmap(int imageId, PixelBuffer placeholders)
+                {
+                    ImageId = imageId;
+                    Placeholders = placeholders;
+                }
+
+                public int ImageId { get; }
+
+                public PixelBuffer Placeholders { get; }
             }
         }
 

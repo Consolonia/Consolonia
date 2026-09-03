@@ -37,7 +37,12 @@ namespace Consolonia.Controls
         /// <summary>
         ///     Supports sixel graphics output
         /// </summary>
-        SupportsSixel = 0x40
+        SupportsSixel = 0x40,
+
+        /// <summary>
+        ///     Supports the kitty graphics protocol
+        /// </summary>
+        SupportsKittyGraphics = 0x80
     }
 
     public interface IConsoleCapabilities

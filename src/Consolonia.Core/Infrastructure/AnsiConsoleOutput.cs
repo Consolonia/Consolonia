@@ -258,12 +258,17 @@ namespace Consolonia.Core.Infrastructure
             this.CellPixelHeight = cellH;
             this.CellPixelWidth = cellW;
 
-            // Detect sixel graphics support: terminals report feature 4 in the
-            // Primary Device Attributes (DA1) response, for example ESC[?62;4;22c
-            string deviceAttributes =
-                RequestAnsiResponseHandler?.Invoke(Esc.RequestDeviceAttributes, 'c', 200) ?? string.Empty;
-            if (DeviceAttributesIndicateSixelSupport(deviceAttributes))
+            // Detect terminal graphics support with a single round trip. The kitty graphics query is
+            // answered with "APC _Gi=31;OK ST" by supporting terminals and ignored by all others, and the
+            // Primary Device Attributes (DA1) response, for example ESC[?62;4;22c, reports feature 4
+            // when sixel graphics are supported. DA1 is answered by every terminal, so it also acts as
+            // the fence telling us all replies have arrived.
+            string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
+                Esc.QueryKittyGraphicsSupport + Esc.RequestDeviceAttributes, 'c', 200) ?? string.Empty;
+            if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
+            if (ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsKittyGraphics;
 
             BlackColorTTYWorkaround();
 
@@ -274,6 +279,10 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
+            // free terminal-side image storage held by kitty graphics placements
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
+                WriteText(Esc.KittyDeleteAllImages);
+
             WriteText(Esc.DisableAlternateBuffer);
             WriteText(Esc.Reset);
             WriteText(Esc.ShowCursor);
@@ -353,6 +362,15 @@ namespace Consolonia.Core.Infrastructure
                     return true;
 
             return false;
+        }
+
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.QueryKittyGraphicsSupport" /> contains the
+        ///     "APC _Gi=31;OK ST" reply a kitty-graphics-capable terminal sends.
+        /// </summary>
+        internal static bool ResponseIndicatesKittyGraphicsSupport(string response)
+        {
+            return response != null && response.Contains("_Gi=31;OK", StringComparison.Ordinal);
         }
 
         /// <summary>
