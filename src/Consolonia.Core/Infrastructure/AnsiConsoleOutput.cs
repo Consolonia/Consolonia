@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia;
@@ -26,15 +27,15 @@ namespace Consolonia.Core.Infrastructure
 
         private readonly StringBuilder _outputBuffer = new();
 
-        /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
-        private System.IO.TextWriter _originalOut;
-
         private PixelBufferCoordinate _headBufferPoint;
         private Color _lastBackground = Colors.Transparent;
         private Color _lastForeground = Colors.Transparent;
         private FontStyle? _lastStyle;
         private TextDecorationLocation? _lastTextDecoration;
         private FontWeight? _lastWeight;
+
+        /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
+        private TextWriter _originalOut;
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
@@ -223,8 +224,8 @@ namespace Consolonia.Core.Infrastructure
             // before. Done after the encoding change above, because setting OutputEncoding
             // recreates Console.Out and would discard this writer.
             _originalOut = Console.Out;
-            Console.SetOut(new System.IO.StreamWriter(
-                Console.OpenStandardOutput(), new UTF8Encoding(false), 65536, leaveOpen: true)
+            Console.SetOut(new StreamWriter(
+                Console.OpenStandardOutput(), new UTF8Encoding(false), 65536, true)
             {
                 AutoFlush = false
             });
