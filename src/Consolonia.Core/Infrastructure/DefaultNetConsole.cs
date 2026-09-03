@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using Avalonia.Input;
@@ -72,7 +73,11 @@ namespace Consolonia.Core.Infrastructure
             ]);
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
+        }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void StartInputLoop()
+        {
             StartSizeCheckTimerAsync();
             StartInputReading();
             _inputBuffer.StartReading();
@@ -86,7 +91,7 @@ namespace Consolonia.Core.Infrastructure
             while (true)
                 try
                 {
-                    PauseTask?.Wait();
+                    WaitPauseTaskIfNecessary();
                     return [Console.ReadKey(true)];
                 }
                 catch (InvalidOperationException)
@@ -103,7 +108,7 @@ namespace Consolonia.Core.Infrastructure
 
                 while (!Disposed)
                 {
-                    PauseTask?.Wait();
+                    await WaitPauseTaskIfNecessaryAsync();
 
                     ConsoleKeyInfo[] consoleKeyInfos = _inputBuffer.Dequeue();
                     if (!consoleKeyInfos.Any())

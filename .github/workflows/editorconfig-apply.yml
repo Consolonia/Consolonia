@@ -24,6 +24,7 @@ jobs:
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
           ref: ${{ github.event.workflow_run.head_branch }}
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          allow-unsafe-pr-checkout: true
 
       - name: Download artifacts
         uses: actions/download-artifact@v4

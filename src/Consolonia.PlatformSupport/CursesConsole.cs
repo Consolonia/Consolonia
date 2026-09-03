@@ -7,7 +7,10 @@
 //
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,7 +32,7 @@ using KeyModifiers = Terminal.Gui.KeyModifiers;
 
 namespace Consolonia.PlatformSupport
 {
-    public class CursesConsole : ConsoleBase
+    public partial class CursesConsole : ConsoleBase
     {
         private static readonly FlagTranslator<Key, RawInputModifiers>
             KeyModifiersFlagTranslator = new([
@@ -129,17 +132,21 @@ namespace Consolonia.PlatformSupport
                 (RawPointerEventType.Wheel, EventClass.Wheel)
             ]);
 
+        private readonly ParametrizedLogger _errorLogger = Log.CreateInputLogger(LogEventLevel.Error);
+
         private readonly FastBuffer<(int, int)> _inputBuffer;
         private readonly InputProcessor<(int, int)> _inputProcessor;
         private readonly ParametrizedLogger _verboseLogger = Log.CreateInputLogger(LogEventLevel.Verbose);
 
         private Curses.Window _cursesWindow;
+        private int _eraseCharacter;
 
         private GpmMonitor _gpmMonitor;
 
         private KeyModifiers _keyModifiers; // todo: it's left from GUI.cs, we should remove this
 
         private RawInputModifiers _moveModifers = RawInputModifiers.None;
+        private IDisposable _sigwinchRegistration;
 
         // ReSharper disable UnusedMember.Local
         [Flags]
@@ -157,17 +164,25 @@ namespace Consolonia.PlatformSupport
         public CursesConsole()
             : base(new AnsiConsoleOutput())
         {
+            // ReSharper disable VirtualMemberCallInConstructor
+            PrepareConsole();
+
             _inputBuffer = new FastBuffer<(int, int)>(ReadInputFunction);
             _inputProcessor = new InputProcessor<(int, int)>(GetMatchers());
-            StartSizeCheckTimerAsync(2500);
+        }
+
+        // todo: synchronization mess has been introduced in this PR. we are fighting race between dispatcher and local locks.
+        // It's not clear for each object what is safe and what is not and safe for what exactly. Some operations are supposed to
+        // be executed only from Dispatcher thread, while others form random. Some of them having race between each other while others race itself
+        // only. Would be great if someone could bring an approach of synchornization which is simple to track and understand.
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void StartInputLoop()
+        {
             StartEventLoop();
         }
 
         private void StartEventLoop()
         {
-            // ReSharper disable VirtualMemberCallInConstructor
-            PrepareConsole();
-
             Task _ = Task.Run(async () =>
             {
                 await Helper.WaitDispatcherInitialized();
@@ -178,11 +193,8 @@ namespace Consolonia.PlatformSupport
                     try
                     {
                         (int, int)[] inputs = _inputBuffer.Dequeue();
-                        await DispatchInputAsync(() =>
-                        {
-                            _keyModifiers = new KeyModifiers();
-                            _inputProcessor.ProcessChunk(inputs);
-                        });
+                        _keyModifiers = new KeyModifiers();
+                        _inputProcessor.ProcessChunk(inputs);
                     }
                     catch (Exception exception)
                     {
@@ -196,26 +208,57 @@ namespace Consolonia.PlatformSupport
         private readonly List<(int code, int wch)> _rowInputBuffer = new(1000); //todo: low magic number
 
         /// <summary>
+        ///     We have to read mouse events immediately once we've got mouse codes. Because the mouse queue is of the opposite
+        ///     direction in ncurses
+        /// </summary>
+        private readonly ConcurrentQueue<Curses.MouseEvent> _mouseEvents = new();
+
+        /// <summary>
         ///     https://github.com/gui-cs/Terminal.Gui/blob/v2_develop/Terminal.Gui/ConsoleDrivers/CursesDriver/CursesDriver.cs#L790
         /// </summary>
-        private const int NoInputTimeout = 10;
+        private const int NoInputTimeout = -1;
+
+        private const int SequenceCollectTimeout = 10;
 
         private (int, int)[] ReadInputFunction()
         {
             _rowInputBuffer.Clear();
+
+            Curses.timeout(NoInputTimeout);
+
             do
             {
-                Task pauseTask = PauseTask;
-                pauseTask?.Wait();
+                WaitPauseTaskIfNecessary();
 
                 int code = Curses.get_wch(out int wch);
                 if (code != Curses.ERR)
                 {
-                    _rowInputBuffer.Add((code, wch));
-                    //check if was escape, wait for one more escape
+                    // Pair KEY_MOUSE with its event on THIS thread, immediately.
+                    if (code == Curses.KEY_CODE_YES && wch == Curses.KeyMouse)
+                    {
+                        if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                        {
+                            _mouseEvents.Enqueue(ev);
+                            _rowInputBuffer.Add((code, wch));
+                        }
+                        else
+                        {
+                            /*coding agents assure this is valid if error returned here*/
+                            _errorLogger.Log2("Error getting mouse event");
+                        }
+                    }
+                    else
+                    {
+                        _rowInputBuffer.Add((code, wch));
+                    }
 
+                    if (_rowInputBuffer.Count == 1)
+                        Curses.timeout(SequenceCollectTimeout);
+
+                    //check if was escape, wait for one more escape
                     if (code != Curses.KEY_CODE_YES && wch == 27)
                     {
+                        WaitPauseTaskIfNecessary();
                         int code2 = Curses.get_wch(out int wch2);
 
                         // ReSharper disable once ConvertIfStatementToConditionalTernaryExpression
@@ -233,7 +276,10 @@ namespace Consolonia.PlatformSupport
                 else
                 {
                     if (_rowInputBuffer.Count == 0)
+                    {
+                        Curses.timeout(NoInputTimeout);
                         continue;
+                    }
 
                     break;
                 }
@@ -242,9 +288,27 @@ namespace Consolonia.PlatformSupport
             return [.. _rowInputBuffer];
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void PrepareConsole()
         {
             _cursesWindow = Curses.initscr();
+
+            _eraseCharacter = Curses.erasechar();
+            if (_eraseCharacter == -1) _eraseCharacter = 127;
+
+            if (_eraseCharacter != 127)
+                _verboseLogger.Log2("Erase character is {EraseCharacter}", _eraseCharacter);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
+                {
+                    Task unused = DispatchInputAsync(() =>
+                    {
+                        Curses.resizeterm(0, 0);
+                        CheckSize();
+                    });
+                });
+
             Curses.raw();
             Curses.noecho();
             _cursesWindow.keypad(true);
@@ -259,7 +323,8 @@ namespace Consolonia.PlatformSupport
                         // if GPM is not available, fallback to basic mouse support
                         TryEnableMouseButtonSupport();
 
-            Curses.timeout(NoInputTimeout);
+            TryToSupportKitty();
+
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
@@ -276,7 +341,7 @@ namespace Consolonia.PlatformSupport
         private static bool IsTtyTerminal()
         {
             string term = Environment.GetEnvironmentVariable("TERM") ?? string.Empty;
-            string terminalPath = Curses.TtyName(1);
+            string terminalPath = Curses.TtyName(1) ?? string.Empty;
             return terminalPath.StartsWith("/dev/tty", StringComparison.OrdinalIgnoreCase) ||
                    term.StartsWith("linux", StringComparison.OrdinalIgnoreCase);
         }
@@ -340,10 +405,16 @@ namespace Consolonia.PlatformSupport
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
         }
 
-
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void RestoreConsole()
         {
             base.RestoreConsole();
+
+            if (_isKittyKeyboardEnabled)
+            {
+                WriteText(Esc.DisableKittyKeyboard);
+                _isKittyKeyboardEnabled = false;
+            }
 
             WriteText(Esc.DisableAllMouseEvents);
             WriteText(Esc.DisableExtendedMouseTracking);
@@ -372,6 +443,7 @@ namespace Consolonia.PlatformSupport
             return Version.Parse(versionOnly) >= Version.Parse("6.4");
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void PauseIO(Task task)
         {
             base.PauseIO(task);
@@ -384,6 +456,9 @@ namespace Consolonia.PlatformSupport
             yield return new SafeLockMatcher(
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
+
+            foreach (IMatcher<(int, int)> matcher in TryGetKittyMatchers())
+                yield return matcher;
 
             (string, Key)[] fSequences =
             [
@@ -436,7 +511,11 @@ namespace Consolonia.PlatformSupport
                 // Shift+Ctrl+Alt+KeyHome
                 (@"\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
                 // Shift+Ctrl+Alt+KeyEnd
-                (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End)
+                (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End),
+                // Ctrl+Enter (`modifyOtherKeys` / xterm extended keys)
+                (@"\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
+
+                // todo: should be other sequences, need research
             ];
 
             foreach ((string, Key) fSequence in fSequences)
@@ -520,18 +599,19 @@ namespace Consolonia.PlatformSupport
             {
                 switch (wch)
                 {
-                    case Curses.KeyResize when Curses.CheckWinChange():
-                        CheckSize();
+                    case Curses.KeyResize:
+                        _ = DispatchInputAsync(() => { CheckSize(); });
                         return;
                     case Curses.KeyMouse:
-                        if (Curses.getmouse(out Curses.MouseEvent ev) == 0)
+                        if (_mouseEvents.TryDequeue(out Curses.MouseEvent ev))
                         {
                             _verboseLogger.Log2(
                                 $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
                             HandleMouseInput(ev);
+                            return;
                         }
 
-                        return;
+                        throw new ConsoloniaException("Mouse event was produced but queue was empty");
                 }
 
                 Key k = MapCursesKey(wch);
@@ -616,6 +696,10 @@ namespace Consolonia.PlatformSupport
             {
                 k = MapCursesKey(wch);
             }
+            else if (wch == _eraseCharacter)
+            {
+                k = Key.Backspace;
+            }
             else
             {
                 // Unfortunately there are no way to differentiate Ctrl+alfa and Ctrl+Shift+alfa.
@@ -662,7 +746,8 @@ namespace Consolonia.PlatformSupport
                     Enum.IsDefined(
                         key) /*because we want string representation only when defined, we don't want numeric value*/:
                 {
-                    bool _ = Enum.TryParse(key.ToString(), true, out consoleKey);
+                    if (!Enum.TryParse(key.ToString(), true, out consoleKey))
+                        throw new NotImplementedException("We could not recognize the key: " + key);
                     break;
                 }
             }
@@ -674,7 +759,8 @@ namespace Consolonia.PlatformSupport
             else
             {
                 if (consoleKey == default)
-                    throw new NotImplementedException();
+                    throw new NotImplementedException(
+                        $"Received key {key} was not mapped to anything using {nameof(KeyFlagTranslator)}, neither it is defined in enum {nameof(Key)}");
                 character = char.MinValue;
                 if (char.IsUpper(character))
                     modifiers |= RawInputModifiers.Shift;
@@ -816,6 +902,7 @@ namespace Consolonia.PlatformSupport
             if (disposing)
             {
                 _inputBuffer.Dispose();
+                _sigwinchRegistration?.Dispose();
 
                 if (_gpmMonitor != null)
                 {

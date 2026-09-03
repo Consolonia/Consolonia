@@ -1,9 +1,9 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:wm="using:Iciclecreek.Avalonia.WindowManager"
+             xmlns:managedWindows="clr-namespace:Consolonia.ManagedWindows;assembly=Consolonia.ManagedWindows"
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryWindows">
     <!-- Gallery Windows has it's own window panel -->
-    <wm:WindowsPanel x:Name="Windows">
+    <managedWindows:WindowsPanelWorkaround x:Name="Windows">
         <Grid RowDefinitions="Auto *">
 
             <StackPanel Spacing="1">
@@ -44,5 +44,5 @@
                         HorizontalAlignment="Left" />
             </StackPanel>
         </Grid>
-    </wm:WindowsPanel>
+    </managedWindows:WindowsPanelWorkaround>
 </UserControl>

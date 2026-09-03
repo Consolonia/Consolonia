@@ -15,12 +15,12 @@
               x:Name="Menu"
               IsTabStop="False">
             <MenuItem Header="_File"
-                      IsTabStop="False">
+                      Focusable="False">
                 <MenuItem Header="E_xit"
                           Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="_Theme"
-                      IsTabStop="False">
+                      Focusable="False">
                 <MenuItem IsChecked="{Binding IsModern}"
                           Header="_Modern"
                           Tag="Modern"
@@ -56,7 +56,7 @@
                           Click="OnThemeVariantDarkMenuClick" />
             </MenuItem>
             <MenuItem Header="_View"
-                      IsTabStop="False">
+                      Focusable="False">
                 <MenuItem Header="Show _XAML"
                           Click="OnShowXaml" />
                 <MenuItem Header="Show _Code Behind"
@@ -64,21 +64,24 @@
             </MenuItem>
         </Menu>
 
-        <ListBox x:Name="GalleryGrid"
-                 DockPanel.Dock="Left"
-                 AutoScrollToSelectedItem="True"
-                 DisplayMemberBinding="{Binding Name}"
-                 SelectionMode="Single">
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Orientation="Vertical" />
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-        </ListBox>
+        <DockPanel KeyboardNavigation.TabNavigation="Cycle">
+            <ListBox x:Name="GalleryGrid"
+                     DockPanel.Dock="Left"
+                     AutoScrollToSelectedItem="True"
+                     DisplayMemberBinding="{Binding Name}"
+                     SelectionMode="Single">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+            </ListBox>
 
-        <Border
-            Child="{Binding ElementName=GalleryGrid,Path=SelectedItem, Converter={StaticResource GalleryItemConverter}}"
-            BorderThickness="1"
-            BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <Border
+                Child="{Binding ElementName=GalleryGrid,Path=SelectedItem, Converter={StaticResource GalleryItemConverter}}"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        </DockPanel>
+
     </DockPanel>
 </UserControl>

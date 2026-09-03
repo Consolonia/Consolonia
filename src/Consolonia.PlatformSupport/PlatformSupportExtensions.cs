@@ -130,7 +130,7 @@ namespace Consolonia
                 Assembly asm = Assembly.Load(assembly);
                 Type type = asm.GetType(name, true);
 
-                ArgumentNullException.ThrowIfNull(type, nameof(type));
+                ArgumentNullException.ThrowIfNull(type);
 
                 object instance = Activator.CreateInstance(
                     type,
@@ -138,7 +138,7 @@ namespace Consolonia
                     null,
                     args,
                     null);
-                ArgumentNullException.ThrowIfNull(instance, nameof(instance));
+                ArgumentNullException.ThrowIfNull(instance);
                 return (T)instance!;
             }
             catch (Exception ex) when (ex is FileNotFoundException or BadImageFormatException or TypeLoadException or

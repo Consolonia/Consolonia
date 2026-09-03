@@ -5,7 +5,7 @@ group:
   files:
     - source: .github/workflows
       dest: .github/workflows
-      deleteOrphaned: true
+      deleteOrphaned: false # we don't want target-only files to be deleted
       exclude: |
         repo-file-sync.yml
         release.yml

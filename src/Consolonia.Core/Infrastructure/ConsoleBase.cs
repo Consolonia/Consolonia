@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia;
@@ -16,9 +17,10 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     /// <remarks>
     ///     This implements disposable and eventing for IConsoleInput and
-    ///     wraps around internal IConsoleOutput
+    ///     wraps around internal IConsoleOutput.
+    ///     Thread-safe
     /// </remarks>
-    public abstract class ConsoleBase : IConsole, IDisposable
+    public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
         private readonly IConsoleOutput _consoleOutput;
 
@@ -39,16 +41,10 @@ namespace Consolonia.Core.Infrastructure
 
         protected bool Disposed { get; private set; }
 
-        protected Task PauseTask { get; private set; }
-
-        /// <summary>
-        ///     Pause the IO
-        /// </summary>
-        /// <param name="task"></param>
-        public virtual void PauseIO(Task task)
+        public override void PauseIO(Task task)
         {
-            task.ContinueWith(_ => { PauseTask = null; }, TaskScheduler.Default);
-            PauseTask = task;
+            base.PauseIO(task);
+            _consoleOutput.PauseIO(task);
         }
 
         protected void StartSizeCheckTimerAsync(uint slowInterval = 1500)
@@ -59,9 +55,7 @@ namespace Consolonia.Core.Infrastructure
 
                 while (!Disposed)
                 {
-                    Task pauseTask = PauseTask;
-                    if (pauseTask != null)
-                        await pauseTask;
+                    await WaitPauseTaskIfNecessaryAsync();
 
 
                     int timeout = -1;
@@ -77,6 +71,7 @@ namespace Consolonia.Core.Infrastructure
         protected async Task DispatchInputAsync(Action action)
 #pragma warning restore CA1822
         {
+            //todo: key and mouse input now can be dispatched on any thread (from avalonia 12)
             await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Input);
         }
 
@@ -86,6 +81,7 @@ namespace Consolonia.Core.Infrastructure
         public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
         public event Action<bool> FocusEvent;
         public event Action<string, ulong, CanBeHandledEventArgs> TextInputEvent;
+        public abstract void StartInputLoop();
 
         protected void RaiseMouseEvent(RawPointerEventType eventType, Point point, Vector? wheelDelta,
             RawInputModifiers modifiers)
@@ -116,14 +112,19 @@ namespace Consolonia.Core.Infrastructure
 
         public PixelBufferSize Size
         {
+            [MethodImpl(MethodImplOptions.Synchronized)]
             get => _consoleOutput.Size;
             set
             {
-                // ReSharper disable once UsageOfDefaultStructEquality //todo: low use special equality interfaces
-                if (_consoleOutput.Size.Equals(value))
-                    return;
+                lock (this)
+                {
+                    // ReSharper disable once UsageOfDefaultStructEquality //todo: low use special equality interfaces
+                    if (_consoleOutput.Size.Equals(value))
+                        return;
 
-                _consoleOutput.Size = value;
+                    _consoleOutput.Size = value;
+                }
+
                 Resized?.Invoke();
             }
         }
@@ -152,6 +153,7 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.HideCaret();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void PrepareConsole()
         {
             _consoleOutput.PrepareConsole();
@@ -163,6 +165,7 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.WritePixel(position, in pixel);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void RestoreConsole()
         {
             _consoleOutput.RestoreConsole();
@@ -196,7 +199,6 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void WriteText(string str)
         {
-            PauseTask?.Wait();
             _consoleOutput.WriteText(str);
         }
 
@@ -269,6 +271,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void Dispose()
         {
 #pragma warning disable CA1063 // Implement IDisposable Correctly

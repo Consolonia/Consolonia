@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using NeoSmart.Unicode;
@@ -9,6 +10,8 @@ namespace Consolonia.Core.Helpers
     /// </summary>
     public class Grapheme
     {
+        private static readonly ConcurrentDictionary<int, bool> EmojiCache = new();
+
         // sequence of unicode codepoints that produce the glyph
         public string Glyph { get; init; }
 
@@ -115,7 +118,7 @@ namespace Consolonia.Core.Helpers
             if (IsVariationSelector(rune))
                 return RuneType.VariationSelector;
 
-            if (Emoji.IsEmoji(rune.ToString()))
+            if (EmojiCache.GetOrAdd(rune.Value, static v => Emoji.IsEmoji(new Rune(v).ToString())))
                 return RuneType.Emoji;
 
             return RuneType.Regular;
