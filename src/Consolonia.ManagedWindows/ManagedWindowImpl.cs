@@ -42,6 +42,7 @@ namespace Consolonia.ManagedWindows
         ///     the main window, all of them firing on every terminal resize into windows that are gone.
         /// </remarks>
         private readonly Action<Size, WindowResizeReason> _mainWindowResized;
+
         private Size _clientSize;
         private bool _contentAdopted;
         private bool _disposing;
