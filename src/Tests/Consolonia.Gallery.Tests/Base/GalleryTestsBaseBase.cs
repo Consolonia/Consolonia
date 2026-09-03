@@ -7,6 +7,7 @@ using Avalonia.VisualTree;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Fonts;
 using Consolonia.Gallery.View;
+using Consolonia.ManagedWindows;
 using Consolonia.NUnit;
 using NUnit.Framework;
 
@@ -25,6 +26,7 @@ namespace Consolonia.Gallery.Tests.Base
         protected override AppBuilder CreateAppBuilder()
         {
             return base.CreateAppBuilder()
+                .UseManagedWindows()
                 .WithConsoleFonts();
         }
 

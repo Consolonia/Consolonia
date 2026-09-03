@@ -10,6 +10,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Consolonia.Gallery.Gallery;
 using Consolonia.Themes;
@@ -130,7 +131,7 @@ namespace Consolonia.Gallery.View
             await RefocusList();
         }
 
-        private static async Task ShowCode(string xamlFile)
+        private async Task ShowCode(string xamlFile)
         {
             string xaml = await Client.GetStringAsync(new Uri(
                 $"https://raw.githubusercontent.com/jinek/Consolonia/refs/heads/main/src/Consolonia.Gallery/Gallery/GalleryViews/{xamlFile}"));
@@ -141,7 +142,7 @@ namespace Consolonia.Gallery.View
                 // ReSharper disable once MethodHasAsyncOverload
                 DataContext = xaml
             };
-            await dialog.ShowDialog();
+            await dialog.ShowDialog(this.FindAncestorOfType<Window>());
         }
 
         private void OnThemeVariantLightMenuClick(object sender, RoutedEventArgs e)
