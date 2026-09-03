@@ -41,6 +41,24 @@ namespace Consolonia.NUnit
         }
 
         /// <summary>
+        ///     Wait until a text pattern appears in the console buffer, asserting failure after the timeout.
+        ///     Use instead of a plain assertion when the appearance happens asynchronously (e.g. a window
+        ///     opening and painting), so slow CI runners do not make the test flaky.
+        /// </summary>
+        /// <param name="unitTestConsole"></param>
+        /// <param name="pattern">Pattern to wait for.</param>
+        /// <param name="timeoutMs">Maximum time to wait before asserting.</param>
+        /// <returns></returns>
+        public static async Task WaitForText(this UnitTestConsole unitTestConsole, string pattern,
+            int timeoutMs = 5000)
+        {
+            await WaitForTextCondition(unitTestConsole, pattern, true, timeoutMs);
+
+            // Produces the standard failure message with the buffer contents on timeout
+            await unitTestConsole.AssertHasText(pattern);
+        }
+
+        /// <summary>
         ///     Wait until a text pattern disappears from the console buffer, asserting failure after the timeout.
         ///     Use instead of a fixed delay when the disappearance happens asynchronously (e.g. a window closing),
         ///     so slow CI runners do not make the test flaky.
@@ -52,18 +70,24 @@ namespace Consolonia.NUnit
         public static async Task WaitForNoText(this UnitTestConsole unitTestConsole, string pattern,
             int timeoutMs = 5000)
         {
+            await WaitForTextCondition(unitTestConsole, pattern, false, timeoutMs);
+
+            // Produces the standard failure message with the buffer contents on timeout
+            await unitTestConsole.AssertHasNoText(pattern);
+        }
+
+        private static async Task WaitForTextCondition(UnitTestConsole unitTestConsole, string pattern,
+            bool shouldMatch, int timeoutMs)
+        {
             var stopwatch = Stopwatch.StartNew();
             while (stopwatch.ElapsedMilliseconds < timeoutMs)
             {
                 bool found = await Dispatcher.UIThread.InvokeAsync(() =>
                     IsMatch(unitTestConsole.PixelBuffer.PrintBuffer(), false, pattern));
-                if (!found)
+                if (found == shouldMatch)
                     return;
                 await Task.Delay(50).ConfigureAwait(true);
             }
-
-            // Produces the standard failure message with the buffer contents
-            await unitTestConsole.AssertHasNoText(pattern);
         }
 
         /// <summary>
