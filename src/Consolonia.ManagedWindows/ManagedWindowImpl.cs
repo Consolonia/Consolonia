@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
@@ -28,15 +29,12 @@ namespace Consolonia.ManagedWindows
         public static readonly AttachedProperty<string> TextIconProperty =
             AvaloniaProperty.RegisterAttached<ManagedWindowImpl, Window, string>("TextIcon");
 
-        public static string GetTextIcon(Window window) => window.GetValue(TextIconProperty);
-        public static void SetTextIcon(Window window, string value) => window.SetValue(TextIconProperty, value);
-
         private readonly IWindowImpl _mainWindow;
-        private IWindowImpl _parentWindow;
-        private IInputRoot _inputRoot;
         private Size _clientSize;
         private bool _contentAdopted;
         private bool _disposing;
+        private IInputRoot _inputRoot;
+        private IWindowImpl _parentWindow;
 
         public ManagedWindowImpl(IWindowImpl mainWindow)
         {
@@ -61,7 +59,7 @@ namespace Consolonia.ManagedWindows
                 if (_disposing)
                     return;
 
-                var closing = ((IWindowImpl)this).Closing;
+                Func<WindowCloseReason, bool> closing = ((IWindowImpl)this).Closing;
                 if (closing != null && !closing.Invoke(e.CloseReason))
                     e.Cancel = true;
             };
@@ -100,6 +98,7 @@ namespace Consolonia.ManagedWindows
             get => base.WindowState;
             set => base.WindowState = value;
         }
+
         public bool WindowStateGetterIsUsable => true;
         public Action<WindowState> WindowStateChanged { get; set; }
         public Action GotInputWhenDisabled { get; set; }
@@ -115,6 +114,191 @@ namespace Consolonia.ManagedWindows
         public void SetInputRoot(IInputRoot inputRoot)
         {
             _inputRoot = inputRoot;
+        }
+
+        public Point PointToClient(PixelPoint point)
+        {
+            return point.ToPoint(1);
+        }
+
+        public PixelPoint PointToScreen(Point point)
+        {
+            return new PixelPoint((int)point.X, (int)point.Y);
+        }
+
+        public void SetCursor(ICursorImpl cursor)
+        {
+        }
+
+        public IPopupImpl CreatePopup()
+        {
+            return null;
+        }
+
+        public void SetTransparencyLevelHint(IReadOnlyList<WindowTransparencyLevel> transparencyLevels)
+        {
+        }
+
+        public void SetFrameThemeVariant(PlatformThemeVariant themeVariant)
+        {
+        }
+
+        public object TryGetFeature(Type featureType)
+        {
+            return _mainWindow.TryGetFeature(featureType);
+        }
+
+        // --- IWindowBaseImpl methods ---
+        public void Show(bool activate, bool isDialog)
+        {
+            // Move content before Show so it's in our tree before any layout pass.
+            AdoptContentFromSource();
+
+            // Clamp to terminal screen size, but respect SizeToContent
+            Size maxSize = _mainWindow.ClientSize;
+            SizeToContent sizeToContent = SizeToContent;
+            if (sizeToContent != SizeToContent.Width && sizeToContent != SizeToContent.WidthAndHeight)
+                if (Width > maxSize.Width || double.IsNaN(Width))
+                    Width = maxSize.Width;
+
+            if (sizeToContent != SizeToContent.Height && sizeToContent != SizeToContent.WidthAndHeight)
+                if (Height > maxSize.Height || double.IsNaN(Height))
+                    Height = maxSize.Height;
+            if (_clientSize.Width > maxSize.Width || _clientSize.Height > maxSize.Height)
+                _clientSize = new Size(
+                    Math.Min(_clientSize.Width, maxSize.Width),
+                    Math.Min(_clientSize.Height, maxSize.Height));
+
+            ShowActivated = activate;
+            if (isDialog)
+            {
+                // Pass the parent ManagedWindowImpl so nested dialogs work correctly
+                var parent = _parentWindow as ManagedWindowImpl;
+                ShowDialog(parent);
+            }
+            else
+            {
+                Show();
+            }
+        }
+
+        public void Hide()
+        {
+            // close is done through Closing and Dispose()
+            IsVisible = false;
+        }
+
+        public void Move(PixelPoint point)
+        {
+            Position = point;
+        }
+
+        public void Resize(Size clientSize, WindowResizeReason reason = WindowResizeReason.Application)
+        {
+            Size maxSize = _mainWindow.ClientSize;
+            clientSize = new Size(
+                Math.Min(clientSize.Width, maxSize.Width),
+                Math.Min(clientSize.Height, maxSize.Height));
+
+            _clientSize = clientSize;
+            try
+            {
+                base.ClientSize = clientSize;
+            }
+            catch (Exception ex) when (ex is NullReferenceException or InvalidOperationException)
+            {
+                // ManagedWindow template may not be applied yet
+            }
+        }
+
+        // --- IWindowImpl methods ---
+        public void SetTitle(string title)
+        {
+            Title = title ?? string.Empty;
+        }
+
+        public void SetTopmost(bool value)
+        {
+            Topmost = value;
+        }
+
+        public void SetIcon(IWindowIconImpl icon)
+        {
+        }
+
+        public void SetWindowDecorations(WindowDecorations enabled)
+        {
+        }
+
+        public void SetParent(IWindowImpl parent)
+        {
+            _parentWindow = parent;
+        }
+
+        public void SetEnabled(bool enable)
+        {
+            IsEnabled = enable;
+        }
+
+        public void SetMinMaxSize(Size minSize, Size maxSize)
+        {
+            MaxHeight = maxSize.Height;
+            MaxWidth = maxSize.Width;
+            MinHeight = minSize.Height;
+            MinWidth = minSize.Width;
+        }
+
+        public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint)
+        {
+        }
+
+        public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight)
+        {
+        }
+
+        public void ShowTaskbarIcon(bool value)
+        {
+        }
+
+        public void SetCanMinimize(bool value)
+        {
+            CanResize = value;
+        }
+
+        public void SetCanMaximize(bool value)
+        {
+            CanResize = value;
+        }
+
+        void IWindowImpl.CanResize(bool value)
+        {
+            CanResize = value;
+        }
+
+        public void BeginMoveDrag(PointerPressedEventArgs e)
+        {
+        }
+
+        public void BeginResizeDrag(WindowEdge edge, PointerPressedEventArgs e)
+        {
+        }
+
+        public void Dispose()
+        {
+            if (_disposing)
+                return;
+            _disposing = true;
+            Close();
+        }
+
+        public static string GetTextIcon(Window window)
+        {
+            return window.GetValue(TextIconProperty);
+        }
+
+        public static void SetTextIcon(Window window, string value)
+        {
+            window.SetValue(TextIconProperty, value);
         }
 
         /// <summary>
@@ -134,49 +318,49 @@ namespace Consolonia.ManagedWindows
             // Bind properties from the Avalonia Window to this ManagedWindow
             this[!TitleProperty] = win[!Window.TitleProperty];
             this[!WindowStartupLocationProperty] = win[!Window.WindowStartupLocationProperty];
-            this[!BackgroundProperty] = win[!Window.BackgroundProperty];
-            this[!ForegroundProperty] = win[!Window.ForegroundProperty];
-            this[!PaddingProperty] = win[!Window.PaddingProperty];
-            this[!FontSizeProperty] = win[!Window.FontSizeProperty];
-            this[!FontFamilyProperty] = win[!Window.FontFamilyProperty];
-            this[!FontWeightProperty] = win[!Window.FontWeightProperty];
-            this[!FontStyleProperty] = win[!Window.FontStyleProperty];
-            this.Opacity = win.Opacity;
-            this[!FlowDirectionProperty] = win[!Visual.FlowDirectionProperty];
-            this[!HorizontalContentAlignmentProperty] = win[!Window.HorizontalContentAlignmentProperty];
-            this[!VerticalContentAlignmentProperty] = win[!Window.VerticalContentAlignmentProperty];
-            this[!MarginProperty] = win[!Window.MarginProperty];
-            this[!IsEnabledProperty] = win[!Window.IsEnabledProperty];
+            this[!BackgroundProperty] = win[!BackgroundProperty];
+            this[!ForegroundProperty] = win[!ForegroundProperty];
+            this[!PaddingProperty] = win[!PaddingProperty];
+            this[!FontSizeProperty] = win[!FontSizeProperty];
+            this[!FontFamilyProperty] = win[!FontFamilyProperty];
+            this[!FontWeightProperty] = win[!FontWeightProperty];
+            this[!FontStyleProperty] = win[!FontStyleProperty];
+            Opacity = win.Opacity;
+            this[!FlowDirectionProperty] = win[!FlowDirectionProperty];
+            this[!HorizontalContentAlignmentProperty] = win[!HorizontalContentAlignmentProperty];
+            this[!VerticalContentAlignmentProperty] = win[!VerticalContentAlignmentProperty];
+            this[!MarginProperty] = win[!MarginProperty];
+            this[!IsEnabledProperty] = win[!IsEnabledProperty];
             this[!WindowStateProperty] = win[!Window.WindowStateProperty];
 
             // Pick up the text icon if set
-            var textIcon = GetTextIcon(win);
+            string textIcon = GetTextIcon(win);
             if (!string.IsNullOrEmpty(textIcon))
-                this.Icon = textIcon;
+                Icon = textIcon;
 
             // Copy size/position from the Window to the ManagedWindow
             if (!double.IsNaN(win.Width))
-                this.Width = win.Width;
+                Width = win.Width;
             if (!double.IsNaN(win.Height))
-                this.Height = win.Height;
+                Height = win.Height;
             if (win.MinWidth > 0)
-                this.MinWidth = win.MinWidth;
+                MinWidth = win.MinWidth;
             if (win.MinHeight > 0)
-                this.MinHeight = win.MinHeight;
+                MinHeight = win.MinHeight;
             if (win.MaxWidth < double.PositiveInfinity)
-                this.MaxWidth = win.MaxWidth;
+                MaxWidth = win.MaxWidth;
             if (win.MaxHeight < double.PositiveInfinity)
-                this.MaxHeight = win.MaxHeight;
+                MaxHeight = win.MaxHeight;
             if (win.Position != default)
-                this.Position = win.Position;
-            this.CanResize = win.CanResize;
-            this.SizeToContent = win.SizeToContent;
+                Position = win.Position;
+            CanResize = win.CanResize;
+            SizeToContent = win.SizeToContent;
 
             // Move content from the Window to this ManagedWindow
-            var content = win.Content;
+            object content = win.Content;
             win.Content = null;
-            this.DataContext = win.DataContext;
-            this.Content = content;
+            DataContext = win.DataContext;
+            Content = content;
 
             // Make the original Window invisible so its empty template doesn't render
             // as an artifact. Use Opacity instead of IsVisible so Avalonia still considers
@@ -185,123 +369,12 @@ namespace Consolonia.ManagedWindows
 
             // Dispose the original Window's LayoutManager so it can't run
             // stale queued arrange/measure operations for controls we moved out.
-            var layoutManagerProp = typeof(TopLevel).GetProperty("LayoutManager",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            PropertyInfo layoutManagerProp = typeof(TopLevel).GetProperty("LayoutManager",
+                BindingFlags.Instance | BindingFlags.NonPublic);
             if (layoutManagerProp?.GetValue(win) is IDisposable layoutManager)
                 layoutManager.Dispose();
 
             _contentAdopted = true;
-        }
-
-        public Point PointToClient(PixelPoint point) => point.ToPoint(1);
-        public PixelPoint PointToScreen(Point point) => new((int)point.X, (int)point.Y);
-        public void SetCursor(ICursorImpl cursor) { }
-        public IPopupImpl CreatePopup() => null;
-        public void SetTransparencyLevelHint(IReadOnlyList<WindowTransparencyLevel> transparencyLevels) { }
-
-        public void SetFrameThemeVariant(PlatformThemeVariant themeVariant) { }
-
-        public object TryGetFeature(Type featureType)
-        {
-            return _mainWindow.TryGetFeature(featureType);
-        }
-
-        // --- IWindowBaseImpl methods ---
-        public void Show(bool activate, bool isDialog)
-        {
-            // Move content before Show so it's in our tree before any layout pass.
-            AdoptContentFromSource();
-
-            // Clamp to terminal screen size, but respect SizeToContent
-            var maxSize = _mainWindow.ClientSize;
-            var sizeToContent = this.SizeToContent;
-            if (sizeToContent != SizeToContent.Width && sizeToContent != SizeToContent.WidthAndHeight)
-            {
-                if (this.Width > maxSize.Width || double.IsNaN(this.Width))
-                    this.Width = maxSize.Width;
-            }
-
-            if (sizeToContent != SizeToContent.Height && sizeToContent != SizeToContent.WidthAndHeight)
-            {
-                if (this.Height > maxSize.Height || double.IsNaN(this.Height))
-                    this.Height = maxSize.Height;
-            }
-            if (_clientSize.Width > maxSize.Width || _clientSize.Height > maxSize.Height)
-                _clientSize = new Size(
-                    Math.Min(_clientSize.Width, maxSize.Width),
-                    Math.Min(_clientSize.Height, maxSize.Height));
-
-            this.ShowActivated = activate;
-            if (isDialog)
-            {
-                // Pass the parent ManagedWindowImpl so nested dialogs work correctly
-                var parent = _parentWindow as ManagedWindowImpl;
-                ShowDialog(parent);
-            }
-            else
-            {
-                Show();
-            }
-        }
-
-        public void Hide()
-        {
-            // close is done through Closing and Dispose()
-            this.IsVisible = false;
-        }
-
-        public void Move(PixelPoint point) => Position = point;
-
-        public void Resize(Size clientSize, WindowResizeReason reason = WindowResizeReason.Application)
-        {
-            var maxSize = _mainWindow.ClientSize;
-            clientSize = new Size(
-                Math.Min(clientSize.Width, maxSize.Width),
-                Math.Min(clientSize.Height, maxSize.Height));
-
-            _clientSize = clientSize;
-            try
-            {
-                base.ClientSize = clientSize;
-            }
-            catch (Exception ex) when (ex is NullReferenceException or InvalidOperationException)
-            {
-                // ManagedWindow template may not be applied yet
-            }
-        }
-
-        // --- IWindowImpl methods ---
-        public void SetTitle(string title) => Title = title ?? string.Empty;
-        public void SetTopmost(bool value) => Topmost = value;
-        public void SetIcon(IWindowIconImpl icon) { }
-        public void SetWindowDecorations(WindowDecorations enabled) { }
-        public void SetParent(IWindowImpl parent) => _parentWindow = parent;
-        public void SetEnabled(bool enable) => IsEnabled = enable;
-
-        public void SetMinMaxSize(Size minSize, Size maxSize)
-        {
-            MaxHeight = maxSize.Height;
-            MaxWidth = maxSize.Width;
-            MinHeight = minSize.Height;
-            MinWidth = minSize.Width;
-        }
-
-        public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint) { }
-        public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight) { }
-        public void ShowTaskbarIcon(bool value) { }
-        public void SetCanMinimize(bool value) => CanResize = value;
-        public void SetCanMaximize(bool value) => CanResize = value;
-        void IWindowImpl.CanResize(bool value) => CanResize = value;
-
-        public void BeginMoveDrag(PointerPressedEventArgs e) { }
-        public void BeginResizeDrag(WindowEdge edge, PointerPressedEventArgs e) { }
-
-        public void Dispose()
-        {
-            if (_disposing)
-                return;
-            _disposing = true;
-            Close();
         }
     }
 }

@@ -17,27 +17,25 @@ namespace Consolonia.Core.Infrastructure
 {
     public class ConsoloniaPlatform : IWindowingPlatform
     {
-        private IWindowImpl _mainWindow;
-
         internal static ConsoloniaPlatformSettings Settings =>
             AvaloniaLocator.Current.GetService<IPlatformSettings>() as ConsoloniaPlatformSettings;
 
         /// <summary>
         ///     Gets the main console window implementation.
         /// </summary>
-        internal IWindowImpl MainWindow => _mainWindow;
+        internal IWindowImpl MainWindow { get; private set; }
 
         public IWindowImpl CreateWindow()
         {
-            if (_mainWindow != null)
+            if (MainWindow != null)
             {
                 var factory = AvaloniaLocator.Current.GetService<IChildWindowImplFactory>();
                 if (factory != null)
-                    return factory.CreateChildWindow(_mainWindow);
+                    return factory.CreateChildWindow(MainWindow);
             }
 
             var window = new ConsoleWindowImpl();
-            _mainWindow = window;
+            MainWindow = window;
             return window;
         }
 
