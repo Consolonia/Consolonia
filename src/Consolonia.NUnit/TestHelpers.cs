@@ -63,7 +63,7 @@ namespace Consolonia.NUnit
             }
 
             // Produces the standard failure message with the buffer contents
-            await AssertHasNoText(unitTestConsole, pattern);
+            await unitTestConsole.AssertHasNoText(pattern);
         }
 
         /// <summary>
