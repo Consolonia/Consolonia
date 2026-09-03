@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
@@ -88,10 +89,9 @@ namespace Consolonia.PlatformSupport
                             ConsoleCapabilities.SupportsAltSolo;
             if (GetConsoleWindow() != IntPtr.Zero)
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
-
-            StartEventLoop();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public override void PauseIO(Task task)
         {
             base.PauseIO(task);
@@ -112,6 +112,12 @@ namespace Consolonia.PlatformSupport
                 int error = Marshal.GetLastWin32Error();
                 throw new Win32Exception(error, $"Error writing console input: {error}");
             }
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void StartInputLoop()
+        {
+            StartEventLoop();
         }
 
         private void StartEventLoop()

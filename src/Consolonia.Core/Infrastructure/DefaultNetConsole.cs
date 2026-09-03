@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using Avalonia.Input;
@@ -72,7 +73,11 @@ namespace Consolonia.Core.Infrastructure
             ]);
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
+        }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void StartInputLoop()
+        {
             StartSizeCheckTimerAsync();
             StartInputReading();
             _inputBuffer.StartReading();

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
 namespace Consolonia.Core.Infrastructure
@@ -23,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        public ICursorImpl CreateCursor(IBitmapImpl cursor, PixelPoint hotSpot)
+        public ICursorImpl CreateCursor(Bitmap cursor, PixelPoint hotSpot)
         {
             throw new NotSupportedException("Consolonia doesn't support bitmap based cursors");
         }

@@ -28,6 +28,8 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      IS_RELEASE_PUBLISH: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main' }}
     defaults:
       run:
         working-directory: ./src
@@ -74,22 +76,41 @@ jobs:
           fi
           dotnet pack --configuration release -o ./packages -p:ContinuousIntegrationBuild=true $VERSION_SUFFIX_ARG
       - name: Push
-        if: ${{ ((github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main') || env.VERSION_SUFFIX != '' }}
+        if: ${{ env.IS_RELEASE_PUBLISH == 'true' || env.VERSION_SUFFIX != '' }}
         run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --source https://api.nuget.org/v3/index.json
-        
-        # tagging the commit so we can track exact version when issues reported
-      - name: Tag commit with version (post-publish)
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event.inputs.push_packages == 'true') && github.ref == 'refs/heads/main' }}
+
+      - name: Prepare release metadata
+        if: ${{ env.IS_RELEASE_PUBLISH == 'true' }}
         run: |
-          set -e
-          git fetch --tags
+          set -euo pipefail
           VERSION_LITERAL=$(grep -oP '(?<=<VersionPrefix>).*?(?=</VersionPrefix>)' ../Directory.Build.props)
-          # Evaluate VERSION by replacing MSBuild variables with their values
           VERSION=$(echo "$VERSION_LITERAL" | sed "s/\\\$(ConsoloniaVersion)/$ConsoloniaVersion/g" | sed "s/\\\$(BUILD_VERSION)/$BUILD_VERSION/g")
+
           if [ -z "$VERSION" ]; then
             echo "Failed to determine version from ../Directory.Build.props" >&2
             exit 1
           fi
+
+          RELEASE_TAG="v$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+
+          mkdir -p ./release-metadata
+          echo "$BUILD_VERSION" > ./release-metadata/build_version
+          echo "$ConsoloniaVersion" > ./release-metadata/consolonia_version
+          echo "$VERSION" > ./release-metadata/release_version
+          echo "$RELEASE_TAG" > ./release-metadata/release_tag
+          echo "${{ github.sha }}" > ./release-metadata/commit_sha
+
+          echo "Prepared release metadata for tag: $RELEASE_TAG"
+        
+        # tagging the commit so we can track exact version when issues reported
+      - name: Tag commit with version (post-publish)
+        if: ${{ env.IS_RELEASE_PUBLISH == 'true' }}
+        run: |
+          set -e
+          git fetch --tags
+
           echo "Version detected: $VERSION"
           echo "BUILD_VERSION: $BUILD_VERSION"
           echo "ConsoloniaVersion: $ConsoloniaVersion"
@@ -98,11 +119,11 @@ jobs:
           git config user.email "github-actions@github.com"
           
           # Tag with full version
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "Tag v$VERSION already exists."
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists."
           else
-            git tag "v$VERSION"
-            git push origin "v$VERSION"
+            git tag "$RELEASE_TAG"
+            git push origin "$RELEASE_TAG"
           fi
           
           # Tag with BUILD_VERSION only
@@ -112,3 +133,11 @@ jobs:
             git tag "$BUILD_VERSION"
             git push origin "$BUILD_VERSION"
           fi
+
+      - name: Upload release metadata artifact
+        if: ${{ env.IS_RELEASE_PUBLISH == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-metadata
+          path: ./src/release-metadata/
+          if-no-files-found: error

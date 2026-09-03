@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia;
 using Avalonia.Media;
@@ -13,6 +14,7 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     /// <remarks>
     ///     This console buffers all output and only writes to the console on Flush.
+    ///     Thread safe
     /// </remarks>
     public class AnsiConsoleOutput : PauseBase, IConsoleOutput
 
@@ -35,12 +37,14 @@ namespace Consolonia.Core.Infrastructure
 
         public PixelBufferSize Size { get; set; }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetTitle(string title)
         {
             WriteText(Esc.SetWindowTitle(title));
             Flush();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
             if (bufferPoint.Equals(GetCaretPosition())) return;
@@ -48,11 +52,13 @@ namespace Consolonia.Core.Infrastructure
             SetCaretPositionInternal(bufferPoint);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public PixelBufferCoordinate GetCaretPosition()
         {
             return _headBufferPoint;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             if (pixel.Width <=
@@ -168,6 +174,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
             if (_outputBuffer.Length > 0)
@@ -183,12 +190,14 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         /// <remarks>This does not move the caret position, so should only be used for escape commands</remarks>
         /// <param name="str"></param>
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void WriteText(string str)
         {
             WaitPauseTaskIfNecessary();
             _outputBuffer.Append(str);
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void PrepareConsole()
         {
 #pragma warning disable CA1303 // Do not pass literals as localized parameters
@@ -213,6 +222,7 @@ namespace Consolonia.Core.Infrastructure
 #pragma warning restore CA1303 // Do not pass literals as localized parameters
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
             WriteText(Esc.DisableAlternateBuffer);
@@ -221,6 +231,7 @@ namespace Consolonia.Core.Infrastructure
             Flush();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetCaretStyle(CaretStyle caretStyle)
         {
             switch (caretStyle)
@@ -248,18 +259,21 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void HideCaret()
         {
             WriteText(Esc.HideCursor);
             Flush();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void ShowCaret()
         {
             WriteText(Esc.ShowCursor);
             Flush();
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void ClearScreen()
         {
             WriteText(Esc.ClearScreen);
@@ -312,7 +326,7 @@ namespace Consolonia.Core.Infrastructure
         ///     Write char to the console
         /// </summary>
         /// <param name="ch"></param>
-        public void WriteChar(char ch)
+        private void WriteChar(char ch)
         {
             if (ch > 0)
                 _outputBuffer.Append(ch);

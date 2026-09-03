@@ -34,6 +34,56 @@
             </Button>
         </StackPanel>
 
-        <StackPanel Grid.Row="1" />
+        <WrapPanel Grid.Row="1"
+                   Margin="2,1">
+            <!-- Border with a gradient Background -->
+            <Border Width="20"
+                    Height="6"
+                    Margin="2,1"
+                    BorderThickness="1"
+                    BorderBrush="White">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%"
+                                         EndPoint="100%,100%">
+                        <GradientStop Color="Blue"
+                                      Offset="0" />
+                        <GradientStop Color="Magenta"
+                                      Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+
+            <!-- Border with a gradient BorderBrush -->
+            <Border Width="20"
+                    Height="6"
+                    Margin="2,1"
+                    BorderThickness="1">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0%,0%"
+                                         EndPoint="100%,0%">
+                        <GradientStop Color="Lime"
+                                      Offset="0" />
+                        <GradientStop Color="Yellow"
+                                      Offset="0.5" />
+                        <GradientStop Color="Red"
+                                      Offset="1" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+            </Border>
+
+            <!-- Border with a radial gradient Background -->
+            <Border Width="20"
+                    Height="6"
+                    Margin="2,1">
+                <Border.Background>
+                    <RadialGradientBrush>
+                        <GradientStop Color="White"
+                                      Offset="0" />
+                        <GradientStop Color="DarkBlue"
+                                      Offset="1" />
+                    </RadialGradientBrush>
+                </Border.Background>
+            </Border>
+        </WrapPanel>
     </Grid>
 </UserControl>

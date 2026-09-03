@@ -9,12 +9,44 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     internal class Snapshot
     {
-        private readonly IReadOnlyList<PixelRect> _rectangles;
+        private IReadOnlyList<PixelRect> _rectangles;
 
         private Snapshot(IReadOnlyList<PixelRect> rectangles)
         {
             _rectangles = rectangles;
+
+            CalculateMinMax();
         }
+
+        public ushort MinY { get; private set; }
+        public ushort MaxY { get; private set; }
+        public ushort MinX { get; private set; }
+        public ushort MaxX { get; private set; }
+
+        public bool IsEmpty => _rectangles.Count == 0;
+
+        private void InitializeMinMax()
+        {
+            MinY = ushort.MaxValue;
+            MaxY = ushort.MinValue;
+            MinX = ushort.MaxValue;
+            MaxX = ushort.MinValue;
+        }
+
+        private void CalculateMinMax()
+        {
+            InitializeMinMax();
+
+            for (int i = 0; i < _rectangles.Count; i++)
+            {
+                PixelRect rect = _rectangles[i];
+                MinY = ushort.Min(MinY, (ushort)rect.Y);
+                MaxY = ushort.Max(MaxY, (ushort)rect.Bottom);
+                MinX = ushort.Min(MinX, (ushort)rect.X);
+                MaxX = ushort.Max(MaxX, (ushort)rect.Right);
+            }
+        }
+
 
         /// <summary>
         ///     Checks if a point is contained within any rectangle.
@@ -44,6 +76,20 @@ namespace Consolonia.Core.Infrastructure
         public bool Contains(ushort x, ushort y, bool inclusive)
         {
             return Contains(new PixelPoint(x, y), inclusive);
+        }
+
+        public void Intersect(int x, int y, ushort width, ushort height)
+        {
+            var result = new List<PixelRect>();
+            foreach (PixelRect rectangle in _rectangles)
+            {
+                PixelRect intersected = rectangle.Intersect(new PixelRect(x, y, width, height));
+                if (!intersected.IsEmpty())
+                    result.Add(intersected);
+            }
+
+            _rectangles = result.AsReadOnly();
+            CalculateMinMax();
         }
 
         /// <summary>

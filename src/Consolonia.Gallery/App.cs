@@ -5,6 +5,7 @@ using System.Threading;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Consolonia.Themes;
+using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.Gallery
 {
@@ -15,7 +16,12 @@ namespace Consolonia.Gallery
         static App()
         {
             // we want tests and UI to be executed with same culture
+            CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
             Thread.CurrentThread.CurrentUICulture = Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+            // initializing WindowsPanel so it skips modifying app styles A6172E10-6B6C-414B-AFE4-C84C6B84462D
+            _ = new WindowsPanel();
         }
 
         public override void OnFrameworkInitializationCompleted()

@@ -76,6 +76,7 @@ dotnet_diagnostic.ca1043.severity = none # todo: why not to use indexer rather t
 dotnet_diagnostic.ca1814.severity = none # sometimes we need rectangle array
 dotnet_diagnostic.ca1058.severity = none # check why new documentation warns not to derive from ApplicationException. The purpose of last is to distinguish system exceptions like OOM, AssemblyLoadException etc from application logic
 dotnet_diagnostic.ca2000.severity = none # exceptions which are listed in the rule can be applied to any type
+dotnet_diagnostic.ca2002.severity = none # we use MethodImpl(Synchronized) for simplicity
 dotnet_diagnostic.CA2007.severity = none # we are assuming task continuation thread is fine by default
 dotnet_diagnostic.ca2213.severity = none # keeping field does not mean necessarity to dispose - it can be dispose somwhere else
 dotnet_diagnostic.CA2219.severity = none # I even would avoid discussing the speculative idea behind the rule. Nice that authors at least have understanding that the exception swallowing in filter clause is an issue, next step is to understand that exceptions can not be 100% avoided anywhere in dotnet. The case we need to suppress this rule is that exception from finally block is way more important than possible exception from try block. 

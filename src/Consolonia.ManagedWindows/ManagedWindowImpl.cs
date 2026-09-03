@@ -7,6 +7,7 @@ using Avalonia.Controls.Platform;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Platform;
+using Avalonia.Platform.Surfaces;
 using Avalonia.Rendering.Composition;
 using Iciclecreek.Avalonia.WindowManager;
 
@@ -72,7 +73,7 @@ namespace Consolonia.ManagedWindows
         public new Size ClientSize => _clientSize;
         public Size? FrameSize => _clientSize;
         public double RenderScaling => 1;
-        public IEnumerable<object> Surfaces => _mainWindow.Surfaces;
+        IPlatformRenderSurface[] ITopLevelImpl.Surfaces => _mainWindow.Surfaces;
         public Action<RawInputEventArgs> Input { get; set; }
         public Action<Rect> Paint { get; set; }
         Action<Size, WindowResizeReason> ITopLevelImpl.Resized { get; set; }
@@ -98,12 +99,14 @@ namespace Consolonia.ManagedWindows
             get => base.WindowState;
             set => base.WindowState = value;
         }
+        public bool WindowStateGetterIsUsable => true;
         public Action<WindowState> WindowStateChanged { get; set; }
         public Action GotInputWhenDisabled { get; set; }
         Func<WindowCloseReason, bool> IWindowImpl.Closing { get; set; }
         public bool IsClientAreaExtendedToDecorations => false;
         public Action<bool> ExtendClientAreaToDecorationsChanged { get; set; }
         public bool NeedsManagedDecorations => false;
+        public PlatformRequestedDrawnDecoration RequestedDrawnDecorations => PlatformRequestedDrawnDecoration.None;
         public Thickness ExtendedMargins => default;
         public Thickness OffScreenMargin => default;
 
@@ -200,11 +203,6 @@ namespace Consolonia.ManagedWindows
             return _mainWindow.TryGetFeature(featureType);
         }
 
-        public void GetWindowsZOrder(Span<Window> windows, Span<long> zOrder)
-        {
-            for (int i = 0; i < zOrder.Length; i++) zOrder[i] = 0;
-        }
-
         // --- IWindowBaseImpl methods ---
         public void Show(bool activate, bool isDialog)
         {
@@ -273,7 +271,7 @@ namespace Consolonia.ManagedWindows
         public void SetTitle(string title) => Title = title ?? string.Empty;
         public void SetTopmost(bool value) => Topmost = value;
         public void SetIcon(IWindowIconImpl icon) { }
-        public void SetSystemDecorations(SystemDecorations enabled) { }
+        public void SetWindowDecorations(WindowDecorations enabled) { }
         public void SetParent(IWindowImpl parent) => _parentWindow = parent;
         public void SetEnabled(bool enable) => base.IsEnabled = enable;
 
@@ -286,7 +284,6 @@ namespace Consolonia.ManagedWindows
         }
 
         public void SetExtendClientAreaToDecorationsHint(bool extendIntoClientAreaHint) { }
-        public void SetExtendClientAreaChromeHints(ExtendClientAreaChromeHints hints) { }
         public void SetExtendClientAreaTitleBarHeightHint(double titleBarHeight) { }
         public void ShowTaskbarIcon(bool value) { }
         public void SetCanMinimize(bool value) => CanResize = value;

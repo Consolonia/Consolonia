@@ -24,8 +24,8 @@
                 <Grid ColumnDefinitions="*,Auto">
 
                     <TextBox Name="PART_TextBox"
-                             Watermark="{TemplateBinding Watermark}"
-                             UseFloatingWatermark="{TemplateBinding UseFloatingWatermark}"
+                             PlaceholderText="{TemplateBinding PlaceholderText}"
+                             UseFloatingPlaceholder="{TemplateBinding UseFloatingPlaceholder}"
                              DataValidationErrors.Errors="{TemplateBinding (DataValidationErrors.Errors)}"
                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
