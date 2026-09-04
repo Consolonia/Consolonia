@@ -1,3 +1,4 @@
+using Consolonia.Controls;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
@@ -42,6 +43,30 @@ namespace Consolonia.Core.Tests
         public bool DetectsKittyGraphicsSupportFromProbeResponse(string response)
         {
             return AnsiConsoleOutput.ResponseIndicatesKittyGraphicsSupport(response);
+        }
+
+        [TestCase("kitty", ConsoleCapabilities.None,
+            ExpectedResult = ConsoleCapabilities.SupportsKittyGraphics,
+            TestName = "KittyOverrideForcesKittyGraphicsOn")]
+        [TestCase("KITTY", ConsoleCapabilities.SupportsSixel,
+            ExpectedResult = ConsoleCapabilities.SupportsSixel | ConsoleCapabilities.SupportsKittyGraphics,
+            TestName = "KittyOverrideIsCaseInsensitiveAndKeepsSixel")]
+        [TestCase("sixel", ConsoleCapabilities.SupportsKittyGraphics,
+            ExpectedResult = ConsoleCapabilities.SupportsSixel,
+            TestName = "SixelOverrideForcesSixelAndDisablesKitty")]
+        [TestCase("quad", ConsoleCapabilities.SupportsKittyGraphics | ConsoleCapabilities.SupportsSixel,
+            ExpectedResult = ConsoleCapabilities.None,
+            TestName = "QuadOverrideDisablesGraphicsProtocols")]
+        [TestCase(null, ConsoleCapabilities.SupportsSixel,
+            ExpectedResult = ConsoleCapabilities.SupportsSixel,
+            TestName = "MissingOverrideLeavesDetectionUntouched")]
+        [TestCase("garbage", ConsoleCapabilities.SupportsSixel,
+            ExpectedResult = ConsoleCapabilities.SupportsSixel,
+            TestName = "UnknownOverrideLeavesDetectionUntouched")]
+        public ConsoleCapabilities AppliesGraphicsProtocolOverride(string overrideValue,
+            ConsoleCapabilities detected)
+        {
+            return AnsiConsoleOutput.ApplyGraphicsProtocolOverride(detected, overrideValue);
         }
     }
 }

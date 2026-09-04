@@ -264,11 +264,21 @@ namespace Consolonia.Core.Infrastructure
             // when sixel graphics are supported. DA1 is answered by every terminal, so it also acts as
             // the fence telling us all replies have arrived.
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
-                Esc.QueryKittyGraphicsSupport + Esc.RequestDeviceAttributes, 'c', 200) ?? string.Empty;
+                Esc.QueryKittyGraphicsSupport + Esc.RequestDeviceAttributes, 'c', 1000) ?? string.Empty;
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
+
+            // Some emulators handle the graphics query asynchronously and reply after DA1,
+            // so if the kitty reply was not inside the fenced response give it one more short read.
+            if (!ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
+                graphicsProbeResponse += RequestAnsiResponseHandler?.Invoke(string.Empty, '\\', 250) ?? string.Empty;
             if (ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsKittyGraphics;
+
+            // Allow overriding the detected graphics protocol, for terminals which render a protocol
+            // without answering the corresponding query (or to force the fallback for testing).
+            Capabilities = ApplyGraphicsProtocolOverride(Capabilities,
+                Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS"));
 
             BlackColorTTYWorkaround();
 
@@ -371,6 +381,25 @@ namespace Consolonia.Core.Infrastructure
         internal static bool ResponseIndicatesKittyGraphicsSupport(string response)
         {
             return response != null && response.Contains("_Gi=31;OK", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        ///     Applies the CONSOLONIA_GRAPHICS environment variable override to the detected capabilities:
+        ///     "kitty" forces kitty graphics on, "sixel" forces sixel (and kitty off), "quad" disables
+        ///     both graphics protocols. Any other value leaves detection untouched.
+        /// </summary>
+        internal static ConsoleCapabilities ApplyGraphicsProtocolOverride(ConsoleCapabilities capabilities,
+            string overrideValue)
+        {
+            return overrideValue?.Trim().ToUpperInvariant() switch
+            {
+                "KITTY" => capabilities | ConsoleCapabilities.SupportsKittyGraphics,
+                "SIXEL" => (capabilities & ~ConsoleCapabilities.SupportsKittyGraphics) |
+                           ConsoleCapabilities.SupportsSixel,
+                "QUAD" => capabilities &
+                          ~(ConsoleCapabilities.SupportsKittyGraphics | ConsoleCapabilities.SupportsSixel),
+                _ => capabilities
+            };
         }
 
         /// <summary>
