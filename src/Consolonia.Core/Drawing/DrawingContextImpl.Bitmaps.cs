@@ -344,7 +344,17 @@ namespace Consolonia.Core.Drawing
                 var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
 
                 if (perBitmap.TryGetValue(key, out KittyRenderedBitmap renderedBitmap))
+                {
+                    // The placement gets deleted when the image leaves the screen (see RenderTarget);
+                    // re-create it when the image is drawn again - the image data is still in the
+                    // terminal, so no pixel retransmission happens.
+                    if (KittyGraphics.TryReclaimPlacement(renderedBitmap.ImageId))
+                        Context._consoleWindowImpl.Console.WriteText(
+                            KittyGraphics.BuildVirtualPlacementSequence(renderedBitmap.ImageId,
+                                targetRect.Width, targetRect.Height));
+
                     return renderedBitmap.Placeholders;
+                }
 
                 // A new version of this bitmap (for example the next frame of an animation) replaces
                 // stale uploads, so delete them in the terminal to free its image storage.
@@ -356,6 +366,7 @@ namespace Consolonia.Core.Drawing
                     {
                         Context._consoleWindowImpl.Console.WriteText(
                             KittyGraphics.BuildDeleteSequence(pair.Value.ImageId));
+                        KittyGraphics.TryReclaimPlacement(pair.Value.ImageId);
                         (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(pair.Key);
                     }
 

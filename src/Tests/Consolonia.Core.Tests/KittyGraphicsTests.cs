@@ -117,5 +117,67 @@ namespace Consolonia.Core.Tests
             Assert.That(symbol.Complex, Is.EqualTo(placeholderCell));
             Assert.That(symbol.Width, Is.EqualTo(1));
         }
+
+        [Test]
+        public void DeletePlacementSequenceIsWellFormedAndKeepsImageData()
+        {
+            // lowercase d=i deletes the placements only, so the image can be placed again
+            // later without retransmitting its pixels
+            Assert.That(KittyGraphics.BuildDeletePlacementSequence(7),
+                Is.EqualTo(Apc + "a=d,d=i,q=2,i=7" + St));
+        }
+
+        [Test]
+        public void ImageIdIsExtractedFromPlaceholderPixel()
+        {
+            Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
+
+            Assert.That(KittyGraphics.TryGetImageId(in placeholderPixel, out int imageId), Is.True);
+            Assert.That(imageId, Is.EqualTo(0x123456));
+        }
+
+        [Test]
+        public void ImageIdIsNotExtractedFromOrdinaryPixels()
+        {
+            var spacePixel = new Pixel(new PixelForeground(Symbol.Space, Colors.White),
+                new PixelBackground(Colors.Black));
+            var emojiPixel = new Pixel(new Symbol("👍"), Colors.White);
+
+            Assert.That(KittyGraphics.TryGetImageId(in spacePixel, out _), Is.False);
+            Assert.That(KittyGraphics.TryGetImageId(in emojiPixel, out _), Is.False);
+        }
+
+        [Test]
+        public void PlacementReclaimIsAOneShot()
+        {
+            KittyGraphics.MarkPlacementDeleted(123456);
+
+            Assert.That(KittyGraphics.TryReclaimPlacement(123456), Is.True);
+            Assert.That(KittyGraphics.TryReclaimPlacement(123456), Is.False);
+        }
+
+        [Test]
+        public void OverwritingPlaceholderCellWithOpaqueBackgroundErasesThePlaceholder()
+        {
+            // regression: navigating to another screen paints an opaque background over the image
+            // area; the blended cell must not keep the placeholder (or the terminal would keep
+            // rendering the image slice) and must compare unequal so the diff repaints it
+            Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
+
+            Pixel overwritten = placeholderPixel.Blend(new Pixel(new PixelBackground(Colors.Black)));
+
+            Assert.That(KittyGraphics.TryGetImageId(in overwritten, out _), Is.False);
+            Assert.That(overwritten.Foreground.Symbol.Complex, Is.Null);
+            Assert.That(overwritten, Is.Not.EqualTo(placeholderPixel));
+        }
+
+        private static Pixel CreatePlaceholderPixel(int imageId)
+        {
+            // mirrors what KittyBitmapRenderer.TransmitAndCreatePlaceholders puts into the buffer
+            return new Pixel(
+                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(0, 0), 1),
+                    KittyGraphics.GetImageIdColor(imageId)),
+                PixelBackground.Transparent);
+        }
     }
 }

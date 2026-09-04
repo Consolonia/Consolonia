@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Threading;
 using Avalonia.Media;
+using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 namespace Consolonia.Core.Drawing
 {
@@ -27,6 +29,11 @@ namespace Consolonia.Core.Drawing
         // Image ids are carried in the 24 bit foreground color of placeholder cells,
         // so they must stay in the range 1..0xFFFFFF (0 is not a valid id).
         private static int _nextImageId;
+
+        // Ids whose terminal side placements were deleted because no placeholder cell referenced
+        // them anymore; the renderer re-creates the placement (without retransmitting the pixels)
+        // when the image is drawn again.
+        private static readonly ConcurrentDictionary<int, byte> DeletedPlacements = new();
 
         /// <summary>
         ///     Combining diacritics used to encode row/column numbers of unicode placeholders,
@@ -114,6 +121,32 @@ namespace Consolonia.Core.Drawing
             return PlaceholderCharacter + RowColumnDiacritics[row] + RowColumnDiacritics[column];
         }
 
+        public static void MarkPlacementDeleted(int imageId)
+        {
+            DeletedPlacements[imageId] = 0;
+        }
+
+        public static bool TryReclaimPlacement(int imageId)
+        {
+            return DeletedPlacements.TryRemove(imageId, out _);
+        }
+
+        /// <summary>
+        ///     Extracts the image id from a placeholder cell (see <see cref="GetPlaceholderCell" />),
+        ///     which carries it in the foreground color.
+        /// </summary>
+        public static bool TryGetImageId(in Pixel pixel, out int imageId)
+        {
+            imageId = 0;
+            string complex = pixel.Foreground.Symbol.Complex;
+            if (complex == null || !complex.StartsWith(PlaceholderCharacter, StringComparison.Ordinal))
+                return false;
+
+            Color color = pixel.Foreground.Color;
+            imageId = (color.R << 16) | (color.G << 8) | color.B;
+            return imageId != 0;
+        }
+
         /// <summary>
         ///     Builds the chunked APC sequence transmitting an RGBA image (a=t, f=32).
         /// </summary>
@@ -160,6 +193,15 @@ namespace Consolonia.Core.Drawing
         ///     Builds the APC sequence deleting an image and its placements, freeing the
         ///     image storage in the terminal.
         /// </summary>
+        /// <summary>
+        ///     Builds the APC sequence deleting the placements of an image while keeping its data,
+        ///     so it can be placed again later without retransmission.
+        /// </summary>
+        public static string BuildDeletePlacementSequence(int imageId)
+        {
+            return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=i,q=2,i={imageId}\u001b\\");
+        }
+
         public static string BuildDeleteSequence(int imageId)
         {
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=I,q=2,i={imageId}\u001b\\");

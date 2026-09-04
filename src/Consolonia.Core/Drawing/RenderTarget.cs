@@ -27,6 +27,11 @@ namespace Consolonia.Core.Drawing
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
 
         private ConsoleCursor _consoleCursor;
+
+        // kitty image ids referenced by placeholder cells, tracked across frames so that
+        // placements whose cells were all overwritten get deleted terminal side
+        private HashSet<int> _kittyImageIdsOnScreen = new();
+        private HashSet<int> _kittyImageIdsPreviouslyOnScreen = new();
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
 
@@ -187,6 +192,9 @@ namespace Consolonia.Core.Drawing
                 {
                     Pixel pixel = pixelBuffer[x, y];
 
+                    if (KittyGraphics.TryGetImageId(in pixel, out int kittyImageId))
+                        _kittyImageIdsOnScreen.Add(kittyImageId);
+
                     if (pixel.IsCaret())
                     {
                         if (caretPosition != null)
@@ -284,6 +292,21 @@ namespace Consolonia.Core.Drawing
                     _cache[x, y] = pixel;
                 }
             }
+
+            // Delete terminal side placements of kitty images no placeholder cell references anymore
+            // (for example after navigating to another screen). Overwriting the cells is what the
+            // protocol prescribes, but terminals which materialize placements as overlays keep
+            // showing the image until its placement is deleted.
+            foreach (int imageId in _kittyImageIdsPreviouslyOnScreen)
+                if (!_kittyImageIdsOnScreen.Contains(imageId))
+                {
+                    _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(imageId));
+                    KittyGraphics.MarkPlacementDeleted(imageId);
+                }
+
+            (_kittyImageIdsPreviouslyOnScreen, _kittyImageIdsOnScreen) =
+                (_kittyImageIdsOnScreen, _kittyImageIdsPreviouslyOnScreen);
+            _kittyImageIdsOnScreen.Clear();
 
             _console.Flush();
 #if FPS
