@@ -2,6 +2,8 @@
 //todo: this file is under refactoring. Restore the duplication finder
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -14,11 +16,17 @@ using Consolonia.Core.Dummy;
 
 namespace Consolonia.Core.Drawing
 {
+    internal readonly record struct BitmapQuantizedCacheKey(
+        int Version,
+        PixelSize TargetSize);
+
     /// <summary>
     ///     Bitmap - drawing implementation
     /// </summary>
     internal partial class DrawingContextImpl
     {
+        private BitmapRenderer _bitmapRenderer;
+
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
         {
             switch (source)
@@ -34,70 +42,15 @@ namespace Consolonia.Core.Drawing
                     Transform.Transform(destRect.BottomRight))
                 .ToPixelRect();
 
-            var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
-
-            // Resize source to be target rect * 2 so we can map to quad pixels
-            var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
-            using IBitmapImpl resizedBitmap =
-                renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
-
-            var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
-
-            using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
-
             PixelRect intersectedRect = CurrentClip.Intersect(targetRect);
 
             if (intersectedRect.IsEmpty())
                 return;
 
-            int stride = frameBuffer.RowBytes;
-            int bytesPerPixel = frameBuffer.Format.BitsPerPixel / 8;
-            unsafe
-            {
-                ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                    ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
-                ReadOnlySpan<BgraColor> pixels = MemoryMarshal.Cast<byte, BgraColor>(pixelBytes);
+            var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
 
-                int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
-                int startX = (intersectedRect.X - targetRect.TopLeft.X) * 2;
-                int endY = startY + intersectedRect.Height * 2;
-                int endX = startX + intersectedRect.Width * 2;
-
-                int py = intersectedRect.Y;
-
-                for (int y = startY; y < endY; y += 2, py++)
-                {
-                    int px = intersectedRect.X;
-                    for (int x = startX; x < endX; x += 2, px++)
-                    {
-                        var point = new PixelPoint(px, py);
-
-                        // get the quad pixel from the bitmap as a quad of 4 BgraColor values
-                        Span<BgraColor> quadPixelColors =
-                        [
-                            GetPixelColor(pixels, x, y, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x + 1, y, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x, y + 1, stride, bytesPerPixel),
-                            GetPixelColor(pixels, x + 1, y + 1, stride, bytesPerPixel)
-                        ];
-
-                        // map it to a single char to represent the 4 pixels
-                        char quadPixelChar = GetQuadPixelCharacter(quadPixelColors);
-
-                        // get the combined colors for the quad pixel
-                        Color foreground = GetForegroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-                        Color background = GetBackgroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-
-                        var imagePixel = new Pixel(
-                            new PixelForeground(new Symbol(quadPixelChar), foreground),
-                            new PixelBackground(background));
-
-                        _pixelBuffer[point] = _pixelBuffer[point].Blend(imagePixel);
-                    }
-                }
-            }
-
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            _bitmapRenderer ??= CreateBitmapRenderer();
+            _bitmapRenderer.Draw(source, renderInterface, targetRect, intersectedRect);
         }
 
         public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
@@ -105,292 +58,825 @@ namespace Consolonia.Core.Drawing
             throw new NotImplementedException();
         }
 
-
-        private static BgraColor GetPixelColor(ReadOnlySpan<BgraColor> pixels, int x, int y, int stride,
-            int bytesPerPixel)
+        /// <summary>
+        ///     Picks the best bitmap renderer the terminal is capable of (capabilities are detected in PrepareConsole).
+        /// </summary>
+        private BitmapRenderer CreateBitmapRenderer()
         {
-            int bytesPerRow = stride;
-            int pixelsPerRow = bytesPerRow / bytesPerPixel;
-            int offset = y * pixelsPerRow + x;
+            ConsoleCapabilities capabilities = _consoleWindowImpl.Console.Capabilities;
 
-            BgraColor pixel = pixels[offset];
+            // Kitty placeholders carry the image id in the 24 bit foreground color of their cells,
+            // so they require truecolor output; the EGA color mode would destroy the id.
+            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
+                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
+                return new KittyBitmapRenderer(this);
 
-            // Handle RGB24 format (no alpha channel)
-            if (bytesPerPixel == 3)
-                pixel.A = 255;
+            if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+                return new SixelBitmapRenderer(this);
 
-            return pixel;
-        }
-
-        private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
-        {
-            char character = GetColorsPattern(colors) switch
-            {
-                // ReSharper disable StringLiteralTypo
-                0b0000 => ' ',
-                0b1000 => '▘',
-                0b0100 => '▝',
-                0b0010 => '▖',
-                0b0001 => '▗',
-                0b1001 => '▚',
-                0b0110 => '▞',
-                0b1010 => '▌',
-                0b0101 => '▐',
-                0b0011 => '▄',
-                0b1100 => '▀',
-                0b1110 => '▛',
-                0b1101 => '▜',
-                0b1011 => '▙',
-                0b0111 => '▟',
-                0b1111 => '█',
-                // ReSharper restore StringLiteralTypo
-                _ => throw new NotImplementedException()
-            };
-            return character;
+            return new QuadPixelBitmapRenderer(this);
         }
 
         /// <summary>
-        ///     Combine the colors for the white part of the quad pixel character.
+        ///     Strategy for drawing a bitmap into the pixel buffer. A renderer is selected once per drawing context
+        ///     based on the console capabilities and owns whatever caching its image protocol needs.
         /// </summary>
-        /// <param name="quadPixel"></param>
-        /// <param name="pixelColors">4 colors</param>
-        /// <returns>foreground color</returns>
-        /// <exception cref="NotImplementedException"></exception>
-        private static Color GetForegroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
+        private abstract class BitmapRenderer
         {
-            if (pixelColors.Length != 4)
-                throw new ArgumentException($"{nameof(pixelColors)} must have 4 elements.");
-
-            // TODO: Some of these chars don't work in IBM Codepage
-            BgraColor bgraColor = quadPixel switch
+            protected BitmapRenderer(DrawingContextImpl context)
             {
-                ' ' => BgraColor.Transparent,
-                '▘' => pixelColors[0],
-                '▝' => pixelColors[1],
-                '▖' => pixelColors[2],
-                '▗' => pixelColors[3],
-                '▚' => CombineColors([pixelColors[0], pixelColors[3]]),
-                '▞' => CombineColors([pixelColors[1], pixelColors[2]]),
-                '▌' => CombineColors([pixelColors[0], pixelColors[2]]),
-                '▐' => CombineColors([pixelColors[1], pixelColors[3]]),
-                '▄' => CombineColors([pixelColors[2], pixelColors[3]]),
-                '▀' => CombineColors([pixelColors[0], pixelColors[1]]),
-                '▛' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
-                '▜' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
-                '▙' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
-                '▟' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
-                '█' => CombineColors(pixelColors),
-                _ => throw new NotImplementedException()
-            };
-
-            return bgraColor.ToColor();
-        }
-
-
-        /// <summary>
-        ///     Combine the colors for the black part of the quad pixel character.
-        /// </summary>
-        /// <param name="quadPixel"></param>
-        /// <param name="pixelColors"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        private static Color GetBackgroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
-        {
-            // TODO: Some of these chars don't work in IBM Codepage
-            BgraColor bgraColor = quadPixel switch
-            {
-                ' ' => CombineColors(pixelColors),
-                '▘' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
-                '▝' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
-                '▖' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
-                '▗' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
-                '▚' => CombineColors([pixelColors[1], pixelColors[2]]),
-                '▞' => CombineColors([pixelColors[0], pixelColors[3]]),
-                '▌' => CombineColors([pixelColors[1], pixelColors[3]]),
-                '▐' => CombineColors([pixelColors[0], pixelColors[2]]),
-                '▄' => CombineColors([pixelColors[0], pixelColors[1]]),
-                '▀' => CombineColors([pixelColors[2], pixelColors[3]]),
-                '▛' => pixelColors[3],
-                '▜' => pixelColors[2],
-                '▙' => pixelColors[1],
-                '▟' => pixelColors[0],
-                '█' => BgraColor.Transparent,
-                _ => throw new NotImplementedException()
-            };
-            return bgraColor.ToColor();
-        }
-
-
-        private static BgraColor CombineColors(ReadOnlySpan<BgraColor> colors)
-        {
-            float accumR = 0, accumG = 0, accumB = 0;
-            float accumAlpha = 0;
-
-            foreach (ref readonly BgraColor color in colors)
-            {
-                float a1 = color.A / 255f;
-                float oneMinusA = 1f - accumAlpha;
-
-                accumR += color.R * a1 * oneMinusA;
-                accumG += color.G * a1 * oneMinusA;
-                accumB += color.B * a1 * oneMinusA;
-                accumAlpha += a1 * oneMinusA;
+                Context = context;
             }
 
-            byte r = (byte)Math.Clamp(accumR, 0, 255);
-            byte g = (byte)Math.Clamp(accumG, 0, 255);
-            byte b = (byte)Math.Clamp(accumB, 0, 255);
-            byte a = (byte)Math.Clamp(accumAlpha * 255f, 0, 255);
+            protected DrawingContextImpl Context { get; }
 
-            return new BgraColor(b, g, r, a);
-        }
+            /// <summary>
+            ///     Draws <paramref name="source" /> into the pixel buffer over <paramref name="targetRect" /> (cell
+            ///     coordinates), limited to the visible <paramref name="intersectedRect" />, and tracks dirty regions.
+            /// </summary>
+            public abstract void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelRect targetRect, PixelRect intersectedRect);
 
-        /// <summary>
-        ///     Cluster quad colors into a pattern (like: TTFF) based on relative closeness
-        /// </summary>
-        /// <param name="colors"></param>
-        /// <returns>T or F for each color as a string</returns>
-        /// <exception cref="ArgumentException"></exception>
-        private byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
-        {
-            if (colors.Length != 4) throw new ArgumentException("Array must contain exactly 4 colors.");
-
-            if (!_consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
+            /// <summary>
+            ///     Copies the visible part of a rendered per-cell bitmap into the pixel buffer,
+            ///     tracking only the cells that actually changed as dirty (in horizontal runs).
+            /// </summary>
+            protected void CopyRenderedBitmapTrackingDirtyRegions(PixelBuffer renderedBitmap,
+                PixelRect intersectedRect, PixelRect visibleRectInTarget)
             {
-                BgraColor topRowColor = Average(colors[0], colors[1]);
-                BgraColor bottomRowColor = Average(colors[2], colors[3]);
-
-                if (colors[0].A == 0 && colors[1].A == 0 && colors[2].A == 0 && colors[3].A == 0)
-                    return 0b0000;
-
-                if (ColorEquals(topRowColor, bottomRowColor))
-                    return topRowColor.A == 0 ? (byte)0b0000 : (byte)0b1111;
-
-                double topBr = GetColorBrightness(topRowColor);
-                double bottomBr = GetColorBrightness(bottomRowColor);
-                return (byte)(topBr >= bottomBr ? 0b1100 : 0b0011);
-            }
-
-            // Initial guess: two clusters with the first two colors as centers
-            Span<BgraColor> clusterCenters = [colors[0], colors[1]];
-            Span<BgraColor> newClusterCenters = stackalloc BgraColor[2];
-            Span<int> clusters = stackalloc int[4];
-
-            for (int iteration = 0; iteration < 10; iteration++) // limit iterations to avoid infinite loop
-            {
-                // Assign colors to the closest cluster center
-                for (int i = 0; i < colors.Length; i++)
-                    clusters[i] = GetColorCluster(colors[i], clusterCenters);
-
-                // Recalculate cluster centers
-                newClusterCenters[0] = BgraColor.Transparent;
-                newClusterCenters[1] = BgraColor.Transparent;
-                for (int cluster = 0; cluster < 2; cluster++)
+                for (int y = 0; y < intersectedRect.Height; y++)
                 {
-                    // Calculate average for this cluster 
-                    int totalRed = 0, totalGreen = 0, totalBlue = 0, totalAlpha = 0;
-                    int count = 0;
-                    bool allTransparent = true;
-
-                    for (int i = 0; i < colors.Length; i++)
-                        if (clusters[i] == cluster)
+                    int dirtyRunStart = -1;
+                    for (int x = 0; x < intersectedRect.Width; x++)
+                    {
+                        var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
+                        var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
+                        Pixel newPixel = renderedBitmap[sourcePoint];
+                        if (Context._pixelBuffer[destPoint] == newPixel)
                         {
-                            BgraColor color = colors[i];
-                            totalRed += color.R;
-                            totalGreen += color.G;
-                            totalBlue += color.B;
-                            totalAlpha += color.A;
-                            count++;
+                            if (dirtyRunStart >= 0)
+                            {
+                                Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                                    intersectedRect.X + dirtyRunStart,
+                                    intersectedRect.Y + y,
+                                    x - dirtyRunStart,
+                                    1));
+                                dirtyRunStart = -1;
+                            }
 
-                            if (color.A != 0)
-                                allTransparent = false;
+                            continue;
                         }
 
-                    if (count > 0)
-                    {
-                        newClusterCenters[cluster].B = (byte)(totalBlue / count);
-                        newClusterCenters[cluster].G = (byte)(totalGreen / count);
-                        newClusterCenters[cluster].R = (byte)(totalRed / count);
-                        newClusterCenters[cluster].A = (byte)(totalAlpha / count);
+                        Context._pixelBuffer[destPoint] = newPixel;
+                        if (dirtyRunStart < 0)
+                            dirtyRunStart = x;
                     }
 
-                    if (count == 4 && allTransparent)
-                        return 0;
+                    if (dirtyRunStart >= 0)
+                    {
+                        Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
+                            intersectedRect.X + dirtyRunStart,
+                            intersectedRect.Y + y,
+                            intersectedRect.Width - dirtyRunStart,
+                            1));
+                    }
                 }
-
-                // Check for convergence
-                bool converged = true;
-                for (int i = 0; i < 2; i++)
-                    if (!ColorEquals(clusterCenters[i], newClusterCenters[i]))
-                    {
-                        converged = false;
-                        break;
-                    }
-
-                if (converged)
-                    break;
-
-                clusterCenters[0] = newClusterCenters[0];
-                clusterCenters[1] = newClusterCenters[1];
             }
 
-            // Determine which cluster is lower and which is higher
-            int lowerCluster = GetColorBrightness(clusterCenters[0]) < GetColorBrightness(clusterCenters[1]) ? 0 : 1;
-            int higherCluster = 1 - lowerCluster;
-
-            // represent bitmask where 0 for lower cluster and 1 for higher cluster
-            return (byte)
-                ((clusters[0] == higherCluster ? 0b1000 : 0) |
-                 (clusters[1] == higherCluster ? 0b0100 : 0) |
-                 (clusters[2] == higherCluster ? 0b0010 : 0) |
-                 (clusters[3] == higherCluster ? 0b0001 : 0));
-        }
-
-        private static BgraColor Average(in BgraColor a, in BgraColor b)
-        {
-            return new BgraColor(
-                (byte)((a.B + b.B) / 2),
-                (byte)((a.G + b.G) / 2),
-                (byte)((a.R + b.R) / 2),
-                (byte)((a.A + b.A) / 2));
-        }
-
-        private static bool ColorEquals(BgraColor c1, BgraColor c2)
-        {
-            return Unsafe.As<BgraColor, int>(ref c1) == Unsafe.As<BgraColor, int>(ref c2);
-        }
-
-        private static int GetColorCluster(BgraColor color, ReadOnlySpan<BgraColor> clusterCenters)
-        {
-            double minDistance = double.MaxValue;
-            int closestCluster = -1;
-
-            for (int i = 0; i < clusterCenters.Length; i++)
+            /// <summary>
+            ///     Unwraps the bitmap used as identity for render caches.
+            /// </summary>
+            protected static IBitmapImpl GetCacheBitmapImpl(IBitmapImpl bitmapImpl)
             {
-                double distance = GetColorDistance(color, clusterCenters[i]);
-                if (distance < minDistance)
+                return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
+                    ? adjustedBitmap.InnerBitmap
+                    : bitmapImpl;
+            }
+        }
+
+        /// <summary>
+        ///     Renders a bitmap as per-cell sixel images with fine-grained dirty region tracking.
+        ///     Requires a terminal with sixel support.
+        /// </summary>
+        private sealed class SixelBitmapRenderer : BitmapRenderer
+        {
+            private static readonly ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, PixelBuffer>>
+                RenderedBitmapCache = new();
+
+            public SixelBitmapRenderer(DrawingContextImpl context)
+                : base(context)
+            {
+            }
+
+            public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelRect targetRect, PixelRect intersectedRect)
+            {
+                int cellPixelWidth = Context._consoleWindowImpl.Console.CellPixelWidth;
+                int cellPixelHeight = Context._consoleWindowImpl.Console.CellPixelHeight;
+
+                var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
+                    targetRect.Height * cellPixelHeight);
+                var visibleRectInTarget = new PixelRect(
+                    intersectedRect.X - targetRect.X,
+                    intersectedRect.Y - targetRect.Y,
+                    intersectedRect.Width,
+                    intersectedRect.Height);
+
+                PixelBuffer renderedBitmap = GetOrCreateRenderedBitmap(source, targetSize, () =>
                 {
-                    minDistance = distance;
-                    closestCluster = i;
+                    var fullTargetSize = new PixelSize(targetSize.Width, targetSize.Height);
+
+                    using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
+                        ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
+                        : null;
+                    if (resizedBitmap != null)
+                        source = resizedBitmap;
+
+                    var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+
+                    using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
+
+                    unsafe
+                    {
+                        ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                            ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
+                            frameBuffer.RowBytes * frameBuffer.Size.Height);
+
+                        byte[] fullBytes = CopyVisibleBitmapBytes(pixelBytes, frameBuffer.RowBytes,
+                            fullTargetSize, 0, 0);
+
+                        // Quantize the full image once to get a shared palette
+                        Sixel fullSixel = Sixel.CreateFromBitmap(fullBytes,
+                            fullTargetSize.Width, fullTargetSize.Height,
+                            cellPixelWidth, cellPixelHeight);
+
+                        var bitmapBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
+                        byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
+
+                        for (int cellY = 0; cellY < targetRect.Height; cellY++)
+                        {
+                            for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                            {
+                                FillCellBgrxBuffer(fullBytes, fullTargetSize.Width, cellX, cellY,
+                                    cellPixelWidth, cellPixelHeight, cellBgrx);
+
+                                Sixel cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                                    cellPixelWidth, cellPixelHeight,
+                                    cellPixelWidth, cellPixelHeight, fullSixel.Palette);
+                                bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
+                                    PixelBackground.Transparent);
+                            }
+                        }
+
+                        return bitmapBuffer;
+                    }
+                });
+
+                CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect, visibleRectInTarget);
+            }
+
+            private static byte[] CopyVisibleBitmapBytes(ReadOnlySpan<byte> pixelBytes, int rowBytes,
+                PixelSize visibleTargetSize, int visibleOffsetX, int visibleOffsetY)
+            {
+                int visibleRowBytes = visibleTargetSize.Width * 4;
+                byte[] visibleBytes = GC.AllocateUninitializedArray<byte>(visibleRowBytes * visibleTargetSize.Height);
+
+                for (int row = 0; row < visibleTargetSize.Height; row++)
+                {
+                    int sourceOffset = (visibleOffsetY + row) * rowBytes + visibleOffsetX * 4;
+                    int targetOffset = row * visibleRowBytes;
+                    pixelBytes.Slice(sourceOffset, visibleRowBytes)
+                        .CopyTo(visibleBytes.AsSpan(targetOffset, visibleRowBytes));
+                }
+
+                return visibleBytes;
+            }
+
+            private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,
+                int cellPixelWidth, int cellPixelHeight, Span<byte> cellBgrx)
+            {
+                int bytesPerPixel = 4;
+                int srcRowBytes = imageWidth * bytesPerPixel;
+                int cellRowBytes = cellPixelWidth * bytesPerPixel;
+                for (int row = 0; row < cellPixelHeight; row++)
+                {
+                    int sourceOffset = ((cellY * cellPixelHeight) + row) * srcRowBytes +
+                                       (cellX * cellPixelWidth * bytesPerPixel);
+                    int targetOffset = row * cellRowBytes;
+                    bgrx.Slice(sourceOffset, cellRowBytes)
+                        .CopyTo(cellBgrx.Slice(targetOffset, cellRowBytes));
                 }
             }
 
-            return closestCluster;
+            private static PixelBuffer GetOrCreateRenderedBitmap(IBitmapImpl source, PixelSize targetSize,
+                Func<PixelBuffer> factory)
+            {
+                IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
+                var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
+                var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
+
+                if (perBitmap.TryGetValue(key, out PixelBuffer renderedBitmap))
+                    return renderedBitmap;
+
+                renderedBitmap = factory();
+                perBitmap[key] = renderedBitmap;
+                return renderedBitmap;
+            }
         }
 
-        private static double GetColorDistance(BgraColor c1, BgraColor c2)
+        /// <summary>
+        ///     Renders a bitmap via the kitty graphics protocol using unicode placeholders.
+        ///     Pixels are transmitted to the terminal once per bitmap version; every covered cell then
+        ///     becomes an ordinary text cell referencing the image (U+10EEEE plus row/column diacritics,
+        ///     image id in the foreground color), so pixel buffer diffing and occlusion work unchanged
+        ///     while redraws cost no pixel retransmission.
+        /// </summary>
+        private sealed class KittyBitmapRenderer : BitmapRenderer
         {
-            int dr = c1.R - c2.R;
-            int dg = c1.G - c2.G;
-            int db = c1.B - c2.B;
-            int da = c1.A - c2.A;
+            private static readonly
+                ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, KittyRenderedBitmap>>
+                RenderedBitmapCache = new();
 
-            return Math.Sqrt(dr * dr + dg * dg + db * db + da * da);
+            // placements larger than the placeholder diacritics can address fall back to this renderer
+            private readonly BitmapRenderer _oversizeFallbackRenderer;
+
+            public KittyBitmapRenderer(DrawingContextImpl context)
+                : base(context)
+            {
+                _oversizeFallbackRenderer =
+                    context._consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel)
+                        ? new SixelBitmapRenderer(context)
+                        : new QuadPixelBitmapRenderer(context);
+            }
+
+            public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelRect targetRect, PixelRect intersectedRect)
+            {
+                if (targetRect.Width > KittyGraphics.MaxPlacementSize ||
+                    targetRect.Height > KittyGraphics.MaxPlacementSize)
+                {
+                    _oversizeFallbackRenderer.Draw(source, renderInterface, targetRect, intersectedRect);
+                    return;
+                }
+
+                int cellPixelWidth = Context._consoleWindowImpl.Console.CellPixelWidth;
+                int cellPixelHeight = Context._consoleWindowImpl.Console.CellPixelHeight;
+
+                var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
+                    targetRect.Height * cellPixelHeight);
+                var visibleRectInTarget = new PixelRect(
+                    intersectedRect.X - targetRect.X,
+                    intersectedRect.Y - targetRect.Y,
+                    intersectedRect.Width,
+                    intersectedRect.Height);
+
+                PixelBuffer placeholderBuffer =
+                    GetOrCreatePlaceholderBuffer(source, renderInterface, targetRect, targetSize);
+
+                CopyRenderedBitmapTrackingDirtyRegions(placeholderBuffer, intersectedRect, visibleRectInTarget);
+            }
+
+            private PixelBuffer GetOrCreatePlaceholderBuffer(IBitmapImpl source,
+                IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
+            {
+                IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
+                var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
+                var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
+
+                if (perBitmap.TryGetValue(key, out KittyRenderedBitmap renderedBitmap))
+                {
+                    // The placement gets deleted when the image leaves the screen (see RenderTarget);
+                    // re-create it when the image is drawn again - the image data is still in the
+                    // terminal, so no pixel retransmission happens.
+                    if (KittyGraphics.TryReclaimPlacement(renderedBitmap.ImageId))
+                        Context._consoleWindowImpl.Console.WriteText(
+                            KittyGraphics.BuildVirtualPlacementSequence(renderedBitmap.ImageId,
+                                targetRect.Width, targetRect.Height));
+
+                    return renderedBitmap.Placeholders;
+                }
+
+                // A new version of this bitmap (typically the next frame of an animation) reuses the
+                // image id and placeholder buffer of the previous version of the same size:
+                // transmitting with an existing id replaces the image data in the terminal while
+                // the placement and the placeholder cells stay valid, so the diff re-emits no cells
+                // and only the pixel data crosses the wire. Stale versions of other sizes are
+                // deleted to free terminal-side image storage; images of bitmaps which get garbage
+                // collected without a version change are cleaned up in bulk by KittyDeleteAllImages
+                // when the console is restored.
+                KittyRenderedBitmap reusableBitmap = null;
+                List<BitmapQuantizedCacheKey> staleKeys = null;
+                foreach (KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap> pair in perBitmap)
+                    if (pair.Key.Version != cacheSource.Version)
+                    {
+                        if (reusableBitmap == null && pair.Key.TargetSize.Equals(targetSize))
+                        {
+                            reusableBitmap = pair.Value;
+                        }
+                        else
+                        {
+                            Context._consoleWindowImpl.Console.WriteText(
+                                KittyGraphics.BuildDeleteSequence(pair.Value.ImageId));
+                            KittyGraphics.TryReclaimPlacement(pair.Value.ImageId);
+                        }
+
+                        (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(pair.Key);
+                    }
+
+                if (staleKeys != null)
+                    foreach (BitmapQuantizedCacheKey staleKey in staleKeys)
+                        perBitmap.Remove(staleKey);
+
+                if (reusableBitmap != null)
+                {
+                    byte[] imageData = ExtractImageData(source, renderInterface, targetSize,
+                        out KittyImageFormat imageFormat);
+                    Context._consoleWindowImpl.Console.WriteText(KittyGraphics.BuildTransmitSequence(
+                        reusableBitmap.ImageId, targetSize.Width, targetSize.Height, imageData, imageFormat));
+                    if (KittyGraphics.TryReclaimPlacement(reusableBitmap.ImageId))
+                        Context._consoleWindowImpl.Console.WriteText(
+                            KittyGraphics.BuildVirtualPlacementSequence(reusableBitmap.ImageId,
+                                targetRect.Width, targetRect.Height));
+
+                    perBitmap[key] = reusableBitmap;
+                    return reusableBitmap.Placeholders;
+                }
+
+                renderedBitmap = TransmitAndCreatePlaceholders(source, renderInterface, targetRect, targetSize);
+                perBitmap[key] = renderedBitmap;
+                return renderedBitmap.Placeholders;
+            }
+
+            private KittyRenderedBitmap TransmitAndCreatePlaceholders(IBitmapImpl source,
+                IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
+            {
+                byte[] imageData = ExtractImageData(source, renderInterface, targetSize,
+                    out KittyImageFormat imageFormat);
+
+                int imageId = KittyGraphics.AllocateImageId();
+                Context._consoleWindowImpl.Console.WriteText(
+                    KittyGraphics.BuildTransmitSequence(imageId, targetSize.Width, targetSize.Height, imageData,
+                        imageFormat));
+                Context._consoleWindowImpl.Console.WriteText(
+                    KittyGraphics.BuildVirtualPlacementSequence(imageId, targetRect.Width, targetRect.Height));
+
+                Color imageIdColor = KittyGraphics.GetImageIdColor(imageId);
+                var placeholderBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
+                for (int cellY = 0; cellY < targetRect.Height; cellY++)
+                    for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                        placeholderBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                            new PixelForeground(
+                                Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(cellY, cellX), 1),
+                                imageIdColor),
+                            PixelBackground.Transparent);
+
+                return new KittyRenderedBitmap(imageId, placeholderBuffer);
+            }
+
+            private static byte[] ExtractImageData(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelSize targetSize, out KittyImageFormat format)
+            {
+                using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
+                    ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
+                    : null;
+
+                IBitmapImpl bitmapToRead = resizedBitmap ?? source;
+
+                // PNG is orders of magnitude smaller on the wire than raw RGBA (a full screen
+                // image is around 7MB raw, well over 9MB after base64), which matters both for
+                // the first paint and for every animation frame.
+                byte[] png = TryEncodePng(bitmapToRead);
+                if (png != null)
+                {
+                    format = KittyImageFormat.Png;
+                    return png;
+                }
+
+                // fallback for bitmap implementations which cannot encode themselves
+                format = KittyImageFormat.Rgba;
+                var readableBitmap = (IReadableBitmapImpl)bitmapToRead;
+
+                using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
+                unsafe
+                {
+                    ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                        ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
+                        frameBuffer.RowBytes * frameBuffer.Size.Height);
+
+                    return ConvertBgraToRgba(pixelBytes, frameBuffer.RowBytes, targetSize);
+                }
+            }
+
+            private static byte[] TryEncodePng(IBitmapImpl bitmap)
+            {
+                try
+                {
+                    // Avalonia bitmap implementations save as PNG (via Skia); the bitmap is
+                    // already scaled to the target size, so this encodes exactly what is shown
+                    using var stream = new MemoryStream();
+                    bitmap.Save(stream);
+                    return stream.ToArray();
+                }
+                catch (Exception exception) when (exception is NotSupportedException or NotImplementedException)
+                {
+                    return null;
+                }
+            }
+
+            private static byte[] ConvertBgraToRgba(ReadOnlySpan<byte> bgra, int rowBytes, PixelSize size)
+            {
+                byte[] rgba = GC.AllocateUninitializedArray<byte>(size.Width * size.Height * 4);
+                for (int row = 0; row < size.Height; row++)
+                {
+                    int sourceOffset = row * rowBytes;
+                    int targetOffset = row * size.Width * 4;
+                    for (int x = 0; x < size.Width; x++)
+                    {
+                        rgba[targetOffset] = bgra[sourceOffset + 2];
+                        rgba[targetOffset + 1] = bgra[sourceOffset + 1];
+                        rgba[targetOffset + 2] = bgra[sourceOffset];
+                        rgba[targetOffset + 3] = bgra[sourceOffset + 3];
+                        sourceOffset += 4;
+                        targetOffset += 4;
+                    }
+                }
+
+                return rgba;
+            }
+
+            private sealed class KittyRenderedBitmap
+            {
+                public KittyRenderedBitmap(int imageId, PixelBuffer placeholders)
+                {
+                    ImageId = imageId;
+                    Placeholders = placeholders;
+                }
+
+                public int ImageId { get; }
+
+                public PixelBuffer Placeholders { get; }
+            }
         }
 
-        private static double GetColorBrightness(BgraColor color)
+        /// <summary>
+        ///     Renders a bitmap by approximating each cell with a colored quad-pixel block character.
+        ///     This is the fallback for terminals without graphics protocol support.
+        /// </summary>
+        private sealed class QuadPixelBitmapRenderer : BitmapRenderer
         {
-            return 0.299 * color.R + 0.587 * color.G + 0.114 * color.B + color.A;
+            public QuadPixelBitmapRenderer(DrawingContextImpl context)
+                : base(context)
+            {
+            }
+
+            public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelRect targetRect, PixelRect intersectedRect)
+            {
+                // Resize source to be target rect * 2 so we can map to quad pixels
+                var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
+                using IBitmapImpl resizedBitmap =
+                    renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
+
+                var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+
+                using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
+
+                int stride = frameBuffer.RowBytes;
+                int bytesPerPixel = frameBuffer.Format.BitsPerPixel / 8;
+                unsafe
+                {
+                    ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                        ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
+
+                    int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
+                    int startX = (intersectedRect.X - targetRect.TopLeft.X) * 2;
+                    int endY = startY + intersectedRect.Height * 2;
+                    int endX = startX + intersectedRect.Width * 2;
+
+                    int py = intersectedRect.Y;
+
+                    for (int y = startY; y < endY; y += 2, py++)
+                    {
+                        int px = intersectedRect.X;
+                        for (int x = startX; x < endX; x += 2, px++)
+                        {
+                            var point = new PixelPoint(px, py);
+
+                            // get the quad pixel from the bitmap as a quad of 4 BgraColor values
+                            Span<BgraColor> quadPixelColors =
+                            [
+                                GetPixelColor(pixelBytes, x, y, stride, bytesPerPixel),
+                                GetPixelColor(pixelBytes, x + 1, y, stride, bytesPerPixel),
+                                GetPixelColor(pixelBytes, x, y + 1, stride, bytesPerPixel),
+                                GetPixelColor(pixelBytes, x + 1, y + 1, stride, bytesPerPixel)
+                            ];
+
+                            // map it to a single char to represent the 4 pixels
+                            char quadPixelChar = GetQuadPixelCharacter(quadPixelColors);
+
+                            // get the combined colors for the quad pixel
+                            Color foreground = GetForegroundColorForQuadPixel(quadPixelChar, quadPixelColors);
+                            Color background = GetBackgroundColorForQuadPixel(quadPixelChar, quadPixelColors);
+
+                            var imagePixel = new Pixel(
+                                new PixelForeground(new Symbol(quadPixelChar), foreground),
+                                new PixelBackground(background));
+
+                            Context._pixelBuffer[point] = Context._pixelBuffer[point].Blend(imagePixel);
+                        }
+                    }
+                }
+
+                Context._consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            }
+
+            private static BgraColor GetPixelColor(ReadOnlySpan<byte> pixels, int x, int y, int stride,
+                int bytesPerPixel)
+            {
+                int offset = (y * stride) + (x * bytesPerPixel);
+
+                return bytesPerPixel switch
+                {
+                    4 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]),
+                    3 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], 255),
+                    _ => throw new NotSupportedException(
+                        $"Unsupported bitmap format with {bytesPerPixel} bytes per pixel.")
+                };
+            }
+
+            private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
+            {
+                char character = GetColorsPattern(colors) switch
+                {
+                    // ReSharper disable StringLiteralTypo
+                    0b0000 => ' ',
+                    0b1000 => '▘',
+                    0b0100 => '▝',
+                    0b0010 => '▖',
+                    0b0001 => '▗',
+                    0b1001 => '▚',
+                    0b0110 => '▞',
+                    0b1010 => '▌',
+                    0b0101 => '▐',
+                    0b0011 => '▄',
+                    0b1100 => '▀',
+                    0b1110 => '▛',
+                    0b1101 => '▜',
+                    0b1011 => '▙',
+                    0b0111 => '▟',
+                    0b1111 => '█',
+                    // ReSharper restore StringLiteralTypo
+                    _ => throw new NotImplementedException()
+                };
+                return character;
+            }
+
+            /// <summary>
+            ///     Combine the colors for the white part of the quad pixel character.
+            /// </summary>
+            /// <param name="quadPixel"></param>
+            /// <param name="pixelColors">4 colors</param>
+            /// <returns>foreground color</returns>
+            /// <exception cref="NotImplementedException"></exception>
+            private static Color GetForegroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
+            {
+                if (pixelColors.Length != 4)
+                    throw new ArgumentException($"{nameof(pixelColors)} must have 4 elements.");
+
+                // TODO: Some of these chars don't work in IBM Codepage
+                BgraColor bgraColor = quadPixel switch
+                {
+                    ' ' => BgraColor.Transparent,
+                    '▘' => pixelColors[0],
+                    '▝' => pixelColors[1],
+                    '▖' => pixelColors[2],
+                    '▗' => pixelColors[3],
+                    '▚' => CombineColors([pixelColors[0], pixelColors[3]]),
+                    '▞' => CombineColors([pixelColors[1], pixelColors[2]]),
+                    '▌' => CombineColors([pixelColors[0], pixelColors[2]]),
+                    '▐' => CombineColors([pixelColors[1], pixelColors[3]]),
+                    '▄' => CombineColors([pixelColors[2], pixelColors[3]]),
+                    '▀' => CombineColors([pixelColors[0], pixelColors[1]]),
+                    '▛' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
+                    '▜' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
+                    '▙' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
+                    '▟' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
+                    '█' => CombineColors(pixelColors),
+                    _ => throw new NotImplementedException()
+                };
+
+                return bgraColor.ToColor();
+            }
+
+
+            /// <summary>
+            ///     Combine the colors for the black part of the quad pixel character.
+            /// </summary>
+            /// <param name="quadPixel"></param>
+            /// <param name="pixelColors"></param>
+            /// <returns></returns>
+            /// <exception cref="NotImplementedException"></exception>
+            private static Color GetBackgroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
+            {
+                // TODO: Some of these chars don't work in IBM Codepage
+                BgraColor bgraColor = quadPixel switch
+                {
+                    ' ' => CombineColors(pixelColors),
+                    '▘' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
+                    '▝' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
+                    '▖' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
+                    '▗' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
+                    '▚' => CombineColors([pixelColors[1], pixelColors[2]]),
+                    '▞' => CombineColors([pixelColors[0], pixelColors[3]]),
+                    '▌' => CombineColors([pixelColors[1], pixelColors[3]]),
+                    '▐' => CombineColors([pixelColors[0], pixelColors[2]]),
+                    '▄' => CombineColors([pixelColors[0], pixelColors[1]]),
+                    '▀' => CombineColors([pixelColors[2], pixelColors[3]]),
+                    '▛' => pixelColors[3],
+                    '▜' => pixelColors[2],
+                    '▙' => pixelColors[1],
+                    '▟' => pixelColors[0],
+                    '█' => BgraColor.Transparent,
+                    _ => throw new NotImplementedException()
+                };
+                return bgraColor.ToColor();
+            }
+
+
+            private static BgraColor CombineColors(ReadOnlySpan<BgraColor> colors)
+            {
+                float accumR = 0, accumG = 0, accumB = 0;
+                float accumAlpha = 0;
+
+                foreach (ref readonly BgraColor color in colors)
+                {
+                    float a1 = color.A / 255f;
+                    float oneMinusA = 1f - accumAlpha;
+
+                    accumR += color.R * a1 * oneMinusA;
+                    accumG += color.G * a1 * oneMinusA;
+                    accumB += color.B * a1 * oneMinusA;
+                    accumAlpha += a1 * oneMinusA;
+                }
+
+                byte r = (byte)Math.Clamp(accumR, 0, 255);
+                byte g = (byte)Math.Clamp(accumG, 0, 255);
+                byte b = (byte)Math.Clamp(accumB, 0, 255);
+                byte a = (byte)Math.Clamp(accumAlpha * 255f, 0, 255);
+
+                return new BgraColor(b, g, r, a);
+            }
+
+            /// <summary>
+            ///     Cluster quad colors into a pattern (like: TTFF) based on relative closeness
+            /// </summary>
+            /// <param name="colors"></param>
+            /// <returns>T or F for each color as a string</returns>
+            /// <exception cref="ArgumentException"></exception>
+            private byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
+            {
+                if (colors.Length != 4) throw new ArgumentException("Array must contain exactly 4 colors.");
+
+                if (!Context._consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
+                {
+                    BgraColor topRowColor = Average(colors[0], colors[1]);
+                    BgraColor bottomRowColor = Average(colors[2], colors[3]);
+
+                    if (colors[0].A == 0 && colors[1].A == 0 && colors[2].A == 0 && colors[3].A == 0)
+                        return 0b0000;
+
+                    if (ColorEquals(topRowColor, bottomRowColor))
+                        return topRowColor.A == 0 ? (byte)0b0000 : (byte)0b1111;
+
+                    double topBr = GetColorBrightness(topRowColor);
+                    double bottomBr = GetColorBrightness(bottomRowColor);
+                    return (byte)(topBr >= bottomBr ? 0b1100 : 0b0011);
+                }
+
+                // Initial guess: two clusters with the first two colors as centers
+                Span<BgraColor> clusterCenters = [colors[0], colors[1]];
+                Span<BgraColor> newClusterCenters = stackalloc BgraColor[2];
+                Span<int> clusters = stackalloc int[4];
+
+                for (int iteration = 0; iteration < 10; iteration++) // limit iterations to avoid infinite loop
+                {
+                    // Assign colors to the closest cluster center
+                    for (int i = 0; i < colors.Length; i++)
+                        clusters[i] = GetColorCluster(colors[i], clusterCenters);
+
+                    // Recalculate cluster centers
+                    newClusterCenters[0] = BgraColor.Transparent;
+                    newClusterCenters[1] = BgraColor.Transparent;
+                    for (int cluster = 0; cluster < 2; cluster++)
+                    {
+                        // Calculate average for this cluster
+                        int totalRed = 0, totalGreen = 0, totalBlue = 0, totalAlpha = 0;
+                        int count = 0;
+                        bool allTransparent = true;
+
+                        for (int i = 0; i < colors.Length; i++)
+                            if (clusters[i] == cluster)
+                            {
+                                BgraColor color = colors[i];
+                                totalRed += color.R;
+                                totalGreen += color.G;
+                                totalBlue += color.B;
+                                totalAlpha += color.A;
+                                count++;
+
+                                if (color.A != 0)
+                                    allTransparent = false;
+                            }
+
+                        if (count > 0)
+                        {
+                            newClusterCenters[cluster].B = (byte)(totalBlue / count);
+                            newClusterCenters[cluster].G = (byte)(totalGreen / count);
+                            newClusterCenters[cluster].R = (byte)(totalRed / count);
+                            newClusterCenters[cluster].A = (byte)(totalAlpha / count);
+                        }
+
+                        if (count == 4 && allTransparent)
+                            return 0;
+                    }
+
+                    // Check for convergence
+                    bool converged = true;
+                    for (int i = 0; i < 2; i++)
+                        if (!ColorEquals(clusterCenters[i], newClusterCenters[i]))
+                        {
+                            converged = false;
+                            break;
+                        }
+
+                    if (converged)
+                        break;
+
+                    clusterCenters[0] = newClusterCenters[0];
+                    clusterCenters[1] = newClusterCenters[1];
+                }
+
+                // Determine which cluster is lower and which is higher
+                int lowerCluster = GetColorBrightness(clusterCenters[0]) < GetColorBrightness(clusterCenters[1])
+                    ? 0
+                    : 1;
+                int higherCluster = 1 - lowerCluster;
+
+                // represent bitmask where 0 for lower cluster and 1 for higher cluster
+                return (byte)
+                    ((clusters[0] == higherCluster ? 0b1000 : 0) |
+                     (clusters[1] == higherCluster ? 0b0100 : 0) |
+                     (clusters[2] == higherCluster ? 0b0010 : 0) |
+                     (clusters[3] == higherCluster ? 0b0001 : 0));
+            }
+
+            private static BgraColor Average(in BgraColor a, in BgraColor b)
+            {
+                return new BgraColor(
+                    (byte)((a.B + b.B) / 2),
+                    (byte)((a.G + b.G) / 2),
+                    (byte)((a.R + b.R) / 2),
+                    (byte)((a.A + b.A) / 2));
+            }
+
+            private static bool ColorEquals(BgraColor c1, BgraColor c2)
+            {
+                return Unsafe.As<BgraColor, int>(ref c1) == Unsafe.As<BgraColor, int>(ref c2);
+            }
+
+            private static int GetColorCluster(BgraColor color, ReadOnlySpan<BgraColor> clusterCenters)
+            {
+                double minDistance = double.MaxValue;
+                int closestCluster = -1;
+
+                for (int i = 0; i < clusterCenters.Length; i++)
+                {
+                    double distance = GetColorDistance(color, clusterCenters[i]);
+                    if (distance < minDistance)
+                    {
+                        minDistance = distance;
+                        closestCluster = i;
+                    }
+                }
+
+                return closestCluster;
+            }
+
+            private static double GetColorDistance(BgraColor c1, BgraColor c2)
+            {
+                int dr = c1.R - c2.R;
+                int dg = c1.G - c2.G;
+                int db = c1.B - c2.B;
+                int da = c1.A - c2.A;
+
+                return Math.Sqrt(dr * dr + dg * dg + db * db + da * da);
+            }
+
+            private static double GetColorBrightness(BgraColor color)
+            {
+                return 0.299 * color.R + 0.587 * color.G + 0.114 * color.B + color.A;
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
@@ -194,6 +195,24 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(newPixel.Foreground.Symbol.Character, Is.EqualTo('a'));
             Assert.That(newPixel.Foreground.Color, Is.EqualTo(Colors.Red));
             Assert.That(newPixel.Background.Color, Is.EqualTo(Colors.Blue));
+        }
+
+        [Test]
+        public void BlendShadedBackgroundOverKittyPlaceholderDegradesItToASpace()
+        {
+            // regression: a dialog's dimming overlay blends a translucent background over the app.
+            // Blending must not keep the placeholder glyph with a mutated foreground color - the
+            // color carries the kitty image id, and a corrupted id makes the terminal render
+            // literal placeholder glyphs (a screen full of tofu boxes)
+            var placeholderPixel = new Pixel(
+                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(0, 0), 1),
+                    KittyGraphics.GetImageIdColor(0x123456)),
+                PixelBackground.Transparent);
+
+            Pixel shaded = placeholderPixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
+
+            Assert.That(KittyGraphics.IsPlaceholder(in shaded.Foreground.Symbol), Is.False);
+            Assert.That(shaded.Foreground.Symbol.Character, Is.EqualTo(' '));
         }
 
         [Test]

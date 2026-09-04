@@ -31,6 +31,10 @@ namespace Consolonia.NUnit
 
         public ConsoleCapabilities Capabilities { get; }
 
+        public int CellPixelWidth => 8;
+
+        public int CellPixelHeight => 16;
+
         public void SetTitle(string title)
         {
             Console.WriteLine($"Title changed to {title}");
@@ -53,6 +57,10 @@ namespace Consolonia.NUnit
                 PixelBuffer[position] = new Pixel(pixel.Foreground, pixel.Background);
             else
                 PixelBuffer[position] = pixel;
+        }
+
+        public void WriteSixel(PixelBufferCoordinate position, Consolonia.Core.Drawing.Sixel sixel)
+        {
         }
 
         public void WriteText(string str)

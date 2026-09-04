@@ -121,23 +121,41 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public Pixel Shade()
         {
-            return new Pixel(Foreground.Shade(), Background.Shade(), CaretStyle);
+            PixelForeground foreground = GetForegroundForColorMutation();
+            return new Pixel(foreground.Shade(), Background.Shade(), CaretStyle);
         }
 
         public Pixel Brighten()
         {
-            return new Pixel(Foreground.Brighten(), Background.Brighten(), CaretStyle);
+            PixelForeground foreground = GetForegroundForColorMutation();
+            return new Pixel(foreground.Brighten(), Background.Brighten(), CaretStyle);
         }
 
         public Pixel Invert()
         {
-            return new Pixel(new PixelForeground(Foreground.Symbol,
+            PixelForeground foreground = GetForegroundForColorMutation();
+            return new Pixel(new PixelForeground(foreground.Symbol,
                     Background.Color, // background color becomes the new foreground color
-                    Foreground.Weight,
-                    Foreground.Style,
-                    Foreground.TextDecoration),
-                new PixelBackground(Foreground.Color),
+                    foreground.Weight,
+                    foreground.Style,
+                    foreground.TextDecoration),
+                new PixelBackground(foreground.Color),
                 CaretStyle);
+        }
+
+        /// <summary>
+        ///     The foreground color of a kitty graphics placeholder cell carries the image id: any
+        ///     operation which changes cell colors would corrupt the reference and make the terminal
+        ///     render the literal placeholder glyph. Such operations therefore degrade the cell to a
+        ///     plain space first - visually honest, since whatever is being drawn over the image
+        ///     (a dimming shade, a selection) obscures it anyway.
+        /// </summary>
+        private PixelForeground GetForegroundForColorMutation()
+        {
+            return KittyGraphics.IsPlaceholder(in Foreground.Symbol)
+                ? new PixelForeground(Symbol.Space, Foreground.Color, Foreground.Weight, Foreground.Style,
+                    Foreground.TextDecoration)
+                : Foreground;
         }
 
         /// <summary>
@@ -176,14 +194,21 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     newCaretStyle = pixelAbove.CaretStyle;
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop)
+                    {
                         // merge the PixelForeground color with the pixelAbove background color
-                        newForeground = new PixelForeground(Foreground.Symbol,
-                            MergeColors(Foreground.Color, aboveBgColor, true),
-                            Foreground.Weight,
-                            Foreground.Style,
-                            Foreground.TextDecoration);
+                        // (degrading kitty placeholder cells to spaces first, since merging would
+                        // corrupt the image id their foreground color carries)
+                        PixelForeground currentForeground = GetForegroundForColorMutation();
+                        newForeground = new PixelForeground(currentForeground.Symbol,
+                            MergeColors(currentForeground.Color, aboveBgColor, true),
+                            currentForeground.Weight,
+                            currentForeground.Style,
+                            currentForeground.TextDecoration);
+                    }
                     else
+                    {
                         newForeground = pixelAbove.Foreground;
+                    }
 
                     break;
             }
