@@ -1,3 +1,3 @@
-using System;
+using System.Runtime.CompilerServices;
 
-[assembly: CLSCompliant(false)] //todo: should we make it compliant?
+[assembly: InternalsVisibleTo("Consolonia.Gallery.Tests")]
