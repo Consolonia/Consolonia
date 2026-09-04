@@ -132,14 +132,25 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
+        ///     Checks whether a symbol is a kitty unicode placeholder cell.
+        ///     Cheap enough to run on every cell of every frame: two character comparisons.
+        /// </summary>
+        public static bool IsPlaceholder(in Symbol symbol)
+        {
+            string complex = symbol.Complex;
+            return complex != null && complex.Length >= 2 &&
+                   complex[0] == PlaceholderCharacter[0] &&
+                   complex[1] == PlaceholderCharacter[1];
+        }
+
+        /// <summary>
         ///     Extracts the image id from a placeholder cell (see <see cref="GetPlaceholderCell" />),
         ///     which carries it in the foreground color.
         /// </summary>
         public static bool TryGetImageId(in Pixel pixel, out int imageId)
         {
             imageId = 0;
-            string complex = pixel.Foreground.Symbol.Complex;
-            if (complex == null || !complex.StartsWith(PlaceholderCharacter, StringComparison.Ordinal))
+            if (!IsPlaceholder(in pixel.Foreground.Symbol))
                 return false;
 
             Color color = pixel.Foreground.Color;

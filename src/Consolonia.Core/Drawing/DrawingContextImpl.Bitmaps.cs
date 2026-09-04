@@ -356,23 +356,50 @@ namespace Consolonia.Core.Drawing
                     return renderedBitmap.Placeholders;
                 }
 
-                // A new version of this bitmap (for example the next frame of an animation) replaces
-                // stale uploads, so delete them in the terminal to free its image storage.
-                // Images of bitmaps which get garbage collected without a version change are cleaned
-                // up in bulk by KittyDeleteAllImages when the console is restored.
+                // A new version of this bitmap (typically the next frame of an animation) reuses the
+                // image id and placeholder buffer of the previous version of the same size:
+                // transmitting with an existing id replaces the image data in the terminal while
+                // the placement and the placeholder cells stay valid, so the diff re-emits no cells
+                // and only the pixel data crosses the wire. Stale versions of other sizes are
+                // deleted to free terminal-side image storage; images of bitmaps which get garbage
+                // collected without a version change are cleaned up in bulk by KittyDeleteAllImages
+                // when the console is restored.
+                KittyRenderedBitmap reusableBitmap = null;
                 List<BitmapQuantizedCacheKey> staleKeys = null;
                 foreach (KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap> pair in perBitmap)
                     if (pair.Key.Version != cacheSource.Version)
                     {
-                        Context._consoleWindowImpl.Console.WriteText(
-                            KittyGraphics.BuildDeleteSequence(pair.Value.ImageId));
-                        KittyGraphics.TryReclaimPlacement(pair.Value.ImageId);
+                        if (reusableBitmap == null && pair.Key.TargetSize.Equals(targetSize))
+                        {
+                            reusableBitmap = pair.Value;
+                        }
+                        else
+                        {
+                            Context._consoleWindowImpl.Console.WriteText(
+                                KittyGraphics.BuildDeleteSequence(pair.Value.ImageId));
+                            KittyGraphics.TryReclaimPlacement(pair.Value.ImageId);
+                        }
+
                         (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(pair.Key);
                     }
 
                 if (staleKeys != null)
                     foreach (BitmapQuantizedCacheKey staleKey in staleKeys)
                         perBitmap.Remove(staleKey);
+
+                if (reusableBitmap != null)
+                {
+                    Context._consoleWindowImpl.Console.WriteText(KittyGraphics.BuildTransmitSequence(
+                        reusableBitmap.ImageId, targetSize.Width, targetSize.Height,
+                        ExtractRgba(source, renderInterface, targetSize)));
+                    if (KittyGraphics.TryReclaimPlacement(reusableBitmap.ImageId))
+                        Context._consoleWindowImpl.Console.WriteText(
+                            KittyGraphics.BuildVirtualPlacementSequence(reusableBitmap.ImageId,
+                                targetRect.Width, targetRect.Height));
+
+                    perBitmap[key] = reusableBitmap;
+                    return reusableBitmap.Placeholders;
+                }
 
                 renderedBitmap = TransmitAndCreatePlaceholders(source, renderInterface, targetRect, targetSize);
                 perBitmap[key] = renderedBitmap;
@@ -382,24 +409,7 @@ namespace Consolonia.Core.Drawing
             private KittyRenderedBitmap TransmitAndCreatePlaceholders(IBitmapImpl source,
                 IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
             {
-                using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
-                    ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
-                    : null;
-
-                var readableBitmap = (IReadableBitmapImpl)(resizedBitmap ?? source);
-
-                byte[] rgba;
-                using (ILockedFramebuffer frameBuffer = readableBitmap.Lock())
-                {
-                    unsafe
-                    {
-                        ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                            ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
-                            frameBuffer.RowBytes * frameBuffer.Size.Height);
-
-                        rgba = ConvertBgraToRgba(pixelBytes, frameBuffer.RowBytes, targetSize);
-                    }
-                }
+                byte[] rgba = ExtractRgba(source, renderInterface, targetSize);
 
                 int imageId = KittyGraphics.AllocateImageId();
                 Context._consoleWindowImpl.Console.WriteText(
@@ -418,6 +428,26 @@ namespace Consolonia.Core.Drawing
                             PixelBackground.Transparent);
 
                 return new KittyRenderedBitmap(imageId, placeholderBuffer);
+            }
+
+            private static byte[] ExtractRgba(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelSize targetSize)
+            {
+                using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
+                    ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
+                    : null;
+
+                var readableBitmap = (IReadableBitmapImpl)(resizedBitmap ?? source);
+
+                using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
+                unsafe
+                {
+                    ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
+                        ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
+                        frameBuffer.RowBytes * frameBuffer.Size.Height);
+
+                    return ConvertBgraToRgba(pixelBytes, frameBuffer.RowBytes, targetSize);
+                }
             }
 
             private static byte[] ConvertBgraToRgba(ReadOnlySpan<byte> bgra, int rowBytes, PixelSize size)

@@ -171,6 +171,43 @@ namespace Consolonia.Core.Tests
             Assert.That(overwritten, Is.Not.EqualTo(placeholderPixel));
         }
 
+        [Test]
+        public void ColorMutatingOperationsDegradePlaceholderToASpace()
+        {
+            Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
+
+            Pixel shaded = placeholderPixel.Shade();
+            Pixel brightened = placeholderPixel.Brighten();
+            Pixel inverted = placeholderPixel.Invert();
+
+            Assert.That(KittyGraphics.IsPlaceholder(in shaded.Foreground.Symbol), Is.False);
+            Assert.That(KittyGraphics.IsPlaceholder(in brightened.Foreground.Symbol), Is.False);
+            Assert.That(KittyGraphics.IsPlaceholder(in inverted.Foreground.Symbol), Is.False);
+        }
+
+        [Test]
+        public void PlaceholderPixelsAreStableFrameToFrame()
+        {
+            // steady state diff stability: identical placeholder cells must compare equal so an
+            // unchanged image region emits zero bytes per frame
+            Pixel first = CreatePlaceholderPixel(0x123456);
+            Pixel second = CreatePlaceholderPixel(0x123456);
+
+            Assert.That(first, Is.EqualTo(second));
+        }
+
+        [Test]
+        public void IsPlaceholderRecognizesPlaceholderSymbolsOnly()
+        {
+            Symbol placeholder = Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(5, 7), 1);
+            var emoji = new Symbol("👍");
+            Symbol space = Symbol.Space;
+
+            Assert.That(KittyGraphics.IsPlaceholder(in placeholder), Is.True);
+            Assert.That(KittyGraphics.IsPlaceholder(in emoji), Is.False);
+            Assert.That(KittyGraphics.IsPlaceholder(in space), Is.False);
+        }
+
         private static Pixel CreatePlaceholderPixel(int imageId)
         {
             // mirrors what KittyBitmapRenderer.TransmitAndCreatePlaceholders puts into the buffer
