@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -389,9 +390,10 @@ namespace Consolonia.Core.Drawing
 
                 if (reusableBitmap != null)
                 {
+                    byte[] imageData = ExtractImageData(source, renderInterface, targetSize,
+                        out KittyImageFormat imageFormat);
                     Context._consoleWindowImpl.Console.WriteText(KittyGraphics.BuildTransmitSequence(
-                        reusableBitmap.ImageId, targetSize.Width, targetSize.Height,
-                        ExtractRgba(source, renderInterface, targetSize)));
+                        reusableBitmap.ImageId, targetSize.Width, targetSize.Height, imageData, imageFormat));
                     if (KittyGraphics.TryReclaimPlacement(reusableBitmap.ImageId))
                         Context._consoleWindowImpl.Console.WriteText(
                             KittyGraphics.BuildVirtualPlacementSequence(reusableBitmap.ImageId,
@@ -409,11 +411,13 @@ namespace Consolonia.Core.Drawing
             private KittyRenderedBitmap TransmitAndCreatePlaceholders(IBitmapImpl source,
                 IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
             {
-                byte[] rgba = ExtractRgba(source, renderInterface, targetSize);
+                byte[] imageData = ExtractImageData(source, renderInterface, targetSize,
+                    out KittyImageFormat imageFormat);
 
                 int imageId = KittyGraphics.AllocateImageId();
                 Context._consoleWindowImpl.Console.WriteText(
-                    KittyGraphics.BuildTransmitSequence(imageId, targetSize.Width, targetSize.Height, rgba));
+                    KittyGraphics.BuildTransmitSequence(imageId, targetSize.Width, targetSize.Height, imageData,
+                        imageFormat));
                 Context._consoleWindowImpl.Console.WriteText(
                     KittyGraphics.BuildVirtualPlacementSequence(imageId, targetRect.Width, targetRect.Height));
 
@@ -430,14 +434,28 @@ namespace Consolonia.Core.Drawing
                 return new KittyRenderedBitmap(imageId, placeholderBuffer);
             }
 
-            private static byte[] ExtractRgba(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-                PixelSize targetSize)
+            private static byte[] ExtractImageData(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+                PixelSize targetSize, out KittyImageFormat format)
             {
                 using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
                     ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
                     : null;
 
-                var readableBitmap = (IReadableBitmapImpl)(resizedBitmap ?? source);
+                IBitmapImpl bitmapToRead = resizedBitmap ?? source;
+
+                // PNG is orders of magnitude smaller on the wire than raw RGBA (a full screen
+                // image is around 7MB raw, well over 9MB after base64), which matters both for
+                // the first paint and for every animation frame.
+                byte[] png = TryEncodePng(bitmapToRead);
+                if (png != null)
+                {
+                    format = KittyImageFormat.Png;
+                    return png;
+                }
+
+                // fallback for bitmap implementations which cannot encode themselves
+                format = KittyImageFormat.Rgba;
+                var readableBitmap = (IReadableBitmapImpl)bitmapToRead;
 
                 using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
                 unsafe
@@ -447,6 +465,22 @@ namespace Consolonia.Core.Drawing
                         frameBuffer.RowBytes * frameBuffer.Size.Height);
 
                     return ConvertBgraToRgba(pixelBytes, frameBuffer.RowBytes, targetSize);
+                }
+            }
+
+            private static byte[] TryEncodePng(IBitmapImpl bitmap)
+            {
+                try
+                {
+                    // Avalonia bitmap implementations save as PNG (via Skia); the bitmap is
+                    // already scaled to the target size, so this encodes exactly what is shown
+                    using var stream = new MemoryStream();
+                    bitmap.Save(stream);
+                    return stream.ToArray();
+                }
+                catch (Exception exception) when (exception is NotSupportedException or NotImplementedException)
+                {
+                    return null;
                 }
             }
 

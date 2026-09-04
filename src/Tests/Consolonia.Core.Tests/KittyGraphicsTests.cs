@@ -71,21 +71,33 @@ namespace Consolonia.Core.Tests
         {
             byte[] rgba = { 1, 2, 3, 4 };
 
-            string sequence = KittyGraphics.BuildTransmitSequence(3, 1, 1, rgba);
+            string sequence = KittyGraphics.BuildTransmitSequence(3, 1, 1, rgba, KittyImageFormat.Rgba);
 
             Assert.That(sequence,
                 Is.EqualTo(Apc + "a=t,f=32,q=2,i=3,s=1,v=1,m=0;" + Convert.ToBase64String(rgba) + St));
         }
 
         [Test]
+        public void PngImageIsTransmittedAsFormat100WithoutDimensions()
+        {
+            // a PNG payload carries its own dimensions, so no s= and v= keys
+            byte[] png = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+
+            string sequence = KittyGraphics.BuildTransmitSequence(4, 100, 200, png, KittyImageFormat.Png);
+
+            Assert.That(sequence,
+                Is.EqualTo(Apc + "a=t,f=100,q=2,i=4,m=0;" + Convert.ToBase64String(png) + St));
+        }
+
+        [Test]
         public void LargeImageIsTransmittedInChunksWhichReassembleToThePayload()
         {
-            // 2000 pixels of RGBA make a base64 payload larger than two 4096 char chunks
+            // 8000 bytes of arbitrary binary payload make a base64 string larger than two 4096 char chunks
             byte[] rgba = new byte[2000 * 4];
             for (int i = 0; i < rgba.Length; i++)
                 rgba[i] = unchecked((byte)(i * 31));
 
-            string sequence = KittyGraphics.BuildTransmitSequence(9, 50, 40, rgba);
+            string sequence = KittyGraphics.BuildTransmitSequence(9, 50, 40, rgba, KittyImageFormat.Rgba);
 
             string[] chunks = sequence.Split(St, StringSplitOptions.RemoveEmptyEntries);
             Assert.That(chunks.Length, Is.GreaterThan(2));

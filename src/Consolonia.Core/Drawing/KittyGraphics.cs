@@ -18,6 +18,18 @@ namespace Consolonia.Core.Drawing
     ///     buffer diffing and occlusion like any other cell, while the image pixels cross the
     ///     wire only once.
     /// </summary>
+    /// <summary>
+    ///     Pixel data formats of the kitty graphics protocol (the f key of a transmit command).
+    /// </summary>
+    internal enum KittyImageFormat
+    {
+        /// <summary>Raw 32 bit RGBA (f=32). Roughly 4 bytes per pixel plus base64 expansion.</summary>
+        Rgba,
+
+        /// <summary>PNG encoded (f=100). Orders of magnitude smaller on the wire for real images.</summary>
+        Png
+    }
+
     internal static class KittyGraphics
     {
         /// <summary>The unicode placeholder codepoint U+10EEEE as a utf-16 string.</summary>
@@ -159,13 +171,15 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Builds the chunked APC sequence transmitting an RGBA image (a=t, f=32).
+        ///     Builds the chunked APC sequence transmitting an image (a=t): PNG encoded (f=100,
+        ///     the image carries its own dimensions) or raw 32 bit RGBA (f=32).
         /// </summary>
-        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight, byte[] rgba)
+        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight, byte[] data,
+            KittyImageFormat format)
         {
-            ArgumentNullException.ThrowIfNull(rgba);
+            ArgumentNullException.ThrowIfNull(data);
 
-            string payload = Convert.ToBase64String(rgba);
+            string payload = Convert.ToBase64String(data);
             var stringBuilder = new StringBuilder(payload.Length + 128);
             int offset = 0;
             bool first = true;
@@ -176,8 +190,11 @@ namespace Consolonia.Core.Drawing
                 stringBuilder.Append("\u001b_G");
                 if (first)
                 {
-                    stringBuilder.Append(CultureInfo.InvariantCulture,
-                        $"a=t,f=32,q=2,i={imageId},s={pixelWidth},v={pixelHeight},");
+                    string header = format == KittyImageFormat.Png
+                        ? string.Create(CultureInfo.InvariantCulture, $"a=t,f=100,q=2,i={imageId},")
+                        : string.Create(CultureInfo.InvariantCulture,
+                            $"a=t,f=32,q=2,i={imageId},s={pixelWidth},v={pixelHeight},");
+                    stringBuilder.Append(header);
                     first = false;
                 }
 
