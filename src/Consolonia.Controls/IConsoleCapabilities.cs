@@ -42,7 +42,12 @@ namespace Consolonia.Controls
         /// <summary>
         ///     Supports the kitty graphics protocol
         /// </summary>
-        SupportsKittyGraphics = 0x80
+        SupportsKittyGraphics = 0x80,
+
+        /// <summary>
+        ///     Supports synchronized output (DEC private mode 2026), letting a whole frame be applied atomically
+        /// </summary>
+        SupportsSynchronizedOutput = 0x100
     }
 
     public interface IConsoleCapabilities

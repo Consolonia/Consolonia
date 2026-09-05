@@ -258,13 +258,18 @@ namespace Consolonia.Core.Infrastructure
             this.CellPixelHeight = cellH;
             this.CellPixelWidth = cellW;
 
-            // Detect terminal graphics support with a single round trip. The kitty graphics query is
-            // answered with "APC _Gi=31;OK ST" by supporting terminals and ignored by all others, and the
-            // Primary Device Attributes (DA1) response, for example ESC[?62;4;22c, reports feature 4
-            // when sixel graphics are supported. DA1 is answered by every terminal, so it also acts as
-            // the fence telling us all replies have arrived.
+            // Detect terminal graphics and synchronized output support with a single round trip. The
+            // kitty graphics query is answered with "APC _Gi=31;OK ST" by supporting terminals and
+            // ignored by all others, the DECRQM query for mode 2026 is answered with "CSI?2026;<state>$y"
+            // by terminals which know synchronized output, and the Primary Device Attributes (DA1)
+            // response, for example ESC[?62;4;22c, reports feature 4 when sixel graphics are supported.
+            // DA1 is answered by every terminal, so it also acts as the fence telling us all replies
+            // have arrived (neither of the other replies contains a 'c').
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
-                Esc.QueryKittyGraphicsSupport + Esc.RequestDeviceAttributes, 'c', 1000) ?? string.Empty;
+                Esc.QueryKittyGraphicsSupport + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
+                'c', 1000) ?? string.Empty;
+            if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsSynchronizedOutput;
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
 
@@ -289,6 +294,11 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
+            // close any synchronized update left open by an interrupted frame, so the terminal
+            // does not sit on withheld output until its fallback timeout expires
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
+                WriteText(Esc.EndSynchronizedUpdate);
+
             // free terminal-side image storage held by kitty graphics placements
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
                 WriteText(Esc.KittyDeleteAllImages);
@@ -381,6 +391,30 @@ namespace Consolonia.Core.Infrastructure
         internal static bool ResponseIndicatesKittyGraphicsSupport(string response)
         {
             return response != null && response.Contains("_Gi=31;OK", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.RequestSynchronizedOutputMode" /> reports
+        ///     DEC private mode 2026 as available. DECRPM states 1 (set), 2 (reset) and 3 (permanently
+        ///     set) mean the terminal applies synchronized updates; 0 (unrecognized) and 4 (permanently
+        ///     reset) mean it does not.
+        /// </summary>
+        internal static bool ResponseIndicatesSynchronizedOutputSupport(string response)
+        {
+            if (string.IsNullOrEmpty(response))
+                return false;
+
+            const string prefix = "[?2026;";
+            int start = response.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+                return false;
+
+            int stateStart = start + prefix.Length;
+            int end = response.IndexOf("$y", stateStart, StringComparison.Ordinal);
+            if (end < 0)
+                return false;
+
+            return response[stateStart..end] is "1" or "2" or "3";
         }
 
         /// <summary>

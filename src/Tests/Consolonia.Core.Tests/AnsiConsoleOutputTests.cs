@@ -45,6 +45,27 @@ namespace Consolonia.Core.Tests
             return AnsiConsoleOutput.ResponseIndicatesKittyGraphicsSupport(response);
         }
 
+        [TestCase("[?2026;1$y", ExpectedResult = true,
+            TestName = "SynchronizedOutputSetStateIsDetected")]
+        [TestCase("[?2026;2$y", ExpectedResult = true,
+            TestName = "SynchronizedOutputResetStateIsDetected")]
+        [TestCase("[?2026;3$y", ExpectedResult = true,
+            TestName = "SynchronizedOutputPermanentlySetStateIsDetected")]
+        [TestCase("[?2026;0$y", ExpectedResult = false,
+            TestName = "SynchronizedOutputUnrecognizedModeIsRejected")]
+        [TestCase("[?2026;4$y", ExpectedResult = false,
+            TestName = "SynchronizedOutputPermanentlyResetStateIsRejected")]
+        [TestCase("_Gi=31;OK[?2026;2$y[?62;4;22c", ExpectedResult = true,
+            TestName = "SynchronizedOutputReplyCombinedWithOtherProbeRepliesIsDetected")]
+        [TestCase("[?62;4;22c", ExpectedResult = false,
+            TestName = "DeviceAttributesAloneAreNotSynchronizedOutput")]
+        [TestCase("", ExpectedResult = false,
+            TestName = "EmptySynchronizedOutputResponseIsRejected")]
+        public bool DetectsSynchronizedOutputSupportFromProbeResponse(string response)
+        {
+            return AnsiConsoleOutput.ResponseIndicatesSynchronizedOutputSupport(response);
+        }
+
         [TestCase("kitty", ConsoleCapabilities.None,
             ExpectedResult = ConsoleCapabilities.SupportsKittyGraphics,
             TestName = "KittyOverrideForcesKittyGraphicsOn")]
