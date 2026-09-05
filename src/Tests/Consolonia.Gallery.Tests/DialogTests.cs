@@ -15,11 +15,17 @@ namespace Consolonia.Gallery.Tests
         {
             await UITest.KeyInput(Key.Enter);
             await UITest.KeyInput(Key.Tab);
-            await UITest.AssertHasText(SomeDialogWindow.DialogTitle);
-            await UITest.AssertHasText("One More");
+            // The dialog opens and paints asynchronously; poll so slow CI runners
+            // don't assert before its content has been laid out and rendered.
+            await UITest.WaitForText(SomeDialogWindow.DialogTitle);
+            await UITest.WaitForText("One More");
             await UITest.KeyInput(Key.Escape);
-            // await Task.Delay(100);
-            await UITest.AssertHasNoText("One More");
+            // The dialog closes asynchronously after Escape; poll instead of a fixed
+            // delay so slow CI runners don't fail while the close is still in flight.
+            await UITest.WaitForNoText("One More");
+            // Also wait for the window chrome to be gone, so the next fixture does not
+            // start asserting while the dialog's frame is still being repainted away.
+            await UITest.WaitForNoText(SomeDialogWindow.DialogTitle);
         }
     }
 }
