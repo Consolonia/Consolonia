@@ -70,7 +70,7 @@ namespace Consolonia.Gallery.Tests
                 " ▄ ▄■▄▄▄████▓▒▒░ ▓▒░ ▐▀▄▀▓▓▒░█▓▄▄░▒▓▓▓▓▓▓■▀▓▀▌▐▌▐█▄▄▀ ");
         }
 
-        private static async Task ClickNext()
+        private async Task ClickNext()
         {
             await UITest.KeyInput(Key.Space);
             await Task.Delay(500); //todo: slow test
