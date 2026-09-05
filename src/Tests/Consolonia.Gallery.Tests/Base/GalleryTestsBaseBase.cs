@@ -30,7 +30,7 @@ namespace Consolonia.Gallery.Tests.Base
                 .WithConsoleFonts();
         }
 
-        [OneTimeSetUp]
+        [SetUp]
         public async Task Setup()
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
