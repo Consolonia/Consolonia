@@ -184,17 +184,17 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void ColorMutatingOperationsDegradePlaceholderToASpace()
+        public void ColorMutatingOperationsLeavePlaceholderUntouched()
         {
+            // the foreground color carries the image id, so a mutated color corrupts the reference
+            // (tofu boxes) and a degrade-to-space kills the picture under every window shadow. The
+            // cell must come back bit-identical: the image shows through the effect unmodified,
+            // and the diff sees no change to re-emit
             Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
 
-            Pixel shaded = placeholderPixel.Shade();
-            Pixel brightened = placeholderPixel.Brighten();
-            Pixel inverted = placeholderPixel.Invert();
-
-            Assert.That(KittyGraphics.IsPlaceholder(in shaded.Foreground.Symbol), Is.False);
-            Assert.That(KittyGraphics.IsPlaceholder(in brightened.Foreground.Symbol), Is.False);
-            Assert.That(KittyGraphics.IsPlaceholder(in inverted.Foreground.Symbol), Is.False);
+            Assert.That(placeholderPixel.Shade(), Is.EqualTo(placeholderPixel));
+            Assert.That(placeholderPixel.Brighten(), Is.EqualTo(placeholderPixel));
+            Assert.That(placeholderPixel.Invert(), Is.EqualTo(placeholderPixel));
         }
 
         [Test]
