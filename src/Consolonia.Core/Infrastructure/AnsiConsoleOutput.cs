@@ -28,6 +28,11 @@ namespace Consolonia.Core.Infrastructure
 
         private readonly ArrayBufferWriter<byte> _outputBuffer = new();
 
+        // Diagnostic: set CONSOLONIA_DEBUG_FLUSH to a file path to log the byte size of every
+        // flushed frame plus how many kitty transmits (a=t) it carried.
+        private static readonly string DebugFlushLogPath =
+            Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FLUSH");
+
         private PixelBufferCoordinate _headBufferPoint;
         private Color _lastBackground = Colors.Transparent;
         private Color _lastForeground = Colors.Transparent;
@@ -203,9 +208,48 @@ namespace Consolonia.Core.Infrastructure
             if (_outputBuffer.WrittenCount > 0)
             {
                 WaitPauseTaskIfNecessary();
+
+                if (DebugFlushLogPath != null)
+                    LogFlushDiagnostics(_outputBuffer.WrittenSpan);
+
+                // Wrap every flushed batch in a synchronized update (DEC 2026) where supported, so
+                // the terminal applies it atomically instead of repainting mid-parse. Done here
+                // rather than by the render loop so begin and end always go out as a pair: a frame
+                // abandoned to an exception must not leave the terminal holding output forever.
+                bool synchronizedOutput = Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput);
+                if (synchronizedOutput)
+                    _stdOut.Write(BeginSynchronizedUpdateBytes);
                 _stdOut.Write(_outputBuffer.WrittenSpan);
+                if (synchronizedOutput)
+                    _stdOut.Write(EndSynchronizedUpdateBytes);
+
                 _stdOut.Flush();
                 _outputBuffer.Clear();
+            }
+        }
+
+        private static readonly byte[] BeginSynchronizedUpdateBytes = Encoding.ASCII.GetBytes(Esc.BeginSynchronizedUpdate);
+        private static readonly byte[] EndSynchronizedUpdateBytes = Encoding.ASCII.GetBytes(Esc.EndSynchronizedUpdate);
+
+        private static void LogFlushDiagnostics(ReadOnlySpan<byte> frame)
+        {
+            int transmits = 0;
+            ReadOnlySpan<byte> marker = "_Ga=t"u8;
+            ReadOnlySpan<byte> rest = frame;
+            for (int found = rest.IndexOf(marker); found >= 0; found = rest.IndexOf(marker))
+            {
+                transmits++;
+                rest = rest[(found + marker.Length)..];
+            }
+
+            try
+            {
+                File.AppendAllText(DebugFlushLogPath,
+                    $"{DateTime.Now:HH:mm:ss.fff} bytes={frame.Length} a=t count={transmits}{Environment.NewLine}");
+            }
+            catch (IOException)
+            {
+                // diagnostics must never take the app down
             }
         }
 

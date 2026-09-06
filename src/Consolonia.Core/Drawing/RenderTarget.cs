@@ -14,7 +14,6 @@ using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
-using Consolonia.Core.Text;
 
 namespace Consolonia.Core.Drawing
 {
@@ -160,16 +159,6 @@ namespace Consolonia.Core.Drawing
 
             if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
                 InitializeCacheInternal();
-
-            // Wrap the frame in a synchronized update (DEC 2026) where supported, so the terminal
-            // applies it atomically instead of repainting mid-parse. Without this, rewriting kitty
-            // placeholder cells tears visibly: overwriting a placeholder removes its image tile
-            // until the rewrite of that cell arrives, and a repaint in between shows the bare
-            // cell background where the picture belongs.
-            bool synchronizedOutput =
-                _console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput);
-            if (synchronizedOutput)
-                _console.WriteText(Esc.BeginSynchronizedUpdate);
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -318,9 +307,6 @@ namespace Consolonia.Core.Drawing
             (_kittyImageIdsPreviouslyOnScreen, _kittyImageIdsOnScreen) =
                 (_kittyImageIdsOnScreen, _kittyImageIdsPreviouslyOnScreen);
             _kittyImageIdsOnScreen.Clear();
-
-            if (synchronizedOutput)
-                _console.WriteText(Esc.EndSynchronizedUpdate);
 
             _console.Flush();
 #if FPS
