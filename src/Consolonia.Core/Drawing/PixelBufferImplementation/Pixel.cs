@@ -139,7 +139,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     Foreground.Weight,
                     Foreground.Style,
                     Foreground.TextDecoration),
-                new PixelBackground(Foreground.Color),
+                new PixelBackground(Foreground.Color, Background.Tile),
                 CaretStyle);
         }
 
@@ -213,8 +213,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     break;
             }
 
-            // Background is always blended
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false));
+            // Background is always blended. A non-opaque overlay keeps the background's image tile:
+            // the image is only evicted by an opaque background painted over the cell (the fully
+            // opaque fast path above returns the overlay pixel, tile-less, which is that eviction).
+            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
+                Background.Tile);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
         }

@@ -472,6 +472,10 @@ namespace Consolonia.Core.Infrastructure
             return overrideValue?.Trim().ToUpperInvariant() switch
             {
                 "KITTY" => capabilities | ConsoleCapabilities.SupportsKittyGraphics,
+                // the renderer reads the same variable to pick the kitty mode: rect placements
+                // are the default, "kittyplaceholder" selects the legacy unicode-placeholder mode
+                "KITTYRECT" => capabilities | ConsoleCapabilities.SupportsKittyGraphics,
+                "KITTYPLACEHOLDER" => capabilities | ConsoleCapabilities.SupportsKittyGraphics,
                 "SIXEL" => (capabilities & ~ConsoleCapabilities.SupportsKittyGraphics) |
                            ConsoleCapabilities.SupportsSixel,
                 "QUAD" => capabilities &

@@ -65,11 +65,17 @@ namespace Consolonia.Core.Drawing
         {
             ConsoleCapabilities capabilities = _consoleWindowImpl.Console.Capabilities;
 
-            // Kitty placeholders carry the image id in the 24 bit foreground color of their cells,
-            // so they require truecolor output; the EGA color mode would destroy the id.
+            // Kitty graphics default to classic rect placements ("image as cell background"):
+            // glyphs composite over the picture and an opaque background evicts it. The legacy
+            // placeholder mode remains selectable with CONSOLONIA_GRAPHICS=kittyplaceholder; its
+            // cells carry the image id in their 24 bit foreground color, hence the truecolor
+            // requirement, which the rect mode keeps for capability parity.
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
                 AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(this);
+                return new KittyBitmapRenderer(this,
+                    placementMode: !string.Equals(
+                        Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS")?.Trim(),
+                        "kittyplaceholder", StringComparison.OrdinalIgnoreCase));
 
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
                 return new SixelBitmapRenderer(this);
@@ -301,9 +307,17 @@ namespace Consolonia.Core.Drawing
             // placements larger than the placeholder diacritics can address fall back to this renderer
             private readonly BitmapRenderer _oversizeFallbackRenderer;
 
-            public KittyBitmapRenderer(DrawingContextImpl context)
+            // Classic rect-placement mode ("image as cell background"): instead of placeholder
+            // cells, every covered cell carries a KittyTile in its BACKGROUND and keeps its
+            // foreground free for glyphs. RenderTarget coalesces contiguous tiles into classic
+            // placements at z=-1, which the terminal draws below text - so borders, labels and
+            // shadows composite over the picture, and painting an opaque background evicts it.
+            private readonly bool _placementMode;
+
+            public KittyBitmapRenderer(DrawingContextImpl context, bool placementMode = false)
                 : base(context)
             {
+                _placementMode = placementMode;
                 _oversizeFallbackRenderer =
                     context._consoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel)
                         ? new SixelBitmapRenderer(context)
@@ -313,8 +327,11 @@ namespace Consolonia.Core.Drawing
             public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
                 PixelRect targetRect, PixelRect intersectedRect)
             {
-                if (targetRect.Width > KittyGraphics.MaxPlacementSize ||
-                    targetRect.Height > KittyGraphics.MaxPlacementSize)
+                // the diacritic table bounds placeholder addressing only; rect placements use
+                // pixel crops and have no such limit
+                if (!_placementMode &&
+                    (targetRect.Width > KittyGraphics.MaxPlacementSize ||
+                     targetRect.Height > KittyGraphics.MaxPlacementSize))
                 {
                     _oversizeFallbackRenderer.Draw(source, renderInterface, targetRect, intersectedRect);
                     return;
@@ -348,8 +365,9 @@ namespace Consolonia.Core.Drawing
                 {
                     // The placement gets deleted when the image leaves the screen (see RenderTarget);
                     // re-create it when the image is drawn again - the image data is still in the
-                    // terminal, so no pixel retransmission happens.
-                    if (KittyGraphics.TryReclaimPlacement(renderedBitmap.ImageId))
+                    // terminal, so no pixel retransmission happens. Rect mode has no virtual
+                    // placement: RenderTarget derives classic placements from the tiles each frame.
+                    if (!_placementMode && KittyGraphics.TryReclaimPlacement(renderedBitmap.ImageId))
                         Context._consoleWindowImpl.Console.WriteText(
                             KittyGraphics.BuildVirtualPlacementSequence(renderedBitmap.ImageId,
                                 targetRect.Width, targetRect.Height));
@@ -370,7 +388,11 @@ namespace Consolonia.Core.Drawing
                 foreach (KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap> pair in perBitmap)
                     if (pair.Key.Version != cacheSource.Version)
                     {
-                        if (reusableBitmap == null && pair.Key.TargetSize.Equals(targetSize))
+                        // Rect mode never reuses an id across versions: a classic placement binds
+                        // to the image it was created against, so retransmitting under the same id
+                        // would leave the placements showing the old pixels. A fresh id changes the
+                        // cells' tiles, which re-keys the rectangles and re-places them.
+                        if (!_placementMode && reusableBitmap == null && pair.Key.TargetSize.Equals(targetSize))
                         {
                             reusableBitmap = pair.Value;
                         }
@@ -394,7 +416,7 @@ namespace Consolonia.Core.Drawing
                         out KittyImageFormat imageFormat);
                     Context._consoleWindowImpl.Console.WriteText(KittyGraphics.BuildTransmitSequence(
                         reusableBitmap.ImageId, targetSize.Width, targetSize.Height, imageData, imageFormat));
-                    if (KittyGraphics.TryReclaimPlacement(reusableBitmap.ImageId))
+                    if (!_placementMode && KittyGraphics.TryReclaimPlacement(reusableBitmap.ImageId))
                         Context._consoleWindowImpl.Console.WriteText(
                             KittyGraphics.BuildVirtualPlacementSequence(reusableBitmap.ImageId,
                                 targetRect.Width, targetRect.Height));
@@ -418,20 +440,38 @@ namespace Consolonia.Core.Drawing
                 Context._consoleWindowImpl.Console.WriteText(
                     KittyGraphics.BuildTransmitSequence(imageId, targetSize.Width, targetSize.Height, imageData,
                         imageFormat));
+
+                var cellBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
+
+                if (_placementMode)
+                {
+                    // The image is cell BACKGROUND: an empty foreground over an opaque black
+                    // backing (occludes whatever the picture was drawn over) plus the tile
+                    // reference. Glyphs drawn later blend into the foreground and composite over
+                    // the picture terminal side; an opaque background drawn later evicts the tile.
+                    for (int cellY = 0; cellY < targetRect.Height; cellY++)
+                        for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                            cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                                new PixelForeground(Symbol.Space, Colors.Transparent),
+                                new PixelBackground(Colors.Black,
+                                    new KittyTile(imageId, (ushort)cellX, (ushort)cellY)));
+
+                    return new KittyRenderedBitmap(imageId, cellBuffer);
+                }
+
                 Context._consoleWindowImpl.Console.WriteText(
                     KittyGraphics.BuildVirtualPlacementSequence(imageId, targetRect.Width, targetRect.Height));
 
                 Color imageIdColor = KittyGraphics.GetImageIdColor(imageId);
-                var placeholderBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
                 for (int cellY = 0; cellY < targetRect.Height; cellY++)
                     for (int cellX = 0; cellX < targetRect.Width; cellX++)
-                        placeholderBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                        cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
                             new PixelForeground(
                                 Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(cellY, cellX), 1),
                                 imageIdColor),
                             PixelBackground.Transparent);
 
-                return new KittyRenderedBitmap(imageId, placeholderBuffer);
+                return new KittyRenderedBitmap(imageId, cellBuffer);
             }
 
             private static byte[] ExtractImageData(IBitmapImpl source, IPlatformRenderInterface renderInterface,

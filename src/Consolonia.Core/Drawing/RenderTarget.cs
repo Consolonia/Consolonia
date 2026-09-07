@@ -32,6 +32,23 @@ namespace Consolonia.Core.Drawing
         // placements whose cells were all overwritten get deleted terminal side
         private HashSet<int> _kittyImageIdsOnScreen = new();
         private HashSet<int> _kittyImageIdsPreviouslyOnScreen = new();
+
+        // Classic rect placements derived from KittyTile cell backgrounds (the "image as cell
+        // background" mode): contiguous tiles coalesce into placements at z=-1, diffed across
+        // frames so only appearing/disappearing rectangles cross the wire. The first dictionary
+        // holds the placements live in the terminal; the second is the scratch the next frame is
+        // collected into before the two swap.
+        private Dictionary<KittyRect, int> _kittyRectPlacements = new();
+        private Dictionary<KittyRect, int> _kittyRectPlacementsScratch = new();
+
+        private readonly record struct KittyRect(
+            int ImageId,
+            ushort TileX,
+            ushort TileY,
+            ushort Width,
+            ushort Height,
+            ushort ScreenX,
+            ushort ScreenY);
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
 
@@ -184,6 +201,7 @@ namespace Consolonia.Core.Drawing
             RenderSixelRegions(pixelBuffer, dirtyRegions, ref sixelHandled);
 
             // Pass 2: Render non-sixel dirty pixels.
+            bool sawKittyTiles = false;
             for (ushort y = 0; y < pixelBuffer.Height; y++)
             {
                 bool isWide = false;
@@ -194,6 +212,9 @@ namespace Consolonia.Core.Drawing
 
                     if (KittyGraphics.TryGetImageId(in pixel, out int kittyImageId))
                         _kittyImageIdsOnScreen.Add(kittyImageId);
+
+                    if (!pixel.Background.Tile.IsEmpty)
+                        sawKittyTiles = true;
 
                     if (pixel.IsCaret())
                     {
@@ -293,6 +314,11 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
+            // Classic rect placements: coalesce the tiles present this frame into rectangles and
+            // emit only what changed (new rectangles placed, vanished ones deleted).
+            if (sawKittyTiles || _kittyRectPlacements.Count > 0)
+                EmitKittyRectPlacements(pixelBuffer);
+
             // Delete terminal side placements of kitty images no placeholder cell references anymore
             // (for example after navigating to another screen). Overwriting the cells is what the
             // protocol prescribes, but terminals which materialize placements as overlays keep
@@ -332,6 +358,102 @@ namespace Consolonia.Core.Drawing
             }
         }
 
+
+        /// <summary>
+        ///     Coalesces the KittyTile cell backgrounds present in the buffer into maximal
+        ///     rectangles and reconciles them with the classic placements currently live in the
+        ///     terminal: unchanged rectangles cost nothing, new ones are placed (at the rectangle's
+        ///     cell position, cropped to its slice of the pre-scaled image, z=-1 so text drawn on
+        ///     the covered cells composites over the picture), vanished ones are deleted by
+        ///     placement id with the image data retained for cheap re-placement.
+        /// </summary>
+        private void EmitKittyRectPlacements(PixelBuffer pixelBuffer)
+        {
+            Dictionary<KittyRect, int> live = _kittyRectPlacements;
+            Dictionary<KittyRect, int> next = _kittyRectPlacementsScratch;
+            next.Clear();
+
+            bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
+
+            for (ushort y = 0; y < pixelBuffer.Height; y++)
+                for (ushort x = 0; x < pixelBuffer.Width; x++)
+                {
+                    if (visited[x, y])
+                        continue;
+
+                    KittyTile tile = pixelBuffer[x, y].Background.Tile;
+                    if (tile.IsEmpty)
+                        continue;
+
+                    // expand rightward while the tiles continue the same image's row
+                    ushort width = 1;
+                    while (x + width < pixelBuffer.Width && !visited[x + width, y])
+                    {
+                        KittyTile nextTile = pixelBuffer[(ushort)(x + width), y].Background.Tile;
+                        if (nextTile.ImageId != tile.ImageId ||
+                            nextTile.X != tile.X + width ||
+                            nextTile.Y != tile.Y)
+                            break;
+                        width++;
+                    }
+
+                    // expand downward while each row continues the same tile grid at full width
+                    ushort height = 1;
+                    while (y + height < pixelBuffer.Height)
+                    {
+                        bool rowMatches = true;
+                        for (ushort i = 0; i < width; i++)
+                        {
+                            KittyTile rowTile = pixelBuffer[(ushort)(x + i), (ushort)(y + height)].Background.Tile;
+                            if (visited[x + i, y + height] ||
+                                rowTile.ImageId != tile.ImageId ||
+                                rowTile.X != tile.X + i ||
+                                rowTile.Y != tile.Y + height)
+                            {
+                                rowMatches = false;
+                                break;
+                            }
+                        }
+
+                        if (!rowMatches)
+                            break;
+                        height++;
+                    }
+
+                    for (ushort dy = 0; dy < height; dy++)
+                        for (ushort dx = 0; dx < width; dx++)
+                            visited[x + dx, y + dy] = true;
+
+                    var rect = new KittyRect(tile.ImageId, tile.X, tile.Y, width, height, x, y);
+
+                    // a rectangle already placed last frame stays untouched; a new one is placed
+                    if (live.Remove(rect, out int placementId))
+                    {
+                        next[rect] = placementId;
+                    }
+                    else
+                    {
+                        placementId = KittyGraphics.AllocatePlacementId();
+                        next[rect] = placementId;
+
+                        int cellPixelWidth = _console.CellPixelWidth;
+                        int cellPixelHeight = _console.CellPixelHeight;
+                        _console.SetCaretPosition(new PixelBufferCoordinate(rect.ScreenX, rect.ScreenY));
+                        _console.WriteText(KittyGraphics.BuildRectPlacementSequence(
+                            rect.ImageId, placementId,
+                            rect.TileX * cellPixelWidth, rect.TileY * cellPixelHeight,
+                            rect.Width * cellPixelWidth, rect.Height * cellPixelHeight));
+                    }
+                }
+
+            // whatever is left in the live set has no tiles backing it anymore
+            foreach (KeyValuePair<KittyRect, int> stale in live)
+                _console.WriteText(
+                    KittyGraphics.BuildDeleteRectPlacementSequence(stale.Key.ImageId, stale.Value));
+            live.Clear();
+
+            (_kittyRectPlacements, _kittyRectPlacementsScratch) = (next, live);
+        }
 
         /// <summary>
         /// Pass 1: Find contiguous dirty sixel cells sharing the same source,

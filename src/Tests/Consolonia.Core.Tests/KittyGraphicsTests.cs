@@ -198,6 +198,15 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
+        public void RectPlacementSequencesAreWellFormed()
+        {
+            Assert.That(KittyGraphics.BuildRectPlacementSequence(5, 7, 16, 32, 64, 48),
+                Is.EqualTo("\u001b_Ga=p,q=2,C=1,z=-1,i=5,p=7,x=16,y=32,w=64,h=48\u001b\\"));
+            Assert.That(KittyGraphics.BuildDeleteRectPlacementSequence(5, 7),
+                Is.EqualTo("\u001b_Ga=d,d=i,q=2,i=5,p=7\u001b\\"));
+        }
+
+        [Test]
         public void PlaceholderPixelsAreStableFrameToFrame()
         {
             // steady state diff stability: identical placeholder cells must compare equal so an

@@ -218,6 +218,36 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
+        public void KittyTileBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
+        {
+            // the "image as cell background" model: cell = (backgroundColor|backgroundImage) +
+            // foreground character. A glyph with a transparent background composites over the
+            // picture; a translucent wash leaves it; only an opaque background evicts it.
+            var tile = new KittyTile(0x42, 3, 5);
+            var tilePixel = new Pixel(
+                new PixelForeground(Symbol.Space, Colors.Transparent),
+                new PixelBackground(Colors.Black, tile));
+
+            Pixel withGlyph = tilePixel.Blend(new Pixel(
+                new PixelForeground(new Symbol('▕'), Colors.Gray),
+                PixelBackground.Transparent));
+            Assert.That(withGlyph.Foreground.Symbol.Character, Is.EqualTo('▕'));
+            Assert.That(withGlyph.Background.Tile, Is.EqualTo(tile),
+                "a glyph with transparent background must draw OVER the picture, not evict it");
+
+            Pixel shaded = tilePixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
+            Assert.That(shaded.Background.Tile, Is.EqualTo(tile),
+                "a translucent wash must not evict the picture");
+
+            Pixel covered = tilePixel.Blend(new Pixel(new PixelBackground(Colors.White)));
+            Assert.That(covered.Background.Tile.IsEmpty, Is.True,
+                "an opaque background owns the cell: the picture must be evicted");
+
+            Assert.That(tilePixel.Shade().Background.Tile, Is.EqualTo(tile));
+            Assert.That(tilePixel.Invert().Background.Tile, Is.EqualTo(tile));
+        }
+
+        [Test]
         public void ShadeAndInvertOverKittyPlaceholderLeaveItUntouched()
         {
             // same invariant for the direct color mutations (shadows use Shade, selection uses

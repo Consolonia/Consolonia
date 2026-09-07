@@ -230,6 +230,45 @@ namespace Consolonia.Core.Drawing
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=i,q=2,i={imageId}\u001b\\");
         }
 
+        // ---- classic rect placements (the "image as cell background" mode) ----
+
+        /// <summary>
+        ///     The z-index rect placements are created at: below text, above background colors,
+        ///     so glyphs printed on the covered cells composite over the picture.
+        /// </summary>
+        public const int RectPlacementZIndex = -1;
+
+        private static int _nextPlacementId;
+
+        public static int AllocatePlacementId()
+        {
+            return (Interlocked.Increment(ref _nextPlacementId) - 1) % 0xFFFFFF + 1;
+        }
+
+        /// <summary>
+        ///     Builds the APC sequence creating a classic placement showing a source-pixel crop of
+        ///     an already transmitted image at the current cursor position, below text (z=-1),
+        ///     without moving the cursor (C=1). The image is pre-scaled to the cell grid, so the
+        ///     crop maps 1:1 onto cells and no c=/r= stretching is involved.
+        /// </summary>
+        public static string BuildRectPlacementSequence(int imageId, int placementId,
+            int sourceX, int sourceY, int sourceWidth, int sourceHeight)
+        {
+            return string.Create(CultureInfo.InvariantCulture,
+                $"\u001b_Ga=p,q=2,C=1,z={RectPlacementZIndex},i={imageId},p={placementId},x={sourceX},y={sourceY},w={sourceWidth},h={sourceHeight}\u001b\\");
+        }
+
+        /// <summary>
+        ///     Builds the APC sequence deleting one specific placement of an image while keeping
+        ///     the image data, so other placements of the same image survive and re-placement
+        ///     needs no retransmission.
+        /// </summary>
+        public static string BuildDeleteRectPlacementSequence(int imageId, int placementId)
+        {
+            return string.Create(CultureInfo.InvariantCulture,
+                $"\u001b_Ga=d,d=i,q=2,i={imageId},p={placementId}\u001b\\");
+        }
+
         public static string BuildDeleteSequence(int imageId)
         {
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=I,q=2,i={imageId}\u001b\\");
