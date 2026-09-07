@@ -2,124 +2,52 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="using:Consolonia.Gallery.Gallery.GalleryViews"
              mc:Ignorable="d"
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryImage">
-    <Grid Grid.RowDefinitions="Auto *">
+    <UserControl.Resources>
+        <local:ImagePathToBitmapConverter x:Key="ImagePathToBitmapConverter" />
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*">
         <Button Grid.Row="0"
                 HorizontalAlignment="Center"
                 Margin="1"
                 Content="Open Image..."
                 Click="Button_Click" />
-        <ScrollViewer Grid.Row="1"
-                      XYFocus.NavigationModes="Keyboard">
-            <StackPanel>
-                <Image x:Name="BigImage"
-                       IsVisible="false" />
 
-                <WrapPanel ItemWidth="50"
-                           x:Name="WrapPanel">
-                    <WrapPanel.Styles>
-                        <!-- Make thumbnails focusable and tab-stoppable for XY navigation on a focusable container -->
-                        <Style Selector="WrapPanel > Border.thumbnail">
-                            <Setter Property="Focusable"
-                                    Value="True" />
-                            <Setter Property="KeyboardNavigation.IsTabStop"
-                                    Value="True" />
-                            <Setter Property="BorderThickness"
-                                    Value="0" />
-                            <Setter Property="Padding"
-                                    Value="0" />
-                        </Style>
-                        <Style Selector="WrapPanel > Border.thumbnail:focus">
-                            <Setter Property="BorderThickness"
-                                    Value="1" />
-                            <Setter Property="BorderBrush"
-                                    Value="{DynamicResource ThemeActionBackgroundBrush}" />
-                        </Style>
-                    </WrapPanel.Styles>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/0.jpg"
+        <Grid Grid.Row="1"
+              ColumnDefinitions="Auto,*,Auto"
+              Margin="1">
+            <Button Grid.Column="0"
+                    Margin="1"
+                    Content="&lt;"
+                    Click="PrevButton_Click" />
+            <TextBlock x:Name="ImageTitle"
+                       Grid.Column="1"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="2"
+                    Margin="1"
+                    Content="&gt;"
+                    Click="NextButton_Click" />
+        </Grid>
+
+        <Border Grid.Row="2"
+                Margin="1">
+            <Carousel x:Name="ImageCarousel"
+                      ItemsSource="{Binding ImagePaths}"
+                      PageTransition="{x:Null}">
+                <Carousel.ItemTemplate>
+                    <DataTemplate>
+                        <Image HorizontalAlignment="Stretch"
+                               VerticalAlignment="Stretch"
+                               Source="{Binding Converter={StaticResource ImagePathToBitmapConverter}}"
                                Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/1.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/2.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/3.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/4.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/5.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/6.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/7.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/8.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/9.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/0.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/1.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/2.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/3.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/4.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/5.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/6.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/7.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/8.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                    <Border Classes="thumbnail">
-                        <Image Source="avares://Consolonia.Gallery/Resources/9.jpg"
-                               Stretch="Uniform" />
-                    </Border>
-                </WrapPanel>
-            </StackPanel>
-        </ScrollViewer>
+                    </DataTemplate>
+                </Carousel.ItemTemplate>
+            </Carousel>
+        </Border>
     </Grid>
 
 </UserControl>

@@ -40,12 +40,12 @@
                     <ControlTemplate TargetType="windowManager:ManagedWindow">
                         <Panel>
 
-                            <!--Shade-->
+                            <!--Shade: same size as the frame below by construction (the margins are
+                                mirror images), shifted right and down so it peeks out past the
+                                frame's right and bottom edges-->
                             <Border BorderThickness="0"
                                     Background="{DynamicResource ThemeShadeBrush}"
-                                    Margin="2,1,0,0"
-                                    Width="{Binding ElementName=OuterBorder, Path=Width}"
-                                    Height="{Binding ElementName=OuterBorder, Path=Height}" />
+                                    Margin="2,1,0,0" />
 
                             <!--Frame-->
                             <Border BorderThickness="{TemplateBinding BorderThickness}"

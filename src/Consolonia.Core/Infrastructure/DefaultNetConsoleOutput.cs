@@ -34,6 +34,10 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => throw new NotImplementedException();
+
+        public int CellPixelHeight => throw new NotImplementedException();
+
         public virtual void SetTitle(string title)
         {
             WaitPauseTaskIfNecessary();
@@ -124,6 +128,11 @@ namespace Consolonia.Core.Infrastructure
                 Console.Write(_stringBuilder.ToString());
                 _stringBuilder.Clear();
             }
+        }
+
+        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        {
+            // Sixel not supported by legacy Console API
         }
 
         public virtual void WriteText(string str)

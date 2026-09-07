@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.avaloniaui.net)",
+      "Bash(grep:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(ls:*)",
+      "Bash(dotnet tool:*)"
+    ]
+  }
+}
