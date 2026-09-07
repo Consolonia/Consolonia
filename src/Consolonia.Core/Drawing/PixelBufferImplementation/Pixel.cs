@@ -121,23 +121,38 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public Pixel Shade()
         {
+            if (IsKittyPlaceholder()) return this;
             return new Pixel(Foreground.Shade(), Background.Shade(), CaretStyle);
         }
 
         public Pixel Brighten()
         {
+            if (IsKittyPlaceholder()) return this;
             return new Pixel(Foreground.Brighten(), Background.Brighten(), CaretStyle);
         }
 
         public Pixel Invert()
         {
+            if (IsKittyPlaceholder()) return this;
             return new Pixel(new PixelForeground(Foreground.Symbol,
                     Background.Color, // background color becomes the new foreground color
                     Foreground.Weight,
                     Foreground.Style,
                     Foreground.TextDecoration),
-                new PixelBackground(Foreground.Color),
+                new PixelBackground(Foreground.Color, Background.Tile),
                 CaretStyle);
+        }
+
+        /// <summary>
+        ///     The foreground color of a kitty graphics placeholder cell carries the image id: any
+        ///     operation which changes cell colors would corrupt the reference and make the terminal
+        ///     render the literal placeholder glyph. Color mutations (a dimming shade, a selection
+        ///     invert, a translucent blend) therefore leave placeholder cells untouched - the image
+        ///     shows through unmodified rather than being replaced by a flat colored cell.
+        /// </summary>
+        private bool IsKittyPlaceholder()
+        {
+            return KittyGraphics.IsPlaceholder(in Foreground.Symbol);
         }
 
         /// <summary>
@@ -176,20 +191,33 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     newCaretStyle = pixelAbove.CaretStyle;
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop)
+                    {
+                        // a translucent color wash over a kitty placeholder cell would corrupt the
+                        // image id its foreground color carries, so the cell passes through
+                        // untouched and the image shows through unmodified (see IsKittyPlaceholder)
+                        if (IsKittyPlaceholder())
+                            return this;
+
                         // merge the PixelForeground color with the pixelAbove background color
                         newForeground = new PixelForeground(Foreground.Symbol,
                             MergeColors(Foreground.Color, aboveBgColor, true),
                             Foreground.Weight,
                             Foreground.Style,
                             Foreground.TextDecoration);
+                    }
                     else
+                    {
                         newForeground = pixelAbove.Foreground;
+                    }
 
                     break;
             }
 
-            // Background is always blended
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false));
+            // Background is always blended. A non-opaque overlay keeps the background's image tile:
+            // the image is only evicted by an opaque background painted over the cell (the fully
+            // opaque fast path above returns the overlay pixel, tile-less, which is that eviction).
+            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
+                Background.Tile);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
         }
