@@ -65,17 +65,13 @@ namespace Consolonia.Core.Drawing
         {
             ConsoleCapabilities capabilities = _consoleWindowImpl.Console.Capabilities;
 
-            // Kitty graphics default to classic rect placements ("image as cell background"):
-            // glyphs composite over the picture and an opaque background evicts it. The legacy
-            // placeholder mode remains selectable with CONSOLONIA_GRAPHICS=kittyplaceholder; its
-            // cells carry the image id in their 24 bit foreground color, hence the truecolor
-            // requirement, which the rect mode keeps for capability parity.
+            // Kitty graphics use classic rect placements ("image as cell background"): glyphs
+            // composite over the picture and an opaque background evicts it. The unicode
+            // placeholder mode remains in the code as the fallback for hosts where classic
+            // placements cannot survive (tmux-style passthrough), but nothing selects it today.
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
                 AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(this,
-                    placementMode: !string.Equals(
-                        Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS")?.Trim(),
-                        "kittyplaceholder", StringComparison.OrdinalIgnoreCase));
+                return new KittyBitmapRenderer(this, placementMode: true);
 
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
                 return new SixelBitmapRenderer(this);
@@ -737,7 +733,11 @@ namespace Consolonia.Core.Drawing
                     '▜' => pixelColors[2],
                     '▙' => pixelColors[1],
                     '▟' => pixelColors[0],
-                    '█' => BgraColor.Transparent,
+                    // Same color as the foreground, NOT transparent: a transparent background kept
+                    // whatever lay under the picture in the cell (typically the page background),
+                    // and any hairline the terminal's glyph rasterization leaves around a full
+                    // block let that stale color peek through as scattered ticks over the image.
+                    '█' => CombineColors(pixelColors),
                     _ => throw new NotImplementedException()
                 };
                 return bgraColor.ToColor();
