@@ -42,6 +42,7 @@
                             <ContentPresenter Name="PART_HeaderPresenter"
                                               Padding="1 0"
                                               Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
                                               Margin="{TemplateBinding Padding}"
                                               VerticalAlignment="Center"
                                               Grid.Column="2"
