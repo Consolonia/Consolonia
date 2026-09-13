@@ -116,7 +116,7 @@
                 </MenuItem>
             </Menu>
         </StackPanel>
-        
+
         <StackPanel>
             <TextBlock Margin="1,2">ItemTemplate</TextBlock>
             <Menu>
@@ -130,8 +130,8 @@
                     <MenuItem.ItemTemplate>
                         <DataTemplate>
                             <StackPanel>
-                                <TextBlock Text="Item: "/>
-                                <TextBlock Text="{Binding}"/>
+                                <TextBlock Text="Item: " />
+                                <TextBlock Text="{Binding}" />
                             </StackPanel>
                         </DataTemplate>
                     </MenuItem.ItemTemplate>
