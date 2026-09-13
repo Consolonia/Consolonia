@@ -67,6 +67,7 @@
                                     <ScrollViewer>
                                         <ItemsPresenter Name="PART_ItemsPresenter"
                                                         ItemsPanel="{TemplateBinding ItemsPanel}"
+                                                        KeyboardNavigation.TabNavigation="Continue"
                                                         Grid.IsSharedSizeScope="True">
                                             <ItemsPresenter.Styles>
                                                 <Style Selector="ItemsPresenter">
