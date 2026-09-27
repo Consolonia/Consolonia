@@ -18,6 +18,7 @@
                                               IsCaretShown="{TemplateBinding IsFocused}">
                             <ContentPresenter Name="PART_HeaderPresenter"
                                               Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
                                               Margin="{TemplateBinding Padding}"
                                               RecognizesAccessKey="True" />
                         </console:CaretControl>
@@ -30,6 +31,7 @@
                                 <ScrollViewer>
                                     <ItemsPresenter Name="PART_ItemsPresenter"
                                                     ItemsPanel="{TemplateBinding ItemsPanel}"
+                                                    KeyboardNavigation.TabNavigation="Continue"
                                                     Grid.IsSharedSizeScope="True">
                                         <ItemsPresenter.Styles>
                                             <Style Selector="ItemsPresenter">
