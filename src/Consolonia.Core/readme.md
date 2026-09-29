@@ -44,7 +44,8 @@ must be present when instantiated; in particular, TurboVision managed-window
 styles use resources supplied by the TurboVision theme. Theme-family resource
 updates also accept Avalonia's unset sentinel while rejecting values that are
 not strings. Typed bindings replace reflection bindings in the console slider,
-calendar day-title, Modern border panel, and TurboVision window shade.
+calendar day-title, and Modern border panel. The TurboVision window shade now
+sizes through layout instead of binding to a nonexistent `OuterBorder`.
 
 The native smoke executable checks brush interpolation, pixel JSON, screen
 metadata, caret-timer configuration, compiled style roots, clipboard
@@ -52,7 +53,7 @@ registration, and Modern-to-TurboVision DataGrid theme-family switching.
 It does **not** prove full application NativeAOT safety. The public
 `ResourceIncludeBase` API still supports arbitrary dynamic XAML URIs for JIT
 clients and is marked `RequiresUnreferencedCode`; callers receive a trimming
-warning. Use compiled `Styles` roots in NativeAOT apps instead. The Gallery example intentionally
-retains many reflection bindings, and Avalonia Controls DataGrid,
-Iciclecreek, and Vanara can produce their own warnings. Do not treat a
-successful scoped probe or package build as a warning-free application release.
+warning. Use compiled `Styles` roots in NativeAOT apps instead. The Gallery
+example intentionally retains many reflection bindings, and Avalonia Controls
+DataGrid, Iciclecreek, and Vanara can produce their own warnings. Do not treat
+a successful scoped probe or package build as a warning-free application release.
