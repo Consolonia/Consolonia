@@ -33,5 +33,13 @@ namespace Consolonia.Gallery.Tests
             await UITest.AssertHasNoText("Second Menu Item");
             await UITest.KeyInput(Key.Left);
         }
+
+        [Test]
+        public async Task ItemTemplateTest()
+        {
+            await UITest.KeyInput(Key.C, RawInputModifiers.Alt);
+            await UITest.AssertHasText("Item:");
+            await UITest.AssertHasText("Item 1");
+        }
     }
 }

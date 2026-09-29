@@ -3,6 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:console="https://github.com/consolonia"
+             xmlns:collections="clr-namespace:System.Collections;assembly=System.Runtime"
+             xmlns:system="clr-namespace:System;assembly=System.Runtime"
              mc:Ignorable="d"
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryMenu">
     <StackPanel Orientation="Horizontal"
@@ -111,6 +113,28 @@
                 </MenuItem>
                 <MenuItem Header="_Help">
                     <MenuItem Header="_About" />
+                </MenuItem>
+            </Menu>
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock Margin="1,2">ItemTemplate</TextBlock>
+            <Menu>
+                <MenuItem Header="_Children">
+                    <MenuItem.ItemsSource>
+                        <collections:ArrayList>
+                            <system:String>Item 1</system:String>
+                            <system:String>Item 2</system:String>
+                        </collections:ArrayList>
+                    </MenuItem.ItemsSource>
+                    <MenuItem.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="Item: " />
+                                <TextBlock Text="{Binding}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </MenuItem.ItemTemplate>
                 </MenuItem>
             </Menu>
         </StackPanel>
