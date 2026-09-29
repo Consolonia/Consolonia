@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Avalonia;
 using Avalonia.Media;
 using Consolonia.Controls;
@@ -92,6 +93,36 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             string json = JsonSerializer.Serialize(buffer);
             var buffer2 = JsonSerializer.Deserialize<PixelBuffer>(json);
             AssertBufferEqual(buffer, buffer2);
+        }
+
+        [Test]
+        public void JsonSerializationHonorsConfiguredNestedSymbolConverter()
+        {
+            var options = new JsonSerializerOptions();
+            options.Converters.Add(new TestSymbolConverter());
+            var buffer = new PixelBuffer(1, 1);
+
+            string json = JsonSerializer.Serialize(buffer, options);
+            PixelBuffer restored = JsonSerializer.Deserialize<PixelBuffer>(json, options);
+
+            StringAssert.Contains("\"Symbol\":\"configured\"", json);
+            Assert.AreEqual(new Symbol('A'), restored[0].Foreground.Symbol);
+        }
+
+        private sealed class TestSymbolConverter : JsonConverter<Symbol>
+        {
+            public override Symbol Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                if (reader.GetString() != "configured")
+                    throw new JsonException();
+
+                return new Symbol('A');
+            }
+
+            public override void Write(Utf8JsonWriter writer, Symbol value, JsonSerializerOptions options)
+            {
+                writer.WriteStringValue("configured");
+            }
         }
 
         [Test]

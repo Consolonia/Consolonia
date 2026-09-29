@@ -1,12 +1,18 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Consolonia.Controls;
 using Consolonia.Controls.Brushes;
+using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 if (RuntimeFeature.IsDynamicCodeSupported)
     throw new InvalidOperationException("Publish and execute this probe as NativeAOT.");
+
+AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new ProbeConsoleCapabilities());
 
 var from = new LineBrush
 {
@@ -41,4 +47,20 @@ var solid = (ISolidColorBrush)animator.Interpolate(0.5,
 if (solid.Color != Color.FromRgb(188, 188, 188))
     throw new InvalidOperationException("NativeAOT ordinary brush interpolation failed.");
 
-Console.WriteLine("NativeAOT LineBrush registration, BorderBrush construction and interpolation passed.");
+var buffer = new PixelBuffer(1, 1);
+string json = JsonSerializer.Serialize(buffer, PixelBufferJsonContext.Default.PixelBuffer);
+PixelBuffer roundTrip = JsonSerializer.Deserialize(json, PixelBufferJsonContext.Default.PixelBuffer);
+if (roundTrip is null || roundTrip.Width != 1 || roundTrip.Height != 1 || roundTrip[0] != buffer[0])
+    throw new InvalidOperationException("NativeAOT PixelBuffer serialization failed.");
+
+Console.WriteLine("NativeAOT LineBrush registration, BorderBrush construction, interpolation and PixelBuffer JSON passed.");
+
+[JsonSerializable(typeof(PixelBuffer))]
+internal partial class PixelBufferJsonContext : JsonSerializerContext
+{
+}
+
+internal sealed class ProbeConsoleCapabilities : IConsoleCapabilities
+{
+    public ConsoleCapabilities Capabilities => ConsoleCapabilities.SupportsComplexEmoji;
+}

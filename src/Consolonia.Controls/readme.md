@@ -53,9 +53,10 @@ dotnet publish src\Tests\Consolonia.NativeAot.Smoke\Consolonia.NativeAot.Smoke.c
 .\src\Tests\Consolonia.NativeAot.Smoke\bin\Release\net10.0\win-x64\publish\Consolonia.NativeAot.Smoke.exe
 ```
 
-The probe creates a `Border` with a `LineBrush`, registers the animator, and
-checks interpolated line gradients and ordinary solid brushes in the published
-native executable. It does not load a full TUI theme or render a terminal frame.
+The probe creates a `Border` with a `LineBrush`, checks brush interpolation, and
+round-trips a `Consolonia.Core` pixel buffer through a source-generated JSON
+context in the published native executable. It does not load a full TUI theme or
+render a terminal frame.
 This source fix requires a new `Consolonia.Controls` package release; existing
 12.0.3.13 packages do not contain it. Until then, a project reference to this
 source or a locally packed build is needed.
