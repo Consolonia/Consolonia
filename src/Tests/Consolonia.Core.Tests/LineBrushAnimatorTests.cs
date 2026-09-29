@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Reflection;
 using Avalonia;
 using Avalonia.Animation;
@@ -65,6 +64,17 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
+        public void InterpolatesSolidColorInsideLineBrushAsBefore()
+        {
+            var from = new LineBrush { Brush = new SolidColorBrush(Colors.Black) };
+            var to = new LineBrush { Brush = new SolidColorBrush(Colors.White) };
+
+            var result = (LineBrush)new LineBrushAnimator().Interpolate(0.5, from, to);
+
+            Assert.AreEqual(Color.FromRgb(128, 128, 128), ((ISolidColorBrush)result.Brush).Color);
+        }
+
+        [Test]
         public void NonLineBrushPairFallsBackToDiscreteSwitch()
         {
             var animator = new LineBrushAnimator();
@@ -75,51 +85,120 @@ namespace Consolonia.Core.Tests
             Assert.AreSame(line, animator.Interpolate(0.75, solid, line));
         }
 
-        // Touching LineBrush runs its static constructor, which registers the animator with Avalonia's internal
-        // BaseBrushAnimator registry. Verify by reflection that an entry now matches the LineBrush type and that
-        // its factory produces a usable animator.
         [Test]
-        public void RegistersWithAvaloniaBrushAnimatorRegistry()
+        public void InterpolatesOrdinarySolidBrushUsingSrgb()
         {
-            LineBrushAnimator.EnsureRegistered();
-            // Ensure the static constructor has run too.
-            _ = MakeLineBrush(0.0);
+            var from = new SolidColorBrush(Color.FromRgb(0, 0, 0)) { Opacity = 0.2 };
+            var to = new SolidColorBrush(Color.FromRgb(255, 255, 255)) { Opacity = 0.8 };
 
-            Assembly avalonia = typeof(InterpolatingAnimator<>).Assembly;
-            Type baseBrushAnimator = avalonia.GetType("Avalonia.Animation.Animators.BaseBrushAnimator", true)!;
-            FieldInfo listField = baseBrushAnimator.GetField("_brushAnimators",
-                BindingFlags.NonPublic | BindingFlags.Static)!;
-            var list = (IEnumerable)listField.GetValue(null)!;
+            var result = (ISolidColorBrush)new LineBrushAnimator().Interpolate(0.5, from, to);
 
-            bool matchesLineBrush = false;
-            foreach (object entry in list)
-            {
-                Type tupleType = entry.GetType();
-                var match = (Func<Type, bool>)tupleType.GetField("Item1")!.GetValue(entry)!;
-                if (match(typeof(LineBrush)))
-                {
-                    matchesLineBrush = true;
-
-                    // The factory must yield a non-null animator (the wrapper Avalonia drives).
-                    var factory = (Delegate)tupleType.GetField("Item3")!.GetValue(entry)!;
-                    object animator = factory.DynamicInvoke();
-                    Assert.IsNotNull(animator, "Registered factory should produce an animator instance.");
-                    break;
-                }
-            }
-
-            Assert.IsTrue(matchesLineBrush, "Expected a registered brush animator that matches LineBrush.");
+            Assert.AreEqual(Color.FromRgb(188, 188, 188), result.Color);
+            Assert.AreEqual(0.5, result.Opacity, 1e-6);
         }
 
-        // End-to-end: drive a real Avalonia keyframe animation of Border.BorderBrush (LineBrush keyframes) with a
-        // real clock. This proves Avalonia's BaseBrushAnimator actually selects our registered animator and ticks
-        // it, not merely that the registration entry exists. Avalonia's clock types are internal, so the concrete
-        // ClockBase is created and pulsed by reflection.
+        [Test]
+        public void InterpolatesOrdinaryGradientAndSolidBrush()
+        {
+            IBrush gradient = MakeLineBrush(0.0).Brush;
+            var solid = new SolidColorBrush(Colors.Green);
+
+            var result = (ILinearGradientBrush)new LineBrushAnimator().Interpolate(0.5, gradient, solid);
+            var reversed = (ILinearGradientBrush)new LineBrushAnimator().Interpolate(0.5, solid, gradient);
+
+            Assert.AreEqual(((ILinearGradientBrush)gradient).StartPoint, result.StartPoint);
+            Assert.AreEqual(2, result.GradientStops.Count);
+            Assert.AreEqual(Color.FromRgb(188, 92, 0), result.GradientStops[0].Color);
+            Assert.AreEqual(Color.FromRgb(188, 92, 0), reversed.GradientStops[0].Color);
+        }
+
+        [Test]
+        public void InterpolatesOrdinaryGradientStopsOfDifferentLengths()
+        {
+            var from = (LinearGradientBrush)MakeLineBrush(0).Brush;
+            var to = (LinearGradientBrush)MakeLineBrush(1).Brush;
+            to.GradientStops.Add(new GradientStop(Colors.Green, 0.75));
+
+            var result = (ILinearGradientBrush)new LineBrushAnimator().Interpolate(0.5, from, to);
+
+            Assert.AreEqual(0.5, result.StartPoint.Point.X, 1e-6);
+            Assert.AreEqual(3, result.GradientStops.Count);
+            Assert.AreEqual(0.875, result.GradientStops[2].Offset, 1e-6);
+        }
+
+        [Test]
+        public void EmptyGradientStopsSwitchDiscretely()
+        {
+            var from = new LinearGradientBrush();
+            var to = new LinearGradientBrush { GradientStops = { new GradientStop(Colors.Red, 0) } };
+            var animator = new LineBrushAnimator();
+
+            Assert.AreSame(from, animator.Interpolate(0.25, from, to));
+            Assert.AreSame(to, animator.Interpolate(0.75, from, to));
+        }
+
+        [Test]
+        public void InterpolatesRadialAndConicGradientGeometry()
+        {
+            var fromRadial = new RadialGradientBrush
+            {
+                Center = new RelativePoint(0, 0, RelativeUnit.Relative),
+                RadiusX = new RelativeScalar(0.2, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Colors.Red, 0) }
+            };
+            var toRadial = new RadialGradientBrush
+            {
+                Center = new RelativePoint(1, 1, RelativeUnit.Relative),
+                RadiusX = new RelativeScalar(0.8, RelativeUnit.Relative),
+                GradientStops = { new GradientStop(Colors.Blue, 1) }
+            };
+            var fromConic = new ConicGradientBrush
+            {
+                Angle = 30,
+                GradientStops = { new GradientStop(Colors.Red, 0) }
+            };
+            var toConic = new ConicGradientBrush
+            {
+                Angle = 90,
+                GradientStops = { new GradientStop(Colors.Blue, 1) }
+            };
+            var animator = new LineBrushAnimator();
+
+            var radial = (IRadialGradientBrush)animator.Interpolate(0.5, fromRadial, toRadial);
+            var conic = (IConicGradientBrush)animator.Interpolate(0.5, fromConic, toConic);
+
+            Assert.AreEqual(0.5, radial.Center.Point.X, 1e-6);
+            Assert.AreEqual(0.5, radial.RadiusX.Scalar, 1e-6);
+            Assert.AreEqual(60, conic.Angle, 1e-6);
+        }
+
         [Test]
         public void AvaloniaDrivesAnimatorForBorderBrushAnimation()
         {
+            var brush = AnimateBorderBrush(MakeLineBrush(0.0), MakeLineBrush(1.0)) as LineBrush;
+
+            Assert.IsNotNull(brush, "BorderBrush should be an interpolated LineBrush.");
+            var inner = brush.Brush as ILinearGradientBrush;
+            Assert.IsNotNull(inner, "Inner brush should remain a linear gradient.");
+            Assert.AreEqual(0.5, inner.StartPoint.Point.X, 0.05);
+        }
+
+        [Test]
+        public void AvaloniaDrivesAnimatorForOrdinarySolidBrushAnimation()
+        {
+            LineBrushAnimator.EnsureRegistered();
             LineBrushAnimator.EnsureRegistered();
 
+            var result = AnimateBorderBrush(new SolidColorBrush(Colors.Black),
+                new SolidColorBrush(Colors.White)) as ISolidColorBrush;
+
+            Assert.IsNotNull(result);
+            Assert.AreEqual(Color.FromRgb(188, 188, 188), result.Color);
+        }
+
+        // Avalonia's clock implementation is internal; only the test harness uses reflection to pulse it.
+        private static IBrush AnimateBorderBrush(IBrush from, IBrush to)
+        {
             var border = new Border();
             var animation = new Animation
             {
@@ -130,12 +209,12 @@ namespace Consolonia.Core.Tests
                     new KeyFrame
                     {
                         Cue = new Cue(0d),
-                        Setters = { new Setter(Border.BorderBrushProperty, MakeLineBrush(0.0)) }
+                        Setters = { new Setter(Border.BorderBrushProperty, from) }
                     },
                     new KeyFrame
                     {
                         Cue = new Cue(1d),
-                        Setters = { new Setter(Border.BorderBrushProperty, MakeLineBrush(1.0)) }
+                        Setters = { new Setter(Border.BorderBrushProperty, to) }
                     }
                 }
             };
@@ -172,13 +251,7 @@ namespace Consolonia.Core.Tests
                 throw tie.InnerException!;
             }
 
-            var brush = border.BorderBrush as LineBrush;
-            Assert.IsNotNull(brush,
-                "BorderBrush should be an interpolated LineBrush, proving Avalonia drove our animator.");
-            var inner = brush.Brush as ILinearGradientBrush;
-            Assert.IsNotNull(inner, "Inner brush should remain a linear gradient.");
-            Assert.AreEqual(0.5, inner.StartPoint.Point.X, 0.05,
-                "Inner gradient should be interpolated half-way at 50% progress.");
+            return border.BorderBrush;
         }
 
         private sealed class AlwaysTrueObservable : IObservable<bool>

@@ -27,3 +27,35 @@ Then you can use the controls in your XAML code:
 ```xml
    <console:LineBrush Brush="Red" LineStyle="Edge"/>
 ```
+
+## NativeAOT brush animations
+
+`LineBrush` registers `LineBrushAnimator` through Avalonia 12.0.3's public
+`Animation.RegisterCustomAnimator<IBrush, LineBrushAnimator>()` API when the
+brush is first used. Previously, registration reflected into Avalonia's private
+brush animator list, constructed an internal closed generic tuple and compiled
+an expression tree. That path fails in NativeAOT. Inner gradient interpolation
+also reflected into a private animator; it now uses public immutable brush
+types instead.
+
+Avalonia's public registration matches the *property type*, not the brush value
+type, so this animator also receives ordinary `IBrush` animations. It retains
+solid-color sRGB interpolation, linear/radial/conic gradient interpolation and
+solid-to-gradient conversion for those properties; incompatible brush pairs
+switch at halfway. This avoids registering or preserving Avalonia private
+types for trimming.
+
+To publish and run the focused Windows NativeAOT probe (requires the .NET 10
+SDK and Windows C++ linker):
+
+```powershell
+dotnet publish src\Tests\Consolonia.NativeAot.Smoke\Consolonia.NativeAot.Smoke.csproj -c Release -r win-x64
+.\src\Tests\Consolonia.NativeAot.Smoke\bin\Release\net10.0\win-x64\publish\Consolonia.NativeAot.Smoke.exe
+```
+
+The probe creates a `Border` with a `LineBrush`, registers the animator, and
+checks interpolated line gradients and ordinary solid brushes in the published
+native executable. It does not load a full TUI theme or render a terminal frame.
+This source fix requires a new `Consolonia.Controls` package release; existing
+12.0.3.13 packages do not contain it. Until then, a project reference to this
+source or a locally packed build is needed.
