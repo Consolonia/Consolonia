@@ -1,4 +1,4 @@
-# Consolonia.Core
+# Consolonia.PlatformSupport
 This package is the core Consolonia library.
 
 ## Background
@@ -54,6 +54,6 @@ It does **not** prove full application NativeAOT safety. The public
 `ResourceIncludeBase` API still supports arbitrary dynamic XAML URIs for JIT
 clients and is marked `RequiresUnreferencedCode`; callers receive a trimming
 warning. Use compiled `Styles` roots in NativeAOT apps instead. The Gallery
-example intentionally retains many reflection bindings, and Avalonia Controls
-DataGrid, Iciclecreek, and Vanara can produce their own warnings. Do not treat
-a successful scoped probe or package build as a warning-free application release.
+demo still uses reflection bindings and reflective view discovery. Avalonia
+Controls DataGrid, Iciclecreek, and Vanara can also produce warnings. Do not
+treat a scoped probe or package build as a warning-free application release.
