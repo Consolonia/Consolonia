@@ -64,7 +64,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                 if (_spinnerLocations == null)
                 {
                     _spinnerLocations = new List<Location>();
-                    foreach (Location value in Enum.GetValues(typeof(Location))) _spinnerLocations.Add(value);
+                    foreach (Location value in Enum.GetValues<Location>()) _spinnerLocations.Add(value);
                 }
 
                 return _spinnerLocations;

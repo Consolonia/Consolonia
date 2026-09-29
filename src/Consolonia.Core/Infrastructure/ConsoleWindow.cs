@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.Remoting;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
@@ -322,16 +322,52 @@ namespace Consolonia.Core.Infrastructure
                 return new ConsoloniaScreen(new PixelRect(0, 0, Console.Size.Width, Console.Size.Height));
 
             if (featureType == typeof(ILauncher))
-            {
-                ObjectHandle objHandle =
-                    Activator.CreateInstance("Avalonia.Base", "Avalonia.Platform.Storage.FileIO.BclLauncher");
-                return (ILauncher)objHandle.Unwrap();
-            }
+                return new ConsoleLauncher();
 
             // TODO ISystemNavigationManagerImpl should be implemented to handle BACK navigation between pages of controls like mobile apps do.
             // TODO ITextInputMethodImpl should be implemented to handle text IME input
             Debug.WriteLine($"Missing Feature: {featureType.Name} is not implemented but someone is asking for it!");
             return null;
+        }
+
+        private sealed class ConsoleLauncher : ILauncher
+        {
+            public Task<bool> LaunchUriAsync(Uri uri)
+            {
+                ArgumentNullException.ThrowIfNull(uri);
+                return Task.FromResult(uri.IsAbsoluteUri && Launch(uri.AbsoluteUri));
+            }
+
+            public Task<bool> LaunchFileAsync(IStorageItem storageItem)
+            {
+                ArgumentNullException.ThrowIfNull(storageItem);
+                return Task.FromResult(storageItem.TryGetLocalPath() is { } path && Launch(path));
+            }
+
+            private static bool Launch(string path)
+            {
+                ProcessStartInfo startInfo;
+                if (OperatingSystem.IsWindows())
+                {
+                    startInfo = new ProcessStartInfo(path) { UseShellExecute = true, CreateNoWindow = true };
+                }
+                else if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+                {
+                    startInfo = new ProcessStartInfo(OperatingSystem.IsMacOS() ? "open" : "xdg-open")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    startInfo.ArgumentList.Add(path);
+                }
+                else
+                {
+                    return false;
+                }
+
+                using var process = Process.Start(startInfo);
+                return process is not null;
+            }
         }
 
         public void Dispose()

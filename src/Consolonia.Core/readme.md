@@ -1,4 +1,4 @@
-# Consolonia.PlatformSupport
+# Consolonia.Core
 This package is the core Consolonia library.
 
 ## Background
@@ -27,3 +27,32 @@ round-trip in a published net10 Windows NativeAOT executable. This upstream
 change requires a new `Consolonia.Core` package release in addition to the
 updated `Consolonia.Controls` package. It does not address NativeAOT warnings
 from Avalonia's DataGrid or other external dependencies.
+
+## NativeAOT platform and theme loading
+
+`ConsoloniaScreen` now initializes Avalonia's screen properties through a
+typed `PlatformScreen` subclass rather than reflection. The console window
+provides its own `ILauncher` using the OS shell (Windows), `open` (macOS), or
+`xdg-open` (Linux) instead of constructing Avalonia's internal launcher by
+name. `Consolonia.PlatformSupport` registers a statically constructed
+`IClipboard` adapter, preserving ownership and flush semantics without
+reflecting into Avalonia's internal clipboard class.
+
+The built-in DataGrid and managed-window auto themes select compiled XAML
+style classes rather than loading theme URIs at runtime. Their theme resources
+must be present when instantiated; in particular, TurboVision managed-window
+styles use resources supplied by the TurboVision theme. Theme-family resource
+updates also accept Avalonia's unset sentinel while rejecting values that are
+not strings. Typed bindings replace reflection bindings in the console slider,
+calendar day-title, Modern border panel, and TurboVision window shade.
+
+The native smoke executable checks brush interpolation, pixel JSON, screen
+metadata, caret-timer configuration, compiled style roots, clipboard
+registration, and Modern-to-TurboVision DataGrid theme-family switching.
+It does **not** prove full application NativeAOT safety. The public
+`ResourceIncludeBase` API still supports arbitrary dynamic XAML URIs for JIT
+clients and is marked `RequiresUnreferencedCode`; callers receive a trimming
+warning. Use compiled `Styles` roots in NativeAOT apps instead. The Gallery example intentionally
+retains many reflection bindings, and Avalonia Controls DataGrid,
+Iciclecreek, and Vanara can produce their own warnings. Do not treat a
+successful scoped probe or package build as a warning-free application release.

@@ -5,9 +5,15 @@ using System.Text.Json.Serialization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Consolonia;
+using Consolonia.Controls.DataGrid;
 using Consolonia.Controls;
 using Consolonia.Controls.Brushes;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
+using Consolonia.ManagedWindows;
+using Consolonia.Themes.Templates.Controls.Helpers;
+using Consolonia.Themes.Infrastructure;
 
 if (RuntimeFeature.IsDynamicCodeSupported)
     throw new InvalidOperationException("Publish and execute this probe as NativeAOT.");
@@ -53,7 +59,36 @@ PixelBuffer roundTrip = JsonSerializer.Deserialize(json, PixelBufferJsonContext.
 if (roundTrip is null || roundTrip.Width != 1 || roundTrip.Height != 1 || roundTrip[0] != buffer[0])
     throw new InvalidOperationException("NativeAOT PixelBuffer serialization failed.");
 
-Console.WriteLine("NativeAOT LineBrush registration, BorderBrush construction, interpolation and PixelBuffer JSON passed.");
+new ConsoloniaPlatform().Initialize();
+var screen = new ConsoloniaScreen(new PixelRect(0, 0, 85, 28)).AllScreens[0];
+if (!screen.IsPrimary || screen.Bounds.Width != 85 || screen.Bounds.Height != 28 ||
+    screen.WorkingArea != screen.Bounds || screen.DisplayName != "Console")
+    throw new InvalidOperationException("NativeAOT console screen initialization failed.");
+
+if (new ConsoloniaTextPresenter().CaretBlinkInterval >= TimeSpan.Zero)
+    throw new InvalidOperationException("NativeAOT text presenter caret timer was not disabled.");
+
+var modernGrid = new ModernDataGridStyles();
+var turboGrid = new TurboVisionDataGridStyles();
+var modernWindows = new ModernManagedWindowStyles();
+if (modernGrid.Count == 0 ||
+    turboGrid.Resources.Count == 0 ||
+    modernWindows.Resources.ThemeDictionaries.Count == 0)
+    throw new InvalidOperationException("NativeAOT compiled theme styles failed to load.");
+
+var autoGrid = new AutoDataGridStyles();
+var host = new Control();
+host.Styles.Add(autoGrid);
+host.Resources[AutoThemeStylesBase.ConsoloniaThemeFamilyKey] = AutoThemeStylesBase.ModernThemeKey;
+if (autoGrid.Count != 1 || autoGrid[0] is not ModernDataGridStyles)
+    throw new InvalidOperationException("NativeAOT Modern DataGrid styles were not selected.");
+host.Resources[AutoThemeStylesBase.ConsoloniaThemeFamilyKey] = AutoThemeStylesBase.TurboVisionThemeKey;
+if (autoGrid.Count != 1 || autoGrid[0] is not TurboVisionDataGridStyles)
+    throw new InvalidOperationException("NativeAOT TurboVision DataGrid styles were not selected.");
+
+AppBuilder.Configure<ProbeApp>().UseClipboard(new ConsoleClipboard());
+
+Console.WriteLine("NativeAOT brushes, PixelBuffer JSON, compiled theme styles and clipboard setup passed.");
 
 [JsonSerializable(typeof(PixelBuffer))]
 internal partial class PixelBufferJsonContext : JsonSerializerContext
@@ -63,4 +98,8 @@ internal partial class PixelBufferJsonContext : JsonSerializerContext
 internal sealed class ProbeConsoleCapabilities : IConsoleCapabilities
 {
     public ConsoleCapabilities Capabilities => ConsoleCapabilities.SupportsComplexEmoji;
+}
+
+internal sealed class ProbeApp : Application
+{
 }

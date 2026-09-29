@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -15,9 +14,6 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
         // ReSharper disable once MemberCanBePrivate.Global
         public static readonly StyledProperty<Point> CaretPositionProperty =
             AvaloniaProperty.Register<ConsoloniaTextPresenter, Point>(nameof(CaretPosition));
-
-        private static readonly FieldInfo TickTimerField =
-            typeof(TextPresenter).GetField("_caretTimer", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         static ConsoloniaTextPresenter()
         {
@@ -65,19 +61,8 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
 
         public ConsoloniaTextPresenter()
         {
-            // we need to disable blinking caret, our terminal caret blinks itself once shown
-
-            CaretBlinkInterval = TimeSpan.FromSeconds(-1); // todo: add check to restrict changing
-
-            var caretTickTimer = (DispatcherTimer)TickTimerField.GetValue(this);
-            // can be null with Avalonia 11.1.5
-            if (caretTickTimer != null)
-            {
-                caretTickTimer!.Interval =
-                    TimeSpan.FromMilliseconds(int
-                        .MaxValue); //see DispatcherTimer.Interval, since we can not disable it, setting it to the longest interval possible
-                caretTickTimer!.Tick += (_, _) => throw new NotImplementedException("How to disable timer completely?");
-            }
+            // Avalonia does not create a caret timer when the interval is non-positive.
+            CaretBlinkInterval = TimeSpan.FromSeconds(-1);
 
             CaretBrush = Brushes.Transparent; // we want to draw own caret
         }

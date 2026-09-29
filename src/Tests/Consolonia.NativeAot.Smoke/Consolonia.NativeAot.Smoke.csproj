@@ -8,5 +8,8 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="..\..\Consolonia.Core\Consolonia.Core.csproj" />
+        <ProjectReference Include="..\..\Consolonia.Controls.DataGrid\Consolonia.Controls.DataGrid.csproj" />
+        <ProjectReference Include="..\..\Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj" />
+        <ProjectReference Include="..\..\Consolonia.PlatformSupport\Consolonia.PlatformSupport.csproj" />
     </ItemGroup>
 </Project>

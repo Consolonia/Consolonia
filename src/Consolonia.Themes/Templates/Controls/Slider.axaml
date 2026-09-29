@@ -2,7 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:console="https://github.com/consolonia"
                     x:ClassModifier="internal"
-                    x:CompileBindings="False">
+                    x:CompileBindings="True">
     <ControlTheme x:Key="SliderRepeatTrackTheme"
                   TargetType="RepeatButton">
         <Setter Property="Background"
@@ -54,8 +54,12 @@
                                     <ControlTemplate>
                                         <console:CaretControl Foreground="{TemplateBinding Foreground}"
                                                               VerticalAlignment="Center"
-                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}"
-                                                              IsCaretShown="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Slider, Tree=Logical}, Path=IsFocused}">
+                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}">
+                                            <console:CaretControl.IsCaretShown>
+                                                <Binding x:DataType="Slider"
+                                                         RelativeSource="{RelativeSource Mode=FindAncestor, AncestorType=Slider, Tree=Logical}"
+                                                         Path="IsFocused" />
+                                            </console:CaretControl.IsCaretShown>
                                             <console:SymbolsControl
                                                 Text="{DynamicResource ThemeSliderHorizontalThumbSymbol}"
                                                 VerticalAlignment="Center"
@@ -103,8 +107,12 @@
                                     <ControlTemplate>
                                         <console:CaretControl Foreground="{TemplateBinding Foreground}"
                                                               HorizontalAlignment="Center"
-                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}"
-                                                              IsCaretShown="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Slider, Tree=Logical}, Path=IsFocused}">
+                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}">
+                                            <console:CaretControl.IsCaretShown>
+                                                <Binding x:DataType="Slider"
+                                                         RelativeSource="{RelativeSource Mode=FindAncestor, AncestorType=Slider, Tree=Logical}"
+                                                         Path="IsFocused" />
+                                            </console:CaretControl.IsCaretShown>
                                             <console:SymbolsControl
                                                 Text="{DynamicResource ThemeSliderVerticalThumbSymbol}"
                                                 HorizontalAlignment="Center"

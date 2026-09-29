@@ -2,7 +2,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:console="https://github.com/consolonia"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:CompileBindings="False">
+        x:CompileBindings="True">
     <Styles.Resources>
         <console:PopupPlacementToOuterMargin x:Key="PopupPlacementToOuterMargin" />
         <ControlTheme x:Key="{x:Type console:BorderPanel}"
@@ -14,6 +14,7 @@
                     <Decorator>
                         <Decorator.Padding>
                             <Binding
+                                x:DataType="Popup"
                                 RelativeSource="{RelativeSource AncestorType=Popup, Mode=FindAncestor, Tree=Logical}"
                                 Path="Placement"
                                 Mode="OneWay"
