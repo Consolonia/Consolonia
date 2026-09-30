@@ -28,7 +28,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     ? factory.CreateConverter(typeof(T), options)
                     : converter;
                 return resolved as JsonConverter<T>
-                       ?? throw new InvalidOperationException($"The JSON converter for {typeof(T)} has the wrong type.");
+                       ?? throw new InvalidOperationException(
+                           $"The JSON converter for {typeof(T)} has the wrong type.");
             }
 
             return null;

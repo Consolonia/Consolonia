@@ -41,13 +41,11 @@ namespace Consolonia.Controls.Brushes
         public override IBrush Interpolate(double progress, IBrush oldValue, IBrush newValue)
         {
             if (oldValue is LineBrush oldLine && newValue is LineBrush newLine)
-            {
                 return new LineBrush
                 {
                     Brush = InterpolateBrush(progress, oldLine.Brush, newLine.Brush, true),
                     LineStyle = progress >= 0.5 ? newLine.LineStyle : oldLine.LineStyle
                 };
-            }
 
             if (oldValue is LineBrush || newValue is LineBrush)
                 return progress >= 0.5 ? newValue : oldValue;
@@ -87,13 +85,14 @@ namespace Consolonia.Controls.Brushes
 
         private static IGradientBrush InterpolateGradient(double progress, IGradientBrush from, IGradientBrush to)
         {
-            bool compatible = (from is ILinearGradientBrush && to is ILinearGradientBrush) ||
-                              (from is IRadialGradientBrush && to is IRadialGradientBrush) ||
-                              (from is IConicGradientBrush && to is IConicGradientBrush);
+            bool compatible = from is ILinearGradientBrush && to is ILinearGradientBrush ||
+                              from is IRadialGradientBrush && to is IRadialGradientBrush ||
+                              from is IConicGradientBrush && to is IConicGradientBrush;
             if (!compatible || from.GradientStops.Count == 0 || to.GradientStops.Count == 0)
                 return progress >= 0.5 ? to : from;
 
-            IReadOnlyList<ImmutableGradientStop> stops = InterpolateStops(progress, from.GradientStops, to.GradientStops);
+            IReadOnlyList<ImmutableGradientStop> stops =
+                InterpolateStops(progress, from.GradientStops, to.GradientStops);
             double opacity = Lerp(progress, from.Opacity, to.Opacity);
             ImmutableTransform transform = InterpolateTransform(progress, from.Transform, to.Transform);
             RelativePoint origin = InterpolatePoint(progress, from.TransformOrigin, to.TransformOrigin);

@@ -63,9 +63,21 @@ namespace Consolonia.Core.Tests
             public bool WasCleared { get; private set; }
             public bool WasFlushed { get; private set; }
 
-            public Task<bool> IsCurrentOwnerAsync() => Task.FromResult(IsOwner);
+            public Task FlushAsync()
+            {
+                WasFlushed = true;
+                return Task.CompletedTask;
+            }
 
-            public Task<IAsyncDataTransfer> TryGetDataAsync() => Task.FromResult(_data);
+            public Task<bool> IsCurrentOwnerAsync()
+            {
+                return Task.FromResult(IsOwner);
+            }
+
+            public Task<IAsyncDataTransfer> TryGetDataAsync()
+            {
+                return Task.FromResult(_data);
+            }
 
             public Task SetDataAsync(IAsyncDataTransfer dataTransfer)
             {
@@ -77,12 +89,6 @@ namespace Consolonia.Core.Tests
             {
                 _data = null;
                 WasCleared = true;
-                return Task.CompletedTask;
-            }
-
-            public Task FlushAsync()
-            {
-                WasFlushed = true;
                 return Task.CompletedTask;
             }
         }

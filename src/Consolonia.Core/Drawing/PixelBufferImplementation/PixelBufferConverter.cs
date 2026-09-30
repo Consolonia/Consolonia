@@ -45,7 +45,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                             var pixelList = new List<Pixel>();
                             while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                             {
-                                var pixel = PixelJsonConverters.Read(ref reader, options, PixelConverter);
+                                Pixel pixel = PixelJsonConverters.Read(ref reader, options, PixelConverter);
                                 pixelList.Add(pixel);
                             }
 

@@ -13,12 +13,11 @@
                 <ControlTemplate>
                     <Decorator>
                         <Decorator.Padding>
-                            <Binding
-                                x:DataType="Popup"
-                                RelativeSource="{RelativeSource AncestorType=Popup, Mode=FindAncestor, Tree=Logical}"
-                                Path="Placement"
-                                Mode="OneWay"
-                                Converter="{StaticResource PopupPlacementToOuterMargin}">
+                            <Binding x:DataType="Popup"
+                                     RelativeSource="{RelativeSource AncestorType=Popup, Mode=FindAncestor, Tree=Logical}"
+                                     Path="Placement"
+                                     Mode="OneWay"
+                                     Converter="{StaticResource PopupPlacementToOuterMargin}">
                                 <Binding.FallbackValue>
                                     <Thickness>0</Thickness>
                                 </Binding.FallbackValue>

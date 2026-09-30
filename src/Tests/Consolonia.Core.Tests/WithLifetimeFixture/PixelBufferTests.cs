@@ -103,7 +103,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             var buffer = new PixelBuffer(1, 1);
 
             string json = JsonSerializer.Serialize(buffer, options);
-            PixelBuffer restored = JsonSerializer.Deserialize<PixelBuffer>(json, options);
+            var restored = JsonSerializer.Deserialize<PixelBuffer>(json, options);
 
             StringAssert.Contains("\"Symbol\":\"configured\"", json);
             Assert.AreEqual(new Symbol('A'), restored[0].Foreground.Symbol);

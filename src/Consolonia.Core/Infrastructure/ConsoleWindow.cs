@@ -330,46 +330,6 @@ namespace Consolonia.Core.Infrastructure
             return null;
         }
 
-        private sealed class ConsoleLauncher : ILauncher
-        {
-            public Task<bool> LaunchUriAsync(Uri uri)
-            {
-                ArgumentNullException.ThrowIfNull(uri);
-                return Task.FromResult(uri.IsAbsoluteUri && Launch(uri.AbsoluteUri));
-            }
-
-            public Task<bool> LaunchFileAsync(IStorageItem storageItem)
-            {
-                ArgumentNullException.ThrowIfNull(storageItem);
-                return Task.FromResult(storageItem.TryGetLocalPath() is { } path && Launch(path));
-            }
-
-            private static bool Launch(string path)
-            {
-                ProcessStartInfo startInfo;
-                if (OperatingSystem.IsWindows())
-                {
-                    startInfo = new ProcessStartInfo(path) { UseShellExecute = true, CreateNoWindow = true };
-                }
-                else if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
-                {
-                    startInfo = new ProcessStartInfo(OperatingSystem.IsMacOS() ? "open" : "xdg-open")
-                    {
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
-                    startInfo.ArgumentList.Add(path);
-                }
-                else
-                {
-                    return false;
-                }
-
-                using var process = Process.Start(startInfo);
-                return process is not null;
-            }
-        }
-
         public void Dispose()
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
@@ -627,6 +587,46 @@ namespace Consolonia.Core.Infrastructure
         private void OnCursorChanged(ConsoleCursor obj)
         {
             CursorChanged?.Invoke(obj);
+        }
+
+        private sealed class ConsoleLauncher : ILauncher
+        {
+            public Task<bool> LaunchUriAsync(Uri uri)
+            {
+                ArgumentNullException.ThrowIfNull(uri);
+                return Task.FromResult(uri.IsAbsoluteUri && Launch(uri.AbsoluteUri));
+            }
+
+            public Task<bool> LaunchFileAsync(IStorageItem storageItem)
+            {
+                ArgumentNullException.ThrowIfNull(storageItem);
+                return Task.FromResult(storageItem.TryGetLocalPath() is { } path && Launch(path));
+            }
+
+            private static bool Launch(string path)
+            {
+                ProcessStartInfo startInfo;
+                if (OperatingSystem.IsWindows())
+                {
+                    startInfo = new ProcessStartInfo(path) { UseShellExecute = true, CreateNoWindow = true };
+                }
+                else if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+                {
+                    startInfo = new ProcessStartInfo(OperatingSystem.IsMacOS() ? "open" : "xdg-open")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    startInfo.ArgumentList.Add(path);
+                }
+                else
+                {
+                    return false;
+                }
+
+                using Process process = Process.Start(startInfo);
+                return process is not null;
+            }
         }
     }
 }

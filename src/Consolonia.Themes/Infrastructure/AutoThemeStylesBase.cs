@@ -66,14 +66,15 @@ namespace Consolonia.Themes.Infrastructure
         protected void IncludeStyle(Styles style)
         {
             Add(style);
-            
+
             ((IResourceProvider)style).RemoveOwner(style.Owner!);
         }
 
         /// <summary>
         ///     Supports legacy dynamic URI includes in JIT applications. Use compiled styles for NativeAOT.
         /// </summary>
-        [RequiresUnreferencedCode("Programmatic URI style loading is incompatible with trimming. Use IncludeStyle(IStyle) with a compiled Styles root.")]
+        [RequiresUnreferencedCode(
+            "Programmatic URI style loading is incompatible with trimming. Use IncludeStyle(IStyle) with a compiled Styles root.")]
         protected void IncludeStyle(Uri uri)
         {
             var styleInclude = new StyleInclude(baseUri: null) { Source = uri };
