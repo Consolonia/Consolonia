@@ -54,12 +54,8 @@
                                     <ControlTemplate>
                                         <console:CaretControl Foreground="{TemplateBinding Foreground}"
                                                               VerticalAlignment="Center"
-                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}">
-                                            <console:CaretControl.IsCaretShown>
-                                                <Binding x:DataType="Slider"
-                                                         RelativeSource="{RelativeSource Mode=FindAncestor, AncestorType=Slider, Tree=Logical}"
-                                                         Path="IsFocused" />
-                                            </console:CaretControl.IsCaretShown>
+                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}"
+                                                              IsCaretShown="{CompiledBinding $parent[Slider].IsFocused}">
                                             <console:SymbolsControl
                                                 Text="{DynamicResource ThemeSliderHorizontalThumbSymbol}"
                                                 VerticalAlignment="Center"
@@ -107,12 +103,8 @@
                                     <ControlTemplate>
                                         <console:CaretControl Foreground="{TemplateBinding Foreground}"
                                                               HorizontalAlignment="Center"
-                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}">
-                                            <console:CaretControl.IsCaretShown>
-                                                <Binding x:DataType="Slider"
-                                                         RelativeSource="{RelativeSource Mode=FindAncestor, AncestorType=Slider, Tree=Logical}"
-                                                         Path="IsFocused" />
-                                            </console:CaretControl.IsCaretShown>
+                                                              CaretStyle="{DynamicResource ControlFocusCaretStyle}"
+                                                              IsCaretShown="{CompiledBinding $parent[Slider].IsFocused}">
                                             <console:SymbolsControl
                                                 Text="{DynamicResource ThemeSliderVerticalThumbSymbol}"
                                                 HorizontalAlignment="Center"

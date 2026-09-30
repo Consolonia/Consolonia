@@ -13,9 +13,7 @@
                 <ControlTemplate>
                     <Decorator>
                         <Decorator.Padding>
-                            <Binding x:DataType="Popup"
-                                     RelativeSource="{RelativeSource AncestorType=Popup, Mode=FindAncestor, Tree=Logical}"
-                                     Path="Placement"
+                            <Binding Path="$parent[Popup].Placement"
                                      Mode="OneWay"
                                      Converter="{StaticResource PopupPlacementToOuterMargin}">
                                 <Binding.FallbackValue>

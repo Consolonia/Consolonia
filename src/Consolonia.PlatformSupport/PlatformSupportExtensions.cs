@@ -108,7 +108,14 @@ namespace Consolonia
         public static AppBuilder UseClipboard(this AppBuilder builder, IClipboardImpl clipboardImpl)
         {
             ArgumentNullException.ThrowIfNull(clipboardImpl);
-            return builder.With<IClipboard>(new PlatformClipboard(clipboardImpl));
+            return builder.With<IClipboard>(CreateClipboard(clipboardImpl));
+        }
+
+        internal static IClipboard CreateClipboard(IClipboardImpl clipboardImpl)
+        {
+            // The constant name lets the trimmer preserve Avalonia's clipboard constructor.
+            Type clipboardType = Type.GetType("Avalonia.Input.Platform.Clipboard, Avalonia.Base", true)!;
+            return (IClipboard)Activator.CreateInstance(clipboardType, clipboardImpl)!;
         }
 
         public static bool IsWslPlatform()

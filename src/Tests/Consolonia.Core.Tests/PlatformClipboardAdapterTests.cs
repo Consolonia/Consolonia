@@ -2,7 +2,6 @@ using System.Threading.Tasks;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Consolonia.Core.Infrastructure;
-using Consolonia.PlatformSupport.Clipboard;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
@@ -14,7 +13,7 @@ namespace Consolonia.Core.Tests
         public async Task OwnedDataIsAvailableOnlyWhileClipboardOwnsIt()
         {
             var implementation = new OwnedClipboard();
-            var clipboard = new PlatformClipboard(implementation);
+            IClipboard clipboard = PlatformSupportExtensions.CreateClipboard(implementation);
             var data = new AsyncDataTransfer(new AsyncDataTransferItem("text", DataFormat.Text));
 
             await clipboard.SetDataAsync(data);
@@ -32,7 +31,7 @@ namespace Consolonia.Core.Tests
         public async Task ClearingAndFlushingDelegateToPlatformClipboard()
         {
             var implementation = new OwnedClipboard();
-            var clipboard = new PlatformClipboard(implementation);
+            IClipboard clipboard = PlatformSupportExtensions.CreateClipboard(implementation);
             await clipboard.SetDataAsync(new AsyncDataTransfer(new AsyncDataTransferItem("text", DataFormat.Text)));
 
             await clipboard.FlushAsync();
@@ -47,7 +46,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public async Task NonOwnedClipboardHasNoInProcessDataOrFlushRequirement()
         {
-            var clipboard = new PlatformClipboard(new ConsoleClipboard());
+            IClipboard clipboard = PlatformSupportExtensions.CreateClipboard(new ConsoleClipboard());
             await clipboard.SetDataAsync(new AsyncDataTransfer(new AsyncDataTransferItem("text", DataFormat.Text)));
 
             Assert.IsNull(await clipboard.TryGetInProcessDataAsync());

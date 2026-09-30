@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Input.Raw;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -110,7 +111,25 @@ host.Resources[AutoThemeStylesBase.ConsoloniaThemeFamilyKey] = AutoThemeStylesBa
 if (autoGrid.Count != 1 || autoGrid[0] is not TurboVisionDataGridStyles)
     throw new InvalidOperationException("NativeAOT TurboVision DataGrid styles were not selected.");
 
-AppBuilder.Configure<ProbeApp>().UseClipboard(new ConsoleClipboard());
+AppBuilder.Configure<ProbeApp>()
+    .UseConsolonia()
+    .UseConsole(console)
+    .UseClipboard(new ConsoleClipboard())
+    .SetupWithoutStarting();
+IClipboard clipboard = AvaloniaLocator.Current.GetRequiredService<IClipboard>();
+using (var data = new AsyncDataTransfer(new AsyncDataTransferItem("native clipboard", DataFormat.Text)))
+{
+    await clipboard.SetDataAsync(data);
+    using IAsyncDataTransfer clipboardData = await clipboard.TryGetDataAsync();
+    if (clipboardData is null || await clipboardData.TryGetTextAsync() != "native clipboard" ||
+        await clipboard.TryGetInProcessDataAsync() is not null)
+        throw new InvalidOperationException("NativeAOT Avalonia clipboard round-trip failed.");
+}
+await clipboard.FlushAsync();
+await clipboard.ClearAsync();
+using IAsyncDataTransfer clearedData = await clipboard.TryGetDataAsync();
+if (clearedData is null || clearedData.Items.Count != 0 || await clearedData.TryGetTextAsync() is not null)
+    throw new InvalidOperationException("NativeAOT Avalonia clipboard clear failed.");
 
 Console.WriteLine("NativeAOT brushes, PixelBuffer JSON, compiled theme styles, launcher and clipboard setup passed.");
 
