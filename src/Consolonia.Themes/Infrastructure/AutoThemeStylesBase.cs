@@ -56,7 +56,7 @@ namespace Consolonia.Themes.Infrastructure
 
         /// <summary>
         ///     Compose this Styles instance for the specified theme family.
-        ///     Implementations should call  <see cref="IncludeStyle" />.
+        ///     Implementations should call  <see cref="IncludeStyle(Styles)" />.
         /// </summary>
         protected abstract void ComposeForFamily(string family);
 
