@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Avalonia;
 using Avalonia.Animation;
@@ -135,6 +136,48 @@ namespace Consolonia.Core.Tests
 
             Assert.AreSame(from, animator.Interpolate(0.25, from, to));
             Assert.AreSame(to, animator.Interpolate(0.75, from, to));
+        }
+
+        [TestCase(0.25, false)]
+        [TestCase(0.5, false)]
+        [TestCase(0.75, false)]
+        [TestCase(0.25, true)]
+        [TestCase(0.5, true)]
+        [TestCase(0.75, true)]
+        public void EmptyGradientAndSolidSwitchBetweenOriginalBrushes(double progress, bool reverse)
+        {
+            AssertGradientAndSolidSwitchDiscretely(new LinearGradientBrush(), progress, reverse);
+        }
+
+        [TestCase(0.25, false)]
+        [TestCase(0.5, false)]
+        [TestCase(0.75, false)]
+        [TestCase(0.25, true)]
+        [TestCase(0.5, true)]
+        [TestCase(0.75, true)]
+        public void UnsupportedGradientAndSolidSwitchBetweenOriginalBrushes(double progress, bool reverse)
+        {
+            AssertGradientAndSolidSwitchDiscretely(new UnsupportedGradientBrush(), progress, reverse);
+        }
+
+        private static void AssertGradientAndSolidSwitchDiscretely(IBrush gradient, double progress, bool reverse)
+        {
+            IBrush solid = new SolidColorBrush(Colors.Green);
+            IBrush from = reverse ? solid : gradient;
+            IBrush to = reverse ? gradient : solid;
+
+            IBrush result = new LineBrushAnimator().Interpolate(progress, from, to);
+
+            Assert.AreSame(progress >= 0.5 ? to : from, result);
+        }
+
+        private sealed class UnsupportedGradientBrush : IGradientBrush
+        {
+            public double Opacity => 1;
+            public ITransform Transform => null;
+            public RelativePoint TransformOrigin => RelativePoint.Center;
+            public GradientSpreadMethod SpreadMethod => GradientSpreadMethod.Pad;
+            public IReadOnlyList<IGradientStop> GradientStops { get; } = new[] { new GradientStop(Colors.Red, 0) };
         }
 
         [Test]

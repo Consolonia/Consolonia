@@ -4,12 +4,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Input.Raw;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Consolonia;
 using Consolonia.Controls.DataGrid;
 using Consolonia.Controls;
 using Consolonia.Controls.Brushes;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Dummy;
 using Consolonia.Core.Infrastructure;
 using Consolonia.ManagedWindows;
 using Consolonia.Themes.Templates.Controls.Helpers;
@@ -18,7 +22,9 @@ using Consolonia.Themes.Infrastructure;
 if (RuntimeFeature.IsDynamicCodeSupported)
     throw new InvalidOperationException("Publish and execute this probe as NativeAOT.");
 
-AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new ProbeConsoleCapabilities());
+var console = new ProbeConsole();
+AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(console)
+    .Bind<IConsole>().ToConstant(console);
 
 var from = new LineBrush
 {
@@ -53,6 +59,17 @@ var solid = (ISolidColorBrush)animator.Interpolate(0.5,
 if (solid.Color != Color.FromRgb(188, 188, 188))
     throw new InvalidOperationException("NativeAOT ordinary brush interpolation failed.");
 
+IBrush emptyGradient = new LinearGradientBrush();
+IBrush solidBrush = new SolidColorBrush(Colors.Green);
+foreach (double progress in new[] { 0.25, 0.5, 0.75 })
+{
+    if (!ReferenceEquals(animator.Interpolate(progress, emptyGradient, solidBrush),
+            progress >= 0.5 ? solidBrush : emptyGradient) ||
+        !ReferenceEquals(animator.Interpolate(progress, solidBrush, emptyGradient),
+            progress >= 0.5 ? emptyGradient : solidBrush))
+        throw new InvalidOperationException("NativeAOT empty gradient fallback failed.");
+}
+
 var buffer = new PixelBuffer(1, 1);
 string json = JsonSerializer.Serialize(buffer, PixelBufferJsonContext.Default.PixelBuffer);
 PixelBuffer roundTrip = JsonSerializer.Deserialize(json, PixelBufferJsonContext.Default.PixelBuffer);
@@ -60,6 +77,13 @@ if (roundTrip is null || roundTrip.Width != 1 || roundTrip.Height != 1 || roundT
     throw new InvalidOperationException("NativeAOT PixelBuffer serialization failed.");
 
 new ConsoloniaPlatform().Initialize();
+using (var window = new ConsoleWindowImpl())
+{
+    if (window.TryGetFeature(typeof(ILauncher)) is not ILauncher launcher ||
+        await launcher.LaunchUriAsync(new Uri("relative", UriKind.Relative)))
+        throw new InvalidOperationException("NativeAOT Avalonia launcher activation failed.");
+}
+
 var screen = new ConsoloniaScreen(new PixelRect(0, 0, 85, 28)).AllScreens[0];
 if (!screen.IsPrimary || screen.Bounds.Width != 85 || screen.Bounds.Height != 28 ||
     screen.WorkingArea != screen.Bounds || screen.DisplayName != "Console")
@@ -88,16 +112,52 @@ if (autoGrid.Count != 1 || autoGrid[0] is not TurboVisionDataGridStyles)
 
 AppBuilder.Configure<ProbeApp>().UseClipboard(new ConsoleClipboard());
 
-Console.WriteLine("NativeAOT brushes, PixelBuffer JSON, compiled theme styles and clipboard setup passed.");
+Console.WriteLine("NativeAOT brushes, PixelBuffer JSON, compiled theme styles, launcher and clipboard setup passed.");
 
 [JsonSerializable(typeof(PixelBuffer))]
 internal partial class PixelBufferJsonContext : JsonSerializerContext
 {
 }
 
-internal sealed class ProbeConsoleCapabilities : IConsoleCapabilities
+internal sealed class ProbeConsole : DummyConsoleOutput, IConsole
 {
-    public ConsoleCapabilities Capabilities => ConsoleCapabilities.SupportsComplexEmoji;
+    public ProbeConsole() : base(85, 28)
+    {
+    }
+
+    event Action IConsole.Resized
+    {
+        add { }
+        remove { }
+    }
+
+    event Action<Key, char, RawInputModifiers, bool, ulong, bool> IConsole.KeyEvent
+    {
+        add { }
+        remove { }
+    }
+
+    event Action<string, ulong, CanBeHandledEventArgs> IConsole.TextInputEvent
+    {
+        add { }
+        remove { }
+    }
+
+    event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> IConsole.MouseEvent
+    {
+        add { }
+        remove { }
+    }
+
+    event Action<bool> IConsole.FocusEvent
+    {
+        add { }
+        remove { }
+    }
+
+    public void StartInputLoop()
+    {
+    }
 }
 
 internal sealed class ProbeApp : Application

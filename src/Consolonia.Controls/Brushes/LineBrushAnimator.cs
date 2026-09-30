@@ -60,11 +60,12 @@ namespace Consolonia.Controls.Brushes
                 if (newBrush is IGradientBrush newGradient)
                     return InterpolateGradient(progress, oldGradient, newGradient);
 
-                if (!isInnerBrush && newBrush is ISolidColorBrush newSolid)
+                if (!isInnerBrush && newBrush is ISolidColorBrush newSolid && CanConvertToGradient(oldGradient))
                     return InterpolateGradient(progress, oldGradient, ConvertSolidToGradient(oldGradient, newSolid));
             }
 
-            if (!isInnerBrush && newBrush is IGradientBrush nextGradient && oldBrush is ISolidColorBrush oldColor)
+            if (!isInnerBrush && newBrush is IGradientBrush nextGradient && oldBrush is ISolidColorBrush oldColor &&
+                CanConvertToGradient(nextGradient))
                 return InterpolateGradient(progress, ConvertSolidToGradient(nextGradient, oldColor), nextGradient);
 
             if (oldBrush is ISolidColorBrush oldSolid && newBrush is ISolidColorBrush nextSolid)
@@ -131,6 +132,12 @@ namespace Consolonia.Controls.Brushes
             }
 
             return stops;
+        }
+
+        private static bool CanConvertToGradient(IGradientBrush gradient)
+        {
+            return gradient.GradientStops.Count > 0 &&
+                   gradient is ILinearGradientBrush or IRadialGradientBrush or IConicGradientBrush;
         }
 
         private static IGradientBrush ConvertSolidToGradient(IGradientBrush gradient, ISolidColorBrush solid)
