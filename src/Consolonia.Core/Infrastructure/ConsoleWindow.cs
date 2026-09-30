@@ -323,7 +323,7 @@ namespace Consolonia.Core.Infrastructure
             if (featureType == typeof(ILauncher))
             {
                 // The constant assembly-qualified name lets the trimmer preserve the constructor.
-                Type launcherType = Type.GetType(
+                var launcherType = Type.GetType(
                     "Avalonia.Platform.Storage.FileIO.BclLauncher, Avalonia.Base", true)!;
                 return (ILauncher)Activator.CreateInstance(launcherType)!;
             }
