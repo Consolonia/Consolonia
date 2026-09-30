@@ -50,7 +50,9 @@ namespace Consolonia.Core.Tests
             await clipboard.SetDataAsync(new AsyncDataTransfer(new AsyncDataTransferItem("text", DataFormat.Text)));
 
             Assert.IsNull(await clipboard.TryGetInProcessDataAsync());
-            Assert.AreEqual("text", await (await clipboard.TryGetDataAsync()).TryGetTextAsync());
+            using IAsyncDataTransfer data = await clipboard.TryGetDataAsync();
+            Assert.IsNotNull(data, "The clipboard should return the stored data transfer.");
+            Assert.AreEqual("text", await data.TryGetTextAsync());
             Assert.DoesNotThrowAsync(async () => await clipboard.FlushAsync());
         }
 

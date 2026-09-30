@@ -36,6 +36,7 @@ namespace Consolonia.Gallery.Tests
             {
                 var window = (MainWindow)((IClassicDesktopStyleApplicationLifetime)
                     Application.Current.ApplicationLifetime).MainWindow;
+                Assert.IsNotNull(window, "The Gallery should have an initialized main window.");
                 Slider slider = window.GetVisualDescendants().OfType<Slider>()
                     .First(control => control.Orientation == orientation);
                 slider.DataContext = new object();
