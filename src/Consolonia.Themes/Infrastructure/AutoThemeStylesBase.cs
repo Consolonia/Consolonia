@@ -63,9 +63,11 @@ namespace Consolonia.Themes.Infrastructure
         /// <summary>
         ///     Adds a compiled Styles root for the selected family.
         /// </summary>
-        protected void IncludeStyle(IStyle style)
+        protected void IncludeStyle(Styles style)
         {
             Add(style);
+            
+            ((IResourceProvider)style).RemoveOwner(style.Owner!);
         }
 
         /// <summary>
