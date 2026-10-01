@@ -7,6 +7,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 {
     public class PixelConverter : JsonConverter<Pixel>
     {
+        private static readonly PixelForegroundConverter ForegroundConverter = new();
+        private static readonly PixelBackgroundConverter BackgroundConverter = new();
+
         public override Pixel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -29,10 +32,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     switch (propertyName)
                     {
                         case nameof(Pixel.Foreground):
-                            foreground = JsonSerializer.Deserialize<PixelForeground>(ref reader, options);
+                            foreground = PixelJsonConverters.Read(ref reader, options, ForegroundConverter);
                             break;
                         case nameof(Pixel.Background):
-                            background = JsonSerializer.Deserialize<PixelBackground>(ref reader, options);
+                            background = PixelJsonConverters.Read(ref reader, options, BackgroundConverter);
                             break;
                         case nameof(Pixel.CaretStyle):
                             if (reader.TokenType == JsonTokenType.String)
@@ -59,13 +62,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             writer.WriteStartObject();
 
             writer.WritePropertyName(nameof(Pixel.Foreground));
-            JsonSerializer.Serialize(writer, value.Foreground, options);
+            PixelJsonConverters.Write(writer, value.Foreground, options, ForegroundConverter);
 
             writer.WritePropertyName(nameof(Pixel.Background));
-            JsonSerializer.Serialize(writer, value.Background, options);
+            PixelJsonConverters.Write(writer, value.Background, options, BackgroundConverter);
 
             writer.WritePropertyName(nameof(Pixel.CaretStyle));
-            JsonSerializer.Serialize(writer, value.CaretStyle, options);
+            if (PixelJsonConverters.GetConfiguredConverter<CaretStyle>(options) is { } caretConverter)
+                caretConverter.Write(writer, value.CaretStyle, options);
+            else
+                writer.WriteNumberValue((int)value.CaretStyle);
 
             writer.WriteEndObject();
         }
