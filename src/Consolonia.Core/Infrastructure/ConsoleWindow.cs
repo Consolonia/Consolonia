@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.Remoting;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
@@ -323,9 +322,10 @@ namespace Consolonia.Core.Infrastructure
 
             if (featureType == typeof(ILauncher))
             {
-                ObjectHandle objHandle =
-                    Activator.CreateInstance("Avalonia.Base", "Avalonia.Platform.Storage.FileIO.BclLauncher");
-                return (ILauncher)objHandle.Unwrap();
+                // The constant assembly-qualified name lets the trimmer preserve the constructor.
+                var launcherType = Type.GetType(
+                    "Avalonia.Platform.Storage.FileIO.BclLauncher, Avalonia.Base", true)!;
+                return (ILauncher)Activator.CreateInstance(launcherType)!;
             }
 
             // TODO ISystemNavigationManagerImpl should be implemented to handle BACK navigation between pages of controls like mobile apps do.

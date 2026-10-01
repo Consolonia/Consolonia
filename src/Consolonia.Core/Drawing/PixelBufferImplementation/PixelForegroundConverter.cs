@@ -7,6 +7,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 {
     public class PixelForegroundConverter : JsonConverter<PixelForeground>
     {
+        private static readonly SymbolConverter SymbolConverter = new();
+
         public override PixelForeground Read(ref Utf8JsonReader reader, Type typeToConvert,
             JsonSerializerOptions options)
         {
@@ -32,7 +34,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     switch (propertyName)
                     {
                         case nameof(PixelForeground.Symbol):
-                            symbol = JsonSerializer.Deserialize<Symbol>(ref reader, options);
+                            symbol = PixelJsonConverters.Read(ref reader, options, SymbolConverter);
                             break;
                         case nameof(PixelForeground.Color):
                             string colorStr = reader.GetString();
@@ -78,7 +80,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             writer.WriteStartObject();
 
             writer.WritePropertyName(nameof(PixelForeground.Symbol));
-            JsonSerializer.Serialize(writer, value.Symbol, options);
+            PixelJsonConverters.Write(writer, value.Symbol, options, SymbolConverter);
 
             writer.WriteString(nameof(PixelForeground.Color), value.Color.ToString());
 
