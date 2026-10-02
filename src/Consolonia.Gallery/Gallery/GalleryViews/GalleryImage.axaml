@@ -5,9 +5,6 @@
              xmlns:local="using:Consolonia.Gallery.Gallery.GalleryViews"
              mc:Ignorable="d"
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryImage">
-    <UserControl.Resources>
-        <local:ImagePathToBitmapConverter x:Key="ImagePathToBitmapConverter" />
-    </UserControl.Resources>
 
     <Grid RowDefinitions="Auto,Auto,*">
         <Button Grid.Row="0"
@@ -36,13 +33,13 @@
         <Border Grid.Row="2"
                 Margin="1">
             <Carousel x:Name="ImageCarousel"
-                      ItemsSource="{Binding ImagePaths}"
+                      ItemsSource="{Binding Images}"
                       PageTransition="{x:Null}">
                 <Carousel.ItemTemplate>
                     <DataTemplate>
                         <Image HorizontalAlignment="Stretch"
                                VerticalAlignment="Stretch"
-                               Source="{Binding Converter={StaticResource ImagePathToBitmapConverter}}"
+                               Source="{Binding Bitmap}"
                                Stretch="Uniform" />
                     </DataTemplate>
                 </Carousel.ItemTemplate>
