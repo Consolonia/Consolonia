@@ -11,6 +11,8 @@
         <PackageReference Include="NUnit" Version="3.13.1" />
         <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
         <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <!-- BitmapResizeTests: the real fallback renderer an app gets with UseSkia(). -->
+        <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
     </ItemGroup>
 
     <ItemGroup>
