@@ -2,8 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:windowManager="clr-namespace:Iciclecreek.Avalonia.WindowManager;assembly=Iciclecreek.Avalonia.WindowManager"
         xmlns:brushes="https://github.com/consolonia"
-        xmlns:controls="clr-namespace:Consolonia.ManagedWindows.Controls"
-        x:CompileBindings="False">
+        xmlns:controls="clr-namespace:Consolonia.ManagedWindows.Controls">
     <Styles.Resources>
         <ControlTheme x:Key="{x:Type windowManager:ManagedWindow}"
                       TargetType="windowManager:ManagedWindow">

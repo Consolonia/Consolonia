@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Platform;
@@ -49,20 +48,19 @@ namespace Consolonia.Core.Infrastructure
 
         private static Screen CreateScreen(PixelRect rect)
         {
-            var screen = new PlatformScreen(ConsolePlatformHandle.Instance);
-            SetScreenProperty(screen, nameof(Screen.DisplayName), "Console");
-            SetScreenProperty(screen, nameof(Screen.Scaling), 1d);
-            SetScreenProperty(screen, nameof(Screen.Bounds), rect);
-            SetScreenProperty(screen, nameof(Screen.WorkingArea), rect);
-            SetScreenProperty(screen, nameof(Screen.IsPrimary), true);
-            return screen;
+            return new ConsolePlatformScreen(rect);
         }
 
-        private static void SetScreenProperty<T>(Screen screen, string propertyName, T value)
+        private sealed class ConsolePlatformScreen : PlatformScreen
         {
-            PropertyInfo property = typeof(Screen).GetProperty(propertyName) ??
-                                    throw new InvalidOperationException($"Screen property '{propertyName}' not found.");
-            property.SetValue(screen, value);
+            public ConsolePlatformScreen(PixelRect rect) : base(ConsolePlatformHandle.Instance)
+            {
+                DisplayName = "Console";
+                Scaling = 1;
+                Bounds = rect;
+                WorkingArea = rect;
+                IsPrimary = true;
+            }
         }
 
         private sealed class ConsolePlatformHandle : IPlatformHandle

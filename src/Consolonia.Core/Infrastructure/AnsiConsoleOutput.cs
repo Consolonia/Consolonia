@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -26,7 +26,7 @@ namespace Consolonia.Core.Infrastructure
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        private readonly ArrayBufferWriter<byte> _outputBuffer = new();
+        private readonly StringBuilder _outputBuffer = new();
 
         // set CONSOLONIA_DEBUG_FLUSH to a file path to log each flushed frame's size and kitty transmit (a=t) count
         private static readonly string DebugFlushLogPath =
@@ -38,18 +38,13 @@ namespace Consolonia.Core.Infrastructure
         private FontStyle? _lastStyle;
         private TextDecorationLocation? _lastTextDecoration;
         private FontWeight? _lastWeight;
-        private Stream _stdOut;
 
         internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
 
         internal Func<string, char, int, string> RequestAnsiResponseHandler { get; set; }
 
-        public AnsiConsoleOutput()
-        {
-            Console.OutputEncoding = Encoding.UTF8;
-            _stdOut = Console.OpenStandardOutput();
-        }
-
+        /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
+        private TextWriter _originalOut;
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
@@ -204,45 +199,46 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
-            if (_outputBuffer.WrittenCount > 0)
+            if (_outputBuffer.Length > 0)
             {
                 WaitPauseTaskIfNecessary();
 
                 if (DebugFlushLogPath != null)
-                    LogFlushDiagnostics(_outputBuffer.WrittenSpan);
+                    LogFlushDiagnostics(_outputBuffer);
 
                 // synchronized update (DEC 2026) makes the terminal apply the batch atomically; wrapping here
                 // rather than in the render loop keeps begin/end paired even if a frame is abandoned
                 bool synchronizedOutput = Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput);
                 if (synchronizedOutput)
-                    _stdOut.Write(BeginSynchronizedUpdateBytes);
-                _stdOut.Write(_outputBuffer.WrittenSpan);
-                if (synchronizedOutput)
-                    _stdOut.Write(EndSynchronizedUpdateBytes);
+                    Console.Out.Write(Esc.BeginSynchronizedUpdate);
 
-                _stdOut.Flush();
+                // straight from the builder -- no ToString copy of the whole frame
+                Console.Out.Write(_outputBuffer);
+
+                if (synchronizedOutput)
+                    Console.Out.Write(Esc.EndSynchronizedUpdate);
+
+                // one explicit flush, which with the writer PrepareConsole installed is what turns a
+                // frame into a handful of large writes instead of hundreds of small ones
+                Console.Out.Flush();
                 _outputBuffer.Clear();
             }
         }
 
-        private static readonly byte[] BeginSynchronizedUpdateBytes = Encoding.ASCII.GetBytes(Esc.BeginSynchronizedUpdate);
-        private static readonly byte[] EndSynchronizedUpdateBytes = Encoding.ASCII.GetBytes(Esc.EndSynchronizedUpdate);
-
-        private static void LogFlushDiagnostics(ReadOnlySpan<byte> frame)
+        private static void LogFlushDiagnostics(StringBuilder frame)
         {
+            const string marker = "_Ga=t";
+            string text = frame.ToString();
             int transmits = 0;
-            ReadOnlySpan<byte> marker = "_Ga=t"u8;
-            ReadOnlySpan<byte> rest = frame;
-            for (int found = rest.IndexOf(marker); found >= 0; found = rest.IndexOf(marker))
-            {
+            for (int found = text.IndexOf(marker, StringComparison.Ordinal);
+                 found >= 0;
+                 found = text.IndexOf(marker, found + marker.Length, StringComparison.Ordinal))
                 transmits++;
-                rest = rest[(found + marker.Length)..];
-            }
 
             try
             {
                 File.AppendAllText(DebugFlushLogPath,
-                    $"{DateTime.Now:HH:mm:ss.fff} bytes={frame.Length} a=t count={transmits}{Environment.NewLine}");
+                    $"{DateTime.Now:HH:mm:ss.fff} chars={text.Length} a=t count={transmits}{Environment.NewLine}");
             }
             catch (IOException)
             {
@@ -254,9 +250,19 @@ namespace Consolonia.Core.Infrastructure
         {
             SetCaretPosition(position);
 
+            // sixel payloads are strictly ASCII (data bytes are 0x3F..0x7E), so widening to chars
+            // and re-encoding through the UTF-8 writer reproduces the same bytes
             ReadOnlySpan<byte> bytes = sixel.Render();
-            bytes.CopyTo(_outputBuffer.GetSpan(bytes.Length));
-            _outputBuffer.Advance(bytes.Length);
+            char[] chars = ArrayPool<char>.Shared.Rent(bytes.Length);
+            try
+            {
+                int written = Encoding.ASCII.GetChars(bytes, chars);
+                _outputBuffer.Append(chars, 0, written);
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(chars);
+            }
 
             var newPosition = new PixelBufferCoordinate((ushort)(position.X + sixel.CellsWidth), position.Y);
             SetCaretPositionInternal(newPosition);
@@ -271,18 +277,36 @@ namespace Consolonia.Core.Infrastructure
         public void WriteText(string str)
         {
             WaitPauseTaskIfNecessary();
-            int max = Encoding.UTF8.GetMaxByteCount(str.Length);
-            Span<byte> span = _outputBuffer.GetSpan(max);
-            int written = Encoding.UTF8.GetBytes(str.AsSpan(), span);
-            _outputBuffer.Advance(written);
+            _outputBuffer.Append(str);
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void PrepareConsole()
         {
 #pragma warning disable CA1303 // Do not pass literals as localized parameters
+            Console.OutputEncoding = Encoding.UTF8;
+
+            // Replace Console.Out with a large-buffered, manually flushed writer. The default one
+            // carries a 256-character buffer with AutoFlush enabled, so every frame this class so
+            // carefully batches into _outputBuffer left the process as hundreds of syscall-sized
+            // fragments -- on Windows, each one separately parsed and re-serialized by the
+            // pseudoconsole. Measured against a live ConPTY with full-screen frames: ~14 frames a
+            // second through the default writer, ~100 through this one flushed once per frame.
+            //
+            // Installed via SetOut rather than written to directly, so anything that redirects
+            // Console.Out afterwards -- a test, a host capturing output -- is honoured exactly as
+            // before. Done after the encoding change above, because setting OutputEncoding
+            // recreates Console.Out and would discard this writer.
+            _originalOut = Console.Out;
+            Console.SetOut(new StreamWriter(
+                Console.OpenStandardOutput(), new UTF8Encoding(false), 65536, true)
+            {
+                AutoFlush = false
+            });
+
             // enable alternate screen so original console screen is not affected by the app
             Console.Write(Esc.EnableAlternateBuffer);
+            Console.Out.Flush();
 
             Size = new PixelBufferSize((ushort)Console.WindowWidth, (ushort)Console.WindowHeight);
 
@@ -290,6 +314,9 @@ namespace Consolonia.Core.Infrastructure
             // If the cursor moves 2 positions, it indicates proper rendering of composite surrogate pairs.
             (int left, _) = Console.GetCursorPosition();
             Console.Write(TestEmoji);
+            // The writer no longer flushes on its own, and the position read below asks the
+            // console -- which cannot have moved the cursor for text it has not received.
+            Console.Out.Flush();
             (int left2, _) = Console.GetCursorPosition();
             if (left2 - left == 2)
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
@@ -341,6 +368,13 @@ namespace Consolonia.Core.Infrastructure
             WriteText(Esc.Reset);
             WriteText(Esc.ShowCursor);
             Flush();
+
+            // The console gets its own writer back, flushed; ours held nothing between flushes.
+            if (_originalOut != null)
+            {
+                Console.SetOut(_originalOut);
+                _originalOut = null;
+            }
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -517,14 +551,7 @@ namespace Consolonia.Core.Infrastructure
         private void WriteChar(char ch)
         {
             if (ch > 0)
-            {
-                Span<char> chars = stackalloc char[1];
-                chars[0] = ch;
-
-                Span<byte> bytes = _outputBuffer.GetSpan(Encoding.UTF8.GetMaxByteCount(1));
-                int written = Encoding.UTF8.GetBytes(chars, bytes);
-                _outputBuffer.Advance(written);
-            }
+                _outputBuffer.Append(ch);
         }
     }
 }

@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:console="https://github.com/consolonia">
+        xmlns:console="https://github.com/consolonia"
+        x:Class="Consolonia.Controls.DataGrid.TurboVisionDataGridStyles">
 
     <!--TODO: Validation and Focus-->
     <Styles.Resources>

@@ -1,6 +1,4 @@
 using System;
-using System.IO;
-using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
@@ -109,45 +107,20 @@ namespace Consolonia
 
         public static AppBuilder UseClipboard(this AppBuilder builder, IClipboardImpl clipboardImpl)
         {
-            // Clipboard is new Avalonia wrapper around platform IClipboardImpl, but unfortunately is marked as internal.
-            // This can be replaced with: ```new Clipboard(clipboardImpl);``` when/if avalonia changes the visibility of
-            // Clipboard to public.
-            return builder.With(CreateInternalInstance<IClipboard>("Avalonia.Base",
-                "Avalonia.Input.Platform.Clipboard",
-                [clipboardImpl]));
+            ArgumentNullException.ThrowIfNull(clipboardImpl);
+            return builder.With(CreateClipboard(clipboardImpl));
+        }
+
+        internal static IClipboard CreateClipboard(IClipboardImpl clipboardImpl)
+        {
+            // The constant name lets the trimmer preserve Avalonia's clipboard constructor.
+            var clipboardType = Type.GetType("Avalonia.Input.Platform.Clipboard, Avalonia.Base", true)!;
+            return (IClipboard)Activator.CreateInstance(clipboardType, clipboardImpl)!;
         }
 
         public static bool IsWslPlatform()
         {
             return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WSL_DISTRO_NAME"));
-        }
-
-        private static T CreateInternalInstance<T>(string assembly, string name, object[] args = null)
-            where T : class
-        {
-            try
-            {
-                Assembly asm = Assembly.Load(assembly);
-                Type type = asm.GetType(name, true);
-
-                ArgumentNullException.ThrowIfNull(type);
-
-                object instance = Activator.CreateInstance(
-                    type,
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null,
-                    args,
-                    null);
-                ArgumentNullException.ThrowIfNull(instance);
-                return (T)instance!;
-            }
-            catch (Exception ex) when (ex is FileNotFoundException or BadImageFormatException or TypeLoadException or
-                                           MissingMethodException or TargetInvocationException or InvalidCastException)
-            {
-                throw new InvalidOperationException(
-                    $"Failed to create internal instance of type '{name}' from assembly '{assembly}'. " +
-                    "This may indicate an incompatible Avalonia version.", ex);
-            }
         }
 
         public static AppBuilder UseAutoDetectConsoleColorMode(this AppBuilder builder)

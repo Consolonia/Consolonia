@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
@@ -9,6 +10,8 @@ using Avalonia.Styling;
 namespace Consolonia.Core.Styles
 {
     // Copy-paste from FluentTheme from Avalonia
+    [RequiresUnreferencedCode(
+        "Arbitrary URI-based XAML loading requires reflection. Use a compiled Styles root in trimmed applications.")]
     public abstract class ResourceIncludeBase(Uri baseUri) : IResourceProvider, IStyle
     {
         private bool _isLoading;
