@@ -338,13 +338,13 @@ namespace Consolonia.Core.Drawing
                     intersectedRect.Width,
                     intersectedRect.Height);
 
-                PixelBuffer placeholderBuffer =
-                    GetOrCreatePlaceholderBuffer(source, renderInterface, targetRect, targetSize);
+                PixelBuffer cellBuffer =
+                    GetOrCreateCellBuffer(source, renderInterface, targetRect, targetSize);
 
-                CopyRenderedBitmapTrackingDirtyRegions(placeholderBuffer, intersectedRect, visibleRectInTarget);
+                CopyRenderedBitmapTrackingDirtyRegions(cellBuffer, intersectedRect, visibleRectInTarget);
             }
 
-            private PixelBuffer GetOrCreatePlaceholderBuffer(IBitmapImpl source,
+            private PixelBuffer GetOrCreateCellBuffer(IBitmapImpl source,
                 IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
             {
                 IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
@@ -360,7 +360,7 @@ namespace Consolonia.Core.Drawing
                             KittyGraphics.BuildVirtualPlacementSequence(renderedBitmap.ImageId,
                                 targetRect.Width, targetRect.Height));
 
-                    return renderedBitmap.Placeholders;
+                    return renderedBitmap.Cells;
                 }
 
                 // A new version (next animation frame) reuses the image id and placeholder buffer of the
@@ -404,15 +404,15 @@ namespace Consolonia.Core.Drawing
                                 targetRect.Width, targetRect.Height));
 
                     perBitmap[key] = reusableBitmap;
-                    return reusableBitmap.Placeholders;
+                    return reusableBitmap.Cells;
                 }
 
-                renderedBitmap = TransmitAndCreatePlaceholders(source, renderInterface, targetRect, targetSize);
+                renderedBitmap = TransmitAndCreateCells(source, renderInterface, targetRect, targetSize);
                 perBitmap[key] = renderedBitmap;
-                return renderedBitmap.Placeholders;
+                return renderedBitmap.Cells;
             }
 
-            private KittyRenderedBitmap TransmitAndCreatePlaceholders(IBitmapImpl source,
+            private KittyRenderedBitmap TransmitAndCreateCells(IBitmapImpl source,
                 IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
             {
                 byte[] imageData = ExtractImageData(source, renderInterface, targetSize,
@@ -525,15 +525,15 @@ namespace Consolonia.Core.Drawing
 
             private sealed class KittyRenderedBitmap
             {
-                public KittyRenderedBitmap(int imageId, PixelBuffer placeholders)
+                public KittyRenderedBitmap(int imageId, PixelBuffer cells)
                 {
                     ImageId = imageId;
-                    Placeholders = placeholders;
+                    Cells = cells;
                 }
 
                 public int ImageId { get; }
 
-                public PixelBuffer Placeholders { get; }
+                public PixelBuffer Cells { get; }
             }
         }
 
