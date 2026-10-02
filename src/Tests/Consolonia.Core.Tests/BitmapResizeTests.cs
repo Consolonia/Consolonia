@@ -23,8 +23,6 @@ namespace Consolonia.Core.Tests
     [TestFixture]
     public class BitmapResizeTests
     {
-        private ConsoloniaRenderInterface _renderInterface;
-
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -38,6 +36,8 @@ namespace Consolonia.Core.Tests
 
             _renderInterface = new ConsoloniaRenderInterface(skia);
         }
+
+        private ConsoloniaRenderInterface _renderInterface;
 
         private static MemoryStream RedPng(int width, int height)
         {
