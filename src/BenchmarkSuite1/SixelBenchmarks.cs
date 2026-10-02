@@ -2,7 +2,7 @@ using BenchmarkDotNet.Attributes;
 using Consolonia.Core.Drawing;
 using Microsoft.VSDiagnostics;
 
-namespace Consolonia.Core.Benchmarks;
+namespace BenchmarkSuite1;
 
 [CPUUsageDiagnoser]
 [DotNetObjectAllocDiagnoser]

@@ -6,7 +6,7 @@ namespace BenchmarkSuite1
 {
     internal class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             var config = ManualConfig.Create(DefaultConfig.Instance)
                 .WithArtifactsPath(Path.Combine(Path.GetTempPath(), "BenchmarkSuite1"));

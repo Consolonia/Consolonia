@@ -4,7 +4,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using Avalonia.Platform;
 using JeremyAnsel.ColorQuant;
 
 namespace Consolonia.Core.Drawing
@@ -46,11 +45,8 @@ namespace Consolonia.Core.Drawing
         /// <summary>Height of this image in cells.</summary>
         public int CellsHeight => Height / CellHeight;
 
-        /// <summary>Original bitmap source (may be null).</summary>
-        public IBitmapImpl Source { get; }
-
         public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height,
-            int cellWidth, int cellHeight, IBitmapImpl source = null)
+            int cellWidth, int cellHeight)
         {
             Palette = palette;
             PaletteCount = paletteCount;
@@ -59,7 +55,6 @@ namespace Consolonia.Core.Drawing
             Height = height;
             CellWidth = cellWidth;
             CellHeight = cellHeight;
-            Source = source;
         }
 
         /// <summary>
@@ -72,7 +67,7 @@ namespace Consolonia.Core.Drawing
             if (palette != null)
             {
                 int paletteCount = palette.Length / 4;
-                byte[] indexed = QuantizeWithPalette(bgrx, palette, paletteCount);
+                byte[] indexed = QuantizeWithPalette(bgrx, palette);
                 return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
             }
             else
@@ -268,7 +263,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>
         /// Map BGRX pixel data to an existing palette using nearest-color matching.
         /// </summary>
-        private static byte[] QuantizeWithPalette(byte[] bgrx, byte[] palette, int paletteCount)
+        private static byte[] QuantizeWithPalette(byte[] bgrx, byte[] palette)
         {
             int pixelCount = bgrx.Length / 4;
             byte[] indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
