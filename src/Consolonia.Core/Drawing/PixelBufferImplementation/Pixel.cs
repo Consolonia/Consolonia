@@ -147,8 +147,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         ///     The foreground color of a kitty graphics placeholder cell carries the image id: any
         ///     operation which changes cell colors would corrupt the reference and make the terminal
         ///     render the literal placeholder glyph. Color mutations (a dimming shade, a selection
-        ///     invert, a translucent blend) therefore leave placeholder cells untouched - the image
-        ///     shows through unmodified rather than being replaced by a flat colored cell.
+        ///     invert, a translucent blend) therefore leave placeholder cells untouched.
         /// </summary>
         private bool IsKittyPlaceholder()
         {
@@ -192,9 +191,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop)
                     {
-                        // a translucent color wash over a kitty placeholder cell would corrupt the
-                        // image id its foreground color carries, so the cell passes through
-                        // untouched and the image shows through unmodified (see IsKittyPlaceholder)
+                        // a translucent wash would corrupt the image id (see IsKittyPlaceholder)
                         if (IsKittyPlaceholder())
                             return this;
 
@@ -213,9 +210,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     break;
             }
 
-            // Background is always blended. A non-opaque overlay keeps the background's image tile:
-            // the image is only evicted by an opaque background painted over the cell (the fully
-            // opaque fast path above returns the overlay pixel, tile-less, which is that eviction).
+            // Background is always blended. The tile survives a non-opaque overlay; only an opaque
+            // one evicts it, via the tile-less fast path above.
             var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
                 Background.Tile);
 

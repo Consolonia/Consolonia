@@ -180,7 +180,7 @@ namespace Consolonia.Core.Drawing
                 pos = WriteIntBuf(output, pos, b);
             }
 
-            // Band encoding
+            // Band encoding: 6 pixel rows per band, '$' returns to column 0 for the next color, '-' ends the band
             int bandCount = (height + 5) / 6;
             Span<bool> colorPresent = stackalloc bool[paletteCount];
             var sixelRow = ArrayPool<byte>.Shared.Rent(width);

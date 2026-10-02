@@ -31,8 +31,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground Shade()
         {
-            // the tile survives: the terminal cannot tint an image, so the shade shows only where
-            // the color background is visible
+            // tile survives: the terminal cannot tint an image
             return new PixelBackground(Color.Shade(), Tile);
         }
 

@@ -3,14 +3,14 @@ using System;
 namespace Consolonia.Core.Drawing.PixelBufferImplementation
 {
     /// <summary>
-    ///     One cell's slice of a kitty image, carried as part of the cell's BACKGROUND.
+    ///     One cell's slice of a kitty image, carried as part of the cell's background.
     /// </summary>
     /// <remarks>
-    ///     This is what makes "text over a picture" possible: the image is background, the glyph is
-    ///     foreground, and they composite. Writing an opaque background color over the cell evicts
-    ///     the tile (the background owns the image's lifetime); writing a glyph with a transparent
-    ///     background leaves it in place. The renderer emits contiguous tiles as classic kitty
-    ///     placements at a negative z-index, which the terminal draws below text.
+    ///     Image as background plus glyph as foreground is what composites "text over a picture".
+    ///     Writing an opaque background color over the cell evicts the tile (the background owns the
+    ///     image's lifetime); writing a glyph with a transparent background leaves it in place. The
+    ///     renderer emits contiguous tiles as classic kitty placements at a negative z-index, which
+    ///     the terminal draws below text.
     /// </remarks>
     public readonly struct KittyTile(int imageId, ushort x, ushort y) : IEquatable<KittyTile>
     {

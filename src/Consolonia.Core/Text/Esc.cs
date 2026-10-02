@@ -82,26 +82,23 @@ namespace Consolonia.Core.Text
         // Kitty keyboard protocol will reply with "CSI ? <flags> u".
         public const string QueryKittyKeyboardFlags = "\u001b[?u";
 
-        // Query Primary Device Attributes (DA1). The terminal replies with
-        // "CSI ? <class> ; <feature> ; ... c" where feature 4 indicates sixel graphics support.
+        // Query Primary Device Attributes (DA1). Reply: "CSI ? <class> ; <feature> ; ... c",
+        // where feature 4 means sixel graphics support.
         public const string RequestDeviceAttributes = "\u001b[c";
 
-        // Query kitty graphics protocol support. A supporting terminal replies with
-        // "APC _Gi=31;OK ST". Send it followed by RequestDeviceAttributes as a fence:
-        // every terminal answers DA1, so the absence of the kitty reply means no support.
+        // Query kitty graphics support; a supporting terminal replies "APC _Gi=31;OK ST". Follow it
+        // with RequestDeviceAttributes as a fence: every terminal answers DA1.
         public const string QueryKittyGraphicsSupport = "\u001b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\u001b\\";
 
-        // Delete all kitty graphics images and placements, freeing terminal-side image storage.
+        // Delete all kitty images and placements, freeing terminal-side image storage.
         public const string KittyDeleteAllImages = "\u001b_Ga=d,d=A,q=2\u001b\\";
 
-        // Query synchronized output support (DECRQM for DEC private mode 2026). A terminal which
-        // knows the mode replies with "CSI ? 2026 ; <state> $ y" where state 1 (set), 2 (reset) or
-        // 3 (permanently set) means frames can be applied atomically; 0 means the mode is unknown.
+        // DECRQM for DEC private mode 2026. Reply: "CSI ? 2026 ; <state> $ y", where state 1, 2 or
+        // 3 means synchronized output is supported and 0 means the mode is unknown.
         public const string RequestSynchronizedOutputMode = "\u001b[?2026$p";
 
-        // Synchronized output (DEC private mode 2026): the terminal withholds repainting between
-        // begin and end, so a frame written in between is applied atomically instead of tearing
-        // when it is parsed in chunks.
+        // Synchronized output: the terminal withholds repainting between begin and end, so a frame
+        // parsed in chunks is applied atomically instead of tearing.
         public const string BeginSynchronizedUpdate = "\u001b[?2026h";
         public const string EndSynchronizedUpdate = "\u001b[?2026l";
 

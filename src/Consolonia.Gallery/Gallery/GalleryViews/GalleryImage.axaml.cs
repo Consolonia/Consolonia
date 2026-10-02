@@ -18,14 +18,11 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 {
     public partial class GalleryImage : UserControl
     {
-        /// <summary>
-        ///     Lorem Picsum's listing endpoint, which returns the metadata of a page of photos.
-        /// </summary>
         private const string PicsumListUrl = "https://picsum.photos/v2/list?page=1&limit=25";
 
         /// <summary>
-        ///     Longest edge we ask Picsum to scale to. A terminal renders an image into a handful of
-        ///     cells, so the multi-megapixel originals are pure download cost.
+        ///     A terminal renders an image into a handful of cells, so the multi-megapixel
+        ///     originals are pure download cost.
         /// </summary>
         private const int MaxImageEdge = 1024;
 

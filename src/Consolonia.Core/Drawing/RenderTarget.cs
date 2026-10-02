@@ -28,16 +28,12 @@ namespace Consolonia.Core.Drawing
 
         private ConsoleCursor _consoleCursor;
 
-        // kitty image ids referenced by placeholder cells, tracked across frames so that
-        // placements whose cells were all overwritten get deleted terminal side
+        // kitty image ids referenced this frame; ids which drop out get their placements deleted terminal side
         private HashSet<int> _kittyImageIdsOnScreen = new();
         private HashSet<int> _kittyImageIdsPreviouslyOnScreen = new();
 
-        // Classic rect placements derived from KittyTile cell backgrounds (the "image as cell
-        // background" mode): contiguous tiles coalesce into placements at z=-1, diffed across
-        // frames so only appearing/disappearing rectangles cross the wire. The first dictionary
-        // holds the placements live in the terminal; the second is the scratch the next frame is
-        // collected into before the two swap.
+        // classic rect placements coalesced from KittyTile cell backgrounds at z=-1, diffed across frames
+        // so only changed rectangles cross the wire; scratch collects the next frame, then the two swap
         private Dictionary<KittyRect, int> _kittyRectPlacements = new();
         private Dictionary<KittyRect, int> _kittyRectPlacementsScratch = new();
 
@@ -195,8 +191,7 @@ namespace Consolonia.Core.Drawing
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
 
-            // Pass 1: Combine and render contiguous dirty sixel regions.
-            // We track which cells were handled so pass 2 can skip them.
+            // Pass 1: sixel regions; sixelHandled lets pass 2 skip the cells it took
             bool[,]? sixelHandled = null;
             RenderSixelRegions(pixelBuffer, dirtyRegions, ref sixelHandled);
 
@@ -227,11 +222,10 @@ namespace Consolonia.Core.Drawing
                     if (!dirtyRegions.Contains(x, y, false))
                         continue;
 
-                    // Skip cells already rendered in the sixel pass
                     if (sixelHandled != null && sixelHandled[x, y])
                         continue;
 
-                    // Skip sixel cells that weren't part of a combined region (shouldn't happen, but safe)
+                    // sixel cells pass 1 did not claim (shouldn't happen, but never write them as text)
                     if (pixel.Foreground.Symbol.Sixel != null)
                         continue;
 
@@ -314,15 +308,11 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            // Classic rect placements: coalesce the tiles present this frame into rectangles and
-            // emit only what changed (new rectangles placed, vanished ones deleted).
             if (sawKittyTiles || _kittyRectPlacements.Count > 0)
                 EmitKittyRectPlacements(pixelBuffer);
 
-            // Delete terminal side placements of kitty images no placeholder cell references anymore
-            // (for example after navigating to another screen). Overwriting the cells is what the
-            // protocol prescribes, but terminals which materialize placements as overlays keep
-            // showing the image until its placement is deleted.
+            // overwriting the cells is what the protocol prescribes, but terminals which materialize
+            // placements as overlays keep showing the image until its placement is deleted
             foreach (int imageId in _kittyImageIdsPreviouslyOnScreen)
                 if (!_kittyImageIdsOnScreen.Contains(imageId))
                 {
@@ -426,7 +416,6 @@ namespace Consolonia.Core.Drawing
 
                     var rect = new KittyRect(tile.ImageId, tile.X, tile.Y, width, height, x, y);
 
-                    // a rectangle already placed last frame stays untouched; a new one is placed
                     if (live.Remove(rect, out int placementId))
                     {
                         next[rect] = placementId;
@@ -456,8 +445,8 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        /// Pass 1: Find contiguous dirty sixel cells sharing the same source,
-        /// combine them into a single Sixel via BitBlt, and write once.
+        ///     Pass 1: finds contiguous dirty sixel cells sharing the same palette, combines them into a
+        ///     single Sixel via BitBlt and writes that once, marking the cells handled for pass 2.
         /// </summary>
         private void RenderSixelRegions(PixelBuffer pixelBuffer, Snapshot dirtyRegions, ref bool[,]? sixelHandled)
         {
@@ -478,13 +467,11 @@ namespace Consolonia.Core.Drawing
                     if (!dirtyRegions.Contains(x, y, false))
                         continue;
 
-                    // Found a dirty sixel cell. Expand rightward and downward to find
-                    // the maximal rectangle of contiguous dirty sixel cells with same palette.
+                    // expand to the maximal rectangle of dirty cells sharing this palette instance
                     byte[] palette = cellSixel.Palette;
                     int cellPixelWidth = cellSixel.CellWidth;
                     int cellPixelHeight = cellSixel.CellHeight;
 
-                    // Find max width of contiguous run on the first row
                     int maxWidth = 1;
                     while (x + maxWidth < pixelBuffer.Width)
                     {
@@ -497,7 +484,6 @@ namespace Consolonia.Core.Drawing
                         maxWidth++;
                     }
 
-                    // Expand downward, narrowing width if needed
                     int rectHeight = 1;
                     while (y + rectHeight < pixelBuffer.Height)
                     {
@@ -516,18 +502,16 @@ namespace Consolonia.Core.Drawing
                         if (rowWidth == 0)
                             break;
 
-                        // Only extend if full row width matches (keep it rectangular)
+                        // narrow instead of extending ragged: the region must stay rectangular
                         if (rowWidth < maxWidth)
                             maxWidth = rowWidth;
                         rectHeight++;
                     }
 
-                    // Mark all cells in this rectangle as visited
                     for (int ry = 0; ry < rectHeight; ry++)
                         for (int rx = 0; rx < maxWidth; rx++)
                             visited[x + rx, y + ry] = true;
 
-                    // If just one cell, write it directly without combining
                     if (maxWidth == 1 && rectHeight == 1)
                     {
                         _console.WriteSixel(new PixelBufferCoordinate(x, y), cellSixel);
@@ -537,7 +521,7 @@ namespace Consolonia.Core.Drawing
                         continue;
                     }
 
-                    // Combine cell sixels into one big sixel via BitBlt
+                    // one BitBlt'd sixel for the whole rectangle costs a single escape sequence
                     int combinedWidth = maxWidth * cellPixelWidth;
                     int combinedHeight = rectHeight * cellPixelHeight;
                     byte[] combinedPixels = new byte[combinedWidth * combinedHeight];
@@ -555,10 +539,8 @@ namespace Consolonia.Core.Drawing
                         }
                     }
 
-                    // Write the combined sixel once
                     _console.WriteSixel(new PixelBufferCoordinate(x, y), combined);
 
-                    // Update cache and mark handled
                     sixelHandled ??= new bool[pixelBuffer.Width, pixelBuffer.Height];
                     for (int ry = 0; ry < rectHeight; ry++)
                         for (int rx = 0; rx < maxWidth; rx++)

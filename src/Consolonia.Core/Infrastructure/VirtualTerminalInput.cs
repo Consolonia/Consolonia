@@ -7,14 +7,11 @@ namespace Consolonia.Core.Infrastructure
     ///     Turns on the Windows console's pass-through of terminal replies, for as long as one is expected.
     /// </summary>
     /// <remarks>
-    ///     Without it, conhost/ConPTY reads the escape sequences arriving from the terminal and hands the
-    ///     program key events it made out of them. CSI and DCS replies survive that translation as their
-    ///     own characters, so cursor position and cell size queries have always worked. An APC reply,
-    ///     which is what the kitty graphics query is answered with, does not: it is swallowed up to the
-    ///     escape that ends it, and all the program receives is the leftover backslash. With
-    ///     ENABLE_VIRTUAL_TERMINAL_INPUT set the reply passes through as raw characters instead.
-    ///     Held only for the round trip: the input loop wants the console's reading of an arrow key,
-    ///     not the three characters the terminal actually sent.
+    ///     Without it, conhost/ConPTY turns the terminal's escape sequence replies into key events. CSI and DCS
+    ///     replies survive as their own characters (so cursor position and cell size queries work), but an APC
+    ///     reply, which is how the kitty graphics query is answered, is swallowed up to its terminating escape,
+    ///     leaving only the trailing backslash. ENABLE_VIRTUAL_TERMINAL_INPUT passes the reply through raw.
+    ///     Held only for the round trip, because the input loop wants key events, not raw sequences.
     /// </remarks>
     internal static class VirtualTerminalInput
     {
@@ -50,7 +47,7 @@ namespace Consolonia.Core.Infrastructure
             if (!GetConsoleMode(handle, out uint mode))
                 return default;
 
-            // Already on is not this code's doing, so it is not this code's to turn off again.
+            // already enabled by someone else, so not ours to turn off again
             if ((mode & EnableVirtualTerminalInputFlag) != 0)
                 return default;
 

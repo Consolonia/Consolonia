@@ -65,10 +65,8 @@ namespace Consolonia.Core.Drawing
         {
             ConsoleCapabilities capabilities = _consoleWindowImpl.Console.Capabilities;
 
-            // Kitty graphics use classic rect placements ("image as cell background"): glyphs
-            // composite over the picture and an opaque background evicts it. The unicode
-            // placeholder mode remains in the code as the fallback for hosts where classic
-            // placements cannot survive (tmux-style passthrough), but nothing selects it today.
+            // rect placements let glyphs composite over the picture; the unicode placeholder mode is
+            // kept for hosts where classic placements cannot survive, but nothing selects it today
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
                 AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
                 return new KittyBitmapRenderer(this, placementMode: true);
@@ -288,10 +286,10 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Renders a bitmap via the kitty graphics protocol using unicode placeholders.
-        ///     Pixels are transmitted to the terminal once per bitmap version; every covered cell then
-        ///     becomes an ordinary text cell referencing the image (U+10EEEE plus row/column diacritics,
-        ///     image id in the foreground color), so pixel buffer diffing and occlusion work unchanged
+        ///     Renders a bitmap via the kitty graphics protocol. Pixels are transmitted to the terminal once
+        ///     per bitmap version; every covered cell then references the image - as a background tile in
+        ///     rect-placement mode, or as a unicode placeholder cell (U+10EEEE plus row/column diacritics,
+        ///     image id in the foreground color) - so pixel buffer diffing and occlusion work unchanged
         ///     while redraws cost no pixel retransmission.
         /// </summary>
         private sealed class KittyBitmapRenderer : BitmapRenderer
@@ -303,11 +301,9 @@ namespace Consolonia.Core.Drawing
             // placements larger than the placeholder diacritics can address fall back to this renderer
             private readonly BitmapRenderer _oversizeFallbackRenderer;
 
-            // Classic rect-placement mode ("image as cell background"): instead of placeholder
-            // cells, every covered cell carries a KittyTile in its BACKGROUND and keeps its
-            // foreground free for glyphs. RenderTarget coalesces contiguous tiles into classic
-            // placements at z=-1, which the terminal draws below text - so borders, labels and
-            // shadows composite over the picture, and painting an opaque background evicts it.
+            // Classic rect-placement mode: every covered cell carries a KittyTile in its BACKGROUND,
+            // which RenderTarget coalesces into placements at z=-1, drawn below text - so glyphs
+            // composite over the picture, and painting an opaque background evicts it.
             private readonly bool _placementMode;
 
             public KittyBitmapRenderer(DrawingContextImpl context, bool placementMode = false)
@@ -323,8 +319,7 @@ namespace Consolonia.Core.Drawing
             public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
                 PixelRect targetRect, PixelRect intersectedRect)
             {
-                // the diacritic table bounds placeholder addressing only; rect placements use
-                // pixel crops and have no such limit
+                // the diacritic table bounds placeholder addressing only; rect placements crop pixels
                 if (!_placementMode &&
                     (targetRect.Width > KittyGraphics.MaxPlacementSize ||
                      targetRect.Height > KittyGraphics.MaxPlacementSize))
@@ -359,10 +354,8 @@ namespace Consolonia.Core.Drawing
 
                 if (perBitmap.TryGetValue(key, out KittyRenderedBitmap renderedBitmap))
                 {
-                    // The placement gets deleted when the image leaves the screen (see RenderTarget);
-                    // re-create it when the image is drawn again - the image data is still in the
-                    // terminal, so no pixel retransmission happens. Rect mode has no virtual
-                    // placement: RenderTarget derives classic placements from the tiles each frame.
+                    // the placement is deleted when the image leaves the screen (see RenderTarget);
+                    // re-creating it costs no pixel retransmission. Rect mode has no virtual placement.
                     if (!_placementMode && KittyGraphics.TryReclaimPlacement(renderedBitmap.ImageId))
                         Context._consoleWindowImpl.Console.WriteText(
                             KittyGraphics.BuildVirtualPlacementSequence(renderedBitmap.ImageId,
@@ -371,23 +364,17 @@ namespace Consolonia.Core.Drawing
                     return renderedBitmap.Placeholders;
                 }
 
-                // A new version of this bitmap (typically the next frame of an animation) reuses the
-                // image id and placeholder buffer of the previous version of the same size:
-                // transmitting with an existing id replaces the image data in the terminal while
-                // the placement and the placeholder cells stay valid, so the diff re-emits no cells
-                // and only the pixel data crosses the wire. Stale versions of other sizes are
-                // deleted to free terminal-side image storage; images of bitmaps which get garbage
-                // collected without a version change are cleaned up in bulk by KittyDeleteAllImages
-                // when the console is restored.
+                // A new version (next animation frame) reuses the image id and placeholder buffer of the
+                // same-size previous version: retransmitting under an existing id replaces the pixels
+                // while placement and cells stay valid, so the diff re-emits no cells. Stale versions of
+                // other sizes are deleted; GC'd bitmaps are cleaned up by KittyDeleteAllImages on restore.
                 KittyRenderedBitmap reusableBitmap = null;
                 List<BitmapQuantizedCacheKey> staleKeys = null;
                 foreach (KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap> pair in perBitmap)
                     if (pair.Key.Version != cacheSource.Version)
                     {
-                        // Rect mode never reuses an id across versions: a classic placement binds
-                        // to the image it was created against, so retransmitting under the same id
-                        // would leave the placements showing the old pixels. A fresh id changes the
-                        // cells' tiles, which re-keys the rectangles and re-places them.
+                        // Rect mode cannot reuse an id across versions: a classic placement binds to
+                        // the image it was created against, so a fresh id is needed to re-key the tiles.
                         if (!_placementMode && reusableBitmap == null && pair.Key.TargetSize.Equals(targetSize))
                         {
                             reusableBitmap = pair.Value;
@@ -441,10 +428,8 @@ namespace Consolonia.Core.Drawing
 
                 if (_placementMode)
                 {
-                    // The image is cell BACKGROUND: an empty foreground over an opaque black
-                    // backing (occludes whatever the picture was drawn over) plus the tile
-                    // reference. Glyphs drawn later blend into the foreground and composite over
-                    // the picture terminal side; an opaque background drawn later evicts the tile.
+                    // image as cell BACKGROUND over opaque black (occludes what the picture was drawn
+                    // over), foreground left free so glyphs drawn later composite over the picture
                     for (int cellY = 0; cellY < targetRect.Height; cellY++)
                         for (int cellX = 0; cellX < targetRect.Width; cellX++)
                             cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
@@ -479,9 +464,8 @@ namespace Consolonia.Core.Drawing
 
                 IBitmapImpl bitmapToRead = resizedBitmap ?? source;
 
-                // PNG is orders of magnitude smaller on the wire than raw RGBA (a full screen
-                // image is around 7MB raw, well over 9MB after base64), which matters both for
-                // the first paint and for every animation frame.
+                // PNG is far smaller on the wire than raw RGBA (a full screen image is ~7MB raw, over
+                // 9MB base64), which matters for the first paint and for every animation frame
                 byte[] png = TryEncodePng(bitmapToRead);
                 if (png != null)
                 {
@@ -508,8 +492,7 @@ namespace Consolonia.Core.Drawing
             {
                 try
                 {
-                    // Avalonia bitmap implementations save as PNG (via Skia); the bitmap is
-                    // already scaled to the target size, so this encodes exactly what is shown
+                    // Avalonia saves as PNG via Skia; the bitmap is already scaled to the target size
                     using var stream = new MemoryStream();
                     bitmap.Save(stream);
                     return stream.ToArray();
@@ -733,10 +716,8 @@ namespace Consolonia.Core.Drawing
                     '▜' => pixelColors[2],
                     '▙' => pixelColors[1],
                     '▟' => pixelColors[0],
-                    // Same color as the foreground, NOT transparent: a transparent background kept
-                    // whatever lay under the picture in the cell (typically the page background),
-                    // and any hairline the terminal's glyph rasterization leaves around a full
-                    // block let that stale color peek through as scattered ticks over the image.
+                    // NOT transparent: a transparent background let the color under the picture show
+                    // through the hairlines terminals leave around a full block glyph
                     '█' => CombineColors(pixelColors),
                     _ => throw new NotImplementedException()
                 };

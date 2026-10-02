@@ -92,7 +92,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void LargeImageIsTransmittedInChunksWhichReassembleToThePayload()
         {
-            // 8000 bytes of arbitrary binary payload make a base64 string larger than two 4096 char chunks
+            // 8000 bytes base64-expand past two 4096 char chunks
             byte[] rgba = new byte[2000 * 4];
             for (int i = 0; i < rgba.Length; i++)
                 rgba[i] = unchecked((byte)(i * 31));
@@ -133,8 +133,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void DeletePlacementSequenceIsWellFormedAndKeepsImageData()
         {
-            // lowercase d=i deletes the placements only, so the image can be placed again
-            // later without retransmitting its pixels
+            // lowercase d=i deletes the placements only, keeping the image data for re-placement
             Assert.That(KittyGraphics.BuildDeletePlacementSequence(7),
                 Is.EqualTo(Apc + "a=d,d=i,q=2,i=7" + St));
         }
@@ -171,9 +170,8 @@ namespace Consolonia.Core.Tests
         [Test]
         public void OverwritingPlaceholderCellWithOpaqueBackgroundErasesThePlaceholder()
         {
-            // regression: navigating to another screen paints an opaque background over the image
-            // area; the blended cell must not keep the placeholder (or the terminal would keep
-            // rendering the image slice) and must compare unequal so the diff repaints it
+            // regression: an opaque background painted over the image must drop the placeholder,
+            // or the terminal keeps rendering the image slice
             Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
 
             Pixel overwritten = placeholderPixel.Blend(new Pixel(new PixelBackground(Colors.Black)));
@@ -186,10 +184,8 @@ namespace Consolonia.Core.Tests
         [Test]
         public void ColorMutatingOperationsLeavePlaceholderUntouched()
         {
-            // the foreground color carries the image id, so a mutated color corrupts the reference
-            // (tofu boxes) and a degrade-to-space kills the picture under every window shadow. The
-            // cell must come back bit-identical: the image shows through the effect unmodified,
-            // and the diff sees no change to re-emit
+            // the foreground color carries the image id: mutating it yields tofu boxes, and a
+            // degrade-to-space kills the picture under every window shadow
             Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
 
             Assert.That(placeholderPixel.Shade(), Is.EqualTo(placeholderPixel));
@@ -209,8 +205,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void PlaceholderPixelsAreStableFrameToFrame()
         {
-            // steady state diff stability: identical placeholder cells must compare equal so an
-            // unchanged image region emits zero bytes per frame
+            // identical placeholder cells must compare equal, so a static image emits zero bytes
             Pixel first = CreatePlaceholderPixel(0x123456);
             Pixel second = CreatePlaceholderPixel(0x123456);
 

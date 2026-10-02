@@ -192,7 +192,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         // box pattern for box merging.
         public readonly byte Pattern;
 
-        // sixel
         public readonly Sixel Sixel;
 
         [JsonIgnore] public readonly byte Width;

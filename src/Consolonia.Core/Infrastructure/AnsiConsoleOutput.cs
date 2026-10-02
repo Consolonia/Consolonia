@@ -28,8 +28,7 @@ namespace Consolonia.Core.Infrastructure
 
         private readonly ArrayBufferWriter<byte> _outputBuffer = new();
 
-        // Diagnostic: set CONSOLONIA_DEBUG_FLUSH to a file path to log the byte size of every
-        // flushed frame plus how many kitty transmits (a=t) it carried.
+        // set CONSOLONIA_DEBUG_FLUSH to a file path to log each flushed frame's size and kitty transmit (a=t) count
         private static readonly string DebugFlushLogPath =
             Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FLUSH");
 
@@ -212,10 +211,8 @@ namespace Consolonia.Core.Infrastructure
                 if (DebugFlushLogPath != null)
                     LogFlushDiagnostics(_outputBuffer.WrittenSpan);
 
-                // Wrap every flushed batch in a synchronized update (DEC 2026) where supported, so
-                // the terminal applies it atomically instead of repainting mid-parse. Done here
-                // rather than by the render loop so begin and end always go out as a pair: a frame
-                // abandoned to an exception must not leave the terminal holding output forever.
+                // synchronized update (DEC 2026) makes the terminal apply the batch atomically; wrapping here
+                // rather than in the render loop keeps begin/end paired even if a frame is abandoned
                 bool synchronizedOutput = Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput);
                 if (synchronizedOutput)
                     _stdOut.Write(BeginSynchronizedUpdateBytes);
@@ -297,18 +294,14 @@ namespace Consolonia.Core.Infrastructure
             if (left2 - left == 2)
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
-            // determine cell pixel sizes
+            // 8x16 pixels is the fallback when the terminal does not report its cell size
             (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ?? (8, 16);
             this.CellPixelHeight = cellH;
             this.CellPixelWidth = cellW;
 
-            // Detect terminal graphics and synchronized output support with a single round trip. The
-            // kitty graphics query is answered with "APC _Gi=31;OK ST" by supporting terminals and
-            // ignored by all others, the DECRQM query for mode 2026 is answered with "CSI?2026;<state>$y"
-            // by terminals which know synchronized output, and the Primary Device Attributes (DA1)
-            // response, for example ESC[?62;4;22c, reports feature 4 when sixel graphics are supported.
-            // DA1 is answered by every terminal, so it also acts as the fence telling us all replies
-            // have arrived (neither of the other replies contains a 'c').
+            // three queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
+            // DECRQM mode 2026 (reply "CSI?2026;<state>$y") and DA1 (reply "ESC[?62;4;22c", feature 4 = sixel).
+            // DA1 is answered by every terminal and is the only reply containing 'c', so it fences the read.
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
                 Esc.QueryKittyGraphicsSupport + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
                 'c', 1000) ?? string.Empty;
@@ -317,15 +310,13 @@ namespace Consolonia.Core.Infrastructure
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
 
-            // Some emulators handle the graphics query asynchronously and reply after DA1,
-            // so if the kitty reply was not inside the fenced response give it one more short read.
+            // some terminals answer the kitty query asynchronously, after DA1: give it one more short read
             if (!ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
                 graphicsProbeResponse += RequestAnsiResponseHandler?.Invoke(string.Empty, '\\', 250) ?? string.Empty;
             if (ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsKittyGraphics;
 
-            // Allow overriding the detected graphics protocol, for terminals which render a protocol
-            // without answering the corresponding query (or to force the fallback for testing).
+            // override for terminals which render a protocol without answering its query, or to force fallback
             Capabilities = ApplyGraphicsProtocolOverride(Capabilities,
                 Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS"));
 
@@ -338,8 +329,7 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
-            // close any synchronized update left open by an interrupted frame, so the terminal
-            // does not sit on withheld output until its fallback timeout expires
+            // close any update left open by an interrupted frame, else the terminal withholds output until it times out
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
                 WriteText(Esc.EndSynchronizedUpdate);
 

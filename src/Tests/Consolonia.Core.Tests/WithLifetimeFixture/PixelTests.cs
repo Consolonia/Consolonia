@@ -200,11 +200,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void BlendShadedBackgroundOverKittyPlaceholderLeavesItUntouched()
         {
-            // regression: a window's shadow blends a translucent background over the app. The
-            // placeholder's foreground color carries the kitty image id, so mutating it would make
-            // the terminal render literal placeholder glyphs (a screen full of tofu boxes) - and
-            // degrading the cell to a flat space instead killed the picture under every shadow.
-            // The cell passes through untouched: the image shows through the shade unmodified.
+            // regression: a window's shadow blends a translucent background over the app, and
+            // mutating the image id in the placeholder's foreground color rendered literal
+            // placeholder glyphs (a screen full of tofu boxes)
             var placeholderPixel = new Pixel(
                 new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(0, 0), 1),
                     KittyGraphics.GetImageIdColor(0x123456)),
@@ -221,8 +219,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void KittyTileBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
         {
             // the "image as cell background" model: cell = (backgroundColor|backgroundImage) +
-            // foreground character. A glyph with a transparent background composites over the
-            // picture; a translucent wash leaves it; only an opaque background evicts it.
+            // foreground character
             var tile = new KittyTile(0x42, 3, 5);
             var tilePixel = new Pixel(
                 new PixelForeground(Symbol.Space, Colors.Transparent),
@@ -250,8 +247,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void ShadeAndInvertOverKittyPlaceholderLeaveItUntouched()
         {
-            // same invariant for the direct color mutations (shadows use Shade, selection uses
-            // Invert): a placeholder cell must come back bit-identical, image id intact
+            // same invariant for the direct color mutations: shadows use Shade, selection uses Invert
             var placeholderPixel = new Pixel(
                 new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(1, 2), 1),
                     KittyGraphics.GetImageIdColor(0x00ABCD)),

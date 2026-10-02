@@ -241,9 +241,8 @@ namespace Consolonia.Core.Infrastructure
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
         {
-            // Under ConPTY the Windows console synthesizes key events out of terminal replies and
-            // swallows APC ones (the kitty graphics handshake); with virtual terminal input enabled
-            // for the duration of the round trip the reply passes through as raw characters instead.
+            // conhost/ConPTY synthesizes key events from terminal replies and swallows APC ones
+            // (the kitty graphics handshake); virtual terminal input passes the reply through raw
             using VirtualTerminalInput.Scope scope = VirtualTerminalInput.Enable();
 
             WriteText(request);

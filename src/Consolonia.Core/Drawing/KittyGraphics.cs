@@ -9,16 +9,6 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     Helpers for the kitty graphics protocol using unicode placeholders
-    ///     (https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders).
-    ///     An image is transmitted once, a virtual placement scales it to a rectangle of cells,
-    ///     and every covered cell is rendered as an ordinary character cell containing U+10EEEE
-    ///     with combining diacritics encoding the row/column and the image id encoded in the
-    ///     foreground color. Because placeholders are plain text cells they integrate with pixel
-    ///     buffer diffing and occlusion like any other cell, while the image pixels cross the
-    ///     wire only once.
-    /// </summary>
-    /// <summary>
     ///     Pixel data formats of the kitty graphics protocol (the f key of a transmit command).
     /// </summary>
     internal enum KittyImageFormat
@@ -30,6 +20,15 @@ namespace Consolonia.Core.Drawing
         Png
     }
 
+    /// <summary>
+    ///     Helpers for the kitty graphics protocol using unicode placeholders
+    ///     (https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholders).
+    ///     An image is transmitted once, a virtual placement scales it to a rectangle of cells, and
+    ///     every covered cell is an ordinary character cell containing U+10EEEE with combining
+    ///     diacritics encoding the row/column, plus the image id encoded in the foreground color.
+    ///     Being plain text cells, placeholders diff and occlude like any other cell while the image
+    ///     pixels cross the wire only once.
+    /// </summary>
     internal static class KittyGraphics
     {
         /// <summary>The unicode placeholder codepoint U+10EEEE as a utf-16 string.</summary>
@@ -42,9 +41,8 @@ namespace Consolonia.Core.Drawing
         // so they must stay in the range 1..0xFFFFFF (0 is not a valid id).
         private static int _nextImageId;
 
-        // Ids whose terminal side placements were deleted because no placeholder cell referenced
-        // them anymore; the renderer re-creates the placement (without retransmitting the pixels)
-        // when the image is drawn again.
+        // Ids whose terminal side placement was deleted once no placeholder cell referenced it; the
+        // renderer re-creates the placement, without retransmitting the pixels, when drawn again.
         private static readonly ConcurrentDictionary<int, byte> DeletedPlacements = new();
 
         /// <summary>
@@ -144,8 +142,8 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Checks whether a symbol is a kitty unicode placeholder cell.
-        ///     Cheap enough to run on every cell of every frame: two character comparisons.
+        ///     Checks whether a symbol is a kitty unicode placeholder cell. Runs on every cell of
+        ///     every frame, hence just two character comparisons.
         /// </summary>
         public static bool IsPlaceholder(in Symbol symbol)
         {
@@ -218,23 +216,18 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Builds the APC sequence deleting an image and its placements, freeing the
-        ///     image storage in the terminal.
-        /// </summary>
-        /// <summary>
-        ///     Builds the APC sequence deleting the placements of an image while keeping its data,
-        ///     so it can be placed again later without retransmission.
+        ///     Builds the APC sequence deleting the placements of an image while keeping its data
+        ///     (lowercase d=i), so it can be placed again later without retransmission.
         /// </summary>
         public static string BuildDeletePlacementSequence(int imageId)
         {
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=i,q=2,i={imageId}\u001b\\");
         }
 
-        // ---- classic rect placements (the "image as cell background" mode) ----
-
         /// <summary>
-        ///     The z-index rect placements are created at: below text, above background colors,
-        ///     so glyphs printed on the covered cells composite over the picture.
+        ///     The z-index classic rect placements (the "image as cell background" mode) are created
+        ///     at: below text, above background colors, so glyphs on the covered cells composite
+        ///     over the picture.
         /// </summary>
         public const int RectPlacementZIndex = -1;
 
@@ -269,6 +262,10 @@ namespace Consolonia.Core.Drawing
                 $"\u001b_Ga=d,d=i,q=2,i={imageId},p={placementId}\u001b\\");
         }
 
+        /// <summary>
+        ///     Builds the APC sequence deleting an image and its placements (uppercase d=I), freeing
+        ///     the image storage in the terminal.
+        /// </summary>
         public static string BuildDeleteSequence(int imageId)
         {
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=I,q=2,i={imageId}\u001b\\");
