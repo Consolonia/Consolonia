@@ -189,10 +189,9 @@ namespace Consolonia.Core.Drawing
                     using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
                         ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
                         : null;
-                    if (resizedBitmap != null)
-                        source = resizedBitmap;
 
-                    var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+                    IBitmapImpl bitmapToRead = resizedBitmap ?? source;
+                    var readableBitmap = (IReadableBitmapImpl)bitmapToRead;
 
                     using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
 
