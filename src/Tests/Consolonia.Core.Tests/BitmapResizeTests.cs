@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -26,18 +27,25 @@ namespace Consolonia.Core.Tests
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            // Skia registers itself in the locator; take it and put back whatever was there, so
-            // fixtures that run after this one see the renderer they expect.
-            var previous = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
+            // Skia registers itself in the locator -- its render interface and its font manager.
+            // Do that in a scope of our own and drop the scope afterwards, so fixtures that run
+            // after this one see exactly the registrations they had before.
+            _scope = AvaloniaLocator.EnterScope();
             SkiaPlatform.Initialize();
             var skia = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
-            if (previous != null)
-                AvaloniaLocator.CurrentMutable.Bind<IPlatformRenderInterface>().ToConstant(previous);
 
             _renderInterface = new ConsoloniaRenderInterface(skia);
         }
 
+        [OneTimeTearDown]
+        public void OneTimeTearDown()
+        {
+            _scope?.Dispose();
+            _scope = null;
+        }
+
         private ConsoloniaRenderInterface _renderInterface;
+        private IDisposable _scope;
 
         private static MemoryStream RedPng(int width, int height)
         {
