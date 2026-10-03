@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 // ReSharper disable UnusedMember.Global
@@ -69,6 +70,13 @@ namespace Consolonia.Core.Infrastructure
         /// <param name="position">location for pixel</param>
         /// <param name="pixel">pixel to print</param>
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
+
+        /// <summary>
+        ///     Write a sixel image to the console at the given position.
+        /// </summary>
+        /// <param name="position">top-left cell coordinate</param>
+        /// <param name="sixel">the sixel image to write</param>
+        void WriteSixel(PixelBufferCoordinate position, Sixel sixel);
 
         /// <summary>
         ///     Write raw text to the console

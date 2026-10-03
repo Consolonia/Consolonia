@@ -1,10 +1,12 @@
 using System;
+using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Text;
 
@@ -25,6 +27,10 @@ namespace Consolonia.Core.Infrastructure
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
+        // set CONSOLONIA_DEBUG_FLUSH to a file path to log each flushed frame's size and kitty transmit (a=t) count
+        private static readonly string DebugFlushLogPath =
+            Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FLUSH");
+
         private readonly StringBuilder _outputBuffer = new();
 
         private PixelBufferCoordinate _headBufferPoint;
@@ -37,9 +43,17 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
         private TextWriter _originalOut;
 
+        internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
+
+        internal Func<string, char, int, string> RequestAnsiResponseHandler { get; set; }
+
         public ConsoleCapabilities Capabilities { get; protected set; }
 
         public PixelBufferSize Size { get; set; }
+
+        public int CellPixelWidth { get; private set; }
+
+        public int CellPixelHeight { get; private set; }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetTitle(string title)
@@ -73,6 +87,12 @@ namespace Consolonia.Core.Infrastructure
             Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
 
             SetCaretPosition(position);
+
+            if (pixel.Foreground.Symbol.Sixel != null)
+            {
+                WriteSixel(position, pixel.Foreground.Symbol.Sixel);
+                return;
+            }
 
             if (pixel.Foreground.TextDecoration != _lastTextDecoration)
             {
@@ -185,13 +205,51 @@ namespace Consolonia.Core.Infrastructure
             {
                 WaitPauseTaskIfNecessary();
 
-                // Straight from the builder -- no ToString copy of the whole frame -- and one
-                // explicit flush, which with the writer PrepareConsole installed is what turns a
-                // frame into a handful of large writes instead of hundreds of small ones.
+                if (DebugFlushLogPath != null)
+                    LogFlushDiagnostics(_outputBuffer);
+
+                // synchronized update (DEC 2026) makes the terminal apply the batch atomically; wrapping here
+                // rather than in the render loop keeps begin/end paired even if a frame is abandoned
+                bool synchronizedOutput = Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput);
+                if (synchronizedOutput)
+                    Console.Out.Write(Esc.BeginSynchronizedUpdate);
+
+                // straight from the builder -- no ToString copy of the whole frame
                 Console.Out.Write(_outputBuffer);
+
+                if (synchronizedOutput)
+                    Console.Out.Write(Esc.EndSynchronizedUpdate);
+
+                // one explicit flush, which with the writer PrepareConsole installed is what turns a
+                // frame into a handful of large writes instead of hundreds of small ones
                 Console.Out.Flush();
                 _outputBuffer.Clear();
             }
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
+        {
+            // RenderTarget calls this outside WritePixel, so it needs the same lock and pause handling as WriteText
+            WaitPauseTaskIfNecessary();
+            SetCaretPosition(position);
+
+            // sixel payloads are strictly ASCII (data bytes are 0x3F..0x7E), so widening to chars
+            // and re-encoding through the UTF-8 writer reproduces the same bytes
+            ReadOnlySpan<byte> bytes = sixel.Render();
+            char[] chars = ArrayPool<char>.Shared.Rent(bytes.Length);
+            try
+            {
+                int written = Encoding.ASCII.GetChars(bytes, chars);
+                _outputBuffer.Append(chars, 0, written);
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(chars);
+            }
+
+            var newPosition = new PixelBufferCoordinate((ushort)(position.X + sixel.CellsWidth), position.Y);
+            SetCaretPositionInternal(newPosition);
         }
 
         /// <summary>
@@ -247,6 +305,32 @@ namespace Consolonia.Core.Infrastructure
             if (left2 - left == 2)
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
+            // 8x16 pixels is the fallback when the terminal does not report its cell size
+            (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ?? (8, 16);
+            CellPixelHeight = cellH;
+            CellPixelWidth = cellW;
+
+            // three queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
+            // DECRQM mode 2026 (reply "CSI?2026;<state>$y") and DA1 (reply "ESC[?62;4;22c", feature 4 = sixel).
+            // DA1 is answered by every terminal and is the only reply containing 'c', so it fences the read.
+            string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
+                Esc.QueryKittyGraphicsSupport + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
+                'c', 1000) ?? string.Empty;
+            if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsSynchronizedOutput;
+            if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsSixel;
+
+            // some terminals answer the kitty query asynchronously, after DA1: give it one more short read
+            if (!ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
+                graphicsProbeResponse += RequestAnsiResponseHandler?.Invoke(string.Empty, '\\', 250) ?? string.Empty;
+            if (ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsKittyGraphics;
+
+            // override for terminals which render a protocol without answering its query, or to force fallback
+            Capabilities = ApplyGraphicsProtocolOverride(Capabilities,
+                Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS"));
+
             BlackColorTTYWorkaround();
 
             ClearScreen();
@@ -256,6 +340,14 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
+            // close any update left open by an interrupted frame, else the terminal withholds output until it times out
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
+                WriteText(Esc.EndSynchronizedUpdate);
+
+            // free terminal-side image storage held by kitty graphics placements
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
+                WriteText(Esc.KittyDeleteAllImages);
+
             WriteText(Esc.DisableAlternateBuffer);
             WriteText(Esc.Reset);
             WriteText(Esc.ShowCursor);
@@ -318,6 +410,103 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        private static void LogFlushDiagnostics(StringBuilder frame)
+        {
+            const string marker = "_Ga=t";
+            string text = frame.ToString();
+            int transmits = 0;
+            for (int found = text.IndexOf(marker, StringComparison.Ordinal);
+                 found >= 0;
+                 found = text.IndexOf(marker, found + marker.Length, StringComparison.Ordinal))
+                transmits++;
+
+            try
+            {
+                File.AppendAllText(DebugFlushLogPath,
+                    $"{DateTime.Now:HH:mm:ss.fff} chars={text.Length} a=t count={transmits}{Environment.NewLine}");
+            }
+            catch (IOException)
+            {
+                // diagnostics must never take the app down
+            }
+        }
+
+        /// <summary>
+        ///     Parses a Primary Device Attributes (DA1) response such as "ESC[?62;4;22c".
+        ///     Feature parameter 4 (following the device class) indicates sixel graphics support.
+        /// </summary>
+        internal static bool DeviceAttributesIndicateSixelSupport(string deviceAttributesResponse)
+        {
+            if (string.IsNullOrEmpty(deviceAttributesResponse))
+                return false;
+
+            int start = deviceAttributesResponse.IndexOf('?');
+            int end = deviceAttributesResponse.LastIndexOf('c');
+            if (start < 0 || end <= start)
+                return false;
+
+            string[] parameters = deviceAttributesResponse[(start + 1)..end].Split(';');
+
+            // the first parameter is the device class, the rest are supported features
+            for (int i = 1; i < parameters.Length; i++)
+                if (parameters[i] == "4")
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.QueryKittyGraphicsSupport" /> contains the
+        ///     "APC _Gi=31;OK ST" reply a kitty-graphics-capable terminal sends.
+        /// </summary>
+        internal static bool ResponseIndicatesKittyGraphicsSupport(string response)
+        {
+            return response != null && response.Contains("_Gi=31;OK", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.RequestSynchronizedOutputMode" /> reports
+        ///     DEC private mode 2026 as available. DECRPM states 1 (set), 2 (reset) and 3 (permanently
+        ///     set) mean the terminal applies synchronized updates; 0 (unrecognized) and 4 (permanently
+        ///     reset) mean it does not.
+        /// </summary>
+        internal static bool ResponseIndicatesSynchronizedOutputSupport(string response)
+        {
+            if (string.IsNullOrEmpty(response))
+                return false;
+
+            const string prefix = "[?2026;";
+            int start = response.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+                return false;
+
+            int stateStart = start + prefix.Length;
+            int end = response.IndexOf("$y", stateStart, StringComparison.Ordinal);
+            if (end < 0)
+                return false;
+
+            return response[stateStart..end] is "1" or "2" or "3";
+        }
+
+        /// <summary>
+        ///     Applies the CONSOLONIA_GRAPHICS environment variable override to the detected capabilities:
+        ///     "kitty" forces kitty graphics on, "sixel" forces sixel (and kitty off), "quad" disables
+        ///     both graphics protocols. Any other value leaves detection untouched.
+        /// </summary>
+        internal static ConsoleCapabilities ApplyGraphicsProtocolOverride(ConsoleCapabilities capabilities,
+            string overrideValue)
+        {
+            return overrideValue?.Trim().ToUpperInvariant() switch
+            {
+                "KITTY" => capabilities | ConsoleCapabilities.SupportsKittyGraphics,
+                "SIXEL" => (capabilities & ~ConsoleCapabilities.SupportsKittyGraphics) |
+                           ConsoleCapabilities.SupportsSixel,
+                "QUAD" => capabilities &
+                          ~(ConsoleCapabilities.SupportsKittyGraphics | ConsoleCapabilities.SupportsSixel),
+                _ => capabilities
+            };
         }
 
         /// <summary>

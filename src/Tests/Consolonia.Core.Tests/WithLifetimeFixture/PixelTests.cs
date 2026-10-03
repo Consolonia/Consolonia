@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
@@ -95,6 +96,36 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(!pixel.Equals((object)pixel2));
             Assert.That(!pixel.Equals(pixel2));
             Assert.That(pixel != pixel2);
+        }
+
+        [Test]
+        public void SixelSymbolsCompareByImage()
+        {
+            // regression: a sixel cell carries no character and no pattern, so symbols which ignored the
+            // image compared equal and the pixel buffer diff kept showing the previous picture
+            Sixel sixel = CreateCellSixel(10);
+            Sixel otherSixel = CreateCellSixel(200);
+
+            Pixel pixel = CreateSixelPixel(sixel);
+            Pixel samePixel = CreateSixelPixel(sixel);
+            Pixel otherPixel = CreateSixelPixel(otherSixel);
+
+            Assert.That(pixel == samePixel);
+            Assert.That(pixel.GetHashCode(), Is.EqualTo(samePixel.GetHashCode()));
+            Assert.That(pixel != otherPixel);
+            Assert.That(pixel.Equals((object)otherPixel), Is.False);
+        }
+
+        private static Sixel CreateCellSixel(byte gray)
+        {
+            byte[] palette = { gray, gray, gray, 0 };
+            return new Sixel(palette, 1, new byte[8 * 16], 8, 16, 8, 16);
+        }
+
+        private static Pixel CreateSixelPixel(Sixel sixel)
+        {
+            return new Pixel(new PixelForeground(new Symbol(sixel, 1), Colors.Transparent),
+                PixelBackground.Transparent);
         }
 
         [Test]
@@ -194,6 +225,67 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(newPixel.Foreground.Symbol.Character, Is.EqualTo('a'));
             Assert.That(newPixel.Foreground.Color, Is.EqualTo(Colors.Red));
             Assert.That(newPixel.Background.Color, Is.EqualTo(Colors.Blue));
+        }
+
+        [Test]
+        public void BlendShadedBackgroundOverKittyPlaceholderLeavesItUntouched()
+        {
+            // regression: a window's shadow blends a translucent background over the app, and
+            // mutating the image id in the placeholder's foreground color rendered literal
+            // placeholder glyphs (a screen full of tofu boxes)
+            var placeholderPixel = new Pixel(
+                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(0, 0), 1),
+                    KittyGraphics.GetImageIdColor(0x123456)),
+                PixelBackground.Transparent);
+
+            Pixel shaded = placeholderPixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
+
+            Assert.That(shaded, Is.EqualTo(placeholderPixel));
+            Assert.That(KittyGraphics.TryGetImageId(in shaded, out int imageId), Is.True);
+            Assert.That(imageId, Is.EqualTo(0x123456));
+        }
+
+        [Test]
+        public void KittyTileBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
+        {
+            // the "image as cell background" model: cell = (backgroundColor|backgroundImage) +
+            // foreground character
+            var tile = new KittyTile(0x42, 3, 5);
+            var tilePixel = new Pixel(
+                new PixelForeground(Symbol.Space, Colors.Transparent),
+                new PixelBackground(Colors.Black, tile));
+
+            Pixel withGlyph = tilePixel.Blend(new Pixel(
+                new PixelForeground(new Symbol('▕'), Colors.Gray),
+                PixelBackground.Transparent));
+            Assert.That(withGlyph.Foreground.Symbol.Character, Is.EqualTo('▕'));
+            Assert.That(withGlyph.Background.Tile, Is.EqualTo(tile),
+                "a glyph with transparent background must draw OVER the picture, not evict it");
+
+            Pixel shaded = tilePixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
+            Assert.That(shaded.Background.Tile, Is.EqualTo(tile),
+                "a translucent wash must not evict the picture");
+
+            Pixel covered = tilePixel.Blend(new Pixel(new PixelBackground(Colors.White)));
+            Assert.That(covered.Background.Tile.IsEmpty, Is.True,
+                "an opaque background owns the cell: the picture must be evicted");
+
+            Assert.That(tilePixel.Shade().Background.Tile, Is.EqualTo(tile));
+            Assert.That(tilePixel.Invert().Background.Tile, Is.EqualTo(tile));
+        }
+
+        [Test]
+        public void ShadeAndInvertOverKittyPlaceholderLeaveItUntouched()
+        {
+            // same invariant for the direct color mutations: shadows use Shade, selection uses Invert
+            var placeholderPixel = new Pixel(
+                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(1, 2), 1),
+                    KittyGraphics.GetImageIdColor(0x00ABCD)),
+                PixelBackground.Transparent);
+
+            Assert.That(placeholderPixel.Shade(), Is.EqualTo(placeholderPixel));
+            Assert.That(placeholderPixel.Brighten(), Is.EqualTo(placeholderPixel));
+            Assert.That(placeholderPixel.Invert(), Is.EqualTo(placeholderPixel));
         }
 
         [Test]

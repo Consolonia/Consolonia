@@ -132,8 +132,17 @@ namespace Consolonia.Gallery.View
 
         private static async Task ShowCode(string xamlFile)
         {
-            string xaml = await Client.GetStringAsync(new Uri(
-                $"https://raw.githubusercontent.com/jinek/Consolonia/refs/heads/main/src/Consolonia.Gallery/Gallery/GalleryViews/{xamlFile}"));
+            string xaml = "Failed to load code :(";
+#pragma warning disable CA1031 // Do not catch general exception types
+            try
+            {
+                xaml = await Client.GetStringAsync(new Uri(
+                    $"https://raw.githubusercontent.com/jinek/Consolonia/refs/heads/main/src/Consolonia.Gallery/Gallery/GalleryViews/{xamlFile}"));
+            }
+            catch (Exception)
+            {
+            }
+#pragma warning restore CA1031 // Do not catch general exception types
 
             var dialog = new XamlDialogWindow
             {

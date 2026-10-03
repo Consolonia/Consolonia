@@ -1,11 +1,14 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
 
@@ -31,6 +34,12 @@ namespace Consolonia.Core.Infrastructure
             Console.TreatControlCAsInput = true;
 
             _consoleOutput = consoleOutput;
+
+            if (consoleOutput is AnsiConsoleOutput ansiConsoleOutput)
+            {
+                ansiConsoleOutput.GetConsoleCellSizeHandler = GetConsoleCellSize;
+                ansiConsoleOutput.RequestAnsiResponseHandler = RequestAnsiResponse;
+            }
 
             Size = consoleOutput.Size;
         }
@@ -128,6 +137,10 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => _consoleOutput.CellPixelWidth;
+
+        public int CellPixelHeight => _consoleOutput.CellPixelHeight;
+
         public event Action Resized;
 
         public virtual void ClearScreen()
@@ -184,6 +197,11 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
+        public virtual void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
+        {
+            _consoleOutput.WriteSixel(position, sixel);
+        }
+
         public virtual void WriteText(string str)
         {
             _consoleOutput.WriteText(str);
@@ -194,6 +212,65 @@ namespace Consolonia.Core.Infrastructure
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;
             Size = new PixelBufferSize((ushort)Console.WindowWidth, (ushort)Console.WindowHeight);
             return true;
+        }
+
+        protected virtual (int CellWidth, int CellHeight) GetConsoleCellSize()
+        {
+            int cols = Console.WindowWidth;
+            int rows = Console.WindowHeight;
+
+            string response = RequestAnsiResponse("\x1b[14t", 't', 200);
+
+            int heightPx = 0;
+            int widthPx = 0;
+            int idx4 = response.IndexOf('4');
+            if (idx4 >= 0 && response.EndsWith('t'))
+            {
+                string inner = response[(idx4 + 1)..^1];
+                string[] parts = inner.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                // a stray keypress can land in the reply, so a malformed one must fall back, not throw
+                if (parts.Length == 2 &&
+                    int.TryParse(parts[0], out int parsedHeightPx) &&
+                    int.TryParse(parts[1], out int parsedWidthPx))
+                {
+                    heightPx = parsedHeightPx;
+                    widthPx = parsedWidthPx;
+                }
+            }
+
+            if (widthPx > 0 && heightPx > 0 && cols > 0 && rows > 0)
+                return (widthPx / cols, heightPx / rows);
+
+            return (8, 16);
+        }
+
+        protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
+        {
+            // conhost/ConPTY synthesizes key events from terminal replies and swallows APC ones
+            // (the kitty graphics handshake); virtual terminal input passes the reply through raw
+            using VirtualTerminalInput.Scope scope = VirtualTerminalInput.Enable();
+
+            WriteText(request);
+            Flush();
+
+            var sb = new StringBuilder();
+            long deadline = Environment.TickCount64 + timeoutMs;
+            while (Environment.TickCount64 < deadline)
+            {
+                if (!Console.KeyAvailable)
+                {
+                    // polling without this pins a core for the whole timeout on terminals which never reply
+                    Thread.Sleep(1);
+                    continue;
+                }
+
+                char c = Console.ReadKey(true).KeyChar;
+                sb.Append(c);
+                if (c == terminator)
+                    break;
+            }
+
+            return sb.ToString();
         }
 
         #endregion

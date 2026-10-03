@@ -37,6 +37,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Pattern = 0;
         }
 
+        public Symbol(Sixel sixel, byte width)
+        {
+            Character = char.MinValue;
+            Complex = null;
+            Width = width;
+            Pattern = 0;
+            Sixel = sixel;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Symbol(char ch, byte? width = null)
         {
@@ -140,13 +149,34 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
+        private Symbol(byte width, string verbatimComplex)
+        {
+            Character = char.MinValue;
+            Complex = verbatimComplex;
+            Width = width;
+            Pattern = 0;
+        }
+
+        /// <summary>
+        ///     Creates a symbol whose unicode sequence is stored verbatim, without variation-selector
+        ///     normalization. Used for terminal graphics placeholders (kitty) where the exact
+        ///     codepoint sequence is meaningful to the terminal.
+        /// </summary>
+        internal static Symbol FromVerbatim(string complex, byte width)
+        {
+            return new Symbol(width, complex);
+        }
+
 
         public bool Equals(Symbol other)
         {
             return Character == other.Character &&
                    string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
                    Width == other.Width &&
-                   Pattern == other.Pattern;
+                   Pattern == other.Pattern &&
+                   // every sixel cell looks alike otherwise (no character, no pattern), so without this
+                   // the pixel buffer diff would keep a stale image when a new one lands on the same cells
+                   ReferenceEquals(Sixel, other.Sixel);
         }
 
 
@@ -163,6 +193,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         // box pattern for box merging.
         public readonly byte Pattern;
+
+        public readonly Sixel Sixel;
 
         [JsonIgnore] public readonly byte Width;
 #pragma warning restore CA1051 // Do not declare visible instance fields
@@ -208,16 +240,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override bool Equals([NotNullWhen(true)] object obj)
         {
-            return obj is Symbol other &&
-                   Character == other.Character &&
-                   string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
-                   Width == other.Width &&
-                   Pattern == other.Pattern;
+            return obj is Symbol other && Equals(other);
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Character, Complex, Width, Pattern);
+            return HashCode.Combine(Character, Complex, Width, Pattern, Sixel);
         }
 
         public static bool operator ==(Symbol left, Symbol right)
