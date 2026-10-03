@@ -8,7 +8,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Serialization;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using NeoSmart.Unicode;
 using Wcwidth;
 

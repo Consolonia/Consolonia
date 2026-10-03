@@ -44,6 +44,7 @@ namespace Consolonia.Core.Drawing
             ushort Height,
             ushort ScreenX,
             ushort ScreenY);
+
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
 
@@ -154,8 +155,8 @@ namespace Consolonia.Core.Drawing
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
-                for (ushort x = 0; x < width; x++)
-                    cache[x, y] = Pixel.Empty;
+            for (ushort x = 0; x < width; x++)
+                cache[x, y] = Pixel.Empty;
 
             return cache;
         }
@@ -365,74 +366,74 @@ namespace Consolonia.Core.Drawing
             bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
 
             for (ushort y = 0; y < pixelBuffer.Height; y++)
-                for (ushort x = 0; x < pixelBuffer.Width; x++)
+            for (ushort x = 0; x < pixelBuffer.Width; x++)
+            {
+                if (visited[x, y])
+                    continue;
+
+                KittyTile tile = pixelBuffer[x, y].Background.Tile;
+                if (tile.IsEmpty)
+                    continue;
+
+                // expand rightward while the tiles continue the same image's row
+                ushort width = 1;
+                while (x + width < pixelBuffer.Width && !visited[x + width, y])
                 {
-                    if (visited[x, y])
-                        continue;
-
-                    KittyTile tile = pixelBuffer[x, y].Background.Tile;
-                    if (tile.IsEmpty)
-                        continue;
-
-                    // expand rightward while the tiles continue the same image's row
-                    ushort width = 1;
-                    while (x + width < pixelBuffer.Width && !visited[x + width, y])
-                    {
-                        KittyTile nextTile = pixelBuffer[(ushort)(x + width), y].Background.Tile;
-                        if (nextTile.ImageId != tile.ImageId ||
-                            nextTile.X != tile.X + width ||
-                            nextTile.Y != tile.Y)
-                            break;
-                        width++;
-                    }
-
-                    // expand downward while each row continues the same tile grid at full width
-                    ushort height = 1;
-                    while (y + height < pixelBuffer.Height)
-                    {
-                        bool rowMatches = true;
-                        for (ushort i = 0; i < width; i++)
-                        {
-                            KittyTile rowTile = pixelBuffer[(ushort)(x + i), (ushort)(y + height)].Background.Tile;
-                            if (visited[x + i, y + height] ||
-                                rowTile.ImageId != tile.ImageId ||
-                                rowTile.X != tile.X + i ||
-                                rowTile.Y != tile.Y + height)
-                            {
-                                rowMatches = false;
-                                break;
-                            }
-                        }
-
-                        if (!rowMatches)
-                            break;
-                        height++;
-                    }
-
-                    for (ushort dy = 0; dy < height; dy++)
-                        for (ushort dx = 0; dx < width; dx++)
-                            visited[x + dx, y + dy] = true;
-
-                    var rect = new KittyRect(tile.ImageId, tile.X, tile.Y, width, height, x, y);
-
-                    if (live.Remove(rect, out int placementId))
-                    {
-                        next[rect] = placementId;
-                    }
-                    else
-                    {
-                        placementId = KittyGraphics.AllocatePlacementId();
-                        next[rect] = placementId;
-
-                        int cellPixelWidth = _console.CellPixelWidth;
-                        int cellPixelHeight = _console.CellPixelHeight;
-                        _console.SetCaretPosition(new PixelBufferCoordinate(rect.ScreenX, rect.ScreenY));
-                        _console.WriteText(KittyGraphics.BuildRectPlacementSequence(
-                            rect.ImageId, placementId,
-                            rect.TileX * cellPixelWidth, rect.TileY * cellPixelHeight,
-                            rect.Width * cellPixelWidth, rect.Height * cellPixelHeight));
-                    }
+                    KittyTile nextTile = pixelBuffer[(ushort)(x + width), y].Background.Tile;
+                    if (nextTile.ImageId != tile.ImageId ||
+                        nextTile.X != tile.X + width ||
+                        nextTile.Y != tile.Y)
+                        break;
+                    width++;
                 }
+
+                // expand downward while each row continues the same tile grid at full width
+                ushort height = 1;
+                while (y + height < pixelBuffer.Height)
+                {
+                    bool rowMatches = true;
+                    for (ushort i = 0; i < width; i++)
+                    {
+                        KittyTile rowTile = pixelBuffer[(ushort)(x + i), (ushort)(y + height)].Background.Tile;
+                        if (visited[x + i, y + height] ||
+                            rowTile.ImageId != tile.ImageId ||
+                            rowTile.X != tile.X + i ||
+                            rowTile.Y != tile.Y + height)
+                        {
+                            rowMatches = false;
+                            break;
+                        }
+                    }
+
+                    if (!rowMatches)
+                        break;
+                    height++;
+                }
+
+                for (ushort dy = 0; dy < height; dy++)
+                for (ushort dx = 0; dx < width; dx++)
+                    visited[x + dx, y + dy] = true;
+
+                var rect = new KittyRect(tile.ImageId, tile.X, tile.Y, width, height, x, y);
+
+                if (live.Remove(rect, out int placementId))
+                {
+                    next[rect] = placementId;
+                }
+                else
+                {
+                    placementId = KittyGraphics.AllocatePlacementId();
+                    next[rect] = placementId;
+
+                    int cellPixelWidth = _console.CellPixelWidth;
+                    int cellPixelHeight = _console.CellPixelHeight;
+                    _console.SetCaretPosition(new PixelBufferCoordinate(rect.ScreenX, rect.ScreenY));
+                    _console.WriteText(KittyGraphics.BuildRectPlacementSequence(
+                        rect.ImageId, placementId,
+                        rect.TileX * cellPixelWidth, rect.TileY * cellPixelHeight,
+                        rect.Width * cellPixelWidth, rect.Height * cellPixelHeight));
+                }
+            }
 
             // whatever is left in the live set has no tiles backing it anymore
             foreach (KeyValuePair<KittyRect, int> stale in live)
@@ -452,101 +453,97 @@ namespace Consolonia.Core.Drawing
             bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
 
             for (ushort y = 0; y < pixelBuffer.Height; y++)
+            for (ushort x = 0; x < pixelBuffer.Width; x++)
             {
-                for (ushort x = 0; x < pixelBuffer.Width; x++)
+                if (visited[x, y])
+                    continue;
+
+                Pixel pixel = pixelBuffer[x, y];
+                Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;
+                if (cellSixel == null)
+                    continue;
+
+                if (!dirtyRegions.Contains(x, y, false))
+                    continue;
+
+                // expand to the maximal rectangle of dirty cells sharing this palette instance
+                byte[] palette = cellSixel.Palette;
+                int cellPixelWidth = cellSixel.CellWidth;
+                int cellPixelHeight = cellSixel.CellHeight;
+
+                int maxWidth = 1;
+                while (x + maxWidth < pixelBuffer.Width)
                 {
-                    if (visited[x, y])
-                        continue;
+                    Pixel nextPixel = pixelBuffer[(ushort)(x + maxWidth), y];
+                    Sixel? nextSixel = nextPixel.Foreground.Symbol.Sixel;
+                    if (nextSixel == null || !ReferenceEquals(nextSixel.Palette, palette))
+                        break;
+                    if (!dirtyRegions.Contains((ushort)(x + maxWidth), y, false))
+                        break;
+                    maxWidth++;
+                }
 
-                    Pixel pixel = pixelBuffer[x, y];
-                    Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;
-                    if (cellSixel == null)
-                        continue;
-
-                    if (!dirtyRegions.Contains(x, y, false))
-                        continue;
-
-                    // expand to the maximal rectangle of dirty cells sharing this palette instance
-                    byte[] palette = cellSixel.Palette;
-                    int cellPixelWidth = cellSixel.CellWidth;
-                    int cellPixelHeight = cellSixel.CellHeight;
-
-                    int maxWidth = 1;
-                    while (x + maxWidth < pixelBuffer.Width)
+                int rectHeight = 1;
+                while (y + rectHeight < pixelBuffer.Height)
+                {
+                    int rowWidth = 0;
+                    while (rowWidth < maxWidth)
                     {
-                        Pixel nextPixel = pixelBuffer[(ushort)(x + maxWidth), y];
-                        Sixel? nextSixel = nextPixel.Foreground.Symbol.Sixel;
-                        if (nextSixel == null || !ReferenceEquals(nextSixel.Palette, palette))
+                        Pixel belowPixel = pixelBuffer[(ushort)(x + rowWidth), (ushort)(y + rectHeight)];
+                        Sixel? belowSixel = belowPixel.Foreground.Symbol.Sixel;
+                        if (belowSixel == null || !ReferenceEquals(belowSixel.Palette, palette))
                             break;
-                        if (!dirtyRegions.Contains((ushort)(x + maxWidth), y, false))
+                        if (!dirtyRegions.Contains((ushort)(x + rowWidth), (ushort)(y + rectHeight), false))
                             break;
-                        maxWidth++;
+                        rowWidth++;
                     }
 
-                    int rectHeight = 1;
-                    while (y + rectHeight < pixelBuffer.Height)
-                    {
-                        int rowWidth = 0;
-                        while (rowWidth < maxWidth)
-                        {
-                            Pixel belowPixel = pixelBuffer[(ushort)(x + rowWidth), (ushort)(y + rectHeight)];
-                            Sixel? belowSixel = belowPixel.Foreground.Symbol.Sixel;
-                            if (belowSixel == null || !ReferenceEquals(belowSixel.Palette, palette))
-                                break;
-                            if (!dirtyRegions.Contains((ushort)(x + rowWidth), (ushort)(y + rectHeight), false))
-                                break;
-                            rowWidth++;
-                        }
+                    if (rowWidth == 0)
+                        break;
 
-                        if (rowWidth == 0)
-                            break;
+                    // narrow instead of extending ragged: the region must stay rectangular
+                    if (rowWidth < maxWidth)
+                        maxWidth = rowWidth;
+                    rectHeight++;
+                }
 
-                        // narrow instead of extending ragged: the region must stay rectangular
-                        if (rowWidth < maxWidth)
-                            maxWidth = rowWidth;
-                        rectHeight++;
-                    }
+                for (int ry = 0; ry < rectHeight; ry++)
+                for (int rx = 0; rx < maxWidth; rx++)
+                    visited[x + rx, y + ry] = true;
 
-                    for (int ry = 0; ry < rectHeight; ry++)
-                        for (int rx = 0; rx < maxWidth; rx++)
-                            visited[x + rx, y + ry] = true;
-
-                    if (maxWidth == 1 && rectHeight == 1)
-                    {
-                        _console.WriteSixel(new PixelBufferCoordinate(x, y), cellSixel);
-                        _cache[x, y] = pixel;
-                        sixelHandled ??= new bool[pixelBuffer.Width, pixelBuffer.Height];
-                        sixelHandled[x, y] = true;
-                        continue;
-                    }
-
-                    // one BitBlt'd sixel for the whole rectangle costs a single escape sequence
-                    int combinedWidth = maxWidth * cellPixelWidth;
-                    int combinedHeight = rectHeight * cellPixelHeight;
-                    byte[] combinedPixels = new byte[combinedWidth * combinedHeight];
-                    var combined = new Sixel(palette, cellSixel.PaletteCount, combinedPixels,
-                        combinedWidth, combinedHeight, cellPixelWidth, cellPixelHeight);
-
-                    for (int ry = 0; ry < rectHeight; ry++)
-                    {
-                        for (int rx = 0; rx < maxWidth; rx++)
-                        {
-                            Pixel cellPixel = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
-                            Sixel? cellData = cellPixel.Foreground.Symbol.Sixel;
-                            if (cellData != null)
-                                combined.BitBlt(cellData, rx * cellPixelWidth, ry * cellPixelHeight);
-                        }
-                    }
-
-                    _console.WriteSixel(new PixelBufferCoordinate(x, y), combined);
-
+                if (maxWidth == 1 && rectHeight == 1)
+                {
+                    _console.WriteSixel(new PixelBufferCoordinate(x, y), cellSixel);
+                    _cache[x, y] = pixel;
                     sixelHandled ??= new bool[pixelBuffer.Width, pixelBuffer.Height];
-                    for (int ry = 0; ry < rectHeight; ry++)
-                        for (int rx = 0; rx < maxWidth; rx++)
-                        {
-                            _cache[x + rx, y + ry] = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
-                            sixelHandled[x + rx, y + ry] = true;
-                        }
+                    sixelHandled[x, y] = true;
+                    continue;
+                }
+
+                // one BitBlt'd sixel for the whole rectangle costs a single escape sequence
+                int combinedWidth = maxWidth * cellPixelWidth;
+                int combinedHeight = rectHeight * cellPixelHeight;
+                byte[] combinedPixels = new byte[combinedWidth * combinedHeight];
+                var combined = new Sixel(palette, cellSixel.PaletteCount, combinedPixels,
+                    combinedWidth, combinedHeight, cellPixelWidth, cellPixelHeight);
+
+                for (int ry = 0; ry < rectHeight; ry++)
+                for (int rx = 0; rx < maxWidth; rx++)
+                {
+                    Pixel cellPixel = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
+                    Sixel? cellData = cellPixel.Foreground.Symbol.Sixel;
+                    if (cellData != null)
+                        combined.BitBlt(cellData, rx * cellPixelWidth, ry * cellPixelHeight);
+                }
+
+                _console.WriteSixel(new PixelBufferCoordinate(x, y), combined);
+
+                sixelHandled ??= new bool[pixelBuffer.Width, pixelBuffer.Height];
+                for (int ry = 0; ry < rectHeight; ry++)
+                for (int rx = 0; rx < maxWidth; rx++)
+                {
+                    _cache[x + rx, y + ry] = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
+                    sixelHandled[x + rx, y + ry] = true;
                 }
             }
         }

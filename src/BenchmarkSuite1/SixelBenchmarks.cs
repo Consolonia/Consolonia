@@ -2,26 +2,26 @@ using BenchmarkDotNet.Attributes;
 using Consolonia.Core.Drawing;
 using Microsoft.VSDiagnostics;
 
-namespace BenchmarkSuite1;
-
-[CPUUsageDiagnoser]
-[DotNetObjectAllocDiagnoser]
-[DotNetObjectAllocJobConfiguration]
-public class SixelBenchmarks
+namespace BenchmarkSuite1
 {
-    private const int Width = 320;
-    private const int Height = 192;
-    private const int CellWidth = 8;
-    private const int CellHeight = 16;
-    private byte[] _bitmap = null !;
-    private byte[] _palette = null !;
-    private Sixel _sixel = null !;
-    [GlobalSetup]
-    public void Setup()
+    [CPUUsageDiagnoser]
+    [DotNetObjectAllocDiagnoser]
+    [DotNetObjectAllocJobConfiguration]
+    public class SixelBenchmarks
     {
-        _bitmap = new byte[Width * Height * 4];
-        for (int y = 0; y < Height; y++)
+        private const int Width = 320;
+        private const int Height = 192;
+        private const int CellWidth = 8;
+        private const int CellHeight = 16;
+        private byte[] _bitmap = null !;
+        private byte[] _palette = null !;
+        private Sixel _sixel = null !;
+
+        [GlobalSetup]
+        public void Setup()
         {
+            _bitmap = new byte[Width * Height * 4];
+            for (int y = 0; y < Height; y++)
             for (int x = 0; x < Width; x++)
             {
                 int offset = (y * Width + x) * 4;
@@ -30,27 +30,27 @@ public class SixelBenchmarks
                 _bitmap[offset + 2] = (byte)((x * 17 + y * 5) & 0xFF);
                 _bitmap[offset + 3] = 0xFF;
             }
+
+            _sixel = Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight);
+            _palette = _sixel.Palette;
         }
 
-        _sixel = Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight);
-        _palette = _sixel.Palette;
-    }
+        [Benchmark(Baseline = true)]
+        public Sixel QuantizeWithSharedPalette()
+        {
+            return Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight, _palette);
+        }
 
-    [Benchmark(Baseline = true)]
-    public Sixel QuantizeWithSharedPalette()
-    {
-        return Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight, _palette);
-    }
+        [Benchmark]
+        public Sixel QuantizeFull()
+        {
+            return Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight);
+        }
 
-    [Benchmark]
-    public Sixel QuantizeFull()
-    {
-        return Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight);
-    }
-
-    [Benchmark]
-    public int SerializeToBytes()
-    {
-        return _sixel.Render().Length;
+        [Benchmark]
+        public int SerializeToBytes()
+        {
+            return _sixel.Render().Length;
+        }
     }
 }

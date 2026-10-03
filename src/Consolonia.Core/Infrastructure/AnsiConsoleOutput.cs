@@ -6,6 +6,7 @@ using System.Text;
 using Avalonia;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Text;
 
@@ -26,11 +27,11 @@ namespace Consolonia.Core.Infrastructure
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        private readonly StringBuilder _outputBuffer = new();
-
         // set CONSOLONIA_DEBUG_FLUSH to a file path to log each flushed frame's size and kitty transmit (a=t) count
         private static readonly string DebugFlushLogPath =
             Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FLUSH");
+
+        private readonly StringBuilder _outputBuffer = new();
 
         private PixelBufferCoordinate _headBufferPoint;
         private Color _lastBackground = Colors.Transparent;
@@ -39,12 +40,12 @@ namespace Consolonia.Core.Infrastructure
         private TextDecorationLocation? _lastTextDecoration;
         private FontWeight? _lastWeight;
 
+        /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
+        private TextWriter _originalOut;
+
         internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
 
         internal Func<string, char, int, string> RequestAnsiResponseHandler { get; set; }
-
-        /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
-        private TextWriter _originalOut;
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
@@ -78,7 +79,8 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
-            if (pixel.Width <= 0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
+            if (pixel.Width <=
+                0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
                 return;
 
             //todo: performance of retrieval of the service, at least can be retrieved once
@@ -183,8 +185,8 @@ namespace Consolonia.Core.Infrastructure
 
             position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
             if (pixel.Width > 1 || pixel.Foreground.Symbol.Complex != null)
-            // then we force set the next position to where we want to be because again
-            // we can't rely on the terminal to advance the caret correctly.
+                // then we force set the next position to where we want to be because again
+                // we can't rely on the terminal to advance the caret correctly.
             {
                 SetCaretPositionInternal(position);
             }
@@ -225,28 +227,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        private static void LogFlushDiagnostics(StringBuilder frame)
-        {
-            const string marker = "_Ga=t";
-            string text = frame.ToString();
-            int transmits = 0;
-            for (int found = text.IndexOf(marker, StringComparison.Ordinal);
-                 found >= 0;
-                 found = text.IndexOf(marker, found + marker.Length, StringComparison.Ordinal))
-                transmits++;
-
-            try
-            {
-                File.AppendAllText(DebugFlushLogPath,
-                    $"{DateTime.Now:HH:mm:ss.fff} chars={text.Length} a=t count={transmits}{Environment.NewLine}");
-            }
-            catch (IOException)
-            {
-                // diagnostics must never take the app down
-            }
-        }
-
-        public void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
             SetCaretPosition(position);
 
@@ -323,8 +304,8 @@ namespace Consolonia.Core.Infrastructure
 
             // 8x16 pixels is the fallback when the terminal does not report its cell size
             (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ?? (8, 16);
-            this.CellPixelHeight = cellH;
-            this.CellPixelWidth = cellW;
+            CellPixelHeight = cellH;
+            CellPixelWidth = cellW;
 
             // three queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
             // DECRQM mode 2026 (reply "CSI?2026;<state>$y") and DA1 (reply "ESC[?62;4;22c", feature 4 = sixel).
@@ -426,6 +407,27 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        private static void LogFlushDiagnostics(StringBuilder frame)
+        {
+            const string marker = "_Ga=t";
+            string text = frame.ToString();
+            int transmits = 0;
+            for (int found = text.IndexOf(marker, StringComparison.Ordinal);
+                 found >= 0;
+                 found = text.IndexOf(marker, found + marker.Length, StringComparison.Ordinal))
+                transmits++;
+
+            try
+            {
+                File.AppendAllText(DebugFlushLogPath,
+                    $"{DateTime.Now:HH:mm:ss.fff} chars={text.Length} a=t count={transmits}{Environment.NewLine}");
+            }
+            catch (IOException)
+            {
+                // diagnostics must never take the app down
+            }
         }
 
         /// <summary>

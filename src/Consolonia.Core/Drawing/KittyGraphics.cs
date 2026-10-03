@@ -37,6 +37,13 @@ namespace Consolonia.Core.Drawing
         // maximum base64 payload length per APC chunk allowed by the protocol
         private const int MaxChunkSize = 4096;
 
+        /// <summary>
+        ///     The z-index classic rect placements (the "image as cell background" mode) are created
+        ///     at: below text, above background colors, so glyphs on the covered cells composite
+        ///     over the picture.
+        /// </summary>
+        public const int RectPlacementZIndex = -1;
+
         // Image ids are carried in the 24 bit foreground color of placeholder cells,
         // so they must stay in the range 1..0xFFFFFF (0 is not a valid id).
         private static int _nextImageId;
@@ -103,6 +110,8 @@ namespace Consolonia.Core.Drawing
             "\U0001D188", "\U0001D189", "\U0001D1AA", "\U0001D1AB", "\U0001D1AC", "\U0001D1AD",
             "\U0001D242", "\U0001D243", "\U0001D244"
         };
+
+        private static int _nextPlacementId;
 
         /// <summary>
         ///     The largest number of columns or rows a placeholder placement can address.
@@ -223,15 +232,6 @@ namespace Consolonia.Core.Drawing
         {
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=i,q=2,i={imageId}\u001b\\");
         }
-
-        /// <summary>
-        ///     The z-index classic rect placements (the "image as cell background" mode) are created
-        ///     at: below text, above background colors, so glyphs on the covered cells composite
-        ///     over the picture.
-        /// </summary>
-        public const int RectPlacementZIndex = -1;
-
-        private static int _nextPlacementId;
 
         public static int AllocatePlacementId()
         {

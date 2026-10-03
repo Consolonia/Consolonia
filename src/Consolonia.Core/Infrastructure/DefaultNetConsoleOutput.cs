@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor;
 
@@ -130,7 +131,7 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        public virtual void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
             // Sixel not supported by legacy Console API
         }

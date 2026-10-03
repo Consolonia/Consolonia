@@ -150,7 +150,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             public PixelFormat Format => PixelFormat.Bgra8888;
 
-            public AlphaFormat AlphaFormat => Avalonia.Platform.AlphaFormat.Premul;
+            public AlphaFormat AlphaFormat => AlphaFormat.Premul;
 
             public void Dispose()
             {

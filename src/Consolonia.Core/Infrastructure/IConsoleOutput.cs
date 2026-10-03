@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 // ReSharper disable UnusedMember.Global
@@ -75,7 +76,7 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         /// <param name="position">top-left cell coordinate</param>
         /// <param name="sixel">the sixel image to write</param>
-        void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel);
+        void WriteSixel(PixelBufferCoordinate position, Sixel sixel);
 
         /// <summary>
         ///     Write raw text to the console

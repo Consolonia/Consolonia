@@ -69,7 +69,7 @@ namespace Consolonia.Core.Drawing
             // kept for hosts where classic placements cannot survive, but nothing selects it today
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
                 AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(this, placementMode: true);
+                return new KittyBitmapRenderer(this, true);
 
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
                 return new SixelBitmapRenderer(this);
@@ -133,13 +133,11 @@ namespace Consolonia.Core.Drawing
                     }
 
                     if (dirtyRunStart >= 0)
-                    {
                         Context._consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
                             intersectedRect.X + dirtyRunStart,
                             intersectedRect.Y + y,
                             intersectedRect.Width - dirtyRunStart,
                             1));
-                    }
                 }
             }
 
@@ -205,7 +203,7 @@ namespace Consolonia.Core.Drawing
                             fullTargetSize, 0, 0);
 
                         // Quantize the full image once to get a shared palette
-                        Sixel fullSixel = Sixel.CreateFromBitmap(fullBytes,
+                        var fullSixel = Sixel.CreateFromBitmap(fullBytes,
                             fullTargetSize.Width, fullTargetSize.Height,
                             cellPixelWidth, cellPixelHeight);
 
@@ -213,19 +211,17 @@ namespace Consolonia.Core.Drawing
                         byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
 
                         for (int cellY = 0; cellY < targetRect.Height; cellY++)
+                        for (int cellX = 0; cellX < targetRect.Width; cellX++)
                         {
-                            for (int cellX = 0; cellX < targetRect.Width; cellX++)
-                            {
-                                FillCellBgrxBuffer(fullBytes, fullTargetSize.Width, cellX, cellY,
-                                    cellPixelWidth, cellPixelHeight, cellBgrx);
+                            FillCellBgrxBuffer(fullBytes, fullTargetSize.Width, cellX, cellY,
+                                cellPixelWidth, cellPixelHeight, cellBgrx);
 
-                                Sixel cellSixel = Sixel.CreateFromBitmap(cellBgrx,
-                                    cellPixelWidth, cellPixelHeight,
-                                    cellPixelWidth, cellPixelHeight, fullSixel.Palette);
-                                bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
-                                    PixelBackground.Transparent);
-                            }
+                            var cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                                cellPixelWidth, cellPixelHeight,
+                                cellPixelWidth, cellPixelHeight, fullSixel.Palette);
+                            bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                                new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
+                                PixelBackground.Transparent);
                         }
 
                         return bitmapBuffer;
@@ -260,8 +256,8 @@ namespace Consolonia.Core.Drawing
                 int cellRowBytes = cellPixelWidth * bytesPerPixel;
                 for (int row = 0; row < cellPixelHeight; row++)
                 {
-                    int sourceOffset = ((cellY * cellPixelHeight) + row) * srcRowBytes +
-                                       (cellX * cellPixelWidth * bytesPerPixel);
+                    int sourceOffset = (cellY * cellPixelHeight + row) * srcRowBytes +
+                                       cellX * cellPixelWidth * bytesPerPixel;
                     int targetOffset = row * cellRowBytes;
                     bgrx.Slice(sourceOffset, cellRowBytes)
                         .CopyTo(cellBgrx.Slice(targetOffset, cellRowBytes));
@@ -272,7 +268,8 @@ namespace Consolonia.Core.Drawing
                 Func<PixelBuffer> factory)
             {
                 IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
-                var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
+                Dictionary<BitmapQuantizedCacheKey, PixelBuffer> perBitmap =
+                    RenderedBitmapCache.GetOrCreateValue(cacheSource);
                 var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
 
                 if (perBitmap.TryGetValue(key, out PixelBuffer renderedBitmap))
@@ -348,7 +345,8 @@ namespace Consolonia.Core.Drawing
                 IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
             {
                 IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
-                var perBitmap = RenderedBitmapCache.GetOrCreateValue(cacheSource);
+                Dictionary<BitmapQuantizedCacheKey, KittyRenderedBitmap> perBitmap =
+                    RenderedBitmapCache.GetOrCreateValue(cacheSource);
                 var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
 
                 if (perBitmap.TryGetValue(key, out KittyRenderedBitmap renderedBitmap))
@@ -430,11 +428,11 @@ namespace Consolonia.Core.Drawing
                     // image as cell BACKGROUND over opaque black (occludes what the picture was drawn
                     // over), foreground left free so glyphs drawn later composite over the picture
                     for (int cellY = 0; cellY < targetRect.Height; cellY++)
-                        for (int cellX = 0; cellX < targetRect.Width; cellX++)
-                            cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                                new PixelForeground(Symbol.Space, Colors.Transparent),
-                                new PixelBackground(Colors.Black,
-                                    new KittyTile(imageId, (ushort)cellX, (ushort)cellY)));
+                    for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                        cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                            new PixelForeground(Symbol.Space, Colors.Transparent),
+                            new PixelBackground(Colors.Black,
+                                new KittyTile(imageId, (ushort)cellX, (ushort)cellY)));
 
                     return new KittyRenderedBitmap(imageId, cellBuffer);
                 }
@@ -444,12 +442,12 @@ namespace Consolonia.Core.Drawing
 
                 Color imageIdColor = KittyGraphics.GetImageIdColor(imageId);
                 for (int cellY = 0; cellY < targetRect.Height; cellY++)
-                    for (int cellX = 0; cellX < targetRect.Width; cellX++)
-                        cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                            new PixelForeground(
-                                Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(cellY, cellX), 1),
-                                imageIdColor),
-                            PixelBackground.Transparent);
+                for (int cellX = 0; cellX < targetRect.Width; cellX++)
+                    cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                        new PixelForeground(
+                            Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(cellY, cellX), 1),
+                            imageIdColor),
+                        PixelBackground.Transparent);
 
                 return new KittyRenderedBitmap(imageId, cellBuffer);
             }
@@ -612,7 +610,7 @@ namespace Consolonia.Core.Drawing
             private static BgraColor GetPixelColor(ReadOnlySpan<byte> pixels, int x, int y, int stride,
                 int bytesPerPixel)
             {
-                int offset = (y * stride) + (x * bytesPerPixel);
+                int offset = y * stride + x * bytesPerPixel;
 
                 return bytesPerPixel switch
                 {

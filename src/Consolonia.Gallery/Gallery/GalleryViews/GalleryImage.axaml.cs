@@ -66,7 +66,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             {
                 string json = await GalleryImageItem.Client.GetStringAsync(new Uri(PicsumListUrl));
 
-                using var document = JsonDocument.Parse(json);
+                using JsonDocument document = JsonDocument.Parse(json);
                 foreach (JsonElement photo in document.RootElement.EnumerateArray())
                 {
                     string id = photo.GetProperty("id").GetString();

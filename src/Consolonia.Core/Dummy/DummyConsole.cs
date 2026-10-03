@@ -1,5 +1,7 @@
+using System;
 using System.Runtime.CompilerServices;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
@@ -42,9 +44,9 @@ namespace Consolonia.Core.Dummy
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
-        public int CellPixelWidth => throw new System.NotImplementedException();
+        public int CellPixelWidth => throw new NotImplementedException();
 
-        public int CellPixelHeight => throw new System.NotImplementedException();
+        public int CellPixelHeight => throw new NotImplementedException();
 
         public PixelBufferCoordinate GetCaretPosition()
         {
@@ -65,7 +67,7 @@ namespace Consolonia.Core.Dummy
         {
         }
 
-        public void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
         }
 

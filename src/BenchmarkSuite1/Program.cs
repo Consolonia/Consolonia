@@ -1,16 +1,17 @@
-using BenchmarkDotNet.Running;
-using BenchmarkDotNet.Configs;
 using System.IO;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Reports;
+using BenchmarkDotNet.Running;
 
 namespace BenchmarkSuite1
 {
     internal class Program
     {
-        static void Main()
+        private static void Main()
         {
-            var config = ManualConfig.Create(DefaultConfig.Instance)
+            ManualConfig config = ManualConfig.Create(DefaultConfig.Instance)
                 .WithArtifactsPath(Path.Combine(Path.GetTempPath(), "BenchmarkSuite1"));
-            var _ = BenchmarkRunner.Run(typeof(Program).Assembly, config);
+            Summary[] _ = BenchmarkRunner.Run(typeof(Program).Assembly, config);
         }
     }
 }

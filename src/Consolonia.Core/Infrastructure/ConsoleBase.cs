@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
 
@@ -195,7 +196,7 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
-        public virtual void WriteSixel(PixelBufferCoordinate position, Drawing.Sixel sixel)
+        public virtual void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
             _consoleOutput.WriteSixel(position, sixel);
         }

@@ -9,11 +9,23 @@ using JeremyAnsel.ColorQuant;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    /// Represents a sixel image with palette and indexed pixel data.
-    /// Supports composition via BitBlt and serialization via ToBytes.
+    ///     Represents a sixel image with palette and indexed pixel data.
+    ///     Supports composition via BitBlt and serialization via ToBytes.
     /// </summary>
     public class Sixel
     {
+        public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height,
+            int cellWidth, int cellHeight)
+        {
+            Palette = palette;
+            PaletteCount = paletteCount;
+            Pixels = pixels;
+            Width = width;
+            Height = height;
+            CellWidth = cellWidth;
+            CellHeight = cellHeight;
+        }
+
         /// <summary>BGRX palette, 4 bytes per entry.</summary>
         [SuppressMessage("Performance", "CA1819:Properties should not return arrays",
             Justification = "The sixel hot path uses the backing array directly to avoid extra copies.")]
@@ -45,21 +57,9 @@ namespace Consolonia.Core.Drawing
         /// <summary>Height of this image in cells.</summary>
         public int CellsHeight => Height / CellHeight;
 
-        public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height,
-            int cellWidth, int cellHeight)
-        {
-            Palette = palette;
-            PaletteCount = paletteCount;
-            Pixels = pixels;
-            Width = width;
-            Height = height;
-            CellWidth = cellWidth;
-            CellHeight = cellHeight;
-        }
-
         /// <summary>
-        /// Create a Sixel from raw BGRX pixel data.
-        /// If a palette is provided it is used to quantize against, otherwise a new palette is created.
+        ///     Create a Sixel from raw BGRX pixel data.
+        ///     If a palette is provided it is used to quantize against, otherwise a new palette is created.
         /// </summary>
         public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height,
             int cellWidth, int cellHeight, byte[] palette = null)
@@ -78,8 +78,8 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        /// Copy source image pixels into this image at pixel position (x, y).
-        /// Clips if source extends beyond this image's bounds.
+        ///     Copy source image pixels into this image at pixel position (x, y).
+        ///     Clips if source extends beyond this image's bounds.
         /// </summary>
         public void BitBlt(Sixel source, int x, int y)
         {
@@ -110,6 +110,7 @@ namespace Consolonia.Core.Drawing
 
                 Array.Copy(source.Pixels, srcOffset + srcX, Pixels, dstOffset, copyLen);
             }
+
             _renderedBytes = null;
         }
 
@@ -123,8 +124,8 @@ namespace Consolonia.Core.Drawing
         private byte[] _renderedBytes;
 
         /// <summary>
-        /// Serialize this image to SIXEL escape sequence bytes.
-        /// The returned span is cached on the instance after the first render.
+        ///     Serialize this image to SIXEL escape sequence bytes.
+        ///     The returned span is cached on the instance after the first render.
         /// </summary>
         public ReadOnlySpan<byte> Render()
         {
@@ -138,7 +139,7 @@ namespace Consolonia.Core.Drawing
             byte[] indexed = Pixels;
 
             int maxOutput = 64 + paletteCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
-            var output = RentOrGrow(ref _scratchRenderBuf, maxOutput);
+            byte[] output = RentOrGrow(ref _scratchRenderBuf, maxOutput);
             int pos = 0;
 
             // DCS q
@@ -178,7 +179,7 @@ namespace Consolonia.Core.Drawing
             // Band encoding: 6 pixel rows per band, '$' returns to column 0 for the next color, '-' ends the band
             int bandCount = (height + 5) / 6;
             Span<bool> colorPresent = stackalloc bool[paletteCount];
-            var sixelRow = ArrayPool<byte>.Shared.Rent(width);
+            byte[] sixelRow = ArrayPool<byte>.Shared.Rent(width);
 
             try
             {
@@ -199,7 +200,7 @@ namespace Consolonia.Core.Drawing
                     if (pos + bandWorstCase > output.Length)
                     {
                         int newLen = Math.Max(output.Length * 2, pos + bandWorstCase + 4096);
-                        var newBuf = new byte[newLen];
+                        byte[] newBuf = new byte[newLen];
                         output.AsSpan(0, pos).CopyTo(newBuf);
                         _scratchRenderBuf = newBuf;
                         output = newBuf;
@@ -240,20 +241,23 @@ namespace Consolonia.Core.Drawing
             return rendered;
         }
 
-        public ReadOnlySpan<byte> ToBytes() => Render();
+        public ReadOnlySpan<byte> ToBytes()
+        {
+            return Render();
+        }
 
         #endregion
 
         #region Quantization
 
         /// <summary>
-        /// Quantize BGRX pixel data using Wu's variance-minimizing algorithm.
+        ///     Quantize BGRX pixel data using Wu's variance-minimizing algorithm.
         /// </summary>
         private static void Quantize(byte[] bgrx,
             out byte[] palette, out int paletteCount, out byte[] indexed)
         {
-            var quantizer = _quantizer ??= new WuColorQuantizer();
-            var result = quantizer.Quantize(bgrx, 256);
+            WuColorQuantizer quantizer = _quantizer ??= new WuColorQuantizer();
+            ColorQuantizerResult result = quantizer.Quantize(bgrx, 256);
 
             palette = result.Palette;
             paletteCount = palette.Length / 4;
@@ -261,7 +265,7 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        /// Map BGRX pixel data to an existing palette using nearest-color matching.
+        ///     Map BGRX pixel data to an existing palette using nearest-color matching.
         /// </summary>
         private static byte[] QuantizeWithPalette(byte[] bgrx, byte[] palette)
         {
@@ -277,8 +281,8 @@ namespace Consolonia.Core.Drawing
                 int g = bgrxSpan[offset + 1];
                 int r = bgrxSpan[offset + 2];
                 int lookupIndex = ((r >> PaletteLookup.ChannelShift) << (PaletteLookup.ChannelBits * 2)) |
-                    ((g >> PaletteLookup.ChannelShift) << PaletteLookup.ChannelBits) |
-                    (b >> PaletteLookup.ChannelShift);
+                                  ((g >> PaletteLookup.ChannelShift) << PaletteLookup.ChannelBits) |
+                                  (b >> PaletteLookup.ChannelShift);
                 indexed[i] = paletteLookup[lookupIndex];
             }
 
@@ -290,22 +294,23 @@ namespace Consolonia.Core.Drawing
         #region SIMD helpers
 
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private static void BuildSixelRow(byte[] indexed, byte[] sixelRow, int width, int yStart, int bandRows, byte color)
+        private static void BuildSixelRow(byte[] indexed, byte[] sixelRow, int width, int yStart, int bandRows,
+            byte color)
         {
             ref byte rows0 = ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(indexed), yStart * width);
             ref byte outRef = ref MemoryMarshal.GetArrayDataReference(sixelRow);
 
             if (Vector256.IsHardwareAccelerated && width >= 32)
             {
-                var vColor = Vector256.Create(color);
+                Vector256<byte> vColor = Vector256.Create(color);
                 var v63 = Vector256.Create((byte)63);
 
                 int x = 0;
                 for (; x + 32 <= width; x += 32)
                 {
-                    var bits = Vector256<byte>.Zero;
+                    Vector256<byte> bits = Vector256<byte>.Zero;
 
-                    var eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)x), vColor);
+                    Vector256<byte> eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)x), vColor);
                     bits = Vector256.BitwiseOr(bits, Vector256.BitwiseAnd(eq, Vector256.Create((byte)1)));
 
                     if (bandRows > 1)
@@ -313,21 +318,25 @@ namespace Consolonia.Core.Drawing
                         eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)(width + x)), vColor);
                         bits = Vector256.BitwiseOr(bits, Vector256.BitwiseAnd(eq, Vector256.Create((byte)2)));
                     }
+
                     if (bandRows > 2)
                     {
                         eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)(width * 2 + x)), vColor);
                         bits = Vector256.BitwiseOr(bits, Vector256.BitwiseAnd(eq, Vector256.Create((byte)4)));
                     }
+
                     if (bandRows > 3)
                     {
                         eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)(width * 3 + x)), vColor);
                         bits = Vector256.BitwiseOr(bits, Vector256.BitwiseAnd(eq, Vector256.Create((byte)8)));
                     }
+
                     if (bandRows > 4)
                     {
                         eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)(width * 4 + x)), vColor);
                         bits = Vector256.BitwiseOr(bits, Vector256.BitwiseAnd(eq, Vector256.Create((byte)16)));
                     }
+
                     if (bandRows > 5)
                     {
                         eq = Vector256.Equals(Vector256.LoadUnsafe(ref rows0, (nuint)(width * 5 + x)), vColor);
@@ -342,15 +351,15 @@ namespace Consolonia.Core.Drawing
             }
             else if (Vector128.IsHardwareAccelerated && width >= 16)
             {
-                var vColor = Vector128.Create(color);
+                Vector128<byte> vColor = Vector128.Create(color);
                 var v63 = Vector128.Create((byte)63);
 
                 int x = 0;
                 for (; x + 16 <= width; x += 16)
                 {
-                    var bits = Vector128<byte>.Zero;
+                    Vector128<byte> bits = Vector128<byte>.Zero;
 
-                    var eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)x), vColor);
+                    Vector128<byte> eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)x), vColor);
                     bits = Vector128.BitwiseOr(bits, Vector128.BitwiseAnd(eq, Vector128.Create((byte)1)));
 
                     if (bandRows > 1)
@@ -358,21 +367,25 @@ namespace Consolonia.Core.Drawing
                         eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)(width + x)), vColor);
                         bits = Vector128.BitwiseOr(bits, Vector128.BitwiseAnd(eq, Vector128.Create((byte)2)));
                     }
+
                     if (bandRows > 2)
                     {
                         eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)(width * 2 + x)), vColor);
                         bits = Vector128.BitwiseOr(bits, Vector128.BitwiseAnd(eq, Vector128.Create((byte)4)));
                     }
+
                     if (bandRows > 3)
                     {
                         eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)(width * 3 + x)), vColor);
                         bits = Vector128.BitwiseOr(bits, Vector128.BitwiseAnd(eq, Vector128.Create((byte)8)));
                     }
+
                     if (bandRows > 4)
                     {
                         eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)(width * 4 + x)), vColor);
                         bits = Vector128.BitwiseOr(bits, Vector128.BitwiseAnd(eq, Vector128.Create((byte)16)));
                     }
+
                     if (bandRows > 5)
                     {
                         eq = Vector128.Equals(Vector128.LoadUnsafe(ref rows0, (nuint)(width * 5 + x)), vColor);
@@ -417,15 +430,22 @@ namespace Consolonia.Core.Drawing
                 buf[pos] = (byte)('0' + value);
                 return pos + 1;
             }
+
             if (value < 100)
             {
                 buf[pos] = (byte)('0' + value / 10);
                 buf[pos + 1] = (byte)('0' + value % 10);
                 return pos + 2;
             }
+
             int tmp = value;
             int digits = 0;
-            while (tmp > 0) { digits++; tmp /= 10; }
+            while (tmp > 0)
+            {
+                digits++;
+                tmp /= 10;
+            }
+
             pos += digits;
             int p = pos;
             while (value > 0)
@@ -433,6 +453,7 @@ namespace Consolonia.Core.Drawing
                 buf[--p] = (byte)('0' + value % 10);
                 value /= 10;
             }
+
             return pos;
         }
 
@@ -468,8 +489,10 @@ namespace Consolonia.Core.Drawing
                 {
                     output[pos++] = ch;
                 }
+
                 i += run;
             }
+
             return pos;
         }
 
