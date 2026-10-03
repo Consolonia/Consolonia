@@ -173,7 +173,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Character == other.Character &&
                    string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
                    Width == other.Width &&
-                   Pattern == other.Pattern;
+                   Pattern == other.Pattern &&
+                   // every sixel cell looks alike otherwise (no character, no pattern), so without this
+                   // the pixel buffer diff would keep a stale image when a new one lands on the same cells
+                   ReferenceEquals(Sixel, other.Sixel);
         }
 
 
@@ -237,16 +240,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override bool Equals([NotNullWhen(true)] object obj)
         {
-            return obj is Symbol other &&
-                   Character == other.Character &&
-                   string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
-                   Width == other.Width &&
-                   Pattern == other.Pattern;
+            return obj is Symbol other && Equals(other);
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Character, Complex, Width, Pattern);
+            return HashCode.Combine(Character, Complex, Width, Pattern, Sixel);
         }
 
         public static bool operator ==(Symbol left, Symbol right)

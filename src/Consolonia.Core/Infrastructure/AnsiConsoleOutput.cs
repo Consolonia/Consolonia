@@ -227,8 +227,11 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
+            // RenderTarget calls this outside WritePixel, so it needs the same lock and pause handling as WriteText
+            WaitPauseTaskIfNecessary();
             SetCaretPosition(position);
 
             // sixel payloads are strictly ASCII (data bytes are 0x3F..0x7E), so widening to chars

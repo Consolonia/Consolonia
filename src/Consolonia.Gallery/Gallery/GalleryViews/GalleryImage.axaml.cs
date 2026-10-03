@@ -228,10 +228,15 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
         private static async Task<Bitmap> DecodeAsync(string source)
         {
-            if (source.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            if (source.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                source.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 byte[] bytes = await Client.GetByteArrayAsync(new Uri(source));
-                return await Task.Run(() => new Bitmap(new MemoryStream(bytes)));
+                return await Task.Run(() =>
+                {
+                    using var stream = new MemoryStream(bytes);
+                    return new Bitmap(stream);
+                });
             }
 
             if (source.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))

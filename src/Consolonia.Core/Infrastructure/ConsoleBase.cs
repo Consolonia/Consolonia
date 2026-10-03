@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
@@ -227,14 +228,17 @@ namespace Consolonia.Core.Infrastructure
             {
                 string inner = response[(idx4 + 1)..^1];
                 string[] parts = inner.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length == 2)
+                // a stray keypress can land in the reply, so a malformed one must fall back, not throw
+                if (parts.Length == 2 &&
+                    int.TryParse(parts[0], out int parsedHeightPx) &&
+                    int.TryParse(parts[1], out int parsedWidthPx))
                 {
-                    heightPx = int.Parse(parts[0]);
-                    widthPx = int.Parse(parts[1]);
+                    heightPx = parsedHeightPx;
+                    widthPx = parsedWidthPx;
                 }
             }
 
-            if (widthPx > 0 && heightPx > 0)
+            if (widthPx > 0 && heightPx > 0 && cols > 0 && rows > 0)
                 return (widthPx / cols, heightPx / rows);
 
             return (8, 16);
@@ -254,7 +258,11 @@ namespace Consolonia.Core.Infrastructure
             while (Environment.TickCount64 < deadline)
             {
                 if (!Console.KeyAvailable)
+                {
+                    // polling without this pins a core for the whole timeout on terminals which never reply
+                    Thread.Sleep(1);
                     continue;
+                }
 
                 char c = Console.ReadKey(true).KeyChar;
                 sb.Append(c);

@@ -67,6 +67,38 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     $"cell {x},{y} should hold a sixel");
         }
 
+        /// <summary>
+        ///     Regression test: all sixel cells look alike to the pixel buffer diff unless the image itself is
+        ///     part of the comparison, and a second picture drawn over the first was dropped as "unchanged".
+        /// </summary>
+        [Test]
+        public void DrawingAnotherBitmapOverTheFirstReplacesTheSixelCells()
+        {
+            const int cellsWide = 2;
+            const int cellsHigh = 2;
+            var size = new PixelSize(cellsWide * _console.CellPixelWidth, cellsHigh * _console.CellPixelHeight);
+            var destRect = new Rect(0, 0, cellsWide, cellsHigh);
+
+            using var first = new FakeReadableBitmap(size);
+            _dc.DrawBitmap(first, 1, new Rect(destRect.Size), destRect);
+
+            var firstSixels = new Sixel[cellsWide, cellsHigh];
+            for (ushort y = 0; y < cellsHigh; y++)
+            for (ushort x = 0; x < cellsWide; x++)
+            {
+                firstSixels[x, y] = _buffer[x, y].Foreground.Symbol.Sixel;
+                Assert.IsNotNull(firstSixels[x, y]);
+            }
+
+            using var second = new FakeReadableBitmap(size, 32);
+            _dc.DrawBitmap(second, 1, new Rect(destRect.Size), destRect);
+
+            for (ushort y = 0; y < cellsHigh; y++)
+            for (ushort x = 0; x < cellsWide; x++)
+                Assert.That(_buffer[x, y].Foreground.Symbol.Sixel, Is.Not.SameAs(firstSixels[x, y]),
+                    $"cell {x},{y} should hold the second image");
+        }
+
         public void Dispose()
         {
             _consoleWindowImpl?.Dispose();
@@ -80,7 +112,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             private readonly byte[] _pixels;
 
-            public FakeReadableBitmap(PixelSize size)
+            public FakeReadableBitmap(PixelSize size, byte tint = 128)
             {
                 PixelSize = size;
                 RowBytes = size.Width * 4;
@@ -93,7 +125,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     int offset = y * RowBytes + x * 4;
                     _pixels[offset] = (byte)(x * 255 / Math.Max(1, size.Width - 1));
                     _pixels[offset + 1] = (byte)(y * 255 / Math.Max(1, size.Height - 1));
-                    _pixels[offset + 2] = 128;
+                    _pixels[offset + 2] = tint;
                     _pixels[offset + 3] = 255;
                 }
             }

@@ -99,6 +99,36 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
+        public void SixelSymbolsCompareByImage()
+        {
+            // regression: a sixel cell carries no character and no pattern, so symbols which ignored the
+            // image compared equal and the pixel buffer diff kept showing the previous picture
+            Sixel sixel = CreateCellSixel(10);
+            Sixel otherSixel = CreateCellSixel(200);
+
+            Pixel pixel = CreateSixelPixel(sixel);
+            Pixel samePixel = CreateSixelPixel(sixel);
+            Pixel otherPixel = CreateSixelPixel(otherSixel);
+
+            Assert.That(pixel == samePixel);
+            Assert.That(pixel.GetHashCode(), Is.EqualTo(samePixel.GetHashCode()));
+            Assert.That(pixel != otherPixel);
+            Assert.That(pixel.Equals((object)otherPixel), Is.False);
+        }
+
+        private static Sixel CreateCellSixel(byte gray)
+        {
+            byte[] palette = { gray, gray, gray, 0 };
+            return new Sixel(palette, 1, new byte[8 * 16], 8, 16, 8, 16);
+        }
+
+        private static Pixel CreateSixelPixel(Sixel sixel)
+        {
+            return new Pixel(new PixelForeground(new Symbol(sixel, 1), Colors.Transparent),
+                PixelBackground.Transparent);
+        }
+
+        [Test]
         public void EqualityCaret()
         {
             var pixel = new Pixel(CaretStyle.BlinkingBar);
