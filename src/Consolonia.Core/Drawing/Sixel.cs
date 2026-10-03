@@ -64,6 +64,12 @@ namespace Consolonia.Core.Drawing
         public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height,
             int cellWidth, int cellHeight, byte[] palette = null)
         {
+            ArgumentNullException.ThrowIfNull(bgrx);
+            // Render and BuildSixelRow index Pixels with unchecked Unsafe.Add offsets derived from
+            // width * height, so a short buffer would read past the array
+            if (width <= 0 || height <= 0 || bgrx.Length < width * height * 4)
+                throw new ArgumentException("Bitmap size does not match the given dimensions.", nameof(bgrx));
+
             if (palette != null)
             {
                 int paletteCount = palette.Length / 4;

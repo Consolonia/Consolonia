@@ -47,6 +47,15 @@ namespace BenchmarkSuite1
             return Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight);
         }
 
+        // Render() caches its bytes on the instance, so without a fresh Sixel per invocation this
+        // measures the cache check. IterationSetup pins InvocationCount to 1, which is tolerable for
+        // a render of this size.
+        [IterationSetup(Target = nameof(SerializeToBytes))]
+        public void SetupSerializeToBytes()
+        {
+            _sixel = Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight, _palette);
+        }
+
         [Benchmark]
         public int SerializeToBytes()
         {
