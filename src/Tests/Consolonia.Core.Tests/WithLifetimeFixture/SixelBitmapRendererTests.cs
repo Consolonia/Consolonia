@@ -76,7 +76,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         ///     Minimal readable bitmap over a pinned BGRA buffer. The real render interface cannot create one
         ///     here because Consolonia.Core.Tests has no Skia fallback.
         /// </summary>
-        private sealed class FakeReadableBitmap : IBitmapImpl, IReadableBitmapImpl
+        private sealed class FakeReadableBitmap : IReadableBitmapImpl
         {
             private readonly byte[] _pixels;
 
