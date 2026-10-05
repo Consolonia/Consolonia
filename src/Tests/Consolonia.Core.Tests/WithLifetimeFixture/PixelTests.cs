@@ -116,6 +116,66 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(pixel.Equals((object)otherPixel), Is.False);
         }
 
+        [Test]
+        public void TranslucentOverlayWashesSixelPalette()
+        {
+            Sixel sixel = CreateCellSixel(200);
+            Pixel pixel = CreateSixelPixel(sixel);
+            var backdrop = new Pixel(new PixelBackground(Color.Parse("#7F000000")));
+
+            Pixel dimmed = pixel.Blend(backdrop);
+            Sixel washed = dimmed.Foreground.Symbol.Sixel;
+
+            Assert.That(washed, Is.Not.SameAs(sixel));
+            Assert.That(washed.Pixels, Is.SameAs(sixel.Pixels), "only the palette changes");
+            Assert.That(washed.Palette[0], Is.LessThan(sixel.Palette[0]), "black at half alpha darkens");
+            Assert.That(sixel.Palette[0], Is.EqualTo(200), "the source image is untouched");
+            Assert.That(pixel.Blend(backdrop), Is.EqualTo(dimmed),
+                "the same overlay must yield the same image, else every frame re-sends it");
+        }
+
+        [Test]
+        public void BlockGlyphIsPaintedIntoSixelInsteadOfReplacingIt()
+        {
+            // regression: a window edge (▁) drawn over a sixel picture turned the cell into text,
+            // showing a solid band of background color where the picture should continue
+            Sixel sixel = CreateCellSixel(200);
+            Pixel pixel = CreateSixelPixel(sixel);
+            var edge = new Pixel(new PixelForeground(new Symbol('▁'), Color.FromRgb(0x10, 0x20, 0x30)));
+
+            Pixel withEdge = pixel.Blend(edge);
+            Sixel painted = withEdge.Foreground.Symbol.Sixel;
+
+            Assert.That(painted, Is.Not.Null, "the cell must stay an image");
+            Assert.That(painted.PaletteCount, Is.EqualTo(2), "the edge color is appended to the palette");
+            byte edgeIndex = painted.Pixels[15 * 8];
+            Assert.That(edgeIndex, Is.EqualTo(1), "the bottom eighth (rows 14-15 of 16) is the edge");
+            Assert.That(painted.Pixels[14 * 8 + 7], Is.EqualTo(1));
+            Assert.That(painted.Pixels[13 * 8], Is.EqualTo(0), "above the eighth is still the picture");
+            Assert.That(painted.Palette[4 + 2], Is.EqualTo(0x10), "BGRX: red channel");
+            Assert.That(sixel.Pixels[15 * 8], Is.EqualTo(0), "the source image is untouched");
+            Assert.That(pixel.Blend(edge), Is.EqualTo(withEdge), "same glyph and color, same image");
+
+            // text can't be drawn into a sixel, so the text cell wins as before
+            Pixel withText = pixel.Blend(new Pixel(new PixelForeground(new Symbol('a'), Colors.Red)));
+            Assert.That(withText.Foreground.Symbol.Sixel, Is.Null);
+            Assert.That(withText.Foreground.Symbol.Character, Is.EqualTo('a'));
+        }
+
+        [Test]
+        public void ShadeAndBrightenWashImageCells()
+        {
+            Pixel sixelPixel = CreateSixelPixel(CreateCellSixel(128));
+            Assert.That(sixelPixel.Shade().Foreground.Symbol.Sixel.Palette[0], Is.LessThan(128));
+            Assert.That(sixelPixel.Brighten().Foreground.Symbol.Sixel.Palette[0], Is.GreaterThan(128));
+
+            var tilePixel = new Pixel(new PixelForeground(Symbol.Space, Colors.Transparent),
+                new PixelBackground(Colors.Transparent, new KittyTile(0x42, 0, 0)));
+            Color shadeWash = tilePixel.Shade().Background.Color;
+            Assert.That(shadeWash.A, Is.GreaterThan(0));
+            Assert.That(shadeWash.R, Is.EqualTo(0));
+        }
+
         private static Sixel CreateCellSixel(byte gray)
         {
             byte[] palette = { gray, gray, gray, 0 };
@@ -253,7 +313,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             var tile = new KittyTile(0x42, 3, 5);
             var tilePixel = new Pixel(
                 new PixelForeground(Symbol.Space, Colors.Transparent),
-                new PixelBackground(Colors.Black, tile));
+                new PixelBackground(Colors.Transparent, tile));
 
             Pixel withGlyph = tilePixel.Blend(new Pixel(
                 new PixelForeground(new Symbol('▕'), Colors.Gray),
@@ -265,6 +325,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Pixel shaded = tilePixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
             Assert.That(shaded.Background.Tile, Is.EqualTo(tile),
                 "a translucent wash must not evict the picture");
+            Assert.That(shaded.Background.Color, Is.EqualTo(Color.Parse("#7F000000")),
+                "the wash accumulates in the tile cell's color, to be laid over the image");
 
             Pixel covered = tilePixel.Blend(new Pixel(new PixelBackground(Colors.White)));
             Assert.That(covered.Background.Tile.IsEmpty, Is.True,

@@ -20,7 +20,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         /// <summary>
         ///     A background which is a slice of a kitty image (drawn by the terminal below any
-        ///     foreground glyph), with <paramref name="color" /> beneath it.
+        ///     foreground glyph). <paramref name="color" /> is the wash laid over the image: transparent
+        ///     for none, and translucent overlays blended onto the cell accumulate into it.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground(Color color, KittyTile tile) : this(color)
@@ -31,7 +32,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground Shade()
         {
-            // tile survives: the terminal cannot tint an image
+            // tile survives; Pixel.Shade tints image cells with a wash before reaching here
             return new PixelBackground(Color.Shade(), Tile);
         }
 

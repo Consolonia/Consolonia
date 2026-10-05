@@ -1,9 +1,11 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using Avalonia.Media;
 using JeremyAnsel.ColorQuant;
 
 namespace Consolonia.Core.Drawing
@@ -119,6 +121,215 @@ namespace Consolonia.Core.Drawing
 
             _renderedBytes = null;
         }
+
+        /// <summary>
+        ///     Returns this image with <paramref name="wash" /> alpha-composited over every palette
+        ///     color, which is how a translucent overlay (a modal backdrop, a shade) tints a sixel.
+        ///     Only the palette changes, so the copy shares <see cref="Pixels" /> with this image.
+        /// </summary>
+        /// <remarks>
+        ///     Variants are cached: overlays are re-blended onto the pixel buffer every frame, and
+        ///     since symbols compare sixels by reference, returning the same instance is what keeps an
+        ///     unchanged dimmed image from being re-sent to the terminal. Cells of one image also share
+        ///     the derived palette, so the renderer can still combine them.
+        /// </remarks>
+        public Sixel Wash(Color wash)
+        {
+            if (wash.A == 0)
+                return this;
+
+            return GetOrCreateVariant(char.MinValue, wash, () =>
+                new Sixel(GetWashedPalette(Palette, PaletteCount, wash), PaletteCount, Pixels, Width, Height,
+                    CellWidth, CellHeight));
+        }
+
+        /// <summary>
+        ///     Whether <paramref name="glyph" /> is a block element <see cref="DrawBlockGlyph" /> can
+        ///     paint into the image's pixels.
+        /// </summary>
+        public static bool IsBlockGlyph(char glyph)
+        {
+            return glyph is >= '▀' and <= '▐' or >= '▔' and <= '▟';
+        }
+
+        /// <summary>
+        ///     Returns this image with the block element <paramref name="glyph" /> (an eighth, half or
+        ///     quadrant block, see <see cref="IsBlockGlyph" />) painted over it in
+        ///     <paramref name="color" />. A terminal cell shows either text or a sixel, so this is how a
+        ///     window edge or a shadow drawn over a picture keeps the picture around it.
+        /// </summary>
+        public Sixel DrawBlockGlyph(char glyph, Color color)
+        {
+            if (!IsBlockGlyph(glyph) || color.A == 0)
+                return this;
+
+            return GetOrCreateVariant(glyph, color, () =>
+            {
+                (byte[] palette, int paletteCount, byte index) = GetPaletteWithColor(Palette, PaletteCount, color);
+
+                byte[] pixels = (byte[])Pixels.Clone();
+                for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+                    if (BlockCovers(glyph, x, y, Width, Height))
+                        pixels[y * Width + x] = index;
+
+                return new Sixel(palette, paletteCount, pixels, Width, Height, CellWidth, CellHeight);
+            });
+        }
+
+        private Sixel GetOrCreateVariant(char glyph, Color color, Func<Sixel> create)
+        {
+            lock (_variantsLock)
+            {
+                if (_variants != null && _variants.TryGetValue((glyph, color), out Sixel variant))
+                    return variant;
+
+                // an animated overlay produces a new color every frame; don't hoard them
+                if (_variants == null || _variants.Count >= MaxVariants)
+                    _variants = new Dictionary<(char, Color), Sixel>();
+
+                variant = create();
+                _variants[(glyph, color)] = variant;
+                return variant;
+            }
+        }
+
+        /// <summary>
+        ///     Whether pixel (<paramref name="x" />, <paramref name="y" />) of a
+        ///     <paramref name="width" /> x <paramref name="height" /> cell is inside block element
+        ///     <paramref name="glyph" />.
+        /// </summary>
+        private static bool BlockCovers(char glyph, int x, int y, int width, int height)
+        {
+            bool left = x * 2 < width;
+            bool top = y * 2 < height;
+
+            switch (glyph)
+            {
+                case '▀': // ▀ upper half
+                    return top;
+                case >= '▁' and <= '█': // ▁..█ lower one to eight eighths
+                    return (height - y) * 8 <= (glyph - '▀') * height;
+                case >= '▉' and <= '▏': // ▉..▏ left seven to one eighths
+                    return x * 8 < ('▐' - glyph) * width;
+                case '▐': // ▐ right half
+                    return !left;
+                case '▔': // ▔ upper one eighth
+                    return y * 8 < height;
+                case '▕': // ▕ right one eighth
+                    return (width - x) * 8 <= width;
+                default: // ▖..▟ quadrants: bit 0 upper left, 1 upper right, 2 lower left, 3 lower right
+                    int quadrants = glyph switch
+                    {
+                        '▖' => 0b0100,
+                        '▗' => 0b1000,
+                        '▘' => 0b0001,
+                        '▙' => 0b1101,
+                        '▚' => 0b1001,
+                        '▛' => 0b0111,
+                        '▜' => 0b1011,
+                        '▝' => 0b0010,
+                        '▞' => 0b0110,
+                        '▟' => 0b1110,
+                        _ => 0
+                    };
+                    int quadrant = (top ? 0 : 2) + (left ? 0 : 1);
+                    return (quadrants & (1 << quadrant)) != 0;
+            }
+        }
+
+        private static byte[] GetWashedPalette(byte[] palette, int paletteCount, Color wash)
+        {
+            Dictionary<Color, byte[]> washedPalettes = WashedPalettes.GetOrCreateValue(palette);
+            lock (washedPalettes)
+            {
+                if (washedPalettes.TryGetValue(wash, out byte[] washedPalette))
+                    return washedPalette;
+
+                if (washedPalettes.Count >= MaxVariants)
+                    washedPalettes.Clear();
+
+                int alpha = wash.A;
+                int inverseAlpha = 255 - alpha;
+                washedPalette = new byte[palette.Length];
+                for (int i = 0; i < paletteCount; i++)
+                {
+                    int offset = i * 4;
+                    washedPalette[offset] = (byte)((wash.B * alpha + palette[offset] * inverseAlpha) / 255);
+                    washedPalette[offset + 1] = (byte)((wash.G * alpha + palette[offset + 1] * inverseAlpha) / 255);
+                    washedPalette[offset + 2] = (byte)((wash.R * alpha + palette[offset + 2] * inverseAlpha) / 255);
+                    washedPalette[offset + 3] = palette[offset + 3];
+                }
+
+                washedPalettes[wash] = washedPalette;
+                return washedPalette;
+            }
+        }
+
+        /// <summary>
+        ///     Finds <paramref name="color" /> in the palette, appending it when there is room (the
+        ///     existing indices stay valid) or settling for the nearest entry in a full palette.
+        ///     Cached per palette, so every cell of an image gets the same palette back.
+        /// </summary>
+        private static (byte[] Palette, int PaletteCount, byte Index) GetPaletteWithColor(byte[] palette,
+            int paletteCount, Color color)
+        {
+            Dictionary<Color, (byte[], int, byte)> palettesWithColor = PalettesWithColor.GetOrCreateValue(palette);
+            lock (palettesWithColor)
+            {
+                if (palettesWithColor.TryGetValue(color, out (byte[], int, byte) found))
+                    return found;
+
+                if (palettesWithColor.Count >= MaxVariants)
+                    palettesWithColor.Clear();
+
+                int nearest = 0;
+                int nearestDistance = int.MaxValue;
+                for (int i = 0; i < paletteCount; i++)
+                {
+                    int db = palette[i * 4] - color.B;
+                    int dg = palette[i * 4 + 1] - color.G;
+                    int dr = palette[i * 4 + 2] - color.R;
+                    int distance = dr * dr + dg * dg + db * db;
+                    if (distance < nearestDistance)
+                    {
+                        nearest = i;
+                        nearestDistance = distance;
+                    }
+                }
+
+                if (nearestDistance == 0 || paletteCount >= 256)
+                {
+                    found = (palette, paletteCount, (byte)nearest);
+                }
+                else
+                {
+                    byte[] extended = new byte[Math.Max(palette.Length, (paletteCount + 1) * 4)];
+                    Array.Copy(palette, extended, paletteCount * 4);
+                    extended[paletteCount * 4] = color.B;
+                    extended[paletteCount * 4 + 1] = color.G;
+                    extended[paletteCount * 4 + 2] = color.R;
+                    found = (extended, paletteCount + 1, (byte)paletteCount);
+                }
+
+                palettesWithColor[color] = found;
+                return found;
+            }
+        }
+
+        #region Variants
+
+        private const int MaxVariants = 8;
+
+        private static readonly ConditionalWeakTable<byte[], Dictionary<Color, byte[]>> WashedPalettes = new();
+
+        private static readonly ConditionalWeakTable<byte[], Dictionary<Color, (byte[], int, byte)>>
+            PalettesWithColor = new();
+
+        private readonly object _variantsLock = new();
+        private Dictionary<(char Glyph, Color Color), Sixel> _variants;
+
+        #endregion
 
         #region Serialization
 

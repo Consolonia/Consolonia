@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.IO;
+using System.IO.Compression;
 using System.Text;
 using System.Threading;
 using Avalonia.Media;
@@ -42,7 +44,13 @@ namespace Consolonia.Core.Drawing
         ///     at: below text, above background colors, so glyphs on the covered cells composite
         ///     over the picture.
         /// </summary>
-        public const int RectPlacementZIndex = -1;
+        public const int RectPlacementZIndex = -2;
+
+        /// <summary>
+        ///     The z-index of wash placements: translucent overlays tinting a rect placement (a modal
+        ///     backdrop over a picture), above the image and still below text.
+        /// </summary>
+        public const int WashPlacementZIndex = -1;
 
         // Image ids are carried in the 24 bit foreground color of placeholder cells,
         // so they must stay in the range 1..0xFFFFFF (0 is not a valid id).
@@ -179,10 +187,11 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Builds the chunked APC sequence transmitting an image (a=t): PNG encoded (f=100,
-        ///     the image carries its own dimensions) or raw 32 bit RGBA (f=32).
+        ///     the image carries its own dimensions) or raw 32 bit RGBA (f=32), the latter optionally
+        ///     zlib compressed (o=z).
         /// </summary>
         public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight, byte[] data,
-            KittyImageFormat format)
+            KittyImageFormat format, bool zlibCompressed = false)
         {
             ArgumentNullException.ThrowIfNull(data);
 
@@ -200,7 +209,7 @@ namespace Consolonia.Core.Drawing
                     string header = format == KittyImageFormat.Png
                         ? string.Create(CultureInfo.InvariantCulture, $"a=t,f=100,q=2,i={imageId},")
                         : string.Create(CultureInfo.InvariantCulture,
-                            $"a=t,f=32,q=2,i={imageId},s={pixelWidth},v={pixelHeight},");
+                            $"a=t,f=32,{(zlibCompressed ? "o=z," : "")}q=2,i={imageId},s={pixelWidth},v={pixelHeight},");
                     stringBuilder.Append(header);
                     first = false;
                 }
@@ -240,7 +249,7 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Builds the APC sequence creating a classic placement showing a source-pixel crop of
-        ///     an already transmitted image at the current cursor position, below text (z=-1),
+        ///     an already transmitted image at the current cursor position, below text (z=-2),
         ///     without moving the cursor (C=1). The image is pre-scaled to the cell grid, so the
         ///     crop maps 1:1 onto cells and no c=/r= stretching is involved.
         /// </summary>
@@ -249,6 +258,48 @@ namespace Consolonia.Core.Drawing
         {
             return string.Create(CultureInfo.InvariantCulture,
                 $"\u001b_Ga=p,q=2,C=1,z={RectPlacementZIndex},i={imageId},p={placementId},x={sourceX},y={sourceY},w={sourceWidth},h={sourceHeight}\u001b\\");
+        }
+
+        /// <summary>
+        ///     Builds the APC sequence transmitting a solid <paramref name="wash" /> image of one pixel per
+        ///     cell, <paramref name="columns" /> x <paramref name="rows" /> (zlib compressed, so its size
+        ///     on the wire barely depends on the screen's).
+        /// </summary>
+        /// <remarks>
+        ///     A single pixel stretched with c=/r= would do on kitty, but terminals which map every cell
+        ///     to whole source pixels drop a placement whose cells get less than one; at one pixel per
+        ///     cell every cell gets exactly one.
+        /// </remarks>
+        public static string BuildTransmitWashSequence(int imageId, Color wash, int columns, int rows)
+        {
+            byte[] rgba = new byte[columns * rows * 4];
+            for (int i = 0; i < rgba.Length; i += 4)
+            {
+                rgba[i] = wash.R;
+                rgba[i + 1] = wash.G;
+                rgba[i + 2] = wash.B;
+                rgba[i + 3] = wash.A;
+            }
+
+            using var compressed = new MemoryStream();
+            using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, true))
+            {
+                zlib.Write(rgba);
+            }
+
+            return BuildTransmitSequence(imageId, columns, rows, compressed.ToArray(), KittyImageFormat.Rgba, true);
+        }
+
+        /// <summary>
+        ///     Builds the APC sequence placing a wash image (see <see cref="BuildTransmitWashSequence" />)
+        ///     at the current cursor position over <paramref name="columns" /> x <paramref name="rows" />
+        ///     cells, above rect placements and below text, without moving the cursor (C=1). It crops
+        ///     the image to one pixel per covered cell, so the image must be at least that large.
+        /// </summary>
+        public static string BuildWashPlacementSequence(int imageId, int placementId, int columns, int rows)
+        {
+            return string.Create(CultureInfo.InvariantCulture,
+                $"\u001b_Ga=p,q=2,C=1,z={WashPlacementZIndex},i={imageId},p={placementId},x=0,y=0,w={columns},h={rows},c={columns},r={rows}\u001b\\");
         }
 
         /// <summary>

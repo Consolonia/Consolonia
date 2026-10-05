@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.IO.Compression;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
@@ -197,9 +199,35 @@ namespace Consolonia.Core.Tests
         public void RectPlacementSequencesAreWellFormed()
         {
             Assert.That(KittyGraphics.BuildRectPlacementSequence(5, 7, 16, 32, 64, 48),
-                Is.EqualTo("\u001b_Ga=p,q=2,C=1,z=-1,i=5,p=7,x=16,y=32,w=64,h=48\u001b\\"));
+                Is.EqualTo("\u001b_Ga=p,q=2,C=1,z=-2,i=5,p=7,x=16,y=32,w=64,h=48\u001b\\"));
             Assert.That(KittyGraphics.BuildDeleteRectPlacementSequence(5, 7),
                 Is.EqualTo("\u001b_Ga=d,d=i,q=2,i=5,p=7\u001b\\"));
+        }
+
+        [Test]
+        public void WashSequencesAreWellFormed()
+        {
+            // one pixel per cell of a 3x2 screen, zlib compressed raw RGBA
+            string transmit = KittyGraphics.BuildTransmitWashSequence(9, Color.FromArgb(0x80, 0x10, 0x20, 0x30), 3, 2);
+            const string header = "\u001b_Ga=t,f=32,o=z,q=2,i=9,s=3,v=2,m=0;";
+            Assert.That(transmit, Does.StartWith(header));
+            Assert.That(transmit, Does.EndWith("\u001b\\"));
+
+            byte[] compressed = Convert.FromBase64String(transmit[header.Length..^2]);
+            using var inflated = new MemoryStream();
+            using (var zlib = new ZLibStream(new MemoryStream(compressed), CompressionMode.Decompress))
+            {
+                zlib.CopyTo(inflated);
+            }
+
+            byte[] rgba = inflated.ToArray();
+            Assert.That(rgba, Has.Length.EqualTo(3 * 2 * 4));
+            for (int i = 0; i < rgba.Length; i += 4)
+                Assert.That(rgba[i..(i + 4)], Is.EqualTo(new byte[] { 0x10, 0x20, 0x30, 0x80 }));
+
+            // cropped to one pixel per covered cell, above the image (z=-2) and below text
+            Assert.That(KittyGraphics.BuildWashPlacementSequence(9, 11, 40, 12),
+                Is.EqualTo("\u001b_Ga=p,q=2,C=1,z=-1,i=9,p=11,x=0,y=0,w=40,h=12,c=40,r=12\u001b\\"));
         }
 
         [Test]

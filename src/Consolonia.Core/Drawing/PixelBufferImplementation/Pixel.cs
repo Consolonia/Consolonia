@@ -25,6 +25,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
+        // the overlays Shade and Brighten lay over image cells, roughly matching the
+        // ColorAdjustment step PixelOperations applies to plain colors
+        private static readonly Color ShadeWash = Color.FromArgb(0x40, 0x00, 0x00, 0x00);
+        private static readonly Color BrightenWash = Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Pixel()
         {
@@ -122,12 +127,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public Pixel Shade()
         {
             if (IsKittyPlaceholder()) return this;
+            // image colors can't be shifted one by one; tint the image the way a translucent overlay does
+            if (IsImage()) return Blend(new Pixel(PixelForeground.Empty, new PixelBackground(ShadeWash)));
             return new Pixel(Foreground.Shade(), Background.Shade(), CaretStyle);
         }
 
         public Pixel Brighten()
         {
             if (IsKittyPlaceholder()) return this;
+            if (IsImage()) return Blend(new Pixel(PixelForeground.Empty, new PixelBackground(BrightenWash)));
             return new Pixel(Foreground.Brighten(), Background.Brighten(), CaretStyle);
         }
 
@@ -152,6 +160,40 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         private bool IsKittyPlaceholder()
         {
             return KittyGraphics.IsPlaceholder(in Foreground.Symbol);
+        }
+
+        /// <summary>
+        ///     Composites an overlay onto a sixel cell without giving up the image: the
+        ///     <paramref name="wash" /> tints its palette and a block element glyph (a window edge, a
+        ///     shadow) is painted into its pixels. Any other glyph needs a text cell, so the image loses.
+        /// </summary>
+        private bool TryCompositeOverSixel(in PixelForeground foregroundAbove, Color wash,
+            out PixelForeground result)
+        {
+            Sixel sixel = Foreground.Symbol.Sixel;
+            bool hasGlyph = !foregroundAbove.IsNothingToDraw();
+            if (sixel == null || hasGlyph && !Sixel.IsBlockGlyph(foregroundAbove.Symbol.Character))
+            {
+                result = default;
+                return false;
+            }
+
+            sixel = sixel.Wash(wash);
+            if (hasGlyph)
+                sixel = sixel.DrawBlockGlyph(foregroundAbove.Symbol.Character, foregroundAbove.Color);
+
+            result = new PixelForeground(new Symbol(sixel, Foreground.Symbol.Width), Foreground.Color,
+                Foreground.Weight, Foreground.Style, Foreground.TextDecoration);
+            return true;
+        }
+
+        /// <summary>
+        ///     A sixel cell or a kitty tile cell. Their colors live in the image, so overlays tint them
+        ///     with a wash (<see cref="Sixel.Wash" />, or a kitty overlay placement for tiles) instead.
+        /// </summary>
+        private bool IsImage()
+        {
+            return Foreground.Symbol.Sixel != null || !Background.Tile.IsEmpty;
         }
 
         /// <summary>
@@ -182,7 +224,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop && pixelAbove.CaretStyle == CaretStyle.None)
                         return this;
-                    newForeground = isNoForegroundOnTop ? Foreground : Foreground.Blend(pixelAbove.Foreground);
+                    if (isNoForegroundOnTop)
+                        newForeground = Foreground;
+                    else if (!TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
+                        newForeground = Foreground.Blend(pixelAbove.Foreground);
                     newCaretStyle = CaretStyle.Blend(pixelAbove.CaretStyle);
                 }
                     break;
@@ -195,6 +240,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                         if (IsKittyPlaceholder())
                             return this;
 
+                        // a sixel cell's colors are its palette, so the overlay tints the palette
+                        if (TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
+                            break;
+
                         // merge the PixelForeground color with the pixelAbove background color
                         newForeground = new PixelForeground(Foreground.Symbol,
                             MergeColors(Foreground.Color, aboveBgColor, true),
@@ -202,7 +251,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                             Foreground.Style,
                             Foreground.TextDecoration);
                     }
-                    else
+                    else if (!TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
                     {
                         newForeground = pixelAbove.Foreground;
                     }
@@ -211,7 +260,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             }
 
             // Background is always blended. The tile survives a non-opaque overlay; only an opaque
-            // one evicts it, via the tile-less fast path above.
+            // one evicts it, via the tile-less fast path above. A tile cell's color starts out
+            // transparent, so what accumulates here is exactly the wash to lay over the image.
             var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
                 Background.Tile);
 

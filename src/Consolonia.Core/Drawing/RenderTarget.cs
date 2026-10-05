@@ -36,6 +36,15 @@ namespace Consolonia.Core.Drawing
         private Dictionary<KittyRect, int> _kittyRectPlacements = new();
         private Dictionary<KittyRect, int> _kittyRectPlacementsScratch = new();
 
+        // wash placements tinting rect placements (a translucent overlay over a picture), keyed by the
+        // rect they cover and their color, diffed across frames the same way
+        private Dictionary<(KittyRect Rect, Color Wash), int> _kittyWashPlacements = new();
+        private Dictionary<(KittyRect Rect, Color Wash), int> _kittyWashPlacementsScratch = new();
+
+        // wash images live in the terminal, by color, one pixel per cell of the screen they were sent
+        // for; freed once no wash placement uses them
+        private readonly Dictionary<Color, (int ImageId, ushort Columns, ushort Rows)> _kittyWashImages = new();
+
         private readonly record struct KittyRect(
             int ImageId,
             ushort TileX,
@@ -229,6 +238,14 @@ namespace Consolonia.Core.Drawing
                     if (pixel.Foreground.Symbol.Sixel != null)
                         continue;
 
+                    // a tile cell's color is the wash for its image (laid over it by a wash placement);
+                    // the terminal cell itself, seen only through transparent parts of the image, is
+                    // black with the wash composited onto it
+                    if (!pixel.Background.Tile.IsEmpty)
+                        pixel = new Pixel(pixel.Foreground,
+                            new PixelBackground(CompositeOverBlack(pixel.Background.Color), pixel.Background.Tile),
+                            pixel.CaretStyle);
+
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (!_consoleCursor.IsEmpty() &&
                         _consoleCursor.Coordinate.Y == y &&
@@ -353,15 +370,22 @@ namespace Consolonia.Core.Drawing
         ///     Coalesces the KittyTile cell backgrounds present in the buffer into maximal
         ///     rectangles and reconciles them with the classic placements currently live in the
         ///     terminal: unchanged rectangles cost nothing, new ones are placed (at the rectangle's
-        ///     cell position, cropped to its slice of the pre-scaled image, z=-1 so text drawn on
+        ///     cell position, cropped to its slice of the pre-scaled image, z=-2 so text drawn on
         ///     the covered cells composites over the picture), vanished ones are deleted by
         ///     placement id with the image data retained for cheap re-placement.
+        ///     A rectangle's cells share one wash (see <see cref="PixelBackground" />); a visible wash
+        ///     gets its own placement of a 1x1 translucent image stretched over the rectangle at z=-1,
+        ///     which is how a modal backdrop dims a picture.
         /// </summary>
         private void EmitKittyRectPlacements(PixelBuffer pixelBuffer)
         {
             Dictionary<KittyRect, int> live = _kittyRectPlacements;
             Dictionary<KittyRect, int> next = _kittyRectPlacementsScratch;
             next.Clear();
+            Dictionary<(KittyRect Rect, Color Wash), int> liveWash = _kittyWashPlacements;
+            Dictionary<(KittyRect Rect, Color Wash), int> nextWash = _kittyWashPlacementsScratch;
+            nextWash.Clear();
+            DropWashImagesSmallerThan(pixelBuffer.Width, pixelBuffer.Height);
 
             bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
 
@@ -374,15 +398,18 @@ namespace Consolonia.Core.Drawing
                 KittyTile tile = pixelBuffer[x, y].Background.Tile;
                 if (tile.IsEmpty)
                     continue;
+                Color wash = pixelBuffer[x, y].Background.Color;
 
-                // expand rightward while the tiles continue the same image's row
+                // expand rightward while the tiles continue the same image's row under the same wash
                 ushort width = 1;
                 while (x + width < pixelBuffer.Width && !visited[x + width, y])
                 {
-                    KittyTile nextTile = pixelBuffer[(ushort)(x + width), y].Background.Tile;
+                    PixelBackground nextBackground = pixelBuffer[(ushort)(x + width), y].Background;
+                    KittyTile nextTile = nextBackground.Tile;
                     if (nextTile.ImageId != tile.ImageId ||
                         nextTile.X != tile.X + width ||
-                        nextTile.Y != tile.Y)
+                        nextTile.Y != tile.Y ||
+                        nextBackground.Color != wash)
                         break;
                     width++;
                 }
@@ -394,11 +421,14 @@ namespace Consolonia.Core.Drawing
                     bool rowMatches = true;
                     for (ushort i = 0; i < width; i++)
                     {
-                        KittyTile rowTile = pixelBuffer[(ushort)(x + i), (ushort)(y + height)].Background.Tile;
+                        PixelBackground rowBackground =
+                            pixelBuffer[(ushort)(x + i), (ushort)(y + height)].Background;
+                        KittyTile rowTile = rowBackground.Tile;
                         if (visited[x + i, y + height] ||
                             rowTile.ImageId != tile.ImageId ||
                             rowTile.X != tile.X + i ||
-                            rowTile.Y != tile.Y + height)
+                            rowTile.Y != tile.Y + height ||
+                            rowBackground.Color != wash)
                         {
                             rowMatches = false;
                             break;
@@ -433,6 +463,22 @@ namespace Consolonia.Core.Drawing
                         rect.TileX * cellPixelWidth, rect.TileY * cellPixelHeight,
                         rect.Width * cellPixelWidth, rect.Height * cellPixelHeight));
                 }
+
+                if (wash.A == 0)
+                    continue;
+
+                if (liveWash.Remove((rect, wash), out int washPlacementId))
+                {
+                    nextWash[(rect, wash)] = washPlacementId;
+                    continue;
+                }
+
+                washPlacementId = KittyGraphics.AllocatePlacementId();
+                nextWash[(rect, wash)] = washPlacementId;
+                _console.SetCaretPosition(new PixelBufferCoordinate(rect.ScreenX, rect.ScreenY));
+                _console.WriteText(KittyGraphics.BuildWashPlacementSequence(
+                    GetOrTransmitWashImage(wash, pixelBuffer.Width, pixelBuffer.Height),
+                    washPlacementId, rect.Width, rect.Height));
             }
 
             // whatever is left in the live set has no tiles backing it anymore
@@ -441,7 +487,83 @@ namespace Consolonia.Core.Drawing
                     KittyGraphics.BuildDeleteRectPlacementSequence(stale.Key.ImageId, stale.Value));
             live.Clear();
 
+            foreach (KeyValuePair<(KittyRect Rect, Color Wash), int> stale in liveWash)
+                _console.WriteText(KittyGraphics.BuildDeleteRectPlacementSequence(
+                    _kittyWashImages[stale.Key.Wash].ImageId, stale.Value));
+            liveWash.Clear();
+
             (_kittyRectPlacements, _kittyRectPlacementsScratch) = (next, live);
+            (_kittyWashPlacements, _kittyWashPlacementsScratch) = (nextWash, liveWash);
+
+            FreeUnusedWashImages();
+        }
+
+        /// <summary>
+        ///     Returns the wash image for <paramref name="wash" />, sending one sized to the screen
+        ///     (<paramref name="columns" /> x <paramref name="rows" /> pixels, one per cell) the first time
+        ///     the color is needed, so it covers any rectangle the screen can hold.
+        /// </summary>
+        private int GetOrTransmitWashImage(Color wash, ushort columns, ushort rows)
+        {
+            if (_kittyWashImages.TryGetValue(wash, out (int ImageId, ushort, ushort) image))
+                return image.ImageId;
+
+            int imageId = KittyGraphics.AllocateImageId();
+            _console.WriteText(KittyGraphics.BuildTransmitWashSequence(imageId, wash, columns, rows));
+            _kittyWashImages[wash] = (imageId, columns, rows);
+            return imageId;
+        }
+
+        /// <summary>
+        ///     Deletes the wash images too small for a screen of <paramref name="columns" /> x
+        ///     <paramref name="rows" /> (it grew since they were sent), along with their placements, which
+        ///     this frame then places again on a freshly sent image.
+        /// </summary>
+        private void DropWashImagesSmallerThan(ushort columns, ushort rows)
+        {
+            if (_kittyWashImages.Count == 0)
+                return;
+
+            foreach ((Color wash, (int imageId, ushort imageColumns, ushort imageRows)) in _kittyWashImages.ToList())
+            {
+                if (imageColumns >= columns && imageRows >= rows)
+                    continue;
+
+                // uppercase d=I takes the image's placements with it
+                _console.WriteText(KittyGraphics.BuildDeleteSequence(imageId));
+                _kittyWashImages.Remove(wash);
+                foreach ((KittyRect, Color) key in _kittyWashPlacements.Keys.Where(key => key.Item2 == wash).ToList())
+                    _kittyWashPlacements.Remove(key);
+            }
+        }
+
+        /// <summary>
+        ///     Deletes the wash images no placement shows anymore. An animated overlay goes through a
+        ///     new color every frame, and each one is only a few hundred compressed bytes to send again.
+        /// </summary>
+        private void FreeUnusedWashImages()
+        {
+            if (_kittyWashImages.Count == 0)
+                return;
+
+            var inUse = new HashSet<Color>();
+            foreach ((KittyRect _, Color wash) in _kittyWashPlacements.Keys)
+                inUse.Add(wash);
+
+            foreach (Color wash in _kittyWashImages.Keys.Where(wash => !inUse.Contains(wash)).ToList())
+            {
+                _console.WriteText(KittyGraphics.BuildDeleteSequence(_kittyWashImages[wash].ImageId));
+                _kittyWashImages.Remove(wash);
+            }
+        }
+
+        /// <summary>
+        ///     Composites a (possibly translucent) wash over opaque black.
+        /// </summary>
+        private static Color CompositeOverBlack(Color wash)
+        {
+            return Color.FromRgb((byte)(wash.R * wash.A / 255), (byte)(wash.G * wash.A / 255),
+                (byte)(wash.B * wash.A / 255));
         }
 
         /// <summary>
