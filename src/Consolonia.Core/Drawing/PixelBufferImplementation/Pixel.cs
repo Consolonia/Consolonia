@@ -144,10 +144,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     The foreground color of a kitty graphics placeholder cell carries the image id: any
-        ///     operation which changes cell colors would corrupt the reference and make the terminal
-        ///     render the literal placeholder glyph. Color mutations (a dimming shade, a selection
-        ///     invert, a translucent blend) therefore leave placeholder cells untouched.
+        ///     A kitty placeholder cell is recognized by its symbol, but the terminal reads the image id
+        ///     from its foreground color (see <see cref="KittyGraphics.TryGetImageId" />). Shading,
+        ///     brightening or inverting the color would make the cell point at a different image id, so
+        ///     these operations leave placeholder cells unchanged.
         /// </summary>
         private bool IsKittyPlaceholder()
         {

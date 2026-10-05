@@ -58,7 +58,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         {
             var sources = new List<string>();
 
-#pragma warning disable CA1031 // Do not catch general exception types
             try
             {
                 string json = await Client.GetStringAsync(new Uri(PicsumListUrl));
@@ -73,11 +72,10 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                     sources.Add($"https://picsum.photos/id/{id}/{width}/{height}");
                 }
             }
-            catch (Exception)
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException)
             {
                 return [];
             }
-#pragma warning restore CA1031 // Do not catch general exception types
 
             return sources;
         }
@@ -98,7 +96,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
         private static async Task LoadBitmapAsync(Image image, string source)
         {
-#pragma warning disable CA1031 // Do not catch general exception types
             try
             {
                 if (source.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
@@ -115,11 +112,10 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                     return new Bitmap(stream);
                 });
             }
-            catch (Exception)
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
             {
                 // A photo that will not load just stays blank.
             }
-#pragma warning restore CA1031 // Do not catch general exception types
         }
 
         private async void Button_Click(object sender, RoutedEventArgs e)

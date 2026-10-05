@@ -38,11 +38,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         public Symbol(Sixel sixel, byte width)
+            : this()
         {
-            Character = char.MinValue;
-            Complex = null;
             Width = width;
-            Pattern = 0;
             Sixel = sixel;
         }
 
@@ -158,9 +156,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     Creates a symbol whose unicode sequence is stored verbatim, without variation-selector
-        ///     normalization. Used for terminal graphics placeholders (kitty) where the exact
-        ///     codepoint sequence is meaningful to the terminal.
+        ///     Creates a symbol from <paramref name="complex" /> exactly as given. The public string
+        ///     constructor appends a variation selector (U+FE0E or U+FE0F) to any multi-char glyph that
+        ///     lacks one, which would add a stray codepoint to a kitty placeholder cell
+        ///     (U+10EEEE followed by row/column diacritics).
         /// </summary>
         internal static Symbol FromVerbatim(string complex, byte width)
         {
@@ -176,7 +175,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                    Pattern == other.Pattern &&
                    // every sixel cell looks alike otherwise (no character, no pattern), so without this
                    // the pixel buffer diff would keep a stale image when a new one lands on the same cells
-                   ReferenceEquals(Sixel, other.Sixel);
+                   Sixel == other.Sixel;
         }
 
 
