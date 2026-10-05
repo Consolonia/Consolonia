@@ -2,8 +2,6 @@
 //todo: this file is under refactoring. Restore the duplication finder
 
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -12,7 +10,6 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
-using Consolonia.Core.Dummy;
 
 namespace Consolonia.Core.Drawing
 {

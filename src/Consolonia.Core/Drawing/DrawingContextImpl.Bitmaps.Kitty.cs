@@ -12,7 +12,6 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
-using Consolonia.Core.Dummy;
 
 namespace Consolonia.Core.Drawing
 {
