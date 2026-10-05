@@ -4,15 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
-using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
@@ -26,57 +24,53 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         /// </summary>
         private const int MaxImageEdge = 1024;
 
-        private readonly Carousel _imageCarousel;
+        private static readonly HttpClient Client = new();
 
         public GalleryImage()
         {
             InitializeComponent();
-            _imageCarousel = this.Get<Carousel>("ImageCarousel");
-            DataContext = this;
-            _imageCarousel.SelectionChanged += (_, _) => OnSelectedImageChanged();
-            LoadImages();
+            LoadThumbnails();
         }
 
-        public AvaloniaList<GalleryImageItem> Images { get; } = [];
-
-        private async void LoadImages()
+        private async void LoadThumbnails()
         {
-            IReadOnlyList<GalleryImageItem> items = await FetchPicsumImagesAsync();
-            if (items.Count == 0)
-                items = GetBundledImages();
+            IReadOnlyList<string> sources = await FetchPicsumSourcesAsync();
+            if (sources.Count == 0)
+                sources = Enumerable.Range(0, 10)
+                    .Select(i => $"avares://Consolonia.Gallery/Resources/{i}.jpg")
+                    .ToArray();
 
-            Images.AddRange(items);
-
-            if (_imageCarousel.SelectedIndex < 0)
-                _imageCarousel.SelectedIndex = 0;
-
-            OnSelectedImageChanged();
+            foreach (string source in sources)
+            {
+                var image = new Image { Stretch = Stretch.Uniform };
+                var border = new Border { Child = image };
+                border.Classes.Add("thumbnail");
+                WrapPanel.Children.Add(border);
+                _ = LoadBitmapAsync(image, source);
+            }
         }
 
         /// <summary>
         ///     Asks Picsum which photos exist and turns each one into a down-scaled image url.
         ///     Returns an empty list when the gallery is running offline.
         /// </summary>
-        private static async Task<IReadOnlyList<GalleryImageItem>> FetchPicsumImagesAsync()
+        private static async Task<IReadOnlyList<string>> FetchPicsumSourcesAsync()
         {
-            var items = new List<GalleryImageItem>();
+            var sources = new List<string>();
 
 #pragma warning disable CA1031 // Do not catch general exception types
             try
             {
-                string json = await GalleryImageItem.Client.GetStringAsync(new Uri(PicsumListUrl));
+                string json = await Client.GetStringAsync(new Uri(PicsumListUrl));
 
                 using JsonDocument document = JsonDocument.Parse(json);
                 foreach (JsonElement photo in document.RootElement.EnumerateArray())
                 {
                     string id = photo.GetProperty("id").GetString();
-                    string author = photo.GetProperty("author").GetString();
                     (int width, int height) = ScaleToMaxEdge(photo.GetProperty("width").GetInt32(),
                         photo.GetProperty("height").GetInt32());
 
-                    items.Add(new GalleryImageItem(
-                        $"https://picsum.photos/id/{id}/{width}/{height}",
-                        $"{author} (#{id})"));
+                    sources.Add($"https://picsum.photos/id/{id}/{width}/{height}");
                 }
             }
             catch (Exception)
@@ -85,14 +79,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             }
 #pragma warning restore CA1031 // Do not catch general exception types
 
-            return items;
-        }
-
-        private static IReadOnlyList<GalleryImageItem> GetBundledImages()
-        {
-            return Enumerable.Range(0, 10)
-                .Select(i => new GalleryImageItem($"avares://Consolonia.Gallery/Resources/{i}.jpg", $"{i}.jpg"))
-                .ToArray();
+            return sources;
         }
 
         /// <summary>
@@ -109,143 +96,59 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             return (Math.Max(1, (int)(width * scale)), Math.Max(1, (int)(height * scale)));
         }
 
-        private async void Button_Click(object sender, RoutedEventArgs e)
+        private static async Task LoadBitmapAsync(Image image, string source)
         {
-            IStorageProvider storageProvider = TopLevel.GetTopLevel(this).StorageProvider;
-            if (!storageProvider.CanOpen)
-                return;
-
-            IStorageFolder startLocation =
-                await storageProvider.TryGetFolderFromPathAsync(Environment.CurrentDirectory);
-            IReadOnlyList<IStorageFile> files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Open image",
-                AllowMultiple = false,
-                SuggestedStartLocation = startLocation,
-                FileTypeFilter = new List<FilePickerFileType>
-                {
-                    new("Image files") { Patterns = ["*.jpg", "*.jpeg", "*.png"] },
-                    new("*.* files") { Patterns = ["*.*"] }
-                }
-            });
-
-            IStorageFile file = files?.FirstOrDefault();
-            if (file == null)
-                return;
-
-            string filePath = file.Path.LocalPath;
-            GalleryImageItem item = Images.FirstOrDefault(i =>
-                string.Equals(i.Source, filePath, StringComparison.OrdinalIgnoreCase));
-
-            if (item == null)
-            {
-                item = new GalleryImageItem(filePath, Path.GetFileName(filePath));
-                Images.Add(item);
-            }
-
-            _imageCarousel.SelectedItem = item;
-        }
-
-        private void PrevButton_Click(object sender, RoutedEventArgs e)
-        {
-            _imageCarousel.Previous();
-        }
-
-        private void NextButton_Click(object sender, RoutedEventArgs e)
-        {
-            _imageCarousel.Next();
-        }
-
-        /// <summary>
-        ///     Updates the caption and pulls down the selected photo, plus its neighbours so that
-        ///     paging through the carousel does not wait on the network.
-        /// </summary>
-        private void OnSelectedImageChanged()
-        {
-            if (Images.Count == 0)
-                return;
-
-            int selectedIndex = Math.Max(0, _imageCarousel.SelectedIndex);
-            ImageTitle.Text = $"{selectedIndex + 1}/{Images.Count}  {Images[selectedIndex].Title}";
-
-            foreach (int index in new[] { selectedIndex, selectedIndex + 1, selectedIndex - 1 })
-                if (index >= 0 && index < Images.Count)
-                    _ = Images[index].LoadAsync();
-        }
-    }
-
-    /// <summary>
-    ///     One carousel entry. The bitmap is fetched lazily because the sources are remote urls.
-    /// </summary>
-    public partial class GalleryImageItem : ObservableObject
-    {
-        internal static readonly HttpClient Client = new();
-
-        private readonly SemaphoreSlim _loadGate = new(1, 1);
-
-        [ObservableProperty] private Bitmap _bitmap;
-
-        public GalleryImageItem(string source, string title)
-        {
-            Source = source;
-            Title = title;
-        }
-
-        /// <summary>
-        ///     An http url, an avares resource uri, or a local file path.
-        /// </summary>
-        public string Source { get; }
-
-        public string Title { get; }
-
-        public async Task LoadAsync()
-        {
-            if (Bitmap != null)
-                return;
-
-            await _loadGate.WaitAsync();
+#pragma warning disable CA1031 // Do not catch general exception types
             try
             {
-                if (Bitmap != null)
+                if (source.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
+                {
+                    using Stream stream = AssetLoader.Open(new Uri(source));
+                    image.Source = new Bitmap(stream);
                     return;
-
-#pragma warning disable CA1031 // Do not catch general exception types
-                try
-                {
-                    Bitmap = await DecodeAsync(Source);
                 }
-                catch (Exception)
-                {
-                    // A photo that will not load just stays blank in the carousel.
-                }
-#pragma warning restore CA1031 // Do not catch general exception types
-            }
-            finally
-            {
-                _loadGate.Release();
-            }
-        }
 
-        private static async Task<Bitmap> DecodeAsync(string source)
-        {
-            if (source.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                source.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
                 byte[] bytes = await Client.GetByteArrayAsync(new Uri(source));
-                return await Task.Run(() =>
+                image.Source = await Task.Run(() =>
                 {
                     using var stream = new MemoryStream(bytes);
                     return new Bitmap(stream);
                 });
             }
-
-            if (source.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
+            catch (Exception)
             {
-                using Stream stream = AssetLoader.Open(new Uri(source));
-                return new Bitmap(stream);
+                // A photo that will not load just stays blank.
             }
+#pragma warning restore CA1031 // Do not catch general exception types
+        }
 
-            return await Task.Run(() => new Bitmap(source));
+        private async void Button_Click(object sender, RoutedEventArgs e)
+        {
+            IStorageProvider storageProvider = TopLevel.GetTopLevel(this).StorageProvider;
+            if (storageProvider.CanOpen)
+            {
+                IStorageFolder startLocation =
+                    await storageProvider.TryGetFolderFromPathAsync(Environment.CurrentDirectory);
+                IReadOnlyList<IStorageFile> files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                {
+                    Title = "Open image",
+                    AllowMultiple = false,
+                    SuggestedStartLocation = startLocation,
+                    FileTypeFilter = new List<FilePickerFileType>
+                    {
+                        new("Image files") { Patterns = ["*.jpg", "*.jpeg", "*.png"] },
+                        new("*.* files") { Patterns = ["*.*"] }
+                    }
+                });
+
+                IStorageFile file = files?.FirstOrDefault();
+                if (file != null)
+                {
+                    BigImage.Source = new Bitmap(file.Path.LocalPath);
+                    BigImage.IsVisible = true;
+                    WrapPanel.IsVisible = false;
+                }
+            }
         }
     }
 }

@@ -4,46 +4,42 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryImage">
-
-    <Grid RowDefinitions="Auto,Auto,*">
+    <Grid Grid.RowDefinitions="Auto *">
         <Button Grid.Row="0"
                 HorizontalAlignment="Center"
                 Margin="1"
                 Content="Open Image..."
                 Click="Button_Click" />
+        <ScrollViewer Grid.Row="1"
+                      XYFocus.NavigationModes="Keyboard">
+            <StackPanel>
+                <Image x:Name="BigImage"
+                       IsVisible="false" />
 
-        <Grid Grid.Row="1"
-              ColumnDefinitions="Auto,*,Auto"
-              Margin="1">
-            <Button Grid.Column="0"
-                    Margin="1"
-                    Content="&lt;"
-                    Click="PrevButton_Click" />
-            <TextBlock x:Name="ImageTitle"
-                       Grid.Column="1"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center" />
-            <Button Grid.Column="2"
-                    Margin="1"
-                    Content="&gt;"
-                    Click="NextButton_Click" />
-        </Grid>
-
-        <Border Grid.Row="2"
-                Margin="1">
-            <Carousel x:Name="ImageCarousel"
-                      ItemsSource="{Binding Images}"
-                      PageTransition="{x:Null}">
-                <Carousel.ItemTemplate>
-                    <DataTemplate>
-                        <Image HorizontalAlignment="Stretch"
-                               VerticalAlignment="Stretch"
-                               Source="{Binding Bitmap}"
-                               Stretch="Uniform" />
-                    </DataTemplate>
-                </Carousel.ItemTemplate>
-            </Carousel>
-        </Border>
+                <WrapPanel ItemWidth="50"
+                           x:Name="WrapPanel">
+                    <WrapPanel.Styles>
+                        <!-- Make thumbnails focusable and tab-stoppable for XY navigation on a focusable container -->
+                        <Style Selector="WrapPanel > Border.thumbnail">
+                            <Setter Property="Focusable"
+                                    Value="True" />
+                            <Setter Property="KeyboardNavigation.IsTabStop"
+                                    Value="True" />
+                            <Setter Property="BorderThickness"
+                                    Value="0" />
+                            <Setter Property="Padding"
+                                    Value="0" />
+                        </Style>
+                        <Style Selector="WrapPanel > Border.thumbnail:focus">
+                            <Setter Property="BorderThickness"
+                                    Value="1" />
+                            <Setter Property="BorderBrush"
+                                    Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                        </Style>
+                    </WrapPanel.Styles>
+                </WrapPanel>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 
 </UserControl>
