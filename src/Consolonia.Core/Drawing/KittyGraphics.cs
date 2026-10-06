@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Text;
 using System.Threading;
 using Avalonia.Media;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 namespace Consolonia.Core.Drawing
 {

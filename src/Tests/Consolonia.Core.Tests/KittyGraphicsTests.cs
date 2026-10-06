@@ -4,7 +4,6 @@ using System.IO.Compression;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
