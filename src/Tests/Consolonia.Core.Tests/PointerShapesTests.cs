@@ -206,7 +206,10 @@ namespace Consolonia.Core.Tests
             Assert.That(PointerShapes.FromEnvironment(v => v == "TERM" ? "xterm-256color" : null), Is.Null);
         }
 
-        private static string NoEnvironment(string _) => null;
+        private static string NoEnvironment(string _)
+        {
+            return null;
+        }
 
         [Test]
         public void DetectTakesAQueryAnswerAsAuthoritative()
@@ -214,7 +217,7 @@ namespace Consolonia.Core.Tests
             string flags = string.Join(",", PointerShapes.Used.Select(s => s == "text" ? "1" : "0"));
             string answers = "\u001b]22;" + flags + "\u001b\\\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c";
 
-            (var supported, bool x11) = PointerShapes.Detect(answers, NoEnvironment);
+            (IReadOnlySet<string> supported, bool x11) = PointerShapes.Detect(answers, NoEnvironment);
 
             Assert.That(supported, Is.EquivalentTo(new[] { "text" }));
             Assert.That(x11, Is.False, "an answered query is in CSS names, whoever answered");
@@ -223,7 +226,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void DetectFallsBackToXtVersion()
         {
-            (var supported, bool x11) =
+            (IReadOnlySet<string> supported, bool x11) =
                 PointerShapes.Detect("\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c", NoEnvironment);
 
             Assert.That(supported, Does.Contain("text"));
@@ -233,7 +236,8 @@ namespace Consolonia.Core.Tests
         [Test]
         public void DetectFallsBackToTheEnvironment()
         {
-            (var supported, _) = PointerShapes.Detect("\u001b[?62;22c", v => v == "TERM" ? "foot" : null);
+            (IReadOnlySet<string> supported, _) =
+                PointerShapes.Detect("\u001b[?62;22c", v => v == "TERM" ? "foot" : null);
 
             Assert.That(supported, Is.EquivalentTo(PointerShapes.Used));
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
@@ -12,6 +13,9 @@ namespace Consolonia.PlatformSupport
     {
         /// <summary>How long to wait for the terminal's answers before deciding it gave none.</summary>
         private const int PointerShapesProbeTimeoutMs = 300;
+
+        private static readonly Regex DeviceAttributesAnswer =
+            new(@"\u001b\[\?[0-9;]*c");
 
         /// <summary>
         ///     Works out which mouse pointer shapes the terminal can draw itself (OSC 22), as the curses
@@ -65,8 +69,5 @@ namespace Consolonia.PlatformSupport
 
             return response.ToString();
         }
-
-        private static readonly System.Text.RegularExpressions.Regex DeviceAttributesAnswer =
-            new(@"\u001b\[\?[0-9;]*c");
     }
 }

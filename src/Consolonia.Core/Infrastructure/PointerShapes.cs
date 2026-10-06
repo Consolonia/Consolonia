@@ -99,6 +99,8 @@ namespace Consolonia.Core.Infrastructure
         private static readonly Regex NameAndVersionRegex =
             new(@"^(?<name>[A-Za-z][A-Za-z0-9_-]*)[\s(]*(?<version>[0-9][0-9.]*)?");
 
+        private static readonly Regex QueryAnswerRegex = new(@"\u001b\]22;[01,]*(\u001b\\|\u0007)");
+
         /// <summary>Every shape any Avalonia cursor maps to: what a probe asks the terminal about.</summary>
         public static IReadOnlyList<string> Used { get; } = ShapeOf.Values.Distinct().ToArray();
 
@@ -170,8 +172,6 @@ namespace Consolonia.Core.Infrastructure
 
             return KnownSupport(ParseXtVersion(answers) ?? FromEnvironment(environment));
         }
-
-        private static readonly Regex QueryAnswerRegex = new(@"\u001b\]22;[01,]*(\u001b\\|\u0007)");
 
         /// <summary>
         ///     Reads a terminal's answer to XTVERSION (<c>CSI &gt; q</c>), <c>DCS &gt; | text ST</c>, where
