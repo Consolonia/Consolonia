@@ -35,6 +35,9 @@ namespace Consolonia.Core.Infrastructure
         private readonly IKeyboardDevice _myKeyboardDevice;
         private Point _cursorPosition = new(0, 0);
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
+
+        /// <summary>The pointer shape last sent to the terminal, so the same one is not sent again.</summary>
+        private string _pointerShape;
         private bool _disposedValue;
         private IInputRoot _inputRoot;
 
@@ -537,7 +540,37 @@ namespace Consolonia.Core.Infrastructure
             OnCursorChanged(
                 new ConsoleCursor(
                     new PixelBufferCoordinate((ushort)_cursorPosition.X, (ushort)_cursorPosition.Y),
-                    GetCursorText()));
+                    ApplyPointerShape() ? string.Empty : GetCursorText()));
+        }
+
+        /// <summary>
+        ///     Has the terminal draw the pointer for the current cursor type, where it can.
+        /// </summary>
+        /// <returns>True when the terminal draws it, so no character pointer is needed.</returns>
+        /// <remarks>
+        ///     Shape by shape: a terminal that has the shape draws a real pointer; for one it does not
+        ///     have -- or an Avalonia cursor with no CSS equivalent -- the terminal is put back to its
+        ///     default and the character pointer is drawn over it, as for a terminal without the
+        ///     protocol at all.
+        /// </remarks>
+        private bool ApplyPointerShape()
+        {
+            IReadOnlySet<string> supported = Console.SupportedPointerShapes;
+            if (supported.Count == 0)
+                return false;
+
+            string shape = PointerShapes.For(_cursorType);
+            bool terminalDraws = shape != null && supported.Contains(shape);
+            string wanted = terminalDraws ? shape : PointerShapes.Default;
+
+            // Every mouse move comes through here; only a change is worth a write.
+            if (wanted != _pointerShape && supported.Contains(wanted))
+            {
+                Console.SetPointerShape(wanted);
+                _pointerShape = wanted;
+            }
+
+            return terminalDraws;
         }
 
         private string GetCursorText()
