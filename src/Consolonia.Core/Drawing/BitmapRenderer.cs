@@ -7,6 +7,8 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 namespace Consolonia.Core.Drawing
 {
+    // TargetSize is only read through the generated Equals/GetHashCode: it is half of a dictionary key.
+    // ReSharper disable once NotAccessedPositionalProperty.Global
     internal readonly record struct BitmapQuantizedCacheKey(
         int Version,
         PixelSize TargetSize);
