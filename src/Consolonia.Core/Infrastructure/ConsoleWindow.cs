@@ -35,11 +35,11 @@ namespace Consolonia.Core.Infrastructure
         private readonly IKeyboardDevice _myKeyboardDevice;
         private Point _cursorPosition = new(0, 0);
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
+        private bool _disposedValue;
+        private IInputRoot _inputRoot;
 
         /// <summary>The pointer shape last sent to the terminal, so the same one is not sent again.</summary>
         private string _pointerShape;
-        private bool _disposedValue;
-        private IInputRoot _inputRoot;
 
         public ConsoleWindowImpl()
         {

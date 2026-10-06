@@ -47,18 +47,6 @@ namespace Consolonia.Core.Infrastructure
             // UpArrow and None have no CSS equivalent: they always use the character pointer.
         };
 
-        /// <summary>Every shape any Avalonia cursor maps to: what a probe asks the terminal about.</summary>
-        public static IReadOnlyList<string> Used { get; } = ShapeOf.Values.Distinct().ToArray();
-
-        /// <summary>
-        ///     The terminal pointer shape for <paramref name="cursor" />, or null when there is none and
-        ///     the character pointer has to stand in for it.
-        /// </summary>
-        public static string For(StandardCursorType cursor)
-        {
-            return ShapeOf.GetValueOrDefault(cursor);
-        }
-
         /// <summary>
         ///     xterm's names for the same pointers: X11 cursor-font names, which xterm takes in place
         ///     of CSS ones. A shape with no X11 counterpart is left out, and falls back to the
@@ -88,12 +76,6 @@ namespace Consolonia.Core.Infrastructure
             ["se-resize"] = "bottom_right_corner"
         };
 
-        /// <summary>The X11 cursor-font name xterm uses for <paramref name="shape" />, or null when it has none.</summary>
-        public static string ToX11(string shape)
-        {
-            return X11Names.GetValueOrDefault(shape);
-        }
-
         /// <summary>
         ///     The terminals known to draw OSC 22 pointers, from which version, and whether they take
         ///     X11 names rather than CSS ones.
@@ -111,6 +93,29 @@ namespace Consolonia.Core.Infrastructure
             ("ghostty", new Version(1, 0), false),
             ("xterm", new Version(367, 0), true)
         ];
+
+        private static readonly Regex XtVersionRegex = new(@"\u001bP>\|(?<text>[^\u001b]*)\u001b\\");
+
+        private static readonly Regex NameAndVersionRegex =
+            new(@"^(?<name>[A-Za-z][A-Za-z0-9_-]*)[\s(]*(?<version>[0-9][0-9.]*)?");
+
+        /// <summary>Every shape any Avalonia cursor maps to: what a probe asks the terminal about.</summary>
+        public static IReadOnlyList<string> Used { get; } = ShapeOf.Values.Distinct().ToArray();
+
+        /// <summary>
+        ///     The terminal pointer shape for <paramref name="cursor" />, or null when there is none and
+        ///     the character pointer has to stand in for it.
+        /// </summary>
+        public static string For(StandardCursorType cursor)
+        {
+            return ShapeOf.GetValueOrDefault(cursor);
+        }
+
+        /// <summary>The X11 cursor-font name xterm uses for <paramref name="shape" />, or null when it has none.</summary>
+        public static string ToX11(string shape)
+        {
+            return X11Names.GetValueOrDefault(shape);
+        }
 
         /// <summary>
         ///     The shapes <paramref name="terminal" /> is known to draw when it did not answer the
@@ -183,11 +188,6 @@ namespace Consolonia.Core.Infrastructure
 
             return null;
         }
-
-        private static readonly Regex XtVersionRegex = new(@"\u001bP>\|(?<text>[^\u001b]*)\u001b\\");
-
-        private static readonly Regex NameAndVersionRegex =
-            new(@"^(?<name>[A-Za-z][A-Za-z0-9_-]*)[\s(]*(?<version>[0-9][0-9.]*)?");
 
         private static TerminalIdentity ParseNameAndVersion(string text)
         {

@@ -13,7 +13,15 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     public interface IConsoleOutput : IConsoleCapabilities
     {
+        private static readonly IReadOnlySet<string> NoPointerShapes = new HashSet<string>();
         PixelBufferSize Size { get; set; }
+
+        /// <summary>
+        ///     The mouse pointer shapes the terminal can draw itself (Kitty's pointer shape protocol,
+        ///     OSC 22), as CSS cursor names. Empty when it cannot, and the pointer is drawn as a
+        ///     character instead.
+        /// </summary>
+        IReadOnlySet<string> SupportedPointerShapes => NoPointerShapes;
 
         /// <summary>
         ///     Set the title of the console window
@@ -89,20 +97,11 @@ namespace Consolonia.Core.Infrastructure
         void PauseIO(Task task);
 
         /// <summary>
-        ///     The mouse pointer shapes the terminal can draw itself (Kitty's pointer shape protocol,
-        ///     OSC 22), as CSS cursor names. Empty when it cannot, and the pointer is drawn as a
-        ///     character instead.
-        /// </summary>
-        IReadOnlySet<string> SupportedPointerShapes => NoPointerShapes;
-
-        /// <summary>
         ///     Have the terminal draw its mouse pointer as <paramref name="shape" />, one of
         ///     <see cref="SupportedPointerShapes" />.
         /// </summary>
         void SetPointerShape(string shape)
         {
         }
-
-        private static readonly IReadOnlySet<string> NoPointerShapes = new HashSet<string>();
     }
 }

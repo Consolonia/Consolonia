@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Input;
+using Consolonia.Core.Dummy;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
 using NUnit.Framework;
@@ -60,7 +62,7 @@ namespace Consolonia.Core.Tests
         {
             string[] asked = ["default", "text", "pointer"];
 
-            var supported = PointerShapes.ParseQueryReply("\u001b]22;1,0,1\u001b\\", asked);
+            IReadOnlySet<string> supported = PointerShapes.ParseQueryReply("\u001b]22;1,0,1\u001b\\", asked);
 
             Assert.That(supported, Is.EquivalentTo(new[] { "default", "pointer" }));
         }
@@ -68,7 +70,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void AReplyEndedWithBelIsReadToo()
         {
-            var supported = PointerShapes.ParseQueryReply("\u001b]22;1,1\u0007", ["default", "text"]);
+            IReadOnlySet<string> supported = PointerShapes.ParseQueryReply("\u001b]22;1,1\u0007", ["default", "text"]);
 
             Assert.That(supported, Is.EquivalentTo(new[] { "default", "text" }));
         }
@@ -77,7 +79,8 @@ namespace Consolonia.Core.Tests
         public void AReplyAmongOtherInputIsFound()
         {
             // The Device Attributes sentinel may arrive in the same read.
-            var supported = PointerShapes.ParseQueryReply("\u001b]22;0,1\u001b\\\u001b[?62;22c", ["default", "text"]);
+            IReadOnlySet<string> supported =
+                PointerShapes.ParseQueryReply("\u001b]22;0,1\u001b\\\u001b[?62;22c", ["default", "text"]);
 
             Assert.That(supported, Is.EquivalentTo(new[] { "text" }));
         }
@@ -93,7 +96,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void AShortReplyCoversOnlyTheNamesItAnswers()
         {
-            var supported = PointerShapes.ParseQueryReply("\u001b]22;1\u001b\\", ["default", "text"]);
+            IReadOnlySet<string> supported = PointerShapes.ParseQueryReply("\u001b]22;1\u001b\\", ["default", "text"]);
 
             Assert.That(supported, Is.EquivalentTo(new[] { "default" }));
         }
@@ -130,7 +133,8 @@ namespace Consolonia.Core.Tests
         {
             foreach ((string name, string version) in new[] { ("foot", "1.12"), ("ghostty", "1.0"), ("kitty", "0.31") })
             {
-                (var supported, bool x11) = PointerShapes.KnownSupport(new TerminalIdentity(name, Version.Parse(version)));
+                (IReadOnlySet<string> supported, bool x11) =
+                    PointerShapes.KnownSupport(new TerminalIdentity(name, Version.Parse(version)));
 
                 Assert.That(supported, Is.EquivalentTo(PointerShapes.Used), name);
                 Assert.That(x11, Is.False, name);
@@ -140,14 +144,17 @@ namespace Consolonia.Core.Tests
         [Test]
         public void OlderVersionsGetNothing()
         {
-            Assert.That(PointerShapes.KnownSupport(new TerminalIdentity("foot", new Version(1, 11))).Supported, Is.Empty);
-            Assert.That(PointerShapes.KnownSupport(new TerminalIdentity("xterm", new Version(366, 0))).Supported, Is.Empty);
+            Assert.That(PointerShapes.KnownSupport(new TerminalIdentity("foot", new Version(1, 11))).Supported,
+                Is.Empty);
+            Assert.That(PointerShapes.KnownSupport(new TerminalIdentity("xterm", new Version(366, 0))).Supported,
+                Is.Empty);
         }
 
         [Test]
         public void XtermGetsTheShapesThatHaveX11Names()
         {
-            (var supported, bool x11) = PointerShapes.KnownSupport(new TerminalIdentity("xterm", new Version(390, 0)));
+            (IReadOnlySet<string> supported, bool x11) =
+                PointerShapes.KnownSupport(new TerminalIdentity("xterm", new Version(390, 0)));
 
             Assert.That(x11, Is.True);
             Assert.That(supported, Does.Contain("text").And.Contain("default").And.Contain("ew-resize"));
@@ -202,7 +209,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void AConsoleWithoutTheProtocolHasNoShapes()
         {
-            IConsoleOutput console = new Dummy.DummyConsoleOutput();
+            IConsoleOutput console = new DummyConsoleOutput();
 
             Assert.That(console.SupportedPointerShapes, Is.Empty);
             Assert.DoesNotThrow(() => console.SetPointerShape("text"));

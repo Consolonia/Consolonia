@@ -83,6 +83,14 @@ namespace Consolonia.Core.Text
         // Kitty keyboard protocol will reply with "CSI ? <flags> u".
         public const string QueryKittyKeyboardFlags = "\u001b[?u";
 
+        /// <summary>
+        ///     XTVERSION: asks the terminal its name and version, answered <c>DCS &gt; | text ST</c>.
+        /// </summary>
+        public const string QueryTerminalVersion = "\u001b[>q";
+
+        /// <summary>Kitty pointer shapes (OSC 22): give the pointer back to the terminal's own choice.</summary>
+        public const string ResetPointerShape = "\u001b]22;\u001b\\";
+
         // move cursor
         public static string MoveCursorUp(int n)
         {
@@ -219,13 +227,5 @@ namespace Consolonia.Core.Text
         {
             return $"\u001b]22;?{string.Join(',', shapes)}\u001b\\";
         }
-
-        /// <summary>
-        ///     XTVERSION: asks the terminal its name and version, answered <c>DCS &gt; | text ST</c>.
-        /// </summary>
-        public const string QueryTerminalVersion = "\u001b[>q";
-
-        /// <summary>Kitty pointer shapes (OSC 22): give the pointer back to the terminal's own choice.</summary>
-        public const string ResetPointerShape = "\u001b]22;\u001b\\";
     }
 }
