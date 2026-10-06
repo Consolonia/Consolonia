@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
 using Unix.Terminal;
@@ -21,11 +20,9 @@ namespace Consolonia.PlatformSupport
         ///         answers. Everything up to the sentinel's answer is read.
         ///     </para>
         ///     <para>
-        ///         An answer to the query is authoritative, shape by shape. Most terminals that draw OSC
-        ///         22 pointers -- foot, Ghostty, xterm -- do not answer it, though, so without one the
-        ///         terminal is identified instead, from its XTVERSION answer or failing that its
-        ///         environment, and looked up in <see cref="PointerShapes.KnownSupport" />. A terminal
-        ///         neither answers nor is recognised keeps the character pointer.
+        ///         What the answers mean is decided by <see cref="PointerShapes.Detect" />, shared with
+        ///         the Windows console. A terminal that neither answers nor is recognised keeps the
+        ///         character pointer.
         ///     </para>
         ///     <para>Skipped on a Linux virtual console, as the Kitty keyboard probe is.</para>
         /// </remarks>
@@ -49,15 +46,8 @@ namespace Consolonia.PlatformSupport
                 Curses.timeout(NoInputTimeout);
             }
 
-            if (PointerShapesAnswerRegex().IsMatch(answers))
-            {
-                SupportedPointerShapes = PointerShapes.ParseQueryReply(answers, PointerShapes.Used);
-                return;
-            }
-
-            TerminalIdentity terminal = PointerShapes.ParseXtVersion(answers)
-                                        ?? PointerShapes.FromEnvironment(Environment.GetEnvironmentVariable);
-            (IReadOnlySet<string> supported, bool usesX11Names) = PointerShapes.KnownSupport(terminal);
+            (IReadOnlySet<string> supported, bool usesX11Names) =
+                PointerShapes.Detect(answers, Environment.GetEnvironmentVariable);
             SupportedPointerShapes = supported;
             PointerShapesUseX11Names = usesX11Names;
         }
@@ -86,8 +76,5 @@ namespace Consolonia.PlatformSupport
 
             return response.ToString();
         }
-
-        [GeneratedRegex(@"\x1b\]22;[01,]*(\x1b\\|\x07)")]
-        private static partial Regex PointerShapesAnswerRegex();
     }
 }

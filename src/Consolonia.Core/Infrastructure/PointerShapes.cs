@@ -148,6 +148,32 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
+        ///     What a terminal's answers to the probe mean: the shapes it can draw, as CSS names, and
+        ///     whether it wants them written as X11 names.
+        /// </summary>
+        /// <param name="answers">
+        ///     Everything the terminal sent back to <see cref="Text.Esc.QueryPointerShapes" />,
+        ///     <see cref="Text.Esc.QueryTerminalVersion" /> and the Device Attributes sentinel.
+        /// </param>
+        /// <param name="environment">Reads an environment variable; the fallback when nothing identifies the terminal.</param>
+        /// <remarks>
+        ///     An answer to the support query is authoritative, shape by shape. Most terminals that
+        ///     draw OSC 22 pointers do not answer it, though, so without one the terminal is
+        ///     identified -- from its XTVERSION answer, or failing that its environment -- and looked
+        ///     up in <see cref="KnownSupport" />. Shared by every console that probes, so they agree.
+        /// </remarks>
+        public static (IReadOnlySet<string> Supported, bool UsesX11Names) Detect(string answers,
+            Func<string, string> environment)
+        {
+            if (QueryAnswerRegex.IsMatch(answers))
+                return (ParseQueryReply(answers, Used), false);
+
+            return KnownSupport(ParseXtVersion(answers) ?? FromEnvironment(environment));
+        }
+
+        private static readonly Regex QueryAnswerRegex = new(@"\u001b\]22;[01,]*(\u001b\\|\u0007)");
+
+        /// <summary>
         ///     Reads a terminal's answer to XTVERSION (<c>CSI &gt; q</c>), <c>DCS &gt; | text ST</c>, where
         ///     the text is the terminal's name and version: <c>XTerm(367)</c>, <c>kitty(0.31.0)</c>,
         ///     <c>foot(1.12.1)</c>, <c>ghostty 1.1.0</c>.

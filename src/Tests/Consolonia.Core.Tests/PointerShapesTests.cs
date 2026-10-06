@@ -206,6 +206,46 @@ namespace Consolonia.Core.Tests
             Assert.That(PointerShapes.FromEnvironment(v => v == "TERM" ? "xterm-256color" : null), Is.Null);
         }
 
+        private static string NoEnvironment(string _) => null;
+
+        [Test]
+        public void DetectTakesAQueryAnswerAsAuthoritative()
+        {
+            string flags = string.Join(",", PointerShapes.Used.Select(s => s == "text" ? "1" : "0"));
+            string answers = "\u001b]22;" + flags + "\u001b\\\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c";
+
+            (var supported, bool x11) = PointerShapes.Detect(answers, NoEnvironment);
+
+            Assert.That(supported, Is.EquivalentTo(new[] { "text" }));
+            Assert.That(x11, Is.False, "an answered query is in CSS names, whoever answered");
+        }
+
+        [Test]
+        public void DetectFallsBackToXtVersion()
+        {
+            (var supported, bool x11) =
+                PointerShapes.Detect("\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c", NoEnvironment);
+
+            Assert.That(supported, Does.Contain("text"));
+            Assert.That(x11, Is.True);
+        }
+
+        [Test]
+        public void DetectFallsBackToTheEnvironment()
+        {
+            (var supported, _) = PointerShapes.Detect("\u001b[?62;22c", v => v == "TERM" ? "foot" : null);
+
+            Assert.That(supported, Is.EquivalentTo(PointerShapes.Used));
+        }
+
+        [Test]
+        public void DetectFindsNothingWhereOnlyTheSentinelIsAnswered()
+        {
+            // Classic conhost, VTE, Alacritty, Windows Terminal, kmscon.
+            Assert.That(PointerShapes.Detect("\u001b[?1;0c", NoEnvironment).Supported, Is.Empty);
+            Assert.That(PointerShapes.Detect(string.Empty, NoEnvironment).Supported, Is.Empty);
+        }
+
         [Test]
         public void AConsoleWithoutTheProtocolHasNoShapes()
         {
