@@ -56,11 +56,9 @@ namespace Consolonia.Core.Drawing
         {
             ConsoleCapabilities capabilities = ConsoleWindowImpl.Console.Capabilities;
 
-            // rect placements let glyphs composite over the picture; the unicode placeholder mode is
-            // kept for hosts where classic placements cannot survive, but nothing selects it today
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
                 AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(this, true);
+                return new KittyBitmapRenderer(this);
 
             if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
                 return new SixelBitmapRenderer(this);

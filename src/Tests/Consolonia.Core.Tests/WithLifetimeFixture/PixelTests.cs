@@ -288,24 +288,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
-        public void BlendShadedBackgroundOverKittyPlaceholderLeavesItUntouched()
-        {
-            // regression: a window's shadow blends a translucent background over the app, and
-            // mutating the image id in the placeholder's foreground color rendered literal
-            // placeholder glyphs (a screen full of tofu boxes)
-            var placeholderPixel = new Pixel(
-                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(0, 0), 1),
-                    KittyGraphics.GetImageIdColor(0x123456)),
-                PixelBackground.Transparent);
-
-            Pixel shaded = placeholderPixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
-
-            Assert.That(shaded, Is.EqualTo(placeholderPixel));
-            Assert.That(KittyGraphics.TryGetImageId(in shaded, out int imageId), Is.True);
-            Assert.That(imageId, Is.EqualTo(0x123456));
-        }
-
-        [Test]
         public void KittyTileBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
         {
             // the "image as cell background" model: cell = (backgroundColor|backgroundImage) +
@@ -334,20 +316,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             Assert.That(tilePixel.Shade().Background.Tile, Is.EqualTo(tile));
             Assert.That(tilePixel.Invert().Background.Tile, Is.EqualTo(tile));
-        }
-
-        [Test]
-        public void ShadeAndInvertOverKittyPlaceholderLeaveItUntouched()
-        {
-            // same invariant for the direct color mutations: shadows use Shade, selection uses Invert
-            var placeholderPixel = new Pixel(
-                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(1, 2), 1),
-                    KittyGraphics.GetImageIdColor(0x00ABCD)),
-                PixelBackground.Transparent);
-
-            Assert.That(placeholderPixel.Shade(), Is.EqualTo(placeholderPixel));
-            Assert.That(placeholderPixel.Brighten(), Is.EqualTo(placeholderPixel));
-            Assert.That(placeholderPixel.Invert(), Is.EqualTo(placeholderPixel));
         }
 
         [Test]

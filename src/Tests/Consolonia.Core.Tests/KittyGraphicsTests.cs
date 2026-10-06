@@ -14,37 +14,6 @@ namespace Consolonia.Core.Tests
     {
         private static readonly string Apc = (char)27 + "_G";
         private static readonly string St = (char)27 + @"\";
-        private static readonly string Placeholder = char.ConvertFromUtf32(0x10EEEE);
-
-        [Test]
-        public void PlaceholderCharacterIsUnicodePlaceholderCodepoint()
-        {
-            Assert.That(KittyGraphics.PlaceholderCharacter, Is.EqualTo(Placeholder));
-        }
-
-        [Test]
-        public void PlaceholderCellEncodesRowAndColumnWithDiacritics()
-        {
-            // the first three diacritics of kitty's rowcolumn-diacritics table
-            string first = char.ConvertFromUtf32(0x305);
-            string second = char.ConvertFromUtf32(0x30D);
-            string third = char.ConvertFromUtf32(0x30E);
-
-            Assert.That(KittyGraphics.GetPlaceholderCell(0, 0), Is.EqualTo(Placeholder + first + first));
-            Assert.That(KittyGraphics.GetPlaceholderCell(1, 2), Is.EqualTo(Placeholder + second + third));
-        }
-
-        [Test]
-        public void MaxPlacementSizeMatchesDiacriticsTable()
-        {
-            Assert.That(KittyGraphics.MaxPlacementSize, Is.EqualTo(297));
-        }
-
-        [Test]
-        public void ImageIdColorCarries24BitId()
-        {
-            Assert.That(KittyGraphics.GetImageIdColor(0x123456), Is.EqualTo(Color.FromRgb(0x12, 0x34, 0x56)));
-        }
 
         [Test]
         public void AllocatedImageIdsStayWithin24Bits()
@@ -52,13 +21,6 @@ namespace Consolonia.Core.Tests
             int imageId = KittyGraphics.AllocateImageId();
             Assert.That(imageId, Is.GreaterThan(0));
             Assert.That(imageId, Is.LessThanOrEqualTo(0xFFFFFF));
-        }
-
-        [Test]
-        public void VirtualPlacementSequenceIsWellFormed()
-        {
-            Assert.That(KittyGraphics.BuildVirtualPlacementSequence(5, 10, 4),
-                Is.EqualTo(Apc + "a=p,U=1,q=2,i=5,c=10,r=4" + St));
         }
 
         [Test]
@@ -121,81 +83,6 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void VerbatimSymbolKeepsPlaceholderSequenceUntouched()
-        {
-            string placeholderCell = KittyGraphics.GetPlaceholderCell(2, 3);
-
-            Symbol symbol = Symbol.FromVerbatim(placeholderCell, 1);
-
-            // no variation selector may be appended: the exact codepoint sequence is meaningful to the terminal
-            Assert.That(symbol.Complex, Is.EqualTo(placeholderCell));
-            Assert.That(symbol.Width, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void DeletePlacementSequenceIsWellFormedAndKeepsImageData()
-        {
-            // lowercase d=i deletes the placements only, keeping the image data for re-placement
-            Assert.That(KittyGraphics.BuildDeletePlacementSequence(7),
-                Is.EqualTo(Apc + "a=d,d=i,q=2,i=7" + St));
-        }
-
-        [Test]
-        public void ImageIdIsExtractedFromPlaceholderPixel()
-        {
-            Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
-
-            Assert.That(KittyGraphics.TryGetImageId(in placeholderPixel, out int imageId), Is.True);
-            Assert.That(imageId, Is.EqualTo(0x123456));
-        }
-
-        [Test]
-        public void ImageIdIsNotExtractedFromOrdinaryPixels()
-        {
-            var spacePixel = new Pixel(new PixelForeground(Symbol.Space, Colors.White),
-                new PixelBackground(Colors.Black));
-            var emojiPixel = new Pixel(new Symbol("👍"), Colors.White);
-
-            Assert.That(KittyGraphics.TryGetImageId(in spacePixel, out _), Is.False);
-            Assert.That(KittyGraphics.TryGetImageId(in emojiPixel, out _), Is.False);
-        }
-
-        [Test]
-        public void PlacementReclaimIsAOneShot()
-        {
-            KittyGraphics.MarkPlacementDeleted(123456);
-
-            Assert.That(KittyGraphics.TryReclaimPlacement(123456), Is.True);
-            Assert.That(KittyGraphics.TryReclaimPlacement(123456), Is.False);
-        }
-
-        [Test]
-        public void OverwritingPlaceholderCellWithOpaqueBackgroundErasesThePlaceholder()
-        {
-            // regression: an opaque background painted over the image must drop the placeholder,
-            // or the terminal keeps rendering the image slice
-            Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
-
-            Pixel overwritten = placeholderPixel.Blend(new Pixel(new PixelBackground(Colors.Black)));
-
-            Assert.That(KittyGraphics.TryGetImageId(in overwritten, out _), Is.False);
-            Assert.That(overwritten.Foreground.Symbol.Complex, Is.Null);
-            Assert.That(overwritten, Is.Not.EqualTo(placeholderPixel));
-        }
-
-        [Test]
-        public void ColorMutatingOperationsLeavePlaceholderUntouched()
-        {
-            // the foreground color carries the image id: mutating it yields tofu boxes, and a
-            // degrade-to-space kills the picture under every window shadow
-            Pixel placeholderPixel = CreatePlaceholderPixel(0x123456);
-
-            Assert.That(placeholderPixel.Shade(), Is.EqualTo(placeholderPixel));
-            Assert.That(placeholderPixel.Brighten(), Is.EqualTo(placeholderPixel));
-            Assert.That(placeholderPixel.Invert(), Is.EqualTo(placeholderPixel));
-        }
-
-        [Test]
         public void RectPlacementSequencesAreWellFormed()
         {
             Assert.That(KittyGraphics.BuildRectPlacementSequence(5, 7, 16, 32, 64, 48),
@@ -228,37 +115,6 @@ namespace Consolonia.Core.Tests
             // cropped to one pixel per covered cell, above the image (z=-2) and below text
             Assert.That(KittyGraphics.BuildWashPlacementSequence(9, 11, 40, 12),
                 Is.EqualTo("\u001b_Ga=p,q=2,C=1,z=-1,i=9,p=11,x=0,y=0,w=40,h=12,c=40,r=12\u001b\\"));
-        }
-
-        [Test]
-        public void PlaceholderPixelsAreStableFrameToFrame()
-        {
-            // identical placeholder cells must compare equal, so a static image emits zero bytes
-            Pixel first = CreatePlaceholderPixel(0x123456);
-            Pixel second = CreatePlaceholderPixel(0x123456);
-
-            Assert.That(first, Is.EqualTo(second));
-        }
-
-        [Test]
-        public void IsPlaceholderRecognizesPlaceholderSymbolsOnly()
-        {
-            Symbol placeholder = Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(5, 7), 1);
-            var emoji = new Symbol("👍");
-            Symbol space = Symbol.Space;
-
-            Assert.That(KittyGraphics.IsPlaceholder(in placeholder), Is.True);
-            Assert.That(KittyGraphics.IsPlaceholder(in emoji), Is.False);
-            Assert.That(KittyGraphics.IsPlaceholder(in space), Is.False);
-        }
-
-        private static Pixel CreatePlaceholderPixel(int imageId)
-        {
-            // mirrors what KittyBitmapRenderer.TransmitAndCreatePlaceholders puts into the buffer
-            return new Pixel(
-                new PixelForeground(Symbol.FromVerbatim(KittyGraphics.GetPlaceholderCell(0, 0), 1),
-                    KittyGraphics.GetImageIdColor(imageId)),
-                PixelBackground.Transparent);
         }
     }
 }

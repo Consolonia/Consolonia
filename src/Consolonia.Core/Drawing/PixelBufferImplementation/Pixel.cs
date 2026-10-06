@@ -126,7 +126,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public Pixel Shade()
         {
-            if (IsKittyPlaceholder()) return this;
             // image colors can't be shifted one by one; tint the image the way a translucent overlay does
             if (IsImage()) return Blend(new Pixel(PixelForeground.Empty, new PixelBackground(ShadeWash)));
             return new Pixel(Foreground.Shade(), Background.Shade(), CaretStyle);
@@ -134,14 +133,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public Pixel Brighten()
         {
-            if (IsKittyPlaceholder()) return this;
             if (IsImage()) return Blend(new Pixel(PixelForeground.Empty, new PixelBackground(BrightenWash)));
             return new Pixel(Foreground.Brighten(), Background.Brighten(), CaretStyle);
         }
 
         public Pixel Invert()
         {
-            if (IsKittyPlaceholder()) return this;
             return new Pixel(new PixelForeground(Foreground.Symbol,
                     Background.Color, // background color becomes the new foreground color
                     Foreground.Weight,
@@ -149,17 +146,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     Foreground.TextDecoration),
                 new PixelBackground(Foreground.Color, Background.Tile),
                 CaretStyle);
-        }
-
-        /// <summary>
-        ///     A kitty placeholder cell is recognized by its symbol, but the terminal reads the image id
-        ///     from its foreground color (see <see cref="KittyGraphics.TryGetImageId" />). Shading,
-        ///     brightening or inverting the color would make the cell point at a different image id, so
-        ///     these operations leave placeholder cells unchanged.
-        /// </summary>
-        private bool IsKittyPlaceholder()
-        {
-            return KittyGraphics.IsPlaceholder(in Foreground.Symbol);
         }
 
         /// <summary>
@@ -236,10 +222,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop)
                     {
-                        // a translucent wash would corrupt the image id (see IsKittyPlaceholder)
-                        if (IsKittyPlaceholder())
-                            return this;
-
                         // a sixel cell's colors are its palette, so the overlay tints the palette
                         if (TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
                             break;

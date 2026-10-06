@@ -147,25 +147,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
-        private Symbol(byte width, string verbatimComplex)
-        {
-            Character = char.MinValue;
-            Complex = verbatimComplex;
-            Width = width;
-            Pattern = 0;
-        }
-
-        /// <summary>
-        ///     Creates a symbol from <paramref name="complex" /> exactly as given. The public string
-        ///     constructor appends a variation selector (U+FE0E or U+FE0F) to any multi-char glyph that
-        ///     lacks one, which would add a stray codepoint to a kitty placeholder cell
-        ///     (U+10EEEE followed by row/column diacritics).
-        /// </summary>
-        internal static Symbol FromVerbatim(string complex, byte width)
-        {
-            return new Symbol(width, complex);
-        }
-
 
         public bool Equals(Symbol other)
         {

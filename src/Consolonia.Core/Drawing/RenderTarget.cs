@@ -27,11 +27,7 @@ namespace Consolonia.Core.Drawing
 
         private ConsoleCursor _consoleCursor;
 
-        // kitty image ids referenced this frame; ids which drop out get their placements deleted terminal side
-        private HashSet<int> _kittyImageIdsOnScreen = new();
-        private HashSet<int> _kittyImageIdsPreviouslyOnScreen = new();
-
-        // classic rect placements coalesced from KittyTile cell backgrounds at z=-1, diffed across frames
+        // classic rect placements coalesced from KittyTile cell backgrounds at z=-2, diffed across frames
         // so only changed rectangles cross the wire; scratch collects the next frame, then the two swap
         private Dictionary<KittyRect, int> _kittyRectPlacements = new();
         private Dictionary<KittyRect, int> _kittyRectPlacementsScratch = new();
@@ -214,9 +210,6 @@ namespace Consolonia.Core.Drawing
                 {
                     Pixel pixel = pixelBuffer[x, y];
 
-                    if (KittyGraphics.TryGetImageId(in pixel, out int kittyImageId))
-                        _kittyImageIdsOnScreen.Add(kittyImageId);
-
                     if (!pixel.Background.Tile.IsEmpty)
                         sawKittyTiles = true;
 
@@ -327,19 +320,6 @@ namespace Consolonia.Core.Drawing
 
             if (sawKittyTiles || _kittyRectPlacements.Count > 0)
                 EmitKittyRectPlacements(pixelBuffer);
-
-            // overwriting the cells is what the protocol prescribes, but terminals which materialize
-            // placements as overlays keep showing the image until its placement is deleted
-            foreach (int imageId in _kittyImageIdsPreviouslyOnScreen)
-                if (!_kittyImageIdsOnScreen.Contains(imageId))
-                {
-                    _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(imageId));
-                    KittyGraphics.MarkPlacementDeleted(imageId);
-                }
-
-            (_kittyImageIdsPreviouslyOnScreen, _kittyImageIdsOnScreen) =
-                (_kittyImageIdsOnScreen, _kittyImageIdsPreviouslyOnScreen);
-            _kittyImageIdsOnScreen.Clear();
 
             _console.Flush();
 #if FPS
