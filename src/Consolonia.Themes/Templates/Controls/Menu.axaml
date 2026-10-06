@@ -18,7 +18,9 @@
                                               IsCaretShown="{TemplateBinding IsFocused}">
                             <ContentPresenter Name="PART_HeaderPresenter"
                                               Content="{TemplateBinding Header}"
-                                              Margin="{TemplateBinding Padding}" />
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
                         </console:CaretControl>
                         <Popup Name="PART_Popup"
                                IsLightDismissEnabled="True"
@@ -29,6 +31,7 @@
                                 <ScrollViewer>
                                     <ItemsPresenter Name="PART_ItemsPresenter"
                                                     ItemsPanel="{TemplateBinding ItemsPanel}"
+                                                    KeyboardNavigation.TabNavigation="Continue"
                                                     Grid.IsSharedSizeScope="True">
                                         <ItemsPresenter.Styles>
                                             <Style Selector="ItemsPresenter">
@@ -54,7 +57,7 @@
         <Style Selector="^:selected /template/ Border#root">
             <!--TurboVision approach-->
             <Setter Property="Background"
-                    Value="{DynamicResource ThemeActionBackgroundBrush}" />
+                    Value="{DynamicResource ThemeChooserBackgroundBrush}" />
             <Setter Property="(TemplatedControl.Foreground)"
                     Value="{DynamicResource ThemeChooserForegroundBrush}" />
         </Style>

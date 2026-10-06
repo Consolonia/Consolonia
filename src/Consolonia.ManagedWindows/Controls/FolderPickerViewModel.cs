@@ -16,7 +16,7 @@ namespace Consolonia.ManagedWindows.Controls
         public FolderPickerViewModel(FolderPickerOpenOptions options)
             : base(options)
         {
-            ArgumentNullException.ThrowIfNull(options, nameof(options));
+            ArgumentNullException.ThrowIfNull(options);
             SelectionMode = options.AllowMultiple ? SelectionMode.Multiple : SelectionMode.Single;
             SelectedFolders.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSelection));
         }

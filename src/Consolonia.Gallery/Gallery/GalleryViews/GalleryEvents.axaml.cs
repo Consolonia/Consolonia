@@ -114,13 +114,13 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             _console.MouseEvent -= OnRawMouse;
         }
 
-        private void OnRawKeyboardGotFocus(object sender, GotFocusEventArgs e)
+        private void OnRawKeyboardGotFocus(object sender, FocusChangedEventArgs e)
         {
             EnsureConsole();
             _console.KeyEvent += OnRawKey;
         }
 
-        private void OnRawKeyboardLostFocus(object sender, RoutedEventArgs e)
+        private void OnRawKeyboardLostFocus(object sender, FocusChangedEventArgs e)
         {
             EnsureConsole();
             _console.KeyEvent -= OnRawKey;

@@ -22,6 +22,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         private static readonly Dictionary<char, string> GlyphCharCache = new();
         private static readonly Dictionary<string, string> GlyphComplexCache = new();
+        private static readonly Dictionary<char, bool> EmojiCharCache = new();
 
         public static readonly Symbol Empty = new();
         public static readonly Symbol Space = new(' ');
@@ -62,7 +63,14 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         private static bool ShouldUseEmojiVariation(char ch, byte width)
         {
-            if (Emoji.IsEmoji(new string(ch, 1)))
+            bool isEmoji;
+            lock (EmojiCharCache)
+            {
+                if (!EmojiCharCache.TryGetValue(ch, out isEmoji))
+                    EmojiCharCache[ch] = isEmoji = Emoji.IsEmoji(new string(ch, 1));
+            }
+
+            if (isEmoji)
                 return true;
 
             return width == 2 && char.GetUnicodeCategory(ch) == UnicodeCategory.OtherSymbol;

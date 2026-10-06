@@ -95,6 +95,9 @@ namespace Unix.Terminal {
 
         static void LoadMethods ()
 		{
+			if (curses_library != null)
+				return;
+
 			var libs = UnmanagedLibrary.IsMacOSPlatform ? new string [] { "libncurses.dylib" } : new string [] { "libncursesw.so.6", "libncursesw.so.5" };
 			curses_library = new UnmanagedLibrary (libs, false);
 			methods = new NativeMethods (curses_library);
@@ -103,6 +106,9 @@ namespace Unix.Terminal {
 		static void FindNCurses ()
 		{
 			LoadMethods ();
+			if (curses_handle != IntPtr.Zero)
+				return;
+
 			curses_handle = methods.UnmanagedLibrary.NativeLibraryHandle;
 
 			stdscr = read_static_ptr ("stdscr");
@@ -111,15 +117,27 @@ namespace Unix.Terminal {
 			cols_ptr = get_ptr ("COLS");
 		}
 
-			static public Window initscr ()
-			{
+		static bool _isInitializing;
+
+		static public Window initscr ()
+		{
+			if (main_window != null)
+				return main_window;
+
+			if (_isInitializing) return null;
+
+			_isInitializing = true;
+			try {
 				setlocale (LC_ALL, "");
 				FindNCurses ();
 
 				// Prevents the terminal from being locked after exiting.
 				reset_shell_mode ();
 
-				main_window = new Window (methods.initscr ());
+				IntPtr handle = methods.initscr ();
+				stdscr = handle;
+
+				main_window = new Window (handle);
 				try {
 					console_sharp_get_dims (out lines, out cols);
 				} catch (DllNotFoundException) {
@@ -131,7 +149,10 @@ namespace Unix.Terminal {
 					Environment.Exit (1);
 				}
 				return main_window;
+			} finally {
+				_isInitializing = false;
 			}
+		}
 
 		public static int Lines {
 			get {
@@ -327,6 +348,7 @@ namespace Unix.Terminal {
 		static public bool is_term_resized (int lines, int columns) => methods.is_term_resized (lines, columns);
 		static public int resize_term (int lines, int columns) => methods.resize_term (lines, columns);
 		static public int resizeterm (int lines, int columns) => methods.resizeterm (lines, columns);
+		static public int erasechar() => methods.erasechar();
 		static public void use_env (bool f) => methods.use_env (f);
 		static public int flushinp () => methods.flushinp ();
 		static public int def_prog_mode () => methods.def_prog_mode ();
@@ -416,6 +438,7 @@ namespace Unix.Terminal {
 		public delegate int savetty ();
 		public delegate int resetty ();
 		public delegate IntPtr curses_version ();
+		public delegate int erasechar();
 	}
 	
 	internal class NativeMethods {
@@ -489,6 +512,7 @@ namespace Unix.Terminal {
 		public readonly Delegates.savetty savetty;
 		public readonly Delegates.resetty resetty;
 		public readonly Delegates.curses_version curses_version;
+		public readonly Delegates.erasechar erasechar;
 		public UnmanagedLibrary UnmanagedLibrary;
 
 		public NativeMethods (UnmanagedLibrary lib)
@@ -564,6 +588,7 @@ namespace Unix.Terminal {
 			savetty = lib.GetNativeMethodDelegate<Delegates.savetty> ("savetty");
 			resetty = lib.GetNativeMethodDelegate<Delegates.resetty> ("resetty");
 			curses_version = lib.GetNativeMethodDelegate<Delegates.curses_version> ("curses_version");
+			erasechar = lib.GetNativeMethodDelegate<Delegates.erasechar>("erasechar");
 		}
 	}
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member

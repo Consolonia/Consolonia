@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
@@ -22,8 +21,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             // ReSharper disable PossibleNullReferenceException //todo: build task does not understand ! operator
             await ((ConsoloniaLifetime)Application.Current!.ApplicationLifetime!).DisconnectFromConsoleAsync(cts.Token);
             // ReSharper restore PossibleNullReferenceException
-            Console.ResetColor();
-            Console.Clear();
         }
 
 

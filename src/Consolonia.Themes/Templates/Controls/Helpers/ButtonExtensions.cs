@@ -28,11 +28,11 @@ namespace Consolonia.Themes.Templates.Controls.Helpers
                 if (timeout == DelayPressProperty.GetDefaultValue(typeof(Button)))
                     return;
 
-                PseudolassesExtensions.Set(button.Classes, ":clickdelayed", true);
+                PseudoClassesExtensions.Set(button.Classes, ":clickdelayed", true);
 
                 await Task.Delay(timeout).ConfigureAwait(true); //todo: magic number
 
-                PseudolassesExtensions.Set(button.Classes, ":clickdelayed", false);
+                PseudoClassesExtensions.Set(button.Classes, ":clickdelayed", false);
             }));
         }
     }

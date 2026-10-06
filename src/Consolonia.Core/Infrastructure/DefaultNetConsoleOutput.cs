@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Controls;
@@ -13,7 +14,7 @@ namespace Consolonia.Core.Infrastructure
     /// <remarks>
     ///     Buffers on TextRuns of shared color/textstyle/properties
     /// </remarks>
-    public class DefaultNetConsoleOutput : IConsoleOutput
+    public class DefaultNetConsoleOutput : PauseBase, IConsoleOutput
     {
         private readonly StringBuilder _stringBuilder;
         private PixelBufferCoordinate _currentPosition;
@@ -35,28 +36,38 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void SetTitle(string title)
         {
+            WaitPauseTaskIfNecessary();
             Console.Title = title;
         }
 
         public virtual void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
-            try
+            WaitPauseTaskIfNecessary();
+            lock (this)
             {
-                Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
-            }
-            catch (ArgumentOutOfRangeException)
-            {
-                // ignore
-                // this happens while resizing.
+                try
+                {
+                    Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    // ignore
+                    // this happens while resizing.
+                }
             }
         }
 
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
-            (int left, int top) = Console.GetCursorPosition();
-            return new PixelBufferCoordinate((ushort)left, (ushort)top);
+            WaitPauseTaskIfNecessary();
+            lock (this)
+            {
+                (int left, int top) = Console.GetCursorPosition();
+                return new PixelBufferCoordinate((ushort)left, (ushort)top);
+            }
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             // Width 0 is the trailing placeholder cell of a previously rendered wide glyph.
@@ -103,21 +114,29 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void Flush()
         {
-            if (_stringBuilder.Length == 0)
-                return;
+            WaitPauseTaskIfNecessary();
 
-            // Debug.WriteLine($"[{_currentBufferPoint.X},{_currentBufferPoint.Y}] {_lastForegroundColor} on {_lastBackgroundColor} '{_stringBuilder}'");
-            Console.Write(_stringBuilder.ToString());
-            _stringBuilder.Clear();
+            lock (this)
+            {
+                if (_stringBuilder.Length == 0)
+                    return;
+                // Debug.WriteLine($"[{_currentBufferPoint.X},{_currentBufferPoint.Y}] {_lastForegroundColor} on {_lastBackgroundColor} '{_stringBuilder}'");
+                Console.Write(_stringBuilder.ToString());
+                _stringBuilder.Clear();
+            }
         }
 
         public virtual void WriteText(string str)
         {
+            WaitPauseTaskIfNecessary();
+
             Console.Write(str);
         }
 
         public virtual void SetCaretStyle(CaretStyle caretStyle)
         {
+            WaitPauseTaskIfNecessary();
+
             try
             {
 #pragma warning disable CA1416 // Validate platform compatibility
@@ -141,14 +160,17 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void HideCaret()
         {
+            WaitPauseTaskIfNecessary();
             Console.CursorVisible = false;
         }
 
         public virtual void ShowCaret()
         {
+            WaitPauseTaskIfNecessary();
             Console.CursorVisible = true;
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public virtual void PrepareConsole()
         {
             Console.OutputEncoding = Encoding.UTF8;
@@ -175,6 +197,7 @@ namespace Consolonia.Core.Infrastructure
 
         public virtual void ClearScreen()
         {
+            WaitPauseTaskIfNecessary();
             Console.Clear();
         }
     }

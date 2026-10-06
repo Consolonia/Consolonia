@@ -6,13 +6,14 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <ConsoloniaVersion>11.3.12</ConsoloniaVersion>
+        <ConsoloniaVersion>12.0.3</ConsoloniaVersion>
         <ConsoloniaVersionLatest>$(ConsoloniaVersion).*</ConsoloniaVersionLatest>
         <!--If ran not by pipeline - defining for local run-->
         <BUILD_VERSION Condition="'$(BUILD_VERSION)' == ''">0</BUILD_VERSION>
         <VersionPrefix>$(ConsoloniaVersion).$(BUILD_VERSION)</VersionPrefix>
 
-        <AvaloniaVersion>11.3.12</AvaloniaVersion>
+        <AvaloniaVersion>12.0.3</AvaloniaVersion>
+        <AvaloniaControlsDataGridVersion>12.0.0</AvaloniaControlsDataGridVersion>
     </PropertyGroup>
 
     <PropertyGroup>

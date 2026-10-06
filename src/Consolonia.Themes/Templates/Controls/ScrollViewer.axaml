@@ -26,7 +26,7 @@
                       RowDefinitions="*,Auto"
                       ColumnDefinitions="*,Auto">
                     <Panel Background="{TemplateBinding Background}">
-                        <console:ConsoleScrollContentPresenter Name="PART_ContentPresenter"
+                        <console:ConsoleScrollContentPresenter x:Name="PART_ContentPresenter"
                                                                Padding="{TemplateBinding Padding}"
                                                                HorizontalSnapPointsType="{TemplateBinding HorizontalSnapPointsType}"
                                                                VerticalSnapPointsType="{TemplateBinding VerticalSnapPointsType}"
@@ -115,7 +115,7 @@
                             <TextBlock Text="v"
                                        Foreground="{TemplateBinding Foreground}" />
                         </RepeatButton>
-                        <console:ConsoleScrollContentPresenter Name="PART_ContentPresenter"
+                        <console:ConsoleScrollContentPresenter x:Name="PART_ContentPresenter"
                                                                Padding="{TemplateBinding Padding}"
                                                                HorizontalSnapPointsType="{TemplateBinding HorizontalSnapPointsType}"
                                                                VerticalSnapPointsType="{TemplateBinding VerticalSnapPointsType}"

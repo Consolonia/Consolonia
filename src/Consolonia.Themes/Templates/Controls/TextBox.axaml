@@ -38,12 +38,12 @@
                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
                         <TextBlock Name="floatingWatermark"
                                    Foreground="{DynamicResource ThemeNoDisturbBrush}"
-                                   Text="{TemplateBinding Watermark}"
+                                   Text="{TemplateBinding PlaceholderText}"
                                    DockPanel.Dock="Top">
                             <TextBlock.IsVisible>
                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                                     <Binding RelativeSource="{RelativeSource TemplatedParent}"
-                                             Path="UseFloatingWatermark" />
+                                             Path="UseFloatingPlaceholder" />
                                     <Binding RelativeSource="{RelativeSource TemplatedParent}"
                                              Path="Text"
                                              Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
@@ -64,7 +64,7 @@
                                     <Panel>
                                         <!--I don't understand why 1 is not sufficient as a padding for caret of width 1-->
                                         <Panel Margin="0,0,2,0">
-                                            <console:ConsoloniaTextPresenter Name="PART_TextPresenter"
+                                            <console:ConsoloniaTextPresenter x:Name="PART_TextPresenter"
                                                                              Margin="{TemplateBinding Padding}"
                                                                              CaretIndex="{TemplateBinding CaretIndex}"
                                                                              PasswordChar="{TemplateBinding PasswordChar}"
@@ -82,7 +82,7 @@
                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                                    Foreground="{TemplateBinding BorderBrush}"
-                                                   Text="{TemplateBinding Watermark}"
+                                                   Text="{TemplateBinding PlaceholderText}"
                                                    TextAlignment="{TemplateBinding TextAlignment}"
                                                    TextWrapping="{TemplateBinding TextWrapping}">
                                             <TextBlock.IsVisible>

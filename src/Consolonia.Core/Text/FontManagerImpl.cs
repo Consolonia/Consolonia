@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
@@ -24,23 +25,27 @@ namespace Consolonia.Core.Text
 
         public bool TryMatchCharacter(int codepoint, FontStyle fontStyle, FontWeight fontWeight,
             FontStretch fontStretch,
-            CultureInfo culture, out Typeface typeface)
+            string familyName, CultureInfo culture, out IPlatformTypeface typeface)
         {
-            typeface = new Typeface(ConsoleDefaultFontFamily(), fontStyle, fontWeight, fontStretch);
+            typeface = CreateConsolePlatformTypeface(new ConsoleTypeface
+            {
+                Weight = fontWeight,
+                Style = fontStyle
+            });
             return true;
         }
 
         public bool TryCreateGlyphTypeface(string familyName, FontStyle style, FontWeight weight, FontStretch stretch,
-            out IGlyphTypeface glyphTypeface)
+            out IPlatformTypeface glyphTypeface)
         {
             if (familyName == ConsoleDefaultFontFamily())
             {
                 //todo: check font is ours the only
-                glyphTypeface = new ConsoleTypeface
+                glyphTypeface = CreateConsolePlatformTypeface(new ConsoleTypeface
                 {
                     Weight = weight,
                     Style = style
-                };
+                });
                 return true;
             }
 
@@ -48,21 +53,37 @@ namespace Consolonia.Core.Text
             return false;
         }
 
-#pragma warning disable CA1822 // Mark members as static
         public bool TryCreateGlyphTypeface(Stream stream, FontSimulations fontSimulations,
-            [NotNullWhen(true)] out IGlyphTypeface glyphTypeface)
-#pragma warning restore CA1822 // Mark members as static
+            [NotNullWhen(true)] out IPlatformTypeface glyphTypeface)
         {
-            glyphTypeface = new ConsoleTypeface();
+            glyphTypeface = new ConsolePlatformTypeface(new ConsoleTypeface());
             return true;
         }
 
-#pragma warning disable CA1822 // Mark members as static
-        public bool TryCreateGlyphTypeface(Stream stream, out IGlyphTypeface glyphTypeface)
-#pragma warning restore CA1822 // Mark members as static
+
+        public bool TryGetFamilyTypefaces(string familyName, out IReadOnlyList<Typeface> typefaces)
         {
-            glyphTypeface = new ConsoleTypeface();
-            return true;
+            if (familyName == ConsoleDefaultFontFamily())
+            {
+                typefaces =
+                [
+                    new Typeface(ConsoleDefaultFontFamily())
+                ];
+                return true;
+            }
+
+            typefaces = [];
+            return false;
+        }
+
+        public static GlyphTypeface CreateGlyphTypeface(IConsoleTypeface consoleTypeface)
+        {
+            return new GlyphTypeface(CreateConsolePlatformTypeface(consoleTypeface));
+        }
+
+        private static IPlatformTypeface CreateConsolePlatformTypeface(IConsoleTypeface consoleTypeface)
+        {
+            return new ConsolePlatformTypeface(consoleTypeface);
         }
 
         public static string ConsoleDefaultFontFamily()

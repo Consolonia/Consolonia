@@ -35,7 +35,7 @@ namespace Consolonia.Controls
             ArgumentNullException.ThrowIfNull(text);
 
             IConsoleCapabilities console = ConsoleCapabilities.Value;
-            ArgumentNullException.ThrowIfNull(console, nameof(console));
+            ArgumentNullException.ThrowIfNull(console);
             bool supportsComplexEmoji = console.Capabilities.HasFlag(Controls.ConsoleCapabilities.SupportsComplexEmoji);
 
             ushort width = 0;

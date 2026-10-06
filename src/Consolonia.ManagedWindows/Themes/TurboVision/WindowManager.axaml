@@ -42,9 +42,7 @@
                             <!--Shade-->
                             <Border BorderThickness="0"
                                     Background="{DynamicResource ThemeShadeBrush}"
-                                    Margin="2,1,0,0"
-                                    Width="{Binding ElementName=OuterBorder, Path=Width}"
-                                    Height="{Binding ElementName=OuterBorder, Path=Height}" />
+                                    Margin="2,1,0,0" />
 
                             <!--Frame-->
                             <Border BorderThickness="{TemplateBinding BorderThickness}"

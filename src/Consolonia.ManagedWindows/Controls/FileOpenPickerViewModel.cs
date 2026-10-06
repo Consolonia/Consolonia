@@ -20,7 +20,7 @@ namespace Consolonia.ManagedWindows.Controls
         public FileOpenPickerViewModel(FilePickerOpenOptions options)
             : base(options)
         {
-            ArgumentNullException.ThrowIfNull(options, nameof(options));
+            ArgumentNullException.ThrowIfNull(options);
             SelectionMode = options.AllowMultiple ? SelectionMode.Multiple : SelectionMode.Single;
             SelectedFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasSelection));
         }

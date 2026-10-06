@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Media;
+using Consolonia.Controls;
 using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing.PixelBufferImplementation.EgaConsoleColor

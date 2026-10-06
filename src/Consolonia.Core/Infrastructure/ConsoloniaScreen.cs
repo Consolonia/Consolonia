@@ -12,7 +12,7 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoloniaScreen(PixelRect rect)
         {
-            _screens = [new Screen(0.0, rect, rect, true)];
+            _screens = [CreateScreen(rect)];
         }
 
         public int ScreenCount => 1;
@@ -44,6 +44,32 @@ namespace Consolonia.Core.Infrastructure
         public Screen ScreenFromWindow(IWindowBaseImpl window)
         {
             return _screens[0];
+        }
+
+        private static Screen CreateScreen(PixelRect rect)
+        {
+            return new ConsolePlatformScreen(rect);
+        }
+
+        private sealed class ConsolePlatformScreen : PlatformScreen
+        {
+            public ConsolePlatformScreen(PixelRect rect) : base(ConsolePlatformHandle.Instance)
+            {
+                DisplayName = "Console";
+                Scaling = 1;
+                Bounds = rect;
+                WorkingArea = rect;
+                IsPrimary = true;
+            }
+        }
+
+        private sealed class ConsolePlatformHandle : IPlatformHandle
+        {
+            public static readonly ConsolePlatformHandle Instance = new();
+
+            public nint Handle => 0;
+
+            public string HandleDescriptor => "Consolonia";
         }
     }
 }

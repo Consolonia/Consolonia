@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using Consolonia.Controls;
 using Consolonia.Core.Infrastructure;
 using jinek.X11;
 

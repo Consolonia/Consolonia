@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Reactive;
@@ -24,12 +26,18 @@ namespace Consolonia.Themes.Infrastructure
         protected AutoThemeStylesBase()
         {
             _consoloniaThemeFamilySybscription = this.GetResourceObservable(ConsoloniaThemeFamilyKey)
-                .Subscribe(new AnonymousObserver<object>(o => { ApplyFromTheme((string)o); }));
+                .Subscribe(new AnonymousObserver<object>(ApplyFromTheme));
         }
 
-        private void ApplyFromTheme(string value)
+        private void ApplyFromTheme(object value)
         {
-            Apply(value);
+            if (value is null || ReferenceEquals(value, AvaloniaProperty.UnsetValue))
+                Apply(null);
+            else if (value is string family)
+                Apply(family);
+            else
+                throw new InvalidOperationException(
+                    $"Resource '{ConsoloniaThemeFamilyKey}' must be a theme family string.");
         }
 
         private void Apply(string family)
@@ -48,24 +56,25 @@ namespace Consolonia.Themes.Infrastructure
 
         /// <summary>
         ///     Compose this Styles instance for the specified theme family.
-        ///     Implementations should call  <see cref="IncludeStyle" />.
+        ///     Implementations should call  <see cref="IncludeStyle(Styles)" />.
         /// </summary>
         protected abstract void ComposeForFamily(string family);
 
-        /*protected void MergeResource(Uri uri)
+        /// <summary>
+        ///     Adds a compiled Styles root for the selected family.
+        /// </summary>
+        protected void IncludeStyle(Styles style)
         {
-            if (Resources is not ResourceDictionary rd)
-            {
-                rd = new ResourceDictionary();
-                Resources = rd;
-            }
+            Add(style);
 
-            rd.MergedDictionaries.Add(new ResourceInclude(baseUri: null) { Source = uri });
-        }*/
+            ((IResourceProvider)style).RemoveOwner(style.Owner!);
+        }
 
         /// <summary>
-        ///     Helper to include a Styles-root XAML file.
+        ///     Supports legacy dynamic URI includes in JIT applications. Use compiled styles for NativeAOT.
         /// </summary>
+        [RequiresUnreferencedCode(
+            "Programmatic URI style loading is incompatible with trimming. Use IncludeStyle(IStyle) with a compiled Styles root.")]
         protected void IncludeStyle(Uri uri)
         {
             var styleInclude = new StyleInclude(baseUri: null) { Source = uri };

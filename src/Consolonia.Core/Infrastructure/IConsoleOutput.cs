@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
@@ -79,5 +80,11 @@ namespace Consolonia.Core.Infrastructure
         ///     Flush any buffered output
         /// </summary>
         void Flush();
+
+        /// <summary>
+        ///     Pause IO operations
+        /// </summary>
+        /// <param name="task"></param>
+        void PauseIO(Task task);
     }
 }

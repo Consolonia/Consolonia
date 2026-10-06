@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:console="https://github.com/consolonia">
+                    xmlns:console="https://github.com/consolonia"
+                    x:CompileBindings="True">
     <ControlTheme x:Key="{x:Type CalendarItem}"
                   TargetType="CalendarItem">
         <Setter Property="HorizontalAlignment"
@@ -113,11 +114,11 @@ todo: while it's not needed it also does not work when set in the style-->
             </ControlTemplate>
         </Setter>
         <Setter Property="DayTitleTemplate">
-            <Template>
+            <Template x:DataType="x:String">
                 <TextBlock Margin="0,1,0,0"
                            HorizontalAlignment="Left"
                            VerticalAlignment="Center"
-                           Text="{Binding}" />
+                           Text="{CompiledBinding .}" />
             </Template>
 
         </Setter>

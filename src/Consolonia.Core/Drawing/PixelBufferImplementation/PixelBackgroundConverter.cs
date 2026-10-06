@@ -22,8 +22,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
                     if (colorValue != null && Color.TryParse(colorValue, out Color color))
                         return new PixelBackground(color);
-
-                    return new PixelBackground(Colors.Transparent);
                 }
             }
 

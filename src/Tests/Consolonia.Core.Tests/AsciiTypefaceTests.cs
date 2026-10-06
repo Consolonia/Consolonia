@@ -1,10 +1,14 @@
 using System;
+using System.IO;
+using System.Text;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Consolonia.Controls;
+using Consolonia.Core.Text;
 using Consolonia.Core.Text.Fonts;
 using NUnit.Framework;
+using TextShaper = Consolonia.Core.Text.TextShaper;
 
 namespace Consolonia.Core.Tests
 {
@@ -16,6 +20,53 @@ namespace Consolonia.Core.Tests
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleCapabilities>().ToConstant(new MockConsoleCapabilities
                 { Capabilities = ConsoleCapabilities.SupportsComplexEmoji });
+            _testGlyphTypeface = FontManagerImpl.CreateGlyphTypeface(new ConsoleTypeface());
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _testGlyphTypeface?.Dispose();
+            _testGlyphTypeface = null;
+        }
+
+        private GlyphTypeface _testGlyphTypeface;
+
+        [Test]
+        public void TextShaperUsesConsoleTypefaceForConsoleGlyphTypeface()
+        {
+            var consoleTypeface = new ConsoleTypeface();
+            GlyphTypeface glyphTypeface = FontManagerImpl.CreateGlyphTypeface(consoleTypeface);
+            try
+            {
+                var textShaper = new TextShaper();
+
+                Assert.AreSame(consoleTypeface, textShaper.CreateTypeface(glyphTypeface));
+
+                using ShapedBuffer shapedBuffer = textShaper.ShapeText("A👍".AsMemory(),
+                    new TextShaperOptions(glyphTypeface, glyphTypeface.Metrics.DesignEmHeight));
+
+                Assert.AreEqual(2, shapedBuffer.Length);
+                Assert.AreEqual(1, shapedBuffer[0].GlyphAdvance);
+                Assert.AreEqual(2, shapedBuffer[1].GlyphAdvance);
+                Assert.AreSame(glyphTypeface, shapedBuffer.GlyphTypeface);
+            }
+            finally
+            {
+                glyphTypeface.Dispose();
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(short.MaxValue + 3)]
+        public void LoadRejectsFigletHeightsThatDoNotFitConsoleMetrics(int height)
+        {
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes($"flf2a$ {height} 0 0 0 0"));
+
+            var exception =
+                Assert.Throws<InvalidDataException>(() => AsciiArtTypefaceLoader.Load(stream, "InvalidHeight"));
+
+            StringAssert.Contains("height must be between 1", exception.Message);
         }
 
         [Test]
@@ -268,7 +319,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["***"]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["**"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            TextShaperOptions options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -292,7 +343,7 @@ namespace Consolonia.Core.Tests
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*  ", "*  ", "*  "]));
             typeface.AddGlyph('B', new AsciiArtGlyph(typeface, 'B', ["  *", "  *", "  *"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            TextShaperOptions options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("AB".AsMemory(), options);
@@ -487,7 +538,7 @@ namespace Consolonia.Core.Tests
             };
             typeface.AddGlyph('A', new AsciiArtGlyph(typeface, 'A', ["*"]));
 
-            var options = new TextShaperOptions(typeface, 1);
+            TextShaperOptions options = CreateTextShaperOptions();
 
             // Act
             ShapedBuffer result = typeface.ShapeText("A".AsMemory(), options);
@@ -534,6 +585,11 @@ namespace Consolonia.Core.Tests
             Assert.AreEqual(FontStyle.Italic, typeface.Style);
             Assert.AreEqual(FontStretch.Condensed, typeface.Stretch);
             Assert.AreEqual(FontSimulations.Bold, typeface.FontSimulations);
+        }
+
+        private TextShaperOptions CreateTextShaperOptions()
+        {
+            return new TextShaperOptions(_testGlyphTypeface, 1);
         }
     }
 }

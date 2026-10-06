@@ -18,6 +18,12 @@
         </ProjectReference>
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Update="CursesConsole.Kitty.cs">
+        <DependentUpon>CursesConsole.cs</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
     <!-- 
     see https://josef.codes/dotnet-pack-include-referenced-projects/ for information on how 
     this is including Consolonia.GuiCS.dll as an asset and  not a package references

@@ -1,4 +1,3 @@
-using System;
 using Consolonia.Themes.Infrastructure;
 
 namespace Consolonia.ManagedWindows
@@ -14,10 +13,10 @@ namespace Consolonia.ManagedWindows
             switch (family)
             {
                 case TurboVisionThemeKey:
-                    IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/TurboVision/TurboVision.axaml"));
+                    IncludeStyle(new TurboVisionManagedWindowStyles());
                     break;
                 case ModernThemeKey:
-                    IncludeStyle(new Uri("avares://Consolonia.ManagedWindows/Themes/Modern/Modern.axaml"));
+                    IncludeStyle(new ModernManagedWindowStyles());
                     break;
             }
         }

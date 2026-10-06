@@ -88,4 +88,10 @@ dotnet tool uninstall -g Consolonia.Gallery
 https://github.com/jinek/Consolonia/wiki
 
 ## Star History
-[![Star History Chart](https://api.star-history.com/svg?repos=Consolonia/Consolonia&type=date&legend=top-left)](https://www.star-history.com/#Consolonia/Consolonia&type=date&legend=top-left)
+<a href="https://www.star-history.com/?repos=Consolonia%2FConsolonia&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Consolonia/Consolonia&type=date&theme=dark&legend=top-left&sealed_token=nIY0tFHwo47iVhxNxnK3AvwpsE48DKxtn1uBEdcvZmRXC-5B1w005ib9fpgpnkGFCV3RlfSk_YUgYQS5qN8tnoEEgLSFzKl5WWMmxuDlvdpzfgl4nDxyXFdokgKD89AgAxJLvlmOIljCaYrNGlMm5KeIBMEqez4_qXZQ1w6uncUnkcR5rOynp8ynPzOR" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Consolonia/Consolonia&type=date&legend=top-left&sealed_token=nIY0tFHwo47iVhxNxnK3AvwpsE48DKxtn1uBEdcvZmRXC-5B1w005ib9fpgpnkGFCV3RlfSk_YUgYQS5qN8tnoEEgLSFzKl5WWMmxuDlvdpzfgl4nDxyXFdokgKD89AgAxJLvlmOIljCaYrNGlMm5KeIBMEqez4_qXZQ1w6uncUnkcR5rOynp8ynPzOR" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Consolonia/Consolonia&type=date&legend=top-left&sealed_token=nIY0tFHwo47iVhxNxnK3AvwpsE48DKxtn1uBEdcvZmRXC-5B1w005ib9fpgpnkGFCV3RlfSk_YUgYQS5qN8tnoEEgLSFzKl5WWMmxuDlvdpzfgl4nDxyXFdokgKD89AgAxJLvlmOIljCaYrNGlMm5KeIBMEqez4_qXZQ1w6uncUnkcR5rOynp8ynPzOR" />
+ </picture>
+</a>

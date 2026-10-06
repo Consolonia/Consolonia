@@ -4,26 +4,30 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
+using Consolonia.Core.Text.Fonts;
 
 namespace Consolonia.Core.Text
 {
     internal class GlyphRunImpl : IGlyphRunImpl
     {
-        public GlyphRunImpl(IGlyphTypeface glyphTypeface, double fontRenderingEmSize,
+        public GlyphRunImpl(GlyphTypeface glyphTypeface, double fontRenderingEmSize,
             IReadOnlyList<GlyphInfo> glyphInfos, Point baselineOrigin)
         {
             FontRenderingEmSize = fontRenderingEmSize;
-            GlyphTypeface = glyphTypeface;
+            ConsoleTypeface = (glyphTypeface.PlatformTypeface as ConsolePlatformTypeface)?.ConsoleTypeface;
             BaselineOrigin = baselineOrigin;
             GlyphInfos = glyphInfos;
-            double scale = glyphTypeface.Metrics.DesignEmHeight != 0
-                ? fontRenderingEmSize / glyphTypeface.Metrics.DesignEmHeight
+            FontMetrics metrics = ConsoleTypeface?.Metrics ?? glyphTypeface.Metrics;
+            double scale = metrics.DesignEmHeight != 0
+                ? fontRenderingEmSize / metrics.DesignEmHeight
                 : 1;
             double width = glyphInfos.Sum(gi => gi.GlyphAdvance) * scale;
             Bounds = new Rect(new Point(0, 0), new Size(width, fontRenderingEmSize));
         }
 
         public IReadOnlyList<GlyphInfo> GlyphInfos { get; }
+
+        public IConsoleTypeface ConsoleTypeface { get; }
 
         public void Dispose()
         {
@@ -34,8 +38,6 @@ namespace Consolonia.Core.Text
             // empty intersections defaults to entire span.
             return new List<float>();
         }
-
-        public IGlyphTypeface GlyphTypeface { get; }
 
         public double FontRenderingEmSize { get; }
         public Point BaselineOrigin { get; }
