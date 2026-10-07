@@ -161,17 +161,15 @@ namespace Consolonia.PlatformSupport
                         if (code != Curses.KEY_CODE_YES)
                             response.Append((char)wch);
 
-                        string collected = response.ToString();
-                        if (KittySupportAnswerRegex().IsMatch(collected))
-                            return true;
-
-                        // Sentinel (Device Attributes) response arrived without a preceding
-                        // kitty keyboard response -> protocol is not supported.
-                        if (KittyDeviceAttributesAnswerRegex().IsMatch(collected))
+                        // Read on to the sentinel (Device Attributes) answer even once the kitty
+                        // answer is in: left unread, it would end the pointer shape probe that
+                        // follows before that probe's own answers arrive, and they would reach the
+                        // input reader as keys. Supported only if the kitty answer came before it.
+                        if (KittyDeviceAttributesAnswerRegex().IsMatch(response.ToString()))
                             break;
                     }
 
-                    return false;
+                    return KittySupportAnswerRegex().IsMatch(response.ToString());
                 }
                 finally
                 {
