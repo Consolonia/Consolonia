@@ -211,16 +211,76 @@ namespace Consolonia.Core.Tests
             return null;
         }
 
+        /// <summary>The terminal's answer to each support query in turn, flagging <paramref name="has" />.</summary>
+        private static string QueryAnswers(Func<string, bool> has)
+        {
+            return string.Concat(PointerShapes.QueryBatches.Select(batch =>
+                "\u001b]22;" + string.Join(",", batch.Select(s => has(s) ? "1" : "0")) + "\u001b\\"));
+        }
+
+        [Test]
+        public void EachSupportQueryFitsLibtsmsOscBuffer()
+        {
+            // libtsm (kmscon) keeps 127 bytes of an OSC string; the names past them went unanswered.
+            foreach (IReadOnlyList<string> batch in PointerShapes.QueryBatches)
+            {
+                string query = Esc.QueryPointerShapes(batch);
+                string oscString = query["\u001b]".Length..^"\u001b\\".Length];
+                Assert.That(oscString.Length, Is.LessThanOrEqualTo(127), oscString);
+            }
+        }
+
+        [Test]
+        public void TheSupportQueriesAskAboutEveryShapeInOrder()
+        {
+            Assert.That(PointerShapes.QueryBatches.SelectMany(b => b), Is.EqualTo(PointerShapes.Used));
+            Assert.That(PointerShapes.QueryBatches.All(b => b.Count > 0));
+        }
+
+        [Test]
+        public void EachReplyAnswersItsOwnBatch()
+        {
+            string[][] batches = [["default", "text"], ["nw-resize", "se-resize"]];
+
+            IReadOnlySet<string> supported = PointerShapes.ParseQueryReplies(
+                "\u001b]22;0,1\u001b\\\u001b]22;1,0\u001b\\\u001b[?62;22c", batches);
+
+            Assert.That(supported, Is.EquivalentTo(new[] { "text", "nw-resize" }));
+        }
+
+        [Test]
+        public void ABatchWithNoReplyHasNoShapes()
+        {
+            string[][] batches = [["default", "text"], ["nw-resize", "se-resize"]];
+
+            IReadOnlySet<string> supported =
+                PointerShapes.ParseQueryReplies("\u001b]22;1,1\u001b\\\u001b[?62;22c", batches);
+
+            Assert.That(supported, Is.EquivalentTo(new[] { "default", "text" }));
+        }
+
         [Test]
         public void DetectTakesAQueryAnswerAsAuthoritative()
         {
-            string flags = string.Join(",", PointerShapes.Used.Select(s => s == "text" ? "1" : "0"));
-            string answers = "\u001b]22;" + flags + "\u001b\\\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c";
+            string answers = QueryAnswers(s => s == "text") + "\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c";
 
             (IReadOnlySet<string> supported, bool x11) = PointerShapes.Detect(answers, NoEnvironment);
 
             Assert.That(supported, Is.EquivalentTo(new[] { "text" }));
             Assert.That(x11, Is.False, "an answered query is in CSS names, whoever answered");
+        }
+
+        [Test]
+        public void DetectReadsShapesFromEveryQuery()
+        {
+            // The corners come late in the list: they are what a single, truncated query lost.
+            string[] corners = ["nw-resize", "ne-resize", "sw-resize", "se-resize"];
+
+            (IReadOnlySet<string> supported, _) =
+                PointerShapes.Detect(QueryAnswers(_ => true) + "\u001b[?62;22c", NoEnvironment);
+
+            Assert.That(supported, Is.EquivalentTo(PointerShapes.Used));
+            Assert.That(supported, Is.SupersetOf(corners));
         }
 
         [Test]

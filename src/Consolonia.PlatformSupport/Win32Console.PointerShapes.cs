@@ -30,7 +30,8 @@ namespace Consolonia.PlatformSupport
         /// </remarks>
         private void TryToSupportPointerShapes()
         {
-            WriteText(Esc.QueryPointerShapes(PointerShapes.Used));
+            foreach (IReadOnlyList<string> batch in PointerShapes.QueryBatches)
+                WriteText(Esc.QueryPointerShapes(batch));
             WriteText(Esc.QueryTerminalVersion);
             WriteText("\u001b[c"); // sentinel: Device Attributes query
             Flush(); // the queries must actually reach the terminal, otherwise it never responds

@@ -103,8 +103,49 @@ namespace Consolonia.Core.Infrastructure
         // taken for an answer and cut off the XTVERSION and environment fallbacks.
         private static readonly Regex QueryAnswerRegex = new(@"\u001b\]22;[01](,[01])*(\u001b\\|\u0007)");
 
+        /// <summary>
+        ///     The longest a support query's OSC string (<c>22;?</c> and the names) may be. libtsm, and
+        ///     so kmscon, keeps the first 127 bytes of an OSC string and silently drops the rest, so the
+        ///     names past them would go unanswered and be taken for shapes the terminal does not have.
+        /// </summary>
+        private const int MaxQueryLength = 127;
+
+        private const string QueryPrefix = "22;?";
+
         /// <summary>Every shape any Avalonia cursor maps to: what a probe asks the terminal about.</summary>
         public static IReadOnlyList<string> Used { get; } = ShapeOf.Values.Distinct().ToArray();
+
+        /// <summary>
+        ///     <see cref="Used" />, split into support queries short enough for every terminal to read
+        ///     whole, in order. A probe sends one query per batch, and each is answered on its own.
+        /// </summary>
+        public static IReadOnlyList<IReadOnlyList<string>> QueryBatches { get; } = Batch(Used);
+
+        private static IReadOnlyList<IReadOnlyList<string>> Batch(IReadOnlyList<string> shapes)
+        {
+            var batches = new List<IReadOnlyList<string>>();
+            var batch = new List<string>();
+            int length = QueryPrefix.Length;
+
+            foreach (string shape in shapes)
+            {
+                int added = (batch.Count > 0 ? 1 : 0) + shape.Length;
+                if (batch.Count > 0 && length + added > MaxQueryLength)
+                {
+                    batches.Add(batch);
+                    batch = new List<string>();
+                    length = QueryPrefix.Length;
+                    added = shape.Length;
+                }
+
+                batch.Add(shape);
+                length += added;
+            }
+
+            if (batch.Count > 0)
+                batches.Add(batch);
+            return batches;
+        }
 
         /// <summary>
         ///     The terminal pointer shape for <paramref name="cursor" />, or null when there is none and
@@ -170,7 +211,7 @@ namespace Consolonia.Core.Infrastructure
             Func<string, string> environment)
         {
             if (QueryAnswerRegex.IsMatch(answers))
-                return (ParseQueryReply(answers, Used), false);
+                return (ParseQueryReplies(answers, QueryBatches), false);
 
             return KnownSupport(ParseXtVersion(answers) ?? FromEnvironment(environment));
         }
@@ -259,6 +300,22 @@ namespace Consolonia.Core.Infrastructure
             for (int i = 0; i < flags.Length && i < asked.Count; i++)
                 if (flags[i].Trim() == "1")
                     supported.Add(asked[i]);
+
+            return supported;
+        }
+
+        /// <summary>
+        ///     Reads the answers to several support queries, one per batch of names: the first reply
+        ///     answers the first batch, and so on. Empty replies flag nothing and are passed over.
+        /// </summary>
+        /// <returns>The names the terminal said it has; a batch with no reply contributes none.</returns>
+        public static IReadOnlySet<string> ParseQueryReplies(string answers,
+            IReadOnlyList<IReadOnlyList<string>> batches)
+        {
+            var supported = new HashSet<string>(StringComparer.Ordinal);
+            MatchCollection replies = QueryAnswerRegex.Matches(answers);
+            for (int i = 0; i < replies.Count && i < batches.Count; i++)
+                supported.UnionWith(ParseQueryReply(replies[i].Value, batches[i]));
 
             return supported;
         }

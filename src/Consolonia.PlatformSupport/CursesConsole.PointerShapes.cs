@@ -15,8 +15,9 @@ namespace Consolonia.PlatformSupport
         /// </summary>
         /// <remarks>
         ///     <para>
-        ///         Kitty's support query names every shape an Avalonia cursor maps to, and is followed
-        ///         by XTVERSION and then a Device Attributes request as a sentinel, which every terminal
+        ///         Kitty's support query names every shape an Avalonia cursor maps to, split over as
+        ///         many queries as keep each short enough to be read whole, and is followed by
+        ///         XTVERSION and then a Device Attributes request as a sentinel, which every terminal
         ///         answers. Everything up to the sentinel's answer is read.
         ///     </para>
         ///     <para>
@@ -34,7 +35,8 @@ namespace Consolonia.PlatformSupport
             string answers;
             try
             {
-                WriteText(Esc.QueryPointerShapes(PointerShapes.Used));
+                foreach (IReadOnlyList<string> batch in PointerShapes.QueryBatches)
+                    WriteText(Esc.QueryPointerShapes(batch));
                 WriteText(Esc.QueryTerminalVersion);
                 WriteText("\u001b[c"); // sentinel: Device Attributes query
                 Flush(); // the queries must actually reach the terminal, otherwise it never responds
