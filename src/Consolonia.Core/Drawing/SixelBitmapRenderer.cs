@@ -136,6 +136,17 @@ namespace Consolonia.Core.Drawing
             if (perBitmap.TryGetValue(key, out PixelBuffer renderedBitmap))
                 return renderedBitmap;
 
+            // A new version (next animation frame) makes every older version's cells unreachable;
+            // drop them so an animated bitmap does not keep one rendered buffer per frame.
+            List<BitmapQuantizedCacheKey> staleKeys = null;
+            foreach (BitmapQuantizedCacheKey existing in perBitmap.Keys)
+                if (existing.Version != cacheSource.Version)
+                    (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(existing);
+
+            if (staleKeys != null)
+                foreach (BitmapQuantizedCacheKey staleKey in staleKeys)
+                    perBitmap.Remove(staleKey);
+
             renderedBitmap = factory();
             perBitmap[key] = renderedBitmap;
             return renderedBitmap;
