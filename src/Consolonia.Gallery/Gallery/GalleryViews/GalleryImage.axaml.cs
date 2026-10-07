@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -23,6 +24,11 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         ///     originals are pure download cost.
         /// </summary>
         private const int MaxImageEdge = 1024;
+
+        /// <summary>
+        ///     How long to wait for Picsum's photo list before showing the bundled images instead.
+        /// </summary>
+        private static readonly TimeSpan PicsumListTimeout = TimeSpan.FromSeconds(5);
 
         private static readonly HttpClient Client = new();
 
@@ -60,7 +66,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
 
             try
             {
-                string json = await Client.GetStringAsync(new Uri(PicsumListUrl));
+                using var timeout = new CancellationTokenSource(PicsumListTimeout);
+                string json = await Client.GetStringAsync(new Uri(PicsumListUrl), timeout.Token);
 
                 using JsonDocument document = JsonDocument.Parse(json);
                 foreach (JsonElement photo in document.RootElement.EnumerateArray())
@@ -72,7 +79,11 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                     sources.Add($"https://picsum.photos/id/{id}/{width}/{height}");
                 }
             }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException)
+            // InvalidOperationException, KeyNotFoundException and FormatException: a reply that is
+            // JSON but not the list of photos expected.
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException
+                                          or InvalidOperationException or KeyNotFoundException
+                                          or FormatException)
             {
                 return [];
             }
