@@ -17,6 +17,7 @@ using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Text;
 using Window = Avalonia.Controls.Window;
 
 namespace Consolonia.Core.Infrastructure
@@ -564,9 +565,20 @@ namespace Consolonia.Core.Infrastructure
             string wanted = terminalDraws ? shape : PointerShapes.Default;
 
             // Every mouse move comes through here; only a change is worth a write.
-            if (wanted != _pointerShape && supported.Contains(wanted))
+            if (wanted != _pointerShape)
             {
-                Console.SetPointerShape(wanted);
+                if (supported.Contains(wanted))
+                {
+                    Console.SetPointerShape(wanted);
+                }
+                else if (_pointerShape != null)
+                {
+                    // A terminal that answered the query without "default" still has to be taken
+                    // off the shape set last, or it shows beside the character pointer.
+                    Console.WriteText(Esc.ResetPointerShape);
+                    Console.Flush();
+                }
+
                 _pointerShape = wanted;
             }
 
