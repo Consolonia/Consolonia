@@ -233,6 +233,18 @@ namespace Consolonia.Core.Tests
             Assert.That(x11, Is.True);
         }
 
+        [TestCase("\u001b]22;\u001b\\")]
+        [TestCase("\u001b]22;\u0007")]
+        public void DetectFallsBackToXtVersionPastAnEmptyQueryAnswer(string emptyAnswer)
+        {
+            // An empty OSC 22 reply flags no shape at all, so it is not an answer to the query.
+            (IReadOnlySet<string> supported, bool x11) =
+                PointerShapes.Detect(emptyAnswer + "\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c", NoEnvironment);
+
+            Assert.That(supported, Does.Contain("text"));
+            Assert.That(x11, Is.True);
+        }
+
         [Test]
         public void DetectFallsBackToTheEnvironment()
         {
