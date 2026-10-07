@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -38,6 +39,20 @@ namespace Consolonia.PlatformSupport
                 PointerShapes.Detect(ReadAnswersUntilDeviceAttributes(), Environment.GetEnvironmentVariable);
             SupportedPointerShapes = supported;
             PointerShapesUseX11Names = usesX11Names;
+        }
+
+        /// <summary>
+        ///     Gives the pointer back to the terminal, as the curses console does, so it is not left
+        ///     showing the last shape (an I-beam, say) after the program exits.
+        /// </summary>
+        /// <remarks>Written before the base restore, while the console still takes VT sequences.</remarks>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void RestoreConsole()
+        {
+            if (SupportedPointerShapes.Count > 0)
+                WriteText(Esc.ResetPointerShape);
+
+            base.RestoreConsole();
         }
 
         /// <summary>
