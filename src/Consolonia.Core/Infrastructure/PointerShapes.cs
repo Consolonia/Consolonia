@@ -20,6 +20,15 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>The shape a terminal shows when nothing has asked for another.</summary>
         public const string Default = "default";
 
+        /// <summary>
+        ///     The longest a support query's OSC string (<c>22;?</c> and the names) may be. libtsm, and
+        ///     so kmscon, keeps the first 127 bytes of an OSC string and silently drops the rest, so the
+        ///     names past them would go unanswered and be taken for shapes the terminal does not have.
+        /// </summary>
+        private const int MaxQueryLength = 127;
+
+        private const string QueryPrefix = "22;?";
+
         private static readonly Dictionary<StandardCursorType, string> ShapeOf = new()
         {
             [StandardCursorType.Arrow] = Default,
@@ -102,15 +111,6 @@ namespace Consolonia.Core.Infrastructure
         // At least one flag: an empty OSC 22 reply says nothing about any shape, so it must not be
         // taken for an answer and cut off the XTVERSION and environment fallbacks.
         private static readonly Regex QueryAnswerRegex = new(@"\u001b\]22;[01](,[01])*(\u001b\\|\u0007)");
-
-        /// <summary>
-        ///     The longest a support query's OSC string (<c>22;?</c> and the names) may be. libtsm, and
-        ///     so kmscon, keeps the first 127 bytes of an OSC string and silently drops the rest, so the
-        ///     names past them would go unanswered and be taken for shapes the terminal does not have.
-        /// </summary>
-        private const int MaxQueryLength = 127;
-
-        private const string QueryPrefix = "22;?";
 
         /// <summary>Every shape any Avalonia cursor maps to: what a probe asks the terminal about.</summary>
         public static IReadOnlyList<string> Used { get; } = ShapeOf.Values.Distinct().ToArray();
