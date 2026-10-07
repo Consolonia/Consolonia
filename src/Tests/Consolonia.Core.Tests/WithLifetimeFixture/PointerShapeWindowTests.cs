@@ -23,7 +23,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             // Swapped in for this window only: a nested locator scope would hide the rendering
             // services the lifetime's render loop goes on resolving.
-            IConsole original = AvaloniaLocator.Current.GetRequiredService<IConsole>();
+            var original = AvaloniaLocator.Current.GetRequiredService<IConsole>();
             AvaloniaLocator.CurrentMutable.Bind<IConsole>().ToConstant(console);
             try
             {
@@ -109,6 +109,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             {
             }
 
+            public void StartInputLoop()
+            {
+            }
+
 #pragma warning disable CS0067 // never raised: the test drives the window directly
             public event Action Resized;
             public event Action<Key, char, RawInputModifiers, bool, ulong, bool> KeyEvent;
@@ -116,10 +120,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             public event Action<RawPointerEventType, Point, Vector?, RawInputModifiers> MouseEvent;
             public event Action<bool> FocusEvent;
 #pragma warning restore CS0067
-
-            public void StartInputLoop()
-            {
-            }
         }
     }
 }
