@@ -55,6 +55,13 @@ namespace Consolonia.Core.Infrastructure
 
         public int CellPixelHeight { get; private set; }
 
+        /// <summary>
+        ///     True when the terminal answered that it can report the mouse in pixels (SGR-Pixels,
+        ///     DEC private mode 1016). Only detected here: the console reading input turns it on,
+        ///     because only it knows whether it can read those reports.
+        /// </summary>
+        internal bool SupportsSgrPixelsMouse { get; private set; }
+
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetTitle(string title)
         {
@@ -310,14 +317,20 @@ namespace Consolonia.Core.Infrastructure
             CellPixelHeight = cellH;
             CellPixelWidth = cellW;
 
-            // three queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
-            // DECRQM mode 2026 (reply "CSI?2026;<state>$y") and DA1 (reply "ESC[?62;4;22c", feature 4 = sixel).
-            // DA1 is answered by every terminal and is the only reply containing 'c', so it fences the read.
+            // four queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
+            // DECRQM modes 2026 and 1016 (reply "CSI?<mode>;<state>$y") and DA1 (reply "ESC[?62;4;22c",
+            // feature 4 = sixel). DA1 is answered by every terminal and is the only reply containing 'c',
+            // so it fences the read.
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
-                Esc.QueryKittyGraphicsSupport + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
+                Esc.QueryKittyGraphicsSupport + Esc.RequestSynchronizedOutputMode +
+                Esc.RequestSgrPixelsMouseMode + Esc.RequestDeviceAttributes,
                 'c', 1000) ?? string.Empty;
             if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSynchronizedOutput;
+
+            // CONSOLONIA_PIXEL_MOUSE=0 keeps the mouse in whole cells even where pixels are on offer
+            SupportsSgrPixelsMouse = ResponseIndicatesSgrPixelsMouseSupport(graphicsProbeResponse) &&
+                                     Environment.GetEnvironmentVariable("CONSOLONIA_PIXEL_MOUSE") != "0";
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
 
@@ -474,10 +487,25 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         internal static bool ResponseIndicatesSynchronizedOutputSupport(string response)
         {
+            return ResponseIndicatesPrivateModeSupport(response, 2026);
+        }
+
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.RequestSgrPixelsMouseMode" /> reports DEC
+        ///     private mode 1016 as available, by the same DECRPM states as
+        ///     <see cref="ResponseIndicatesSynchronizedOutputSupport" />.
+        /// </summary>
+        internal static bool ResponseIndicatesSgrPixelsMouseSupport(string response)
+        {
+            return ResponseIndicatesPrivateModeSupport(response, 1016);
+        }
+
+        private static bool ResponseIndicatesPrivateModeSupport(string response, int mode)
+        {
             if (string.IsNullOrEmpty(response))
                 return false;
 
-            const string prefix = "[?2026;";
+            string prefix = $"[?{mode};";
             int start = response.IndexOf(prefix, StringComparison.Ordinal);
             if (start < 0)
                 return false;

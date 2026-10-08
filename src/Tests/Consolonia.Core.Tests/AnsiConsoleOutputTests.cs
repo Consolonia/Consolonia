@@ -66,6 +66,25 @@ namespace Consolonia.Core.Tests
             return AnsiConsoleOutput.ResponseIndicatesSynchronizedOutputSupport(response);
         }
 
+        [TestCase("[?1016;1$y", ExpectedResult = true,
+            TestName = "SgrPixelsMouseSetStateIsDetected")]
+        [TestCase("[?1016;2$y", ExpectedResult = true,
+            TestName = "SgrPixelsMouseResetStateIsDetected")]
+        [TestCase("[?1016;0$y", ExpectedResult = false,
+            TestName = "SgrPixelsMouseUnrecognizedModeIsRejected")]
+        [TestCase("_Gi=31;OK[?2026;2$y[?1016;2$y[?62;4;22c", ExpectedResult = true,
+            TestName = "SgrPixelsMouseReplyCombinedWithOtherProbeRepliesIsDetected")]
+        [TestCase("[?2026;2$y[?1016;0$y[?62;4;22c", ExpectedResult = false,
+            TestName = "SynchronizedOutputSupportIsNotMistakenForSgrPixelsMouse")]
+        [TestCase("[?10160;1$y", ExpectedResult = false,
+            TestName = "LongerModeNumberIsNotMistakenForSgrPixelsMouse")]
+        [TestCase("", ExpectedResult = false,
+            TestName = "EmptySgrPixelsMouseResponseIsRejected")]
+        public bool DetectsSgrPixelsMouseSupportFromProbeResponse(string response)
+        {
+            return AnsiConsoleOutput.ResponseIndicatesSgrPixelsMouseSupport(response);
+        }
+
         [TestCase("kitty", ConsoleCapabilities.None,
             ExpectedResult = ConsoleCapabilities.SupportsKittyGraphics,
             TestName = "KittyOverrideForcesKittyGraphicsOn")]
