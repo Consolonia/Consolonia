@@ -139,16 +139,23 @@ namespace Consolonia.Core.Tests
             }
         }
 
-        [TestCase("\x1b[97;2u", 97, 2, 1, 'u')]
-        [TestCase("\x1b[97;65u", 97, 65, 1, 'u')]
-        [TestCase("\x1b[97;66u", 97, 66, 1, 'u')]
-        [TestCase("\x1b[97u", 97, 1, 1, 'u')]
-        [TestCase("\x1b[1072u", 1072, 1, 1, 'u')]
-        [TestCase("\x1b[1072;2u", 1072, 2, 1, 'u')]
-        [TestCase("\x1b[1;2A", 1, 2, 1, 'A')]
-        public void CsiKeyboardMatcherTest(string input, int expectedKey, int expectedModifiers, int expectedEventType, char expectedTerminator)
+        [TestCase("\x1b[97;2u", 97, 2, 1, 'u', 0)]
+        [TestCase("\x1b[97;65u", 97, 65, 1, 'u', 0)]
+        [TestCase("\x1b[97;66u", 97, 66, 1, 'u', 0)]
+        [TestCase("\x1b[97u", 97, 1, 1, 'u', 0)]
+        [TestCase("\x1b[1072u", 1072, 1, 1, 'u', 0)]
+        [TestCase("\x1b[1072;2u", 1072, 2, 1, 'u', 0)]
+        [TestCase("\x1b[1;2A", 1, 2, 1, 'A', 0)]
+        [TestCase("\x1b[49:33;2u", 49, 2, 1, 'u', 33)]
+        [TestCase("\x1b[49:33;2:3u", 49, 2, 3, 'u', 33)]
+        [TestCase("\x1b[97:65;2u", 97, 2, 1, 'u', 65)]
+        [TestCase("\x1b[1092:1060:97;2u", 1092, 2, 1, 'u', 1060)]
+        [TestCase("\x1b[1092::97u", 1092, 1, 1, 'u', 0)]
+        [TestCase("\x1b[50:64;2:2u", 50, 2, 2, 'u', 64)]
+        public void CsiKeyboardMatcherTest(string input, int expectedKey, int expectedModifiers, int expectedEventType,
+            char expectedTerminator, int expectedShiftedKey)
         {
-            (int keyCode, int modifiers, int eventType, char terminator)? matched = null;
+            (int keyCode, int modifiers, int eventType, char terminator, int shiftedKeyCode)? matched = null;
             var matcher = new CsiKeyboardMatcher<char>(res => matched = res, c => new Rune(c));
             var processor = new InputProcessor<char>([matcher]);
             processor.ProcessChunk(input.ToCharArray());
@@ -158,6 +165,7 @@ namespace Consolonia.Core.Tests
             Assert.AreEqual(expectedModifiers, matched.Value.modifiers);
             Assert.AreEqual(expectedEventType, matched.Value.eventType);
             Assert.AreEqual(expectedTerminator, matched.Value.terminator);
+            Assert.AreEqual(expectedShiftedKey, matched.Value.shiftedKeyCode);
         }
     }
 }

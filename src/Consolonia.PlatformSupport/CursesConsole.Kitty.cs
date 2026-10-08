@@ -194,9 +194,14 @@ namespace Consolonia.PlatformSupport
                 new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
         }
 
-        private void HandleCsiKeyboardEvent((int keyCode, int modifiers, int eventType, char terminator) csiEvent)
+        private void HandleCsiKeyboardEvent((int keyCode,
+            int modifiers,
+            int eventType,
+            char terminator,
+            int shiftedKeyCode) csiEvent)
         {
             int keyCode = csiEvent.keyCode;
+            int shiftedKeyCode = csiEvent.shiftedKeyCode;
             int modifierValue = csiEvent.modifiers - 1; // Protocol uses modifiers + 1
             int eventType = csiEvent.eventType;
             char terminator = csiEvent.terminator;
@@ -248,7 +253,7 @@ namespace Consolonia.PlatformSupport
                         };
                         break;
                     }
-                    case 'u' when keyCode is >= 32 and (< 0xD800 or > 0xF8FF and <= 0xFFFF):
+                    case 'u' when IsPrintableBmp(keyCode):
                     {
                         character = (char)keyCode;
                         switch (keyCode)
@@ -289,7 +294,14 @@ namespace Consolonia.PlatformSupport
                         }
 
                         bool isShift = rawModifiers.HasFlag(RawInputModifiers.Shift);
-                        if (isShift ^ isCapsLock)
+                        if (isShift && IsPrintableBmp(shiftedKeyCode))
+                        {
+                            // for example, '!' for Shift+1
+                            character = (char)shiftedKeyCode;
+                            if (isCapsLock)
+                                character = char.ToLowerInvariant(character);
+                        }
+                        else if (isShift ^ isCapsLock)
                             character = char.ToUpperInvariant(character);
 
                         break;
@@ -302,6 +314,13 @@ namespace Consolonia.PlatformSupport
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+            
+            return;
+
+            static bool IsPrintableBmp(int codePoint)
+            {
+                return codePoint is >= 32 and (< 0xD800 or > 0xF8FF and <= 0xFFFF);
+            }
         }
 
         private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
