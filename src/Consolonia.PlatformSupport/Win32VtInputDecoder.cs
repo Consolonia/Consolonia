@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 using System.Text;
 using static Vanara.PInvoke.Kernel32;
 
@@ -24,6 +25,9 @@ namespace Consolonia.PlatformSupport
     ///         Mouse records carry the zero-based pixel position, for the console to divide into cells.
     ///     </para>
     /// </remarks>
+    // Vanara marks the console record types Windows-only; the decoder itself makes no Windows calls,
+    // so its tests run anywhere.
+    [SupportedOSPlatform("windows")]
     internal sealed class Win32VtInputDecoder
     {
         private const char Escape = '\u001b';
