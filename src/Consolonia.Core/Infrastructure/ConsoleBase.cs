@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -11,6 +12,7 @@ using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
+using Consolonia.Core.Text;
 
 namespace Consolonia.Core.Infrastructure
 {
@@ -190,6 +192,26 @@ namespace Consolonia.Core.Infrastructure
         public virtual void SetTitle(string title)
         {
             _consoleOutput.SetTitle(title);
+        }
+
+        /// <inheritdoc />
+        public IReadOnlySet<string> SupportedPointerShapes { get; protected set; } = new HashSet<string>();
+
+        /// <summary>
+        ///     True when the terminal takes X11 cursor names (xterm) rather than CSS ones; the shapes
+        ///     in <see cref="SupportedPointerShapes" /> are CSS names either way.
+        /// </summary>
+        protected bool PointerShapesUseX11Names { get; set; }
+
+        /// <inheritdoc />
+        public virtual void SetPointerShape(string shape)
+        {
+            string name = PointerShapesUseX11Names ? PointerShapes.ToX11(shape) : shape;
+            if (name == null)
+                return;
+
+            WriteText(Esc.SetPointerShape(name));
+            Flush();
         }
 
         public virtual void ShowCaret()

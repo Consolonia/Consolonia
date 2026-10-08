@@ -27,7 +27,7 @@ using static Vanara.PInvoke.Kernel32;
 namespace Consolonia.PlatformSupport
 {
     [SupportedOSPlatform("windows")]
-    public class Win32Console : ConsoleBase
+    public partial class Win32Console : ConsoleBase
     {
         private static readonly FlagTranslator<CONTROL_KEY_STATE, RawInputModifiers>
             KeyModifiersTranslator = new(
@@ -82,6 +82,7 @@ namespace Consolonia.PlatformSupport
 
             // ReSharper disable VirtualMemberCallInConstructor
             PrepareConsole();
+            TryToSupportPointerShapes();
 
             // we will have a consolewindow if we are running in GUI context.
             Capabilities |= ConsoleCapabilities.SupportsMouseButtons |

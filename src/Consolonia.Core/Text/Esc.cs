@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia.Media;
 
 namespace Consolonia.Core.Text
@@ -101,6 +102,14 @@ namespace Consolonia.Core.Text
         // parsed in chunks is applied atomically instead of tearing.
         public const string BeginSynchronizedUpdate = "\u001b[?2026h";
         public const string EndSynchronizedUpdate = "\u001b[?2026l";
+
+        /// <summary>
+        ///     XTVERSION: asks the terminal its name and version, answered <c>DCS &gt; | text ST</c>.
+        /// </summary>
+        public const string QueryTerminalVersion = "\u001b[>q";
+
+        /// <summary>Kitty pointer shapes (OSC 22): give the pointer back to the terminal's own choice.</summary>
+        public const string ResetPointerShape = "\u001b]22;\u001b\\";
 
         // move cursor
         public static string MoveCursorUp(int n)
@@ -219,6 +228,24 @@ namespace Consolonia.Core.Text
         public static string SetWindowTitle(string title)
         {
             return $"\u001b]0;{title}\u0007";
+        }
+
+        /// <summary>
+        ///     Kitty pointer shapes (OSC 22): set the mouse pointer to a CSS cursor name.
+        /// </summary>
+        public static string SetPointerShape(string shape)
+        {
+            return $"\u001b]22;{shape}\u001b\\";
+        }
+
+        /// <summary>
+        ///     Kitty pointer shapes (OSC 22): ask which of <paramref name="shapes" /> the terminal has.
+        ///     It answers <c>OSC 22 ; 1,0,... ST</c>, one flag per name; a terminal without the
+        ///     protocol does not answer at all.
+        /// </summary>
+        public static string QueryPointerShapes(IEnumerable<string> shapes)
+        {
+            return $"\u001b]22;?{string.Join(',', shapes)}\u001b\\";
         }
     }
 }
