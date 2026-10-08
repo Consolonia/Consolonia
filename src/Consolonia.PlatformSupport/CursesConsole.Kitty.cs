@@ -299,8 +299,10 @@ namespace Consolonia.PlatformSupport
         private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
         {
             const double velocity = 1;
-            // SGR mouse coordinates are 1-based
-            var point = new Point(mouseEvent.x - 1, mouseEvent.y - 1);
+            // SGR mouse coordinates are 1-based, and in pixels under SGR-Pixels
+            Point point = _pixelMouse
+                ? PixelToCell(mouseEvent.x, mouseEvent.y)
+                : new Point(mouseEvent.x - 1, mouseEvent.y - 1);
 
             int buttonCode = mouseEvent.button;
 
