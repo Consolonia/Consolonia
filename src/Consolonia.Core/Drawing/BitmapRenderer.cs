@@ -77,17 +77,21 @@ namespace Consolonia.Core.Drawing
             var readableSource = (IReadableBitmapImpl)source;
             using ILockedFramebuffer sourceFrame = readableSource.Lock();
 
+            // The pixels actually there. Not source.PixelSize: an AspectRatioAdjustedBitmap reports half
+            // its height to layout, and measuring by that put the picture's top half where all of it goes.
+            PixelSize sourceSize = sourceFrame.Size;
+
             // drawn at its own size: the visible part is a plain copy
-            if (source.PixelSize == targetSize)
+            if (sourceSize == targetSize)
                 return CopyWindow(sourceFrame, visible.X, visible.Y, visible.Width, visible.Height);
 
             // the source pixels behind the visible part, widened to whole pixels
-            double scaleX = (double)source.PixelSize.Width / targetSize.Width;
-            double scaleY = (double)source.PixelSize.Height / targetSize.Height;
-            int left = Math.Clamp((int)Math.Floor(visible.X * scaleX), 0, source.PixelSize.Width - 1);
-            int top = Math.Clamp((int)Math.Floor(visible.Y * scaleY), 0, source.PixelSize.Height - 1);
-            int right = Math.Clamp((int)Math.Ceiling(visible.Right * scaleX), left + 1, source.PixelSize.Width);
-            int bottom = Math.Clamp((int)Math.Ceiling(visible.Bottom * scaleY), top + 1, source.PixelSize.Height);
+            double scaleX = (double)sourceSize.Width / targetSize.Width;
+            double scaleY = (double)sourceSize.Height / targetSize.Height;
+            int left = Math.Clamp((int)Math.Floor(visible.X * scaleX), 0, sourceSize.Width - 1);
+            int top = Math.Clamp((int)Math.Floor(visible.Y * scaleY), 0, sourceSize.Height - 1);
+            int right = Math.Clamp((int)Math.Ceiling(visible.Right * scaleX), left + 1, sourceSize.Width);
+            int bottom = Math.Clamp((int)Math.Ceiling(visible.Bottom * scaleY), top + 1, sourceSize.Height);
 
             // Scaled as a piece, then cut down to the visible part: widening put the piece's edge a
             // fraction of a pixel outside it, and this is where that fraction comes back off.
