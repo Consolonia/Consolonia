@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -19,7 +18,8 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal sealed class SixelBitmapRenderer : BitmapRenderer
     {
-        private static readonly ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, PixelBuffer>>
+        private static readonly
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, PixelBuffer>>>
             RenderedBitmapCache = new();
 
         public SixelBitmapRenderer(DrawingContextImpl context)
@@ -28,85 +28,54 @@ namespace Consolonia.Core.Drawing
         }
 
         public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect)
+            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
         {
             int cellPixelWidth = Context.ConsoleWindowImpl.Console.CellPixelWidth;
             int cellPixelHeight = Context.ConsoleWindowImpl.Console.CellPixelHeight;
 
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
-            var visibleRectInTarget = new PixelRect(
-                intersectedRect.X - targetRect.X,
-                intersectedRect.Y - targetRect.Y,
-                intersectedRect.Width,
-                intersectedRect.Height);
+            PixelRect visibleCells = VisibleCellsInTarget(targetRect, intersectedRect);
+            var key = new BitmapQuantizedCacheKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
+                interpolationMode);
 
-            PixelBuffer renderedBitmap = GetOrCreateRenderedBitmap(source, targetSize, () =>
+            // only the visible cells are rendered, so the rendering starts at the first of them
+            PixelBuffer renderedBitmap = GetOrRender(RenderedBitmapCache, source, key, () =>
             {
-                var fullTargetSize = new PixelSize(targetSize.Width, targetSize.Height);
+                var visibleSize = new PixelSize(visibleCells.Width * cellPixelWidth,
+                    visibleCells.Height * cellPixelHeight);
+                byte[] visibleBytes = GetVisiblePixels(source, renderInterface, targetSize,
+                    new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
+                        visibleSize.Width, visibleSize.Height),
+                    interpolationMode);
 
-                using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
-                    ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
-                    : null;
+                // Quantize the visible image once to get a shared palette
+                var fullSixel = Sixel.CreateFromBitmap(visibleBytes,
+                    visibleSize.Width, visibleSize.Height,
+                    cellPixelWidth, cellPixelHeight);
 
-                IBitmapImpl bitmapToRead = resizedBitmap ?? source;
-                var readableBitmap = (IReadableBitmapImpl)bitmapToRead;
+                var bitmapBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
+                byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
 
-                using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
-
-                unsafe
+                for (int cellY = 0; cellY < visibleCells.Height; cellY++)
+                for (int cellX = 0; cellX < visibleCells.Width; cellX++)
                 {
-                    ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                        ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
-                        frameBuffer.RowBytes * frameBuffer.Size.Height);
+                    FillCellBgrxBuffer(visibleBytes, visibleSize.Width, cellX, cellY,
+                        cellPixelWidth, cellPixelHeight, cellBgrx);
 
-                    byte[] fullBytes = CopyVisibleBitmapBytes(pixelBytes, frameBuffer.RowBytes,
-                        fullTargetSize, 0, 0);
-
-                    // Quantize the full image once to get a shared palette
-                    var fullSixel = Sixel.CreateFromBitmap(fullBytes,
-                        fullTargetSize.Width, fullTargetSize.Height,
-                        cellPixelWidth, cellPixelHeight);
-
-                    var bitmapBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
-                    byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
-
-                    for (int cellY = 0; cellY < targetRect.Height; cellY++)
-                    for (int cellX = 0; cellX < targetRect.Width; cellX++)
-                    {
-                        FillCellBgrxBuffer(fullBytes, fullTargetSize.Width, cellX, cellY,
-                            cellPixelWidth, cellPixelHeight, cellBgrx);
-
-                        var cellSixel = Sixel.CreateFromBitmap(cellBgrx,
-                            cellPixelWidth, cellPixelHeight,
-                            cellPixelWidth, cellPixelHeight, fullSixel.Palette);
-                        bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                            new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
-                            PixelBackground.Transparent);
-                    }
-
-                    return bitmapBuffer;
+                    var cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                        cellPixelWidth, cellPixelHeight,
+                        cellPixelWidth, cellPixelHeight, fullSixel.Palette);
+                    bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                        new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
+                        PixelBackground.Transparent);
                 }
+
+                return bitmapBuffer;
             });
 
-            CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect, visibleRectInTarget);
-        }
-
-        private static byte[] CopyVisibleBitmapBytes(ReadOnlySpan<byte> pixelBytes, int rowBytes,
-            PixelSize visibleTargetSize, int visibleOffsetX, int visibleOffsetY)
-        {
-            int visibleRowBytes = visibleTargetSize.Width * 4;
-            byte[] visibleBytes = GC.AllocateUninitializedArray<byte>(visibleRowBytes * visibleTargetSize.Height);
-
-            for (int row = 0; row < visibleTargetSize.Height; row++)
-            {
-                int sourceOffset = (visibleOffsetY + row) * rowBytes + visibleOffsetX * 4;
-                int targetOffset = row * visibleRowBytes;
-                pixelBytes.Slice(sourceOffset, visibleRowBytes)
-                    .CopyTo(visibleBytes.AsSpan(targetOffset, visibleRowBytes));
-            }
-
-            return visibleBytes;
+            CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect,
+                new PixelRect(0, 0, visibleCells.Width, visibleCells.Height));
         }
 
         private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,
@@ -123,33 +92,6 @@ namespace Consolonia.Core.Drawing
                 bgrx.Slice(sourceOffset, cellRowBytes)
                     .CopyTo(cellBgrx.Slice(targetOffset, cellRowBytes));
             }
-        }
-
-        private static PixelBuffer GetOrCreateRenderedBitmap(IBitmapImpl source, PixelSize targetSize,
-            Func<PixelBuffer> factory)
-        {
-            IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
-            Dictionary<BitmapQuantizedCacheKey, PixelBuffer> perBitmap =
-                RenderedBitmapCache.GetOrCreateValue(cacheSource);
-            var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
-
-            if (perBitmap.TryGetValue(key, out PixelBuffer renderedBitmap))
-                return renderedBitmap;
-
-            // A new version (next animation frame) makes every older version's cells unreachable;
-            // drop them so an animated bitmap does not keep one rendered buffer per frame.
-            List<BitmapQuantizedCacheKey> staleKeys = null;
-            foreach (BitmapQuantizedCacheKey existing in perBitmap.Keys)
-                if (existing.Version != cacheSource.Version)
-                    (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(existing);
-
-            if (staleKeys != null)
-                foreach (BitmapQuantizedCacheKey staleKey in staleKeys)
-                    perBitmap.Remove(staleKey);
-
-            renderedBitmap = factory();
-            perBitmap[key] = renderedBitmap;
-            return renderedBitmap;
         }
     }
 }

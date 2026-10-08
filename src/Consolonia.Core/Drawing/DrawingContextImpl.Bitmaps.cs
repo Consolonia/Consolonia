@@ -4,6 +4,7 @@
 using System;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -41,7 +42,20 @@ namespace Consolonia.Core.Drawing
             var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
 
             _bitmapRenderer ??= CreateBitmapRenderer();
-            _bitmapRenderer.Draw(source, renderInterface, targetRect, intersectedRect);
+            _bitmapRenderer.Draw(source, renderInterface, targetRect, intersectedRect, GetBitmapInterpolationMode());
+        }
+
+        /// <summary>
+        ///     The interpolation the innermost render options ask for (RenderOptions.BitmapInterpolationMode, so
+        ///     an Image can keep its pixels hard-edged when enlarged), or medium quality when none do.
+        /// </summary>
+        private BitmapInterpolationMode GetBitmapInterpolationMode()
+        {
+            foreach (RenderOptions renderOptions in _renderOptions)
+                if (renderOptions.BitmapInterpolationMode != BitmapInterpolationMode.Unspecified)
+                    return renderOptions.BitmapInterpolationMode;
+
+            return BitmapInterpolationMode.MediumQuality;
         }
 
         public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
