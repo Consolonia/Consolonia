@@ -52,12 +52,33 @@ namespace Consolonia.Core.Drawing
             PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode);
 
         /// <summary>
-        ///     The part of <paramref name="intersectedRect" /> inside <paramref name="targetRect" />, in cells
-        ///     relative to the target.
+        ///     The part of <paramref name="targetRect" /> on screen, in cells relative to the target: what a
+        ///     rendering covers.
         /// </summary>
-        protected static PixelRect VisibleCellsInTarget(PixelRect targetRect, PixelRect intersectedRect)
+        /// <remarks>
+        ///     The screen, not the clip. A partial redraw (a dialog opening over the picture, say) clips to
+        ///     the region being redrawn, and rendering by that clip made a rendering per redraw region. The
+        ///     cells outside it still showed the earlier rendering, and once the cache evicted that one, the
+        ///     kitty renderer deleted its image and those cells went blank. The screen bounds the size just
+        ///     as well, and stays the same however the picture is redrawn.
+        /// </remarks>
+        protected PixelRect OnScreenCellsInTarget(PixelRect targetRect)
         {
-            return new PixelRect(intersectedRect.X - targetRect.X, intersectedRect.Y - targetRect.Y,
+            var screen = new PixelRect(0, 0, Context.PixelBuffer.Width, Context.PixelBuffer.Height);
+            PixelRect onScreen = screen.Intersect(targetRect);
+            return new PixelRect(onScreen.X - targetRect.X, onScreen.Y - targetRect.Y,
+                onScreen.Width, onScreen.Height);
+        }
+
+        /// <summary>
+        ///     Where <paramref name="intersectedRect" /> falls in a rendering of <paramref name="renderedCells" />
+        ///     (cells relative to <paramref name="targetRect" />).
+        /// </summary>
+        protected static PixelRect IntersectedRectInRendering(PixelRect targetRect, PixelRect renderedCells,
+            PixelRect intersectedRect)
+        {
+            return new PixelRect(intersectedRect.X - targetRect.X - renderedCells.X,
+                intersectedRect.Y - targetRect.Y - renderedCells.Y,
                 intersectedRect.Width, intersectedRect.Height);
         }
 

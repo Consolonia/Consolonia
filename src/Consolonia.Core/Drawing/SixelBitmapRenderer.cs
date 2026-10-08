@@ -35,7 +35,7 @@ namespace Consolonia.Core.Drawing
 
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
-            PixelRect visibleCells = VisibleCellsInTarget(targetRect, intersectedRect);
+            PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
             var key = new BitmapQuantizedCacheKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
                 interpolationMode);
 
@@ -75,7 +75,7 @@ namespace Consolonia.Core.Drawing
             });
 
             CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect,
-                new PixelRect(0, 0, visibleCells.Width, visibleCells.Height));
+                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
         }
 
         private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,

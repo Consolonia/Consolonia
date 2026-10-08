@@ -41,7 +41,7 @@ namespace Consolonia.Core.Drawing
 
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
-            PixelRect visibleCells = VisibleCellsInTarget(targetRect, intersectedRect);
+            PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
             var key = new BitmapQuantizedCacheKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
                 interpolationMode);
 
@@ -54,9 +54,9 @@ namespace Consolonia.Core.Drawing
                 evicted => Context.ConsoleWindowImpl.Console.WriteText(
                     KittyGraphics.BuildDeleteSequence(evicted.ImageId)));
 
-            // only the visible cells are rendered, so the rendering starts at the first of them
+            // only the on-screen cells are rendered, so the rendering starts at the first of them
             CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap.Cells, intersectedRect,
-                new PixelRect(0, 0, visibleCells.Width, visibleCells.Height));
+                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
         }
 
         private KittyRenderedBitmap TransmitAndCreateCells(IBitmapImpl source,
