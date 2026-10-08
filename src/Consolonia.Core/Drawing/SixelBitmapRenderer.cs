@@ -16,11 +16,23 @@ namespace Consolonia.Core.Drawing
     ///     Renders a bitmap as per-cell sixel images with fine-grained dirty region tracking.
     ///     Requires a terminal with sixel support.
     /// </summary>
+    /// <remarks>
+    ///     Each cell's sixel is kept by the pixels it shows and reused wherever they show again. The
+    ///     pixel buffer compares sixels by identity, so a cell whose pixels did not change stays the
+    ///     same sixel, is not dirty, and is not written again: a change to the picture rewrites only
+    ///     the cells it touched. Every sixel carries its own palette, so one made with an earlier
+    ///     rendering's palette sits beside new ones unchanged.
+    /// </remarks>
     internal sealed class SixelBitmapRenderer : BitmapRenderer
     {
+        /// <summary>Cell sixels kept for reuse: a few screens' worth.</summary>
+        private const int CellSixelBudget = 32 * 1024;
+
         private static readonly
             ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, PixelBuffer>>>
             RenderedBitmapCache = new();
+
+        private static readonly ContentCache<Sixel> CellSixels = new(CellSixelBudget);
 
         public SixelBitmapRenderer(DrawingContextImpl context)
             : base(context)
@@ -49,10 +61,8 @@ namespace Consolonia.Core.Drawing
                         visibleSize.Width, visibleSize.Height),
                     interpolationMode);
 
-                // Quantize the visible image once to get a shared palette
-                var fullSixel = Sixel.CreateFromBitmap(visibleBytes,
-                    visibleSize.Width, visibleSize.Height,
-                    cellPixelWidth, cellPixelHeight);
+                // Quantize the visible image once to get a shared palette, only if some cell is new
+                byte[] palette = null;
 
                 var bitmapBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
                 byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
@@ -63,9 +73,17 @@ namespace Consolonia.Core.Drawing
                     FillCellBgrxBuffer(visibleBytes, visibleSize.Width, cellX, cellY,
                         cellPixelWidth, cellPixelHeight, cellBgrx);
 
-                    var cellSixel = Sixel.CreateFromBitmap(cellBgrx,
-                        cellPixelWidth, cellPixelHeight,
-                        cellPixelWidth, cellPixelHeight, fullSixel.Palette);
+                    ContentKey cellKey = ContentKey.Of(cellBgrx, cellPixelWidth, cellPixelHeight);
+                    if (!CellSixels.TryGet(cellKey, out Sixel cellSixel))
+                    {
+                        palette ??= Sixel.CreateFromBitmap(visibleBytes,
+                            visibleSize.Width, visibleSize.Height,
+                            cellPixelWidth, cellPixelHeight).Palette;
+                        cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                            cellPixelWidth, cellPixelHeight,
+                            cellPixelWidth, cellPixelHeight, palette);
+                        CellSixels.Add(cellKey, cellSixel, 1);
+                    }
                     bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
                         new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
                         PixelBackground.Transparent);

@@ -153,6 +153,39 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(_buffer[2, 1].Foreground.Symbol.Sixel, Is.SameAs(whole));
         }
 
+        /// <summary>
+        ///     An edit to the picture (a new bitmap, as a paint program publishes per stroke) keeps the sixel
+        ///     of every cell it did not touch, so only the touched cells are dirty and written again.
+        /// </summary>
+        [Test]
+        public void EditedPictureKeepsTheSixelsOfUntouchedCells()
+        {
+            const int cellsWide = 4;
+            const int cellsHigh = 3;
+            int cellWidth = _console.CellPixelWidth;
+            int cellHeight = _console.CellPixelHeight;
+            var size = new PixelSize(cellsWide * cellWidth, cellsHigh * cellHeight);
+            var destRect = new Rect(0, 0, cellsWide, cellsHigh);
+
+            using var before = new FakeReadableBitmap(size);
+            _dc.DrawBitmap(before, 1, new Rect(destRect.Size), destRect);
+            var sixels = new Sixel[cellsWide, cellsHigh];
+            for (ushort y = 0; y < cellsHigh; y++)
+            for (ushort x = 0; x < cellsWide; x++)
+                sixels[x, y] = _buffer[x, y].Foreground.Symbol.Sixel;
+
+            // the same picture with one pixel of cell 2,1 painted over
+            using FakeReadableBitmap after = new FakeReadableBitmap(size)
+                .Fill(new PixelRect(2 * cellWidth + 1, cellHeight + 1, 1, 1), 0, 0, 255);
+            _dc.DrawBitmap(after, 1, new Rect(destRect.Size), destRect);
+
+            for (ushort y = 0; y < cellsHigh; y++)
+            for (ushort x = 0; x < cellsWide; x++)
+                Assert.That(_buffer[x, y].Foreground.Symbol.Sixel,
+                    x == 2 && y == 1 ? Is.Not.SameAs(sixels[x, y]) : Is.SameAs(sixels[x, y]),
+                    $"cell {x},{y}");
+        }
+
         public void Dispose()
         {
             _consoleWindowImpl?.Dispose();
@@ -185,6 +218,22 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             }
 
             private int RowBytes { get; }
+
+            /// <summary>Paints <paramref name="area" /> one opaque color.</summary>
+            public FakeReadableBitmap Fill(PixelRect area, byte blue, byte green, byte red)
+            {
+                for (int y = area.Y; y < area.Bottom; y++)
+                for (int x = area.X; x < area.Right; x++)
+                {
+                    int offset = y * RowBytes + x * 4;
+                    _pixels[offset] = blue;
+                    _pixels[offset + 1] = green;
+                    _pixels[offset + 2] = red;
+                    _pixels[offset + 3] = 255;
+                }
+
+                return this;
+            }
 
             public Vector Dpi => new(96, 96);
 

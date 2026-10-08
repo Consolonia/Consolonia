@@ -149,34 +149,30 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Returns the rendering cached for <paramref name="key" />, or makes one with
-        ///     <paramref name="render" />. Renderings of older versions are dropped, and the oldest of the
-        ///     current version once there are too many, each passed to <paramref name="evicted" />.
+        ///     <paramref name="render" />. A cached one that fails <paramref name="validate" /> is made again.
+        ///     Renderings of older versions are dropped, and the oldest of the current version once there are
+        ///     too many.
         /// </summary>
         protected static T GetOrRender<T>(
             ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, T>>> cache,
-            IBitmapImpl source, BitmapQuantizedCacheKey key, Func<T> render, Action<T> evicted = null)
+            IBitmapImpl source, BitmapQuantizedCacheKey key, Func<T> render, Func<T, bool> validate = null)
         {
             List<KeyValuePair<BitmapQuantizedCacheKey, T>> renderings =
                 cache.GetOrCreateValue(GetCacheBitmapImpl(source));
 
-            foreach (KeyValuePair<BitmapQuantizedCacheKey, T> rendering in renderings)
-                if (rendering.Key == key)
-                    return rendering.Value;
+            int cached = renderings.FindIndex(rendering => rendering.Key == key);
+            if (cached >= 0)
+            {
+                if (validate == null || validate(renderings[cached].Value))
+                    return renderings[cached].Value;
+                renderings.RemoveAt(cached);
+            }
 
             // a new version (next animation frame) makes every older version's renderings unreachable
-            renderings.RemoveAll(rendering =>
-            {
-                if (rendering.Key.Version == key.Version)
-                    return false;
-                evicted?.Invoke(rendering.Value);
-                return true;
-            });
+            renderings.RemoveAll(rendering => rendering.Key.Version != key.Version);
 
             while (renderings.Count >= MaxRenderingsPerBitmap)
-            {
-                evicted?.Invoke(renderings[0].Value);
                 renderings.RemoveAt(0);
-            }
 
             T value = render();
             renderings.Add(new KeyValuePair<BitmapQuantizedCacheKey, T>(key, value));
