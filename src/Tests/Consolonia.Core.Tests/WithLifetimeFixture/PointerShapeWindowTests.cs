@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
@@ -48,6 +49,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             public ConsoleCapabilities Capabilities => ConsoleCapabilities.SupportsAltSolo;
             public PixelBufferSize Size { get; set; } = new(80, 25);
+            public int CellPixelWidth => 8;
+            public int CellPixelHeight => 16;
             public IReadOnlySet<string> SupportedPointerShapes => supported;
 
             public void SetPointerShape(string shape)
@@ -98,6 +101,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             }
 
             public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
+            {
+            }
+
+            public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
             {
             }
 
