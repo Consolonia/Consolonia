@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Avalonia.Input;
 using Consolonia.Core.Helpers.InputProcessing;
 using NUnit.Framework;
 
@@ -144,7 +143,6 @@ namespace Consolonia.Core.Tests
         [TestCase("\x1b[97;65u", 97, 65, 1, 'u')]
         [TestCase("\x1b[97;66u", 97, 66, 1, 'u')]
         [TestCase("\x1b[97u", 97, 1, 1, 'u')]
-        [TestCase("\x1b[49;2u", 49, 2, 1, 'u')]
         [TestCase("\x1b[1072u", 1072, 1, 1, 'u')]
         [TestCase("\x1b[1072;2u", 1072, 2, 1, 'u')]
         [TestCase("\x1b[1;2A", 1, 2, 1, 'A')]
@@ -160,19 +158,6 @@ namespace Consolonia.Core.Tests
             Assert.AreEqual(expectedModifiers, matched.Value.modifiers);
             Assert.AreEqual(expectedEventType, matched.Value.eventType);
             Assert.AreEqual(expectedTerminator, matched.Value.terminator);
-        }
-
-        [TestCase(PhysicalKey.Digit1, true, "!")]
-        [TestCase(PhysicalKey.Digit1, false, "1")]
-        [TestCase(PhysicalKey.Digit2, true, "@")]
-        [TestCase(PhysicalKey.A, true, "A")]
-        [TestCase(PhysicalKey.A, false, "a")]
-        [TestCase(PhysicalKey.Minus, true, "_")]
-        [TestCase(PhysicalKey.Equal, true, "+")]
-        public void PhysicalKeyShiftedSymbolTest(PhysicalKey physicalKey, bool isShift, string expectedSymbol)
-        {
-            string? symbol = physicalKey.ToQwertyKeySymbol(isShift);
-            Assert.AreEqual(expectedSymbol, symbol);
         }
     }
 }

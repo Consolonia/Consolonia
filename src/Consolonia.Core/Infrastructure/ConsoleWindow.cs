@@ -440,19 +440,13 @@ namespace Consolonia.Core.Infrastructure
 
                 if (tryAsTextInput &&
                     !rawInputEventArgs.Handled
+                    && !char.IsControl(keyChar)
                     && !rawInputModifiers.HasFlag(RawInputModifiers.Alt)
                     && !rawInputModifiers.HasFlag(RawInputModifiers.Control))
-                {
-                    string text = rawInputEventArgs.KeySymbol;
-                    if (string.IsNullOrEmpty(text) && !char.IsControl(keyChar))
-                        text = keyChar.ToString();
-
-                    if (!string.IsNullOrEmpty(text))
-                        Input!(new RawTextInputEventArgs(_myKeyboardDevice,
-                            timeStamp,
-                            _inputRoot,
-                            text));
-                }
+                    Input!(new RawTextInputEventArgs(_myKeyboardDevice,
+                        timeStamp,
+                        _inputRoot,
+                        keyChar.ToString()));
             }
         }
 
@@ -467,24 +461,14 @@ namespace Consolonia.Core.Infrastructure
 
         private static string GetKeySymbol(char keyChar, RawInputModifiers rawInputModifiers, PhysicalKey physicalKey)
         {
-            if (rawInputModifiers.HasFlag(RawInputModifiers.Shift) && physicalKey != PhysicalKey.None)
-            {
-                string qwertySymbol = physicalKey.ToQwertyKeySymbol(true);
-                if (!string.IsNullOrEmpty(qwertySymbol))
-                    return qwertySymbol;
-            }
-
             if (!char.IsControl(keyChar))
                 return keyChar.ToString();
 
-            if (physicalKey != PhysicalKey.None)
-            {
-                string qwertySymbol = physicalKey.ToQwertyKeySymbol();
-                if (!string.IsNullOrEmpty(qwertySymbol))
-                    return qwertySymbol;
-            }
+            if (physicalKey == PhysicalKey.None)
+                return null;
 
-            return null;
+            string qwertySymbol = physicalKey.ToQwertyKeySymbol(rawInputModifiers.HasFlag(RawInputModifiers.Shift));
+            return string.IsNullOrEmpty(qwertySymbol) ? null : qwertySymbol;
         }
 
         private static PhysicalKey GetPhysicalKey(Key key)
@@ -515,13 +499,13 @@ namespace Consolonia.Core.Infrastructure
                 Key.OemPlus => PhysicalKey.Equal,
                 Key.OemComma => PhysicalKey.Comma,
                 Key.OemPeriod => PhysicalKey.Period,
-                Key.Oem1 or Key.OemSemicolon => PhysicalKey.Semicolon,
-                Key.Oem2 or Key.OemQuestion => PhysicalKey.Slash,
-                Key.Oem3 or Key.OemTilde => PhysicalKey.Backquote,
-                Key.Oem4 or Key.OemOpenBrackets => PhysicalKey.BracketLeft,
-                Key.Oem5 or Key.OemPipe => PhysicalKey.Backslash,
-                Key.Oem6 or Key.OemCloseBrackets => PhysicalKey.BracketRight,
-                Key.Oem7 or Key.OemQuotes => PhysicalKey.Quote,
+                Key.Oem1 => PhysicalKey.Semicolon,
+                Key.Oem2 => PhysicalKey.Slash,
+                Key.Oem3 => PhysicalKey.Backquote,
+                Key.Oem4 => PhysicalKey.BracketLeft,
+                Key.Oem5 => PhysicalKey.Backslash,
+                Key.Oem6 => PhysicalKey.BracketRight,
+                Key.Oem7 => PhysicalKey.Quote,
                 _ => PhysicalKey.None
             };
         }
