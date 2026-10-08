@@ -248,7 +248,7 @@ namespace Consolonia.PlatformSupport
                         };
                         break;
                     }
-                    case 'u' when keyCode >= 32:
+                    case 'u' when keyCode is >= 32 and (< 0xD800 or > 0xF8FF and <= 0xFFFF):
                     {
                         character = (char)keyCode;
                         switch (keyCode)
