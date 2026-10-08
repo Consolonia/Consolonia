@@ -111,6 +111,21 @@ namespace Consolonia.Core.Text
         /// <summary>Kitty pointer shapes (OSC 22): give the pointer back to the terminal's own choice.</summary>
         public const string ResetPointerShape = "\u001b]22;\u001b\\";
 
+        // DECRQM for DEC private mode 1016. Reply: "CSI ? 1016 ; <state> $ y", where state 1, 2 or
+        // 3 means the terminal can report the mouse in pixels and 0 means the mode is unknown.
+        public const string RequestSgrPixelsMouseMode = "\u001b[?1016$p";
+
+        // SGR-Pixels mouse mode: the same reports as SGR extended mouse mode (1006), but carrying
+        // the pointer's position in pixels instead of cells, so it can be placed within a cell.
+        public const string EnableSgrPixelsMouse = "\u001b[?1016h";
+        public const string DisableSgrPixelsMouse = "\u001b[?1016l";
+
+        // win32-input-mode: asks the Windows console to deliver each key as
+        // "CSI Vk ; Sc ; Uc ; Kd ; Cs ; Rc _" to a program reading virtual terminal input, rather
+        // than as the plain VT text it would otherwise turn the key into.
+        public const string EnableWin32InputMode = "\u001b[?9001h";
+        public const string DisableWin32InputMode = "\u001b[?9001l";
+
         // move cursor
         public static string MoveCursorUp(int n)
         {

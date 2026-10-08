@@ -28,6 +28,9 @@ namespace Consolonia.Core.Infrastructure
     {
         private readonly IConsoleOutput _consoleOutput;
 
+        /// <summary>The cell size the terminal reported, unrounded; empty when it reported none.</summary>
+        private Avalonia.Size _reportedCellPixelSize;
+
         protected ConsoleBase(IConsoleOutput consoleOutput)
         {
             if (consoleOutput is ConsoleBase)
@@ -142,6 +145,24 @@ namespace Consolonia.Core.Infrastructure
         public int CellPixelWidth => _consoleOutput.CellPixelWidth;
 
         public int CellPixelHeight => _consoleOutput.CellPixelHeight;
+
+        /// <summary>
+        ///     True when the terminal can report the mouse in pixels (SGR-Pixels, DEC private mode 1016)
+        ///     and has told us its cell size, without which those pixels cannot be turned back into cells.
+        /// </summary>
+        protected bool TerminalSupportsPixelMouse =>
+            _consoleOutput is AnsiConsoleOutput { SupportsSgrPixelsMouse: true } &&
+            _reportedCellPixelSize is { Width: > 0, Height: > 0 };
+
+        /// <summary>
+        ///     Turns the position in an SGR-Pixels mouse report (one-based pixels) into a cell position,
+        ///     keeping the fraction that says where in the cell the pointer is.
+        /// </summary>
+        protected Point PixelToCell(int x, int y)
+        {
+            return new Point(Math.Max(0, x - 1) / _reportedCellPixelSize.Width,
+                Math.Max(0, y - 1) / _reportedCellPixelSize.Height);
+        }
 
         public event Action Resized;
 
@@ -261,7 +282,10 @@ namespace Consolonia.Core.Infrastructure
             }
 
             if (widthPx > 0 && heightPx > 0 && cols > 0 && rows > 0)
+            {
+                _reportedCellPixelSize = new Avalonia.Size((double)widthPx / cols, (double)heightPx / rows);
                 return (widthPx / cols, heightPx / rows);
+            }
 
             return (8, 16);
         }
