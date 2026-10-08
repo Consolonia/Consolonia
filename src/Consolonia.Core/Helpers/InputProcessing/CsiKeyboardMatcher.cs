@@ -54,7 +54,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             int eventType = match.Groups[EventTypeGroupName].Success
                 ? int.Parse(match.Groups[EventTypeGroupName].Value)
                 : 1;
-            
+
             Group shiftedGroup = match.Groups[ShiftedKeyCodeGroupName];
             int shiftedKeyCode = shiftedGroup.Success && shiftedGroup.Length > 0
                 ? int.Parse(shiftedGroup.Value)

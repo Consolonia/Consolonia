@@ -302,7 +302,9 @@ namespace Consolonia.PlatformSupport
                                 character = char.ToLowerInvariant(character);
                         }
                         else if (isShift ^ isCapsLock)
+                        {
                             character = char.ToUpperInvariant(character);
+                        }
 
                         break;
                     }
@@ -314,7 +316,7 @@ namespace Consolonia.PlatformSupport
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
-            
+
             return;
 
             static bool IsPrintableBmp(int codePoint)
