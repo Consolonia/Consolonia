@@ -138,5 +138,24 @@ namespace Consolonia.Core.Tests
                 result = string.Join(" ", result, newStr);
             }
         }
+
+        [TestCase("\x1b[97;2u", 97, 2, 1, 'u')]
+        [TestCase("\x1b[97;65u", 97, 65, 1, 'u')]
+        [TestCase("\x1b[97;66u", 97, 66, 1, 'u')]
+        [TestCase("\x1b[97u", 97, 1, 1, 'u')]
+        [TestCase("\x1b[1;2A", 1, 2, 1, 'A')]
+        public void CsiKeyboardMatcherTest(string input, int expectedKey, int expectedModifiers, int expectedEventType, char expectedTerminator)
+        {
+            (int keyCode, int modifiers, int eventType, char terminator)? matched = null;
+            var matcher = new CsiKeyboardMatcher<char>(res => matched = res, c => new Rune(c));
+            var processor = new InputProcessor<char>([matcher]);
+            processor.ProcessChunk(input.ToCharArray());
+
+            Assert.IsNotNull(matched);
+            Assert.AreEqual(expectedKey, matched!.Value.keyCode);
+            Assert.AreEqual(expectedModifiers, matched.Value.modifiers);
+            Assert.AreEqual(expectedEventType, matched.Value.eventType);
+            Assert.AreEqual(expectedTerminator, matched.Value.terminator);
+        }
     }
 }

@@ -209,6 +209,7 @@ namespace Consolonia.PlatformSupport
             if ((modifierValue & 1) != 0) rawModifiers |= RawInputModifiers.Shift;
             if ((modifierValue & 2) != 0) rawModifiers |= RawInputModifiers.Alt;
             if ((modifierValue & 4) != 0) rawModifiers |= RawInputModifiers.Control;
+            bool isCapsLock = (modifierValue & 64) != 0;
 
             // Try to map the keycode based on terminator type
             Key key;
@@ -283,6 +284,10 @@ namespace Consolonia.PlatformSupport
                                 };
                                 break;
                         }
+
+                        bool isShift = rawModifiers.HasFlag(RawInputModifiers.Shift);
+                        if (isShift ^ isCapsLock)
+                            character = char.ToUpperInvariant(character);
 
                         break;
                     }
