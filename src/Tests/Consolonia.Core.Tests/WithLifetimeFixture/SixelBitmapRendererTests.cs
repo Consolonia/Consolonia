@@ -127,6 +127,32 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             }
         }
 
+        /// <summary>
+        ///     Regression test: a partial redraw (a dialog opening over the picture) clips to the region being
+        ///     redrawn, and a rendering was made per clip. The cells outside it kept showing the earlier one,
+        ///     which the cache could then evict, blanking them under kitty. A redraw of part of the picture
+        ///     reuses the rendering of the whole on-screen picture.
+        /// </summary>
+        [Test]
+        public void PartialRedrawReusesTheRenderingOfTheWholePicture()
+        {
+            const int cellsWide = 4;
+            const int cellsHigh = 3;
+            var size = new PixelSize(cellsWide * _console.CellPixelWidth, cellsHigh * _console.CellPixelHeight);
+            using var bitmap = new FakeReadableBitmap(size);
+            var destRect = new Rect(0, 0, cellsWide, cellsHigh);
+
+            _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect);
+            Sixel whole = _buffer[2, 1].Foreground.Symbol.Sixel;
+            _buffer[2, 1] = Pixel.Space;
+
+            _dc.PushClip(new Rect(1, 1, 2, 1));
+            _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect);
+            _dc.PopClip();
+
+            Assert.That(_buffer[2, 1].Foreground.Symbol.Sixel, Is.SameAs(whole));
+        }
+
         public void Dispose()
         {
             _consoleWindowImpl?.Dispose();
