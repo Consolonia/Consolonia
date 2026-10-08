@@ -237,7 +237,9 @@ namespace Consolonia.Core.Drawing
         {
             if (_fallback != null)
             {
-                IWriteableBitmapImpl bitmap = _fallback.LoadWriteableBitmapToWidth(stream, width, interpolationMode);
+                // The immutable kind, as LoadBitmap gives. Skia cannot resize a writeable one
+                // ("Invalid source bitmap type"), and drawing resizes it to the cells it covers.
+                IBitmapImpl bitmap = _fallback.LoadBitmapToWidth(stream, width, interpolationMode);
                 return new AspectRatioAdjustedBitmap(bitmap);
             }
 
@@ -249,7 +251,8 @@ namespace Consolonia.Core.Drawing
         {
             if (_fallback != null)
             {
-                IWriteableBitmapImpl bitmap = _fallback.LoadWriteableBitmapToHeight(stream, height, interpolationMode);
+                // Immutable, for the same reason as LoadBitmapToWidth.
+                IBitmapImpl bitmap = _fallback.LoadBitmapToHeight(stream, height, interpolationMode);
                 return new AspectRatioAdjustedBitmap(bitmap);
             }
 
@@ -267,12 +270,29 @@ namespace Consolonia.Core.Drawing
                     ? adjusted.InnerBitmap
                     : bitmapImpl;
 
+                // Skia resizes only immutable bitmaps and throws "Invalid source bitmap type" for a
+                // writeable one -- which DrawBitmap hands it whenever an app draws a WriteableBitmap
+                // at any size but its own. Copy the pixels into an immutable bitmap first.
+                if (sourceBitmap is IWriteableBitmapImpl writeable)
+                {
+                    using IBitmapImpl immutable = ToImmutable(writeable);
+                    return new AspectRatioAdjustedBitmap(
+                        _fallback.ResizeBitmap(immutable, destinationSize, interpolationMode));
+                }
+
                 IBitmapImpl bitmap = _fallback.ResizeBitmap(sourceBitmap, destinationSize, interpolationMode);
                 return new AspectRatioAdjustedBitmap(bitmap);
             }
 
             return ConsoloniaPlatform.RaiseNotSupported<IBitmapImpl>(NotSupportedRequestCode.BitmapsNotSupported, this,
                 nameof(ResizeBitmap));
+        }
+
+        private IBitmapImpl ToImmutable(IWriteableBitmapImpl writeable)
+        {
+            using ILockedFramebuffer frame = writeable.Lock();
+            return _fallback.LoadBitmap(frame.Format, writeable.AlphaFormat ?? AlphaFormat.Premul,
+                frame.Address, frame.Size, frame.Dpi, frame.RowBytes);
         }
 
         public IBitmapImpl LoadBitmap(PixelFormat format, AlphaFormat alphaFormat, IntPtr data, PixelSize size,
