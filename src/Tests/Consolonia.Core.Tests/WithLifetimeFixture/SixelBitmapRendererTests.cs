@@ -99,6 +99,55 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     $"cell {x},{y} should hold the second image");
         }
 
+        /// <summary>
+        ///     Regression test: a picture larger than the clip (zoomed, or scrolled partly out of view) was
+        ///     rendered whole, at a size a terminal can refuse outright, so it vanished. Only the visible
+        ///     cells are rendered now, and the cells outside the clip are left alone.
+        /// </summary>
+        [Test]
+        public void PictureLargerThanTheClipRendersOnlyItsVisibleCells()
+        {
+            const int cellsWide = 6;
+            const int cellsHigh = 4;
+            var size = new PixelSize(cellsWide * _console.CellPixelWidth, cellsHigh * _console.CellPixelHeight);
+            using var bitmap = new FakeReadableBitmap(size);
+
+            // scrolled two cells left and one up, and clipped to a 3x2 viewport
+            var destRect = new Rect(-2, -1, cellsWide, cellsHigh);
+            _dc.PushClip(new Rect(0, 0, 3, 2));
+            Assert.DoesNotThrow(() => _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect));
+            _dc.PopClip();
+
+            for (ushort y = 0; y < 3; y++)
+            for (ushort x = 0; x < 4; x++)
+            {
+                bool visible = x < 3 && y < 2;
+                Assert.That(_buffer[x, y].Foreground.Symbol.Sixel, visible ? Is.Not.Null : Is.Null,
+                    $"cell {x},{y}");
+            }
+        }
+
+        /// <summary>
+        ///     The visible part of a picture drawn at its own size is exactly its pixels under that part.
+        /// </summary>
+        [Test]
+        public void VisiblePixelsOfAPictureAtItsOwnSizeAreItsPixelsThere()
+        {
+            var size = new PixelSize(10, 8);
+            using var bitmap = new FakeReadableBitmap(size);
+            var visible = new PixelRect(3, 2, 4, 5);
+
+            byte[] pixels = BitmapRenderer.GetVisiblePixels(bitmap, null, size, visible,
+                Avalonia.Media.Imaging.BitmapInterpolationMode.None);
+
+            byte[] expected = new byte[visible.Width * visible.Height * 4];
+            using (ILockedFramebuffer frame = bitmap.Lock())
+                for (int row = 0; row < visible.Height; row++)
+                    Marshal.Copy(frame.Address + (visible.Y + row) * frame.RowBytes + visible.X * 4, expected,
+                        row * visible.Width * 4, visible.Width * 4);
+            Assert.That(pixels, Is.EqualTo(expected));
+        }
+
         public void Dispose()
         {
             _consoleWindowImpl?.Dispose();

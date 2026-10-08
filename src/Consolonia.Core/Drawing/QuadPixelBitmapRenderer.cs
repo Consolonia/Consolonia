@@ -25,12 +25,12 @@ namespace Consolonia.Core.Drawing
         }
 
         public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect)
+            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
         {
             // Resize source to be target rect * 2 so we can map to quad pixels
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
             using IBitmapImpl resizedBitmap =
-                renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
+                renderInterface.ResizeBitmap(source, targetSize, interpolationMode);
 
             var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
 

@@ -11,20 +11,21 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
     ///     Renders a bitmap via the kitty graphics protocol. Pixels are transmitted to the terminal once
-    ///     per bitmap version; every covered cell then carries a <see cref="KittyTile" /> in its
-    ///     BACKGROUND, which RenderTarget coalesces into classic placements below text (z=-2). Glyphs
+    ///     per bitmap version and visible part; every covered cell then carries a <see cref="KittyTile" /> in
+    ///     its BACKGROUND, which RenderTarget coalesces into classic placements below text (z=-2). Glyphs
     ///     drawn later composite over the picture, an opaque background evicts it, and pixel buffer
     ///     diffing and occlusion work unchanged while redraws cost no pixel retransmission.
     /// </summary>
     internal sealed class KittyBitmapRenderer : BitmapRenderer
     {
         private static readonly
-            ConditionalWeakTable<IBitmapImpl, Dictionary<BitmapQuantizedCacheKey, KittyRenderedBitmap>>
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap>>>
             RenderedBitmapCache = new();
 
         public KittyBitmapRenderer(DrawingContextImpl context)
@@ -33,76 +34,57 @@ namespace Consolonia.Core.Drawing
         }
 
         public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect)
+            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
         {
             int cellPixelWidth = Context.ConsoleWindowImpl.Console.CellPixelWidth;
             int cellPixelHeight = Context.ConsoleWindowImpl.Console.CellPixelHeight;
 
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
-            var visibleRectInTarget = new PixelRect(
-                intersectedRect.X - targetRect.X,
-                intersectedRect.Y - targetRect.Y,
-                intersectedRect.Width,
-                intersectedRect.Height);
+            PixelRect visibleCells = VisibleCellsInTarget(targetRect, intersectedRect);
+            var key = new BitmapQuantizedCacheKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
+                interpolationMode);
 
-            PixelBuffer cellBuffer =
-                GetOrCreateCellBuffer(source, renderInterface, targetRect, targetSize);
+            // A new version (next animation frame) or visible part takes a fresh image id: a classic
+            // placement binds to the image it was created against, so the tiles must be re-keyed.
+            // Evicted renderings are deleted; GC'd bitmaps are cleaned up by KittyDeleteAllImages on restore.
+            KittyRenderedBitmap renderedBitmap = GetOrRender(RenderedBitmapCache, source, key,
+                () => TransmitAndCreateCells(source, renderInterface, targetSize, visibleCells, interpolationMode,
+                    cellPixelWidth, cellPixelHeight),
+                evicted => Context.ConsoleWindowImpl.Console.WriteText(
+                    KittyGraphics.BuildDeleteSequence(evicted.ImageId)));
 
-            CopyRenderedBitmapTrackingDirtyRegions(cellBuffer, intersectedRect, visibleRectInTarget);
-        }
-
-        private PixelBuffer GetOrCreateCellBuffer(IBitmapImpl source,
-            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
-        {
-            IBitmapImpl cacheSource = GetCacheBitmapImpl(source);
-            Dictionary<BitmapQuantizedCacheKey, KittyRenderedBitmap> perBitmap =
-                RenderedBitmapCache.GetOrCreateValue(cacheSource);
-            var key = new BitmapQuantizedCacheKey(cacheSource.Version, targetSize);
-
-            if (perBitmap.TryGetValue(key, out KittyRenderedBitmap renderedBitmap))
-                return renderedBitmap.Cells;
-
-            // A new version (next animation frame) takes a fresh image id: a classic placement binds
-            // to the image it was created against, so the tiles must be re-keyed. Stale versions are
-            // deleted; GC'd bitmaps are cleaned up by KittyDeleteAllImages on restore.
-            List<BitmapQuantizedCacheKey> staleKeys = null;
-            foreach (KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap> pair in perBitmap)
-                if (pair.Key.Version != cacheSource.Version)
-                {
-                    Context.ConsoleWindowImpl.Console.WriteText(
-                        KittyGraphics.BuildDeleteSequence(pair.Value.ImageId));
-                    (staleKeys ??= new List<BitmapQuantizedCacheKey>()).Add(pair.Key);
-                }
-
-            if (staleKeys != null)
-                foreach (BitmapQuantizedCacheKey staleKey in staleKeys)
-                    perBitmap.Remove(staleKey);
-
-            renderedBitmap = TransmitAndCreateCells(source, renderInterface, targetRect, targetSize);
-            perBitmap[key] = renderedBitmap;
-            return renderedBitmap.Cells;
+            // only the visible cells are rendered, so the rendering starts at the first of them
+            CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap.Cells, intersectedRect,
+                new PixelRect(0, 0, visibleCells.Width, visibleCells.Height));
         }
 
         private KittyRenderedBitmap TransmitAndCreateCells(IBitmapImpl source,
-            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelSize targetSize)
+            IPlatformRenderInterface renderInterface, PixelSize targetSize, PixelRect visibleCells,
+            BitmapInterpolationMode interpolationMode, int cellPixelWidth, int cellPixelHeight)
         {
-            byte[] imageData = ExtractImageData(source, renderInterface, targetSize,
+            var visibleSize = new PixelSize(visibleCells.Width * cellPixelWidth,
+                visibleCells.Height * cellPixelHeight);
+            byte[] visibleBytes = GetVisiblePixels(source, renderInterface, targetSize,
+                new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
+                    visibleSize.Width, visibleSize.Height),
+                interpolationMode);
+            byte[] imageData = EncodeImageData(visibleBytes, visibleSize, renderInterface,
                 out KittyImageFormat imageFormat);
 
             int imageId = KittyGraphics.AllocateImageId();
             Context.ConsoleWindowImpl.Console.WriteText(
-                KittyGraphics.BuildTransmitSequence(imageId, targetSize.Width, targetSize.Height, imageData,
+                KittyGraphics.BuildTransmitSequence(imageId, visibleSize.Width, visibleSize.Height, imageData,
                     imageFormat));
 
-            var cellBuffer = new PixelBuffer((ushort)targetRect.Width, (ushort)targetRect.Height);
+            var cellBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
 
             // image as cell BACKGROUND, foreground left free so glyphs drawn later composite
             // over the picture. The background color starts transparent: it is the wash that
             // translucent overlays accumulate, which RenderTarget lays over the image, and the
             // terminal cell itself is written black (occluding what the picture was drawn over)
-            for (int cellY = 0; cellY < targetRect.Height; cellY++)
-            for (int cellX = 0; cellX < targetRect.Width; cellX++)
+            for (int cellY = 0; cellY < visibleCells.Height; cellY++)
+            for (int cellX = 0; cellX < visibleCells.Width; cellX++)
                 cellBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
                     new PixelForeground(Symbol.Space, Colors.Transparent),
                     new PixelBackground(Colors.Transparent,
@@ -111,49 +93,41 @@ namespace Consolonia.Core.Drawing
             return new KittyRenderedBitmap(imageId, cellBuffer);
         }
 
-        private static byte[] ExtractImageData(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelSize targetSize, out KittyImageFormat format)
+        private static byte[] EncodeImageData(byte[] bgra, PixelSize size, IPlatformRenderInterface renderInterface,
+            out KittyImageFormat format)
         {
-            using IBitmapImpl resizedBitmap = !source.PixelSize.Equals(targetSize)
-                ? renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality)
-                : null;
-
-            IBitmapImpl bitmapToRead = resizedBitmap ?? source;
-
             // PNG is far smaller on the wire than raw RGBA (a full screen image is ~7MB raw, over
             // 9MB base64), which matters for the first paint and for every animation frame
-            byte[] png = TryEncodePng(bitmapToRead);
+            byte[] png = TryEncodePng(bgra, size, renderInterface);
             if (png != null)
             {
                 format = KittyImageFormat.Png;
                 return png;
             }
 
-            // fallback for bitmap implementations which cannot encode themselves
+            // fallback for render interfaces which cannot make an encodable bitmap
             format = KittyImageFormat.Rgba;
-            var readableBitmap = (IReadableBitmapImpl)bitmapToRead;
-
-            using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
-            unsafe
-            {
-                ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                    ref Unsafe.AsRef<byte>((void*)frameBuffer.Address),
-                    frameBuffer.RowBytes * frameBuffer.Size.Height);
-
-                return ConvertBgraToRgba(pixelBytes, frameBuffer.RowBytes, targetSize);
-            }
+            return ConvertBgraToRgba(bgra, size.Width * 4, size);
         }
 
-        private static byte[] TryEncodePng(IBitmapImpl bitmap)
+        private static unsafe byte[] TryEncodePng(byte[] bgra, PixelSize size, IPlatformRenderInterface renderInterface)
         {
             try
             {
-                // Avalonia saves as PNG via Skia; the bitmap is already scaled to the target size
-                using var stream = new MemoryStream();
-                bitmap.Save(stream);
-                return stream.ToArray();
+                // Avalonia saves as PNG via Skia
+                fixed (byte* pixels = bgra)
+                {
+                    using IBitmapImpl bitmap = renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
+                        (IntPtr)pixels, size, new Vector(96, 96), size.Width * 4);
+                    if (bitmap == null)
+                        return null;
+                    using var stream = new MemoryStream();
+                    bitmap.Save(stream);
+                    return stream.ToArray();
+                }
             }
-            catch (Exception exception) when (exception is NotSupportedException or NotImplementedException)
+            catch (Exception exception) when (exception is NotSupportedException or NotImplementedException
+                                                  or ConsoloniaNotSupportedException)
             {
                 return null;
             }
