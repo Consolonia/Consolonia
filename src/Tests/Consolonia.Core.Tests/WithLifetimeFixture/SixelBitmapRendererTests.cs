@@ -127,27 +127,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             }
         }
 
-        /// <summary>
-        ///     The visible part of a picture drawn at its own size is exactly its pixels under that part.
-        /// </summary>
-        [Test]
-        public void VisiblePixelsOfAPictureAtItsOwnSizeAreItsPixelsThere()
-        {
-            var size = new PixelSize(10, 8);
-            using var bitmap = new FakeReadableBitmap(size);
-            var visible = new PixelRect(3, 2, 4, 5);
-
-            byte[] pixels = BitmapRenderer.GetVisiblePixels(bitmap, null, size, visible,
-                Avalonia.Media.Imaging.BitmapInterpolationMode.None);
-
-            byte[] expected = new byte[visible.Width * visible.Height * 4];
-            using (ILockedFramebuffer frame = bitmap.Lock())
-                for (int row = 0; row < visible.Height; row++)
-                    Marshal.Copy(frame.Address + (visible.Y + row) * frame.RowBytes + visible.X * 4, expected,
-                        row * visible.Width * 4, visible.Width * 4);
-            Assert.That(pixels, Is.EqualTo(expected));
-        }
-
         public void Dispose()
         {
             _consoleWindowImpl?.Dispose();
@@ -157,7 +136,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         ///     Minimal readable bitmap over a pinned BGRA buffer. The real render interface cannot create one
         ///     here because Consolonia.Core.Tests has no Skia fallback.
         /// </summary>
-        private sealed class FakeReadableBitmap : IReadableBitmapImpl
+        internal sealed class FakeReadableBitmap : IReadableBitmapImpl
         {
             private readonly byte[] _pixels;
 
