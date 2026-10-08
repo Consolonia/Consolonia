@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Versioning;
 using Consolonia.PlatformSupport;
 using NUnit.Framework;
 using static Vanara.PInvoke.Kernel32;
@@ -7,6 +8,7 @@ using static Vanara.PInvoke.Kernel32;
 namespace Consolonia.Core.Tests
 {
     [TestFixture]
+    [SupportedOSPlatform("windows")]
     public class Win32VtInputDecoderTests
     {
         /// <summary>Terminal input as the console hands it over in virtual terminal input mode.</summary>
