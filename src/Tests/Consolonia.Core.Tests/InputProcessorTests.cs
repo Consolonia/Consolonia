@@ -143,6 +143,8 @@ namespace Consolonia.Core.Tests
         [TestCase("\x1b[97;65u", 97, 65, 1, 'u')]
         [TestCase("\x1b[97;66u", 97, 66, 1, 'u')]
         [TestCase("\x1b[97u", 97, 1, 1, 'u')]
+        [TestCase("\x1b[1072u", 1072, 1, 1, 'u')]
+        [TestCase("\x1b[1072;2u", 1072, 2, 1, 'u')]
         [TestCase("\x1b[1;2A", 1, 2, 1, 'A')]
         public void CsiKeyboardMatcherTest(string input, int expectedKey, int expectedModifiers, int expectedEventType, char expectedTerminator)
         {

@@ -248,7 +248,7 @@ namespace Consolonia.PlatformSupport
                         };
                         break;
                     }
-                    case 'u' when keyCode is >= 32 and < 127:
+                    case 'u' when keyCode >= 32:
                     {
                         character = (char)keyCode;
                         switch (keyCode)
@@ -266,7 +266,7 @@ namespace Consolonia.PlatformSupport
                             case ' ':
                                 key = Key.Space;
                                 break;
-                            default:
+                            case >= 32 and < 127:
                                 key = (char)keyCode switch
                                 {
                                     '.' => Key.OemPeriod,
@@ -282,6 +282,9 @@ namespace Consolonia.PlatformSupport
                                     '`' => Key.Oem3,
                                     _ => Key.None
                                 };
+                                break;
+                            default:
+                                key = Key.None;
                                 break;
                         }
 
