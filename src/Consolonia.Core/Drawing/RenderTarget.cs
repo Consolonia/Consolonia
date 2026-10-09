@@ -25,6 +25,9 @@ namespace Consolonia.Core.Drawing
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
 
+        /// <summary>The sixel pass's per-cell scratch, kept between frames so it is not reallocated.</summary>
+        private bool[]? _sixelVisited;
+
         private ConsoleCursor _consoleCursor;
 
         // classic rect placements coalesced from KittyTile cell backgrounds at z=-2, diffed across frames
@@ -223,9 +226,16 @@ namespace Consolonia.Core.Drawing
                     if (!dirtyRegions.Contains(x, y, false))
                         continue;
 
-                    // pass 1 has already written every dirty sixel cell
-                    if (pixel.Foreground.Symbol.Sixel != null)
-                        continue;
+                    Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;
+                    if (cellSixel != null)
+                    {
+                        // pass 1 has written this cell, unless the mouse cursor is over it: the cursor
+                        // is text, so the cell becomes a text cell on the picture's dominant color
+                        if (!IsUnderMouseCursor(x, y))
+                            continue;
+                        pixel = new Pixel(new PixelForeground(Symbol.Space, Colors.Transparent),
+                            new PixelBackground(cellSixel.DominantColor));
+                    }
 
                     // a tile cell's color is the wash for its image (laid over it by a wash placement);
                     // the cell itself is written with the terminal's default background (see
@@ -236,9 +246,7 @@ namespace Consolonia.Core.Drawing
                             pixel.CaretStyle);
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
-                    if (!_consoleCursor.IsEmpty() &&
-                        _consoleCursor.Coordinate.Y == y &&
-                        _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
+                    if (IsUnderMouseCursor(x, y))
                     {
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
                         {
@@ -540,61 +548,85 @@ namespace Consolonia.Core.Drawing
                 (byte)(wash.B * wash.A / 255));
         }
 
+        private bool IsUnderMouseCursor(int x, int y)
+        {
+            return !_consoleCursor.IsEmpty() &&
+                   _consoleCursor.Coordinate.Y == y &&
+                   _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width;
+        }
+
         /// <summary>
-        ///     Pass 1: finds contiguous dirty sixel cells sharing the same palette, combines them into a
-        ///     single Sixel via BitBlt and writes that once. Pass 2 skips sixel cells.
+        ///     The sixel cell (x, y) needs written this frame, or null when it doesn't: it is not a sixel
+        ///     cell, not dirty, already on screen, or under the mouse cursor (pass 2 draws that as text).
         /// </summary>
+        private Sixel? SixelToWrite(PixelBuffer pixelBuffer, Snapshot dirtyRegions, int x, int y)
+        {
+            Sixel? sixel = pixelBuffer[(ushort)x, (ushort)y].Foreground.Symbol.Sixel;
+            if (sixel == null ||
+                !dirtyRegions.Contains((ushort)x, (ushort)y, false) ||
+                ReferenceEquals(_cache[x, y]?.Foreground.Symbol.Sixel, sixel) ||
+                IsUnderMouseCursor(x, y))
+                return null;
+            return sixel;
+        }
+
+        /// <summary>
+        ///     Pass 1: finds contiguous sixel cells to write that share the same palette, combines them into
+        ///     a single Sixel via BitBlt and writes that once. Pass 2 skips sixel cells.
+        /// </summary>
+        /// <remarks>
+        ///     A dirty cell whose sixel the terminal already shows (the same instance as in the cache) is
+        ///     not sent again: a mouse move or a neighbour repainting marks cells dirty without changing them.
+        /// </remarks>
         private void RenderSixelRegions(PixelBuffer pixelBuffer, Snapshot dirtyRegions)
         {
-            bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
+            // sixel cells only exist where the console draws sixels
+            if (!_console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+                return;
 
-            for (ushort y = 0; y < pixelBuffer.Height; y++)
-            for (ushort x = 0; x < pixelBuffer.Width; x++)
+            int width = pixelBuffer.Width;
+            bool[]? visited = null;
+
+            for (int y = 0; y < pixelBuffer.Height; y++)
+            for (int x = 0; x < width; x++)
             {
-                if (visited[x, y])
+                if (visited != null && visited[y * width + x])
                     continue;
 
-                Pixel pixel = pixelBuffer[x, y];
-                Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;
+                Sixel? cellSixel = SixelToWrite(pixelBuffer, dirtyRegions, x, y);
                 if (cellSixel == null)
                     continue;
 
-                if (!dirtyRegions.Contains(x, y, false))
-                    continue;
+                if (visited == null)
+                {
+                    int cells = width * pixelBuffer.Height;
+                    if (_sixelVisited == null || _sixelVisited.Length < cells)
+                        _sixelVisited = new bool[cells];
+                    else
+                        Array.Clear(_sixelVisited, 0, cells);
+                    visited = _sixelVisited;
+                }
 
-                // expand to the maximal rectangle of dirty cells sharing this palette instance
+                // expand to the maximal rectangle of cells to write sharing this palette instance
                 byte[] palette = cellSixel.Palette;
                 int cellPixelWidth = cellSixel.CellWidth;
                 int cellPixelHeight = cellSixel.CellHeight;
 
                 int maxWidth = 1;
-                while (x + maxWidth < pixelBuffer.Width)
-                {
-                    Pixel nextPixel = pixelBuffer[(ushort)(x + maxWidth), y];
-                    Sixel? nextSixel = nextPixel.Foreground.Symbol.Sixel;
-                    if (nextSixel == null || !ReferenceEquals(nextSixel.Palette, palette) ||
-                        visited[x + maxWidth, y])
-                        break;
-                    if (!dirtyRegions.Contains((ushort)(x + maxWidth), y, false))
-                        break;
+                while (x + maxWidth < width && !visited[y * width + x + maxWidth] &&
+                       ReferenceEquals(SixelToWrite(pixelBuffer, dirtyRegions, x + maxWidth, y)?.Palette, palette))
                     maxWidth++;
-                }
 
                 int rectHeight = 1;
                 while (y + rectHeight < pixelBuffer.Height)
                 {
                     int rowWidth = 0;
-                    while (rowWidth < maxWidth)
-                    {
-                        Pixel belowPixel = pixelBuffer[(ushort)(x + rowWidth), (ushort)(y + rectHeight)];
-                        Sixel? belowSixel = belowPixel.Foreground.Symbol.Sixel;
-                        if (belowSixel == null || !ReferenceEquals(belowSixel.Palette, palette) ||
-                            visited[x + rowWidth, y + rectHeight])
-                            break;
-                        if (!dirtyRegions.Contains((ushort)(x + rowWidth), (ushort)(y + rectHeight), false))
-                            break;
+                    int rowStart = (y + rectHeight) * width + x;
+                    while (rowWidth < maxWidth && !visited[rowStart + rowWidth] &&
+                           ReferenceEquals(
+                               SixelToWrite(pixelBuffer, dirtyRegions, x + rowWidth, y + rectHeight)?.Palette,
+                               palette))
                         rowWidth++;
-                    }
 
                     if (rowWidth == 0)
                         break;
@@ -606,33 +638,31 @@ namespace Consolonia.Core.Drawing
                 }
 
                 for (int ry = 0; ry < rectHeight; ry++)
-                for (int rx = 0; rx < maxWidth; rx++)
-                    visited[x + rx, y + ry] = true;
+                    visited.AsSpan((y + ry) * width + x, maxWidth).Fill(true);
 
                 if (maxWidth == 1 && rectHeight == 1)
                 {
-                    _console.WriteSixel(new PixelBufferCoordinate(x, y), cellSixel);
-                    _cache[x, y] = pixel;
+                    _console.WriteSixel(new PixelBufferCoordinate((ushort)x, (ushort)y), cellSixel);
+                    _cache[x, y] = pixelBuffer[(ushort)x, (ushort)y];
                     continue;
                 }
 
-                // one BitBlt'd sixel for the whole rectangle costs a single escape sequence
+                // one BitBlt'd sixel for the whole rectangle costs a single escape sequence; it is written
+                // once, so its bytes are not kept (IsTransient) and BitBlt fills every pixel
                 int combinedWidth = maxWidth * cellPixelWidth;
                 int combinedHeight = rectHeight * cellPixelHeight;
-                byte[] combinedPixels = new byte[combinedWidth * combinedHeight];
+                byte[] combinedPixels = GC.AllocateUninitializedArray<byte>(combinedWidth * combinedHeight);
                 var combined = new Sixel(palette, cellSixel.PaletteCount, combinedPixels,
-                    combinedWidth, combinedHeight, cellPixelWidth, cellPixelHeight);
+                    combinedWidth, combinedHeight, cellPixelWidth, cellPixelHeight) { IsTransient = true };
 
                 for (int ry = 0; ry < rectHeight; ry++)
                 for (int rx = 0; rx < maxWidth; rx++)
                 {
-                    Pixel cellPixel = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
-                    Sixel? cellData = cellPixel.Foreground.Symbol.Sixel;
-                    if (cellData != null)
-                        combined.BitBlt(cellData, rx * cellPixelWidth, ry * cellPixelHeight);
+                    Sixel cellData = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)].Foreground.Symbol.Sixel!;
+                    combined.BitBlt(cellData, rx * cellPixelWidth, ry * cellPixelHeight);
                 }
 
-                _console.WriteSixel(new PixelBufferCoordinate(x, y), combined);
+                _console.WriteSixel(new PixelBufferCoordinate((ushort)x, (ushort)y), combined);
 
                 for (int ry = 0; ry < rectHeight; ry++)
                 for (int rx = 0; rx < maxWidth; rx++)
