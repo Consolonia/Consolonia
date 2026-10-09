@@ -1,12 +1,8 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -41,7 +37,7 @@ namespace Consolonia.Core.Drawing
         private const long TileImageBudgetBytes = 24L * 1024 * 1024;
 
         private static readonly
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, KittyRenderedBitmap>>>
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRenderedBitmap>>>
             RenderedBitmapCache = new();
 
         /// <summary>Image ids of evicted tiles, deleted from the terminal on the next draw.</summary>
@@ -65,7 +61,7 @@ namespace Consolonia.Core.Drawing
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
             PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
-            var key = new BitmapQuantizedCacheKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
+            var key = new RenderingKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
                 interpolationMode);
 
             // A rendering is reused only while every tile image it shows is still in the terminal;

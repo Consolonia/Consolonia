@@ -196,9 +196,8 @@ namespace Consolonia.Core.Drawing
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
 
-            // Pass 1: sixel regions; sixelHandled lets pass 2 skip the cells it took
-            bool[,]? sixelHandled = null;
-            RenderSixelRegions(pixelBuffer, dirtyRegions, ref sixelHandled);
+            // Pass 1: sixel regions
+            RenderSixelRegions(pixelBuffer, dirtyRegions);
 
             // Pass 2: Render non-sixel dirty pixels.
             bool sawKittyTiles = false;
@@ -224,10 +223,7 @@ namespace Consolonia.Core.Drawing
                     if (!dirtyRegions.Contains(x, y, false))
                         continue;
 
-                    if (sixelHandled != null && sixelHandled[x, y])
-                        continue;
-
-                    // sixel cells pass 1 did not claim (shouldn't happen, but never write them as text)
+                    // pass 1 has already written every dirty sixel cell
                     if (pixel.Foreground.Symbol.Sixel != null)
                         continue;
 
@@ -464,11 +460,11 @@ namespace Consolonia.Core.Drawing
             // whatever is left in the live set has no tiles backing it anymore
             foreach (KeyValuePair<KittyRect, int> stale in live)
                 _console.WriteText(
-                    KittyGraphics.BuildDeleteRectPlacementSequence(stale.Key.ImageId, stale.Value));
+                    KittyGraphics.BuildDeletePlacementSequence(stale.Key.ImageId, stale.Value));
             live.Clear();
 
             foreach (KeyValuePair<(KittyRect Rect, Color Wash), int> stale in liveWash)
-                _console.WriteText(KittyGraphics.BuildDeleteRectPlacementSequence(
+                _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(
                     _kittyWashImages[stale.Key.Wash].ImageId, stale.Value));
             liveWash.Clear();
 
@@ -548,9 +544,9 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Pass 1: finds contiguous dirty sixel cells sharing the same palette, combines them into a
-        ///     single Sixel via BitBlt and writes that once, marking the cells handled for pass 2.
+        ///     single Sixel via BitBlt and writes that once. Pass 2 skips sixel cells.
         /// </summary>
-        private void RenderSixelRegions(PixelBuffer pixelBuffer, Snapshot dirtyRegions, ref bool[,]? sixelHandled)
+        private void RenderSixelRegions(PixelBuffer pixelBuffer, Snapshot dirtyRegions)
         {
             bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
 
@@ -617,8 +613,6 @@ namespace Consolonia.Core.Drawing
                 {
                     _console.WriteSixel(new PixelBufferCoordinate(x, y), cellSixel);
                     _cache[x, y] = pixel;
-                    sixelHandled ??= new bool[pixelBuffer.Width, pixelBuffer.Height];
-                    sixelHandled[x, y] = true;
                     continue;
                 }
 
@@ -640,13 +634,9 @@ namespace Consolonia.Core.Drawing
 
                 _console.WriteSixel(new PixelBufferCoordinate(x, y), combined);
 
-                sixelHandled ??= new bool[pixelBuffer.Width, pixelBuffer.Height];
                 for (int ry = 0; ry < rectHeight; ry++)
                 for (int rx = 0; rx < maxWidth; rx++)
-                {
                     _cache[x + rx, y + ry] = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
-                    sixelHandled[x + rx, y + ry] = true;
-                }
             }
         }
 

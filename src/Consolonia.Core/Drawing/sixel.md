@@ -18,8 +18,7 @@ before anything reaches the terminal.
 
 2. **Layering happens in `Pixel.Blend`** (`PixelBufferImplementation/Pixel.cs`):
    - *Opaque layer on top* → the fast path returns the upper pixel; the tile is gone from that cell.
-   - *Ordinary glyph on top* → `TryCompositeOverSixel` refuses and the glyph replaces the tile
-     ("Any other glyph needs a text cell, so the image loses").
+   - *Glyph on top* → the glyph replaces the tile: a glyph needs a text cell, so the image loses.
    - *Translucent backdrop, no glyph* (modal dimmer, shade) → `Sixel.Wash` alpha-blends the wash
      into the tile's **palette**; the pixels are shared and the variant is cached, so a dimmed
      tile is only sent once.

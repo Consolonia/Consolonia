@@ -149,27 +149,25 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     Composites an overlay onto a sixel cell without giving up the image: the
-        ///     <paramref name="wash" /> tints its palette. A glyph needs a text cell, so the image loses.
+        ///     Tints a sixel cell with a translucent overlay without giving up the image: the
+        ///     <paramref name="wash" /> is blended into its palette. Only for an overlay with no glyph; a
+        ///     glyph needs a text cell, so the image loses.
         /// </summary>
         /// <remarks>
         ///     Block element glyphs used to be painted into the image's pixels, but their color had to
         ///     go into the image's palette and a full one gave them the nearest image color instead, so
         ///     a blue window edge came out whatever the picture had closest to blue.
         /// </remarks>
-        private bool TryCompositeOverSixel(in PixelForeground foregroundAbove, Color wash,
-            out PixelForeground result)
+        private bool TryWashSixel(Color wash, out PixelForeground result)
         {
             Sixel sixel = Foreground.Symbol.Sixel;
-            if (sixel == null || !foregroundAbove.IsNothingToDraw())
+            if (sixel == null)
             {
                 result = default;
                 return false;
             }
 
-            sixel = sixel.Wash(wash);
-
-            result = new PixelForeground(new Symbol(sixel, Foreground.Symbol.Width), Foreground.Color,
+            result = new PixelForeground(new Symbol(sixel.Wash(wash)), Foreground.Color,
                 Foreground.Weight, Foreground.Style, Foreground.TextDecoration);
             return true;
         }
@@ -213,7 +211,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                         return this;
                     if (isNoForegroundOnTop)
                         newForeground = Foreground;
-                    else if (!TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
+                    else
                         newForeground = Foreground.Blend(pixelAbove.Foreground);
                     newCaretStyle = CaretStyle.Blend(pixelAbove.CaretStyle);
                 }
@@ -224,7 +222,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     if (isNoForegroundOnTop)
                     {
                         // a sixel cell's colors are its palette, so the overlay tints the palette
-                        if (TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
+                        if (TryWashSixel(aboveBgColor, out newForeground))
                             break;
 
                         // merge the PixelForeground color with the pixelAbove background color
@@ -234,7 +232,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                             Foreground.Style,
                             Foreground.TextDecoration);
                     }
-                    else if (!TryCompositeOverSixel(pixelAbove.Foreground, aboveBgColor, out newForeground))
+                    else
                     {
                         newForeground = pixelAbove.Foreground;
                     }

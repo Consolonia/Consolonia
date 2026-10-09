@@ -157,7 +157,7 @@ namespace Consolonia.Core.Drawing
         ///     the image data, so other placements of the same image survive and re-placement
         ///     needs no retransmission.
         /// </summary>
-        public static string BuildDeleteRectPlacementSequence(int imageId, int placementId)
+        public static string BuildDeletePlacementSequence(int imageId, int placementId)
         {
             return string.Create(CultureInfo.InvariantCulture,
                 $"\u001b_Ga=d,d=i,q=2,i={imageId},p={placementId}\u001b\\");

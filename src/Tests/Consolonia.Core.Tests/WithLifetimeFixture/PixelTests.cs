@@ -208,7 +208,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private static Pixel CreateSixelPixel(Sixel sixel)
         {
-            return new Pixel(new PixelForeground(new Symbol(sixel, 1), Colors.Transparent),
+            return new Pixel(new PixelForeground(new Symbol(sixel), Colors.Transparent),
                 PixelBackground.Transparent);
         }
 

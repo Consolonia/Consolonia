@@ -32,7 +32,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground Shade()
         {
-            // tile survives; Pixel.Shade tints image cells with a wash before reaching here
+            // image cells never get here: Pixel.Shade tints them with a wash instead
             return new PixelBackground(Color.Shade(), Tile);
         }
 
