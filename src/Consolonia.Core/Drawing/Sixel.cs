@@ -60,6 +60,38 @@ namespace Consolonia.Core.Drawing
         public int CellsHeight => Height / CellHeight;
 
         /// <summary>
+        ///     The palette color covering the most pixels. A glyph drawn over a sixel cell turns it into a
+        ///     text cell, and a glyph with a transparent background takes this as its background so the
+        ///     cell still looks like the picture instead of a hole in it.
+        /// </summary>
+        /// <remarks>
+        ///     Only the index is cached, so a washed variant (same pixels, washed palette) yields the
+        ///     washed color.
+        /// </remarks>
+        public Color DominantColor
+        {
+            get
+            {
+                int index = _dominantIndex;
+                if (index < 0)
+                {
+                    Span<int> counts = stackalloc int[256];
+                    foreach (byte pixel in Pixels)
+                        counts[pixel]++;
+
+                    index = 0;
+                    for (int i = 1; i < counts.Length; i++)
+                        if (counts[i] > counts[index])
+                            index = i;
+                    _dominantIndex = index;
+                }
+
+                int offset = index * 4;
+                return Color.FromRgb(Palette[offset + 2], Palette[offset + 1], Palette[offset]);
+            }
+        }
+
+        /// <summary>
         ///     Create a Sixel from raw BGRX pixel data.
         ///     If a palette is provided it is used to quantize against, otherwise a new palette is created.
         /// </summary>
@@ -120,6 +152,7 @@ namespace Consolonia.Core.Drawing
             }
 
             _renderedBytes = null;
+            _dominantIndex = -1;
         }
 
         /// <summary>
@@ -339,6 +372,7 @@ namespace Consolonia.Core.Drawing
         private static readonly ConditionalWeakTable<byte[], PaletteLookup> PaletteLookups = new();
 
         private byte[] _renderedBytes;
+        private int _dominantIndex = -1;
 
         /// <summary>
         ///     Serialize this image to SIXEL escape sequence bytes.
