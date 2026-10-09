@@ -29,8 +29,8 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal sealed class ContentCache<T>
     {
-        private readonly long _budget;
         private readonly Action<T> _evicted;
+        private long _budget;
         private readonly Dictionary<ContentKey, LinkedListNode<Entry>> _entries = new();
         private readonly LinkedList<Entry> _recency = new();
         private long _cost;
@@ -41,6 +41,15 @@ namespace Consolonia.Core.Drawing
         {
             _budget = budget;
             _evicted = evicted;
+        }
+
+        /// <summary>Raises the budget to at least <paramref name="budget" />; it never shrinks.</summary>
+        public void EnsureBudget(long budget)
+        {
+            lock (_entries)
+            {
+                _budget = Math.Max(_budget, budget);
+            }
         }
 
         /// <summary>The value made for <paramref name="key" />, marked most recently used.</summary>

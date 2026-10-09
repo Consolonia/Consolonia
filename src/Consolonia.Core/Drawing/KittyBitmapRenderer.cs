@@ -30,22 +30,41 @@ namespace Consolonia.Core.Drawing
         internal const int TileRows = 4;
 
         /// <summary>
-        ///     Pixel bytes of tile images kept in the terminal. A few screens' worth: XTerm.NET, for one,
-        ///     holds 64MB of live images. Tiles in use are touched on every draw, so only ones off screen
-        ///     age out.
+        ///     Pixel bytes of tile images kept in the terminal at least: XTerm.NET, for one, holds 64MB of
+        ///     live images. The budget grows to <see cref="ScreensOfTileImages" /> screens on a larger
+        ///     screen, so one full-screen picture never evicts its own tiles while transmitting them.
         /// </summary>
-        private const long TileImageBudgetBytes = 24L * 1024 * 1024;
+        private const long MinTileImageBudgetBytes = 24L * 1024 * 1024;
+
+        /// <summary>Screens' worth of tile images kept, so pictures shown again need not be resent.</summary>
+        private const int ScreensOfTileImages = 3;
 
         private static readonly
             ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRenderedBitmap>>>
             RenderedBitmapCache = new();
 
-        /// <summary>Image ids of evicted tiles, deleted from the terminal on the next draw.</summary>
+        /// <summary>
+        ///     Image ids of tiles evicted from <see cref="TileImages" />. They are not deleted here: a tile
+        ///     can be evicted while a picture that is not being redrawn still shows it. RenderTarget deletes
+        ///     each one once no placement shows it (see <see cref="TryTakeEvictedImage" />).
+        /// </summary>
         private static readonly ConcurrentQueue<int> EvictedTileImages = new();
 
         /// <summary>The terminal's image id for each tile content transmitted.</summary>
         private static readonly ContentCache<int> TileImages =
-            new(TileImageBudgetBytes, imageId => EvictedTileImages.Enqueue(imageId));
+            new(MinTileImageBudgetBytes, imageId => EvictedTileImages.Enqueue(imageId));
+
+        /// <summary>Whether tile images have been evicted that RenderTarget has not taken yet.</summary>
+        internal static bool HasEvictedImages => !EvictedTileImages.IsEmpty;
+
+        /// <summary>
+        ///     Takes the next image id evicted from the tile cache. No rendering will place it again, so
+        ///     once no placement on screen shows it, it is an orphan and must be deleted from the terminal.
+        /// </summary>
+        internal static bool TryTakeEvictedImage(out int imageId)
+        {
+            return EvictedTileImages.TryDequeue(out imageId);
+        }
 
         public KittyBitmapRenderer(DrawingContextImpl context)
             : base(context)
@@ -72,17 +91,15 @@ namespace Consolonia.Core.Drawing
             return true;
         }
 
-        protected override void AfterRendering()
-        {
-            while (EvictedTileImages.TryDequeue(out int evictedImageId))
-                Context.ConsoleWindowImpl.Console.WriteText(KittyGraphics.BuildDeleteSequence(evictedImageId));
-        }
-
         /// <summary>Cuts the visible pixels into tiles and transmits each tile not already in the terminal.</summary>
         protected override KittyRenderedBitmap Render(byte[] visibleBytes, PixelRect visibleCells,
             int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface)
         {
             int visibleWidth = visibleCells.Width * cellPixelWidth;
+            TileImages.EnsureBudget(ScreensOfTileImages * 4L *
+                                    Context.PixelBuffer.Width * cellPixelWidth *
+                                    Context.PixelBuffer.Height * cellPixelHeight);
+
             var cellBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
             var tileKeys = new List<ContentKey>();
             byte[] tileBytes = GC.AllocateUninitializedArray<byte>(
@@ -103,7 +120,7 @@ namespace Consolonia.Core.Drawing
                 if (!TileImages.TryGet(tileKey, out int imageId))
                 {
                     imageId = KittyGraphics.AllocateImageId();
-                    byte[] imageData = EncodeImageData(tile.ToArray(), tileSize, renderInterface,
+                    byte[] imageData = EncodeImageData(tile, tileSize, renderInterface,
                         out KittyImageFormat imageFormat);
                     Context.ConsoleWindowImpl.Console.WriteText(
                         KittyGraphics.BuildTransmitSequence(imageId, tileSize.Width, tileSize.Height, imageData,
@@ -126,7 +143,8 @@ namespace Consolonia.Core.Drawing
             return new KittyRenderedBitmap(tileKeys, cellBuffer);
         }
 
-        private static byte[] EncodeImageData(byte[] bgra, PixelSize size, IPlatformRenderInterface renderInterface,
+        private static byte[] EncodeImageData(ReadOnlySpan<byte> bgra, PixelSize size,
+            IPlatformRenderInterface renderInterface,
             out KittyImageFormat format)
         {
             // PNG is far smaller on the wire than raw RGBA (a full screen image is ~7MB raw, over
@@ -143,7 +161,8 @@ namespace Consolonia.Core.Drawing
             return ConvertBgraToRgba(bgra, size.Width * 4, size);
         }
 
-        private static unsafe byte[] TryEncodePng(byte[] bgra, PixelSize size, IPlatformRenderInterface renderInterface)
+        private static unsafe byte[] TryEncodePng(ReadOnlySpan<byte> bgra, PixelSize size,
+            IPlatformRenderInterface renderInterface)
         {
             try
             {

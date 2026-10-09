@@ -47,6 +47,19 @@ namespace Consolonia.Core.Drawing
         // for; freed once no wash placement uses them
         private readonly Dictionary<Color, (int ImageId, ushort Columns, ushort Rows)> _kittyWashImages = new();
 
+        /// <summary>
+        ///     Tile images evicted from the kitty renderer's cache that a placement still showed when they
+        ///     were taken; each is deleted from the terminal once no placement does.
+        /// </summary>
+        private readonly HashSet<int> _evictedTileImages = new();
+
+        // scratch for the kitty bookkeeping, kept between frames so it is not reallocated
+        private readonly HashSet<int> _placedTileImages = new();
+        private readonly List<int> _orphanedTileImages = new();
+        private readonly HashSet<Color> _washesInUse = new();
+        private readonly List<Color> _washesToDelete = new();
+        private readonly List<(KittyRect Rect, Color Wash)> _washPlacementsToRemove = new();
+
         private readonly record struct KittyRect(
             int ImageId,
             ushort TileX,
@@ -181,8 +194,13 @@ namespace Consolonia.Core.Drawing
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;
 
+            // a new cache means everything is redrawn, kitty placements included
+            bool kittyCellsChanged = false;
             if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
+            {
                 InitializeCacheInternal();
+                kittyCellsChanged = true;
+            }
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -209,7 +227,6 @@ namespace Consolonia.Core.Drawing
             RenderSixelRegions(pixelBuffer, dirty);
 
             // Pass 2: Render non-sixel dirty pixels.
-            bool sawKittyTiles = false;
             for (ushort y = 0; y < pixelBuffer.Height; y++)
             {
                 bool isWide = false;
@@ -217,9 +234,6 @@ namespace Consolonia.Core.Drawing
                 for (ushort x = 0; x < pixelBuffer.Width; x++)
                 {
                     Pixel pixel = pixelBuffer[x, y];
-
-                    if (!pixel.Background.Tile.IsEmpty)
-                        sawKittyTiles = true;
 
                     if (pixel.IsCaret())
                     {
@@ -232,6 +246,11 @@ namespace Consolonia.Core.Drawing
                     if (!dirty[y * pixelBuffer.Width + x])
                         continue;
 
+                    // Placements change only where a cell shows a kitty tile or showed one, and every
+                    // change to the pixel buffer marks its cells dirty, so clean cells never need a look.
+                    if (!pixel.Background.Tile.IsEmpty || _cache[x, y]?.Background.Tile.IsEmpty == false)
+                        kittyCellsChanged = true;
+
                     Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;
                     if (cellSixel != null)
                     {
@@ -243,17 +262,18 @@ namespace Consolonia.Core.Drawing
                             new PixelBackground(cellSixel.DominantColor));
                     }
 
-                    // a tile cell's color is the wash for its image (laid over it by a wash placement);
-                    // the cell itself is written with the terminal's default background (see
-                    // AnsiConsoleOutput.WritePixel), so this composite only feeds the mouse cursor's contrast
-                    if (!pixel.Background.Tile.IsEmpty)
-                        pixel = new Pixel(pixel.Foreground,
-                            new PixelBackground(CompositeOverBlack(pixel.Background.Color), pixel.Background.Tile),
-                            pixel.CaretStyle);
-
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (IsUnderMouseCursor(x, y))
                     {
+                        // a tile cell's color is the wash for its image (laid over it by a wash
+                        // placement); the cell itself is written with the terminal's default background
+                        // (see AnsiConsoleOutput.WritePixel), so the composite is only for the cursor
+                        if (!pixel.Background.Tile.IsEmpty)
+                            pixel = new Pixel(pixel.Foreground,
+                                new PixelBackground(CompositeOverBlack(pixel.Background.Color),
+                                    pixel.Background.Tile),
+                                pixel.CaretStyle);
+
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
                         {
                             // floating cursor tracking effect
@@ -328,7 +348,9 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            if (sawKittyTiles || _kittyRectPlacements.Count > 0)
+            // New evictions are checked right away. One still shown is checked again when kitty cells
+            // change, which is the only way the placement showing it can go.
+            if (kittyCellsChanged || KittyBitmapRenderer.HasEvictedImages)
                 EmitKittyRectPlacements(pixelBuffer);
 
 #if FPS
@@ -448,7 +470,43 @@ namespace Consolonia.Core.Drawing
             (_kittyRectPlacements, _kittyRectPlacementsScratch) = (next, live);
             (_kittyWashPlacements, _kittyWashPlacementsScratch) = (nextWash, liveWash);
 
+            DeleteOrphanedTileImages();
             FreeUnusedWashImages();
+        }
+
+        /// <summary>
+        ///     Deletes from the terminal every tile image evicted from the kitty renderer's cache that no
+        ///     placement shows anymore. One still shown waits: deleting it would take its placements with it
+        ///     and leave a hole in a picture that is not being redrawn.
+        /// </summary>
+        private void DeleteOrphanedTileImages()
+        {
+            while (KittyBitmapRenderer.TryTakeEvictedImage(out int imageId))
+                _evictedTileImages.Add(imageId);
+            if (_evictedTileImages.Count == 0)
+                return;
+
+            _placedTileImages.Clear();
+            foreach (KittyRect rect in _kittyRectPlacements.Keys)
+                _placedTileImages.Add(rect.ImageId);
+
+            SelectOrphans(_evictedTileImages, _placedTileImages, _orphanedTileImages);
+            foreach (int imageId in _orphanedTileImages)
+                _console.WriteText(KittyGraphics.BuildDeleteSequence(imageId));
+        }
+
+        /// <summary>
+        ///     Moves every image in <paramref name="evicted" /> that is not in <paramref name="placed" /> to
+        ///     <paramref name="orphans" /> (cleared first): images nothing tracks and nothing shows.
+        /// </summary>
+        internal static void SelectOrphans(HashSet<int> evicted, HashSet<int> placed, List<int> orphans)
+        {
+            orphans.Clear();
+            foreach (int imageId in evicted)
+                if (!placed.Contains(imageId))
+                    orphans.Add(imageId);
+            foreach (int imageId in orphans)
+                evicted.Remove(imageId);
         }
 
         /// <summary>
@@ -477,17 +535,27 @@ namespace Consolonia.Core.Drawing
             if (_kittyWashImages.Count == 0)
                 return;
 
-            foreach ((Color wash, (int imageId, ushort imageColumns, ushort imageRows)) in _kittyWashImages.ToList())
-            {
-                if (imageColumns >= columns && imageRows >= rows)
-                    continue;
+            _washesToDelete.Clear();
+            foreach ((Color wash, (int _, ushort imageColumns, ushort imageRows)) in _kittyWashImages)
+                if (imageColumns < columns || imageRows < rows)
+                    _washesToDelete.Add(wash);
+            if (_washesToDelete.Count == 0)
+                return;
 
+            foreach (Color wash in _washesToDelete)
+            {
                 // uppercase d=I takes the image's placements with it
-                _console.WriteText(KittyGraphics.BuildDeleteSequence(imageId));
+                _console.WriteText(KittyGraphics.BuildDeleteSequence(_kittyWashImages[wash].ImageId));
                 _kittyWashImages.Remove(wash);
-                foreach ((KittyRect, Color) key in _kittyWashPlacements.Keys.Where(key => key.Item2 == wash).ToList())
-                    _kittyWashPlacements.Remove(key);
             }
+
+            // in place: the caller holds this dictionary as the frame's live wash placements
+            _washPlacementsToRemove.Clear();
+            foreach ((KittyRect Rect, Color Wash) key in _kittyWashPlacements.Keys)
+                if (!_kittyWashImages.ContainsKey(key.Wash))
+                    _washPlacementsToRemove.Add(key);
+            foreach ((KittyRect Rect, Color Wash) key in _washPlacementsToRemove)
+                _kittyWashPlacements.Remove(key);
         }
 
         /// <summary>
@@ -499,11 +567,16 @@ namespace Consolonia.Core.Drawing
             if (_kittyWashImages.Count == 0)
                 return;
 
-            var inUse = new HashSet<Color>();
+            _washesInUse.Clear();
             foreach ((KittyRect _, Color wash) in _kittyWashPlacements.Keys)
-                inUse.Add(wash);
+                _washesInUse.Add(wash);
 
-            foreach (Color wash in _kittyWashImages.Keys.Where(wash => !inUse.Contains(wash)).ToList())
+            _washesToDelete.Clear();
+            foreach (Color wash in _kittyWashImages.Keys)
+                if (!_washesInUse.Contains(wash))
+                    _washesToDelete.Add(wash);
+
+            foreach (Color wash in _washesToDelete)
             {
                 _console.WriteText(KittyGraphics.BuildDeleteSequence(_kittyWashImages[wash].ImageId));
                 _kittyWashImages.Remove(wash);

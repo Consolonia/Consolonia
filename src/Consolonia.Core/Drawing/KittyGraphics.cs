@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -30,6 +31,15 @@ namespace Consolonia.Core.Drawing
     {
         // maximum base64 payload length per APC chunk allowed by the protocol
         private const int MaxChunkSize = 4096;
+
+        /// <summary>
+        ///     Queries kitty graphics support; a supporting terminal replies "APC _Gi=31;OK ST". Follow it
+        ///     with a Device Attributes request as a fence: every terminal answers DA1.
+        /// </summary>
+        public const string QuerySupport = "\u001b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\u001b\\";
+
+        /// <summary>Deletes all kitty images and placements, freeing terminal-side image storage.</summary>
+        public const string DeleteAllImages = "\u001b_Ga=d,d=A,q=2\u001b\\";
 
         /// <summary>
         ///     The z-index classic rect placements (the "image as cell background" mode) are created
@@ -73,8 +83,24 @@ namespace Consolonia.Core.Drawing
         {
             ArgumentNullException.ThrowIfNull(data);
 
-            string payload = Convert.ToBase64String(data);
-            var stringBuilder = new StringBuilder(payload.Length + 128);
+            int payloadLength = (data.Length + 2) / 3 * 4;
+            char[] payload = ArrayPool<char>.Shared.Rent(payloadLength);
+            try
+            {
+                Convert.TryToBase64Chars(data, payload, out payloadLength);
+                return BuildChunks(imageId, pixelWidth, pixelHeight, payload.AsSpan(0, payloadLength), format,
+                    zlibCompressed);
+            }
+            finally
+            {
+                ArrayPool<char>.Shared.Return(payload);
+            }
+        }
+
+        private static string BuildChunks(int imageId, int pixelWidth, int pixelHeight, ReadOnlySpan<char> payload,
+            KittyImageFormat format, bool zlibCompressed)
+        {
+            var stringBuilder = new StringBuilder(payload.Length + payload.Length / MaxChunkSize * 12 + 128);
             int offset = 0;
             bool first = true;
             while (offset < payload.Length)
@@ -93,7 +119,7 @@ namespace Consolonia.Core.Drawing
                 }
 
                 stringBuilder.Append(last ? "m=0;" : "m=1;")
-                    .Append(payload, offset, chunkLength)
+                    .Append(payload.Slice(offset, chunkLength))
                     .Append("\u001b\\");
                 offset += chunkLength;
             }
@@ -141,7 +167,9 @@ namespace Consolonia.Core.Drawing
             }
 
             using var compressed = new MemoryStream();
-            using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, true))
+            // a solid color compresses to almost nothing at any level; an animated overlay sends a new
+            // one every frame, so take the fastest
+            using (var zlib = new ZLibStream(compressed, CompressionLevel.Fastest, true))
             {
                 zlib.Write(rgba);
             }
