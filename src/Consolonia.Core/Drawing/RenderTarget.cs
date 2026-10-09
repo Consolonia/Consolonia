@@ -232,8 +232,8 @@ namespace Consolonia.Core.Drawing
                         continue;
 
                     // a tile cell's color is the wash for its image (laid over it by a wash placement);
-                    // the terminal cell itself, seen only through transparent parts of the image, is
-                    // black with the wash composited onto it
+                    // the cell itself is written with the terminal's default background (see
+                    // AnsiConsoleOutput.WritePixel), so this composite only feeds the mouse cursor's contrast
                     if (!pixel.Background.Tile.IsEmpty)
                         pixel = new Pixel(pixel.Foreground,
                             new PixelBackground(CompositeOverBlack(pixel.Background.Color), pixel.Background.Tile),
