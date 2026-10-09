@@ -22,7 +22,7 @@ namespace Consolonia.Core.Drawing
     ///     composite over the picture, an opaque background evicts it, and pixel buffer diffing and
     ///     occlusion work unchanged.
     /// </summary>
-    internal sealed class KittyBitmapRenderer : BitmapRenderer
+    internal sealed class KittyBitmapRenderer : CellBitmapRenderer<KittyBitmapRenderer.KittyRenderedBitmap>
     {
         /// <summary>Tile size in cells: small enough that a stroke touches few, large enough to be few.</summary>
         internal const int TileColumns = 8;
@@ -52,44 +52,37 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
+        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRenderedBitmap>>>
+            Renderings => RenderedBitmapCache;
+
+        protected override PixelBuffer CellsOf(KittyRenderedBitmap rendering)
         {
-            int cellPixelWidth = Context.ConsoleWindowImpl.Console.CellPixelWidth;
-            int cellPixelHeight = Context.ConsoleWindowImpl.Console.CellPixelHeight;
-
-            var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
-                targetRect.Height * cellPixelHeight);
-            PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
-            var key = new RenderingKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
-                interpolationMode);
-
-            // A rendering is reused only while every tile image it shows is still in the terminal;
-            // using one keeps them all fresh, so a picture on screen does not lose tiles to the budget.
-            KittyRenderedBitmap renderedBitmap = GetOrRender(RenderedBitmapCache, source, key,
-                () => TransmitAndCreateCells(source, renderInterface, targetSize, visibleCells, interpolationMode,
-                    cellPixelWidth, cellPixelHeight),
-                validate: rendering => rendering.TileKeys.TrueForAll(tileKey => TileImages.TryGet(tileKey, out _)));
-
-            while (EvictedTileImages.TryDequeue(out int evictedImageId))
-                Context.ConsoleWindowImpl.Console.WriteText(KittyGraphics.BuildDeleteSequence(evictedImageId));
-
-            // only the on-screen cells are rendered, so the rendering starts at the first of them
-            CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap.Cells, intersectedRect,
-                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
+            return rendering.Cells;
         }
 
-        private KittyRenderedBitmap TransmitAndCreateCells(IBitmapImpl source,
-            IPlatformRenderInterface renderInterface, PixelSize targetSize, PixelRect visibleCells,
-            BitmapInterpolationMode interpolationMode, int cellPixelWidth, int cellPixelHeight)
+        /// <summary>
+        ///     A rendering is reused only while every tile image it shows is still in the terminal; using one
+        ///     keeps them all fresh, so a picture on screen does not lose tiles to the budget.
+        /// </summary>
+        protected override bool IsReusable(KittyRenderedBitmap rendering)
         {
-            var visibleSize = new PixelSize(visibleCells.Width * cellPixelWidth,
-                visibleCells.Height * cellPixelHeight);
-            byte[] visibleBytes = GetVisiblePixels(source, renderInterface, targetSize,
-                new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
-                    visibleSize.Width, visibleSize.Height),
-                interpolationMode);
+            foreach (ContentKey tileKey in rendering.TileKeys)
+                if (!TileImages.TryGet(tileKey, out _))
+                    return false;
+            return true;
+        }
 
+        protected override void AfterRendering()
+        {
+            while (EvictedTileImages.TryDequeue(out int evictedImageId))
+                Context.ConsoleWindowImpl.Console.WriteText(KittyGraphics.BuildDeleteSequence(evictedImageId));
+        }
+
+        /// <summary>Cuts the visible pixels into tiles and transmits each tile not already in the terminal.</summary>
+        protected override KittyRenderedBitmap Render(byte[] visibleBytes, PixelRect visibleCells,
+            int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface)
+        {
+            int visibleWidth = visibleCells.Width * cellPixelWidth;
             var cellBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
             var tileKeys = new List<ContentKey>();
             byte[] tileBytes = GC.AllocateUninitializedArray<byte>(
@@ -102,8 +95,8 @@ namespace Consolonia.Core.Drawing
                 int rows = Math.Min(TileRows, visibleCells.Height - tileY);
                 var tileSize = new PixelSize(columns * cellPixelWidth, rows * cellPixelHeight);
                 Span<byte> tile = tileBytes.AsSpan(0, tileSize.Width * tileSize.Height * 4);
-                CopyTile(visibleBytes, visibleSize.Width, tileX * cellPixelWidth, tileY * cellPixelHeight,
-                    tileSize, tile);
+                CopyBlock(visibleBytes, visibleWidth * 4, tileX * cellPixelWidth, tileY * cellPixelHeight,
+                    tileSize.Width, tileSize.Height, tile);
 
                 ContentKey tileKey = ContentKey.Of(tile, tileSize.Width, tileSize.Height);
                 tileKeys.Add(tileKey);
@@ -125,20 +118,12 @@ namespace Consolonia.Core.Drawing
                 for (int cellY = 0; cellY < rows; cellY++)
                 for (int cellX = 0; cellX < columns; cellX++)
                     cellBuffer[new PixelPoint(tileX + cellX, tileY + cellY)] = new Pixel(
-                        new PixelForeground(Symbol.Space, Colors.Transparent),
+                        PixelForeground.Space,
                         new PixelBackground(Colors.Transparent,
                             new KittyTile(imageId, (ushort)cellX, (ushort)cellY)));
             }
 
             return new KittyRenderedBitmap(tileKeys, cellBuffer);
-        }
-
-        private static void CopyTile(byte[] bgra, int imageWidth, int x, int y, PixelSize tileSize,
-            Span<byte> tile)
-        {
-            int rowBytes = tileSize.Width * 4;
-            for (int row = 0; row < tileSize.Height; row++)
-                bgra.AsSpan(((y + row) * imageWidth + x) * 4, rowBytes).CopyTo(tile.Slice(row * rowBytes, rowBytes));
         }
 
         private static byte[] EncodeImageData(byte[] bgra, PixelSize size, IPlatformRenderInterface renderInterface,
@@ -202,7 +187,7 @@ namespace Consolonia.Core.Drawing
             return rgba;
         }
 
-        private sealed class KittyRenderedBitmap
+        internal sealed class KittyRenderedBitmap
         {
             public KittyRenderedBitmap(List<ContentKey> tileKeys, PixelBuffer cells)
             {

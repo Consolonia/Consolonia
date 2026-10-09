@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -24,81 +23,58 @@ namespace Consolonia.Core.Drawing
         public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
             PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
         {
-            // Resize source to be target rect * 2 so we can map to quad pixels
+            // two pixels across and two down per cell, and only the cells being drawn are scaled: a
+            // picture zoomed far past the screen is not scaled whole every frame
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
-            using IBitmapImpl resizedBitmap =
-                renderInterface.ResizeBitmap(source, targetSize, interpolationMode);
+            var visible = new PixelRect((intersectedRect.X - targetRect.X) * 2, (intersectedRect.Y - targetRect.Y) * 2,
+                intersectedRect.Width * 2, intersectedRect.Height * 2);
+            byte[] bgra = GetVisiblePixels(source, renderInterface, targetSize, visible, interpolationMode);
+            int rowBytes = visible.Width * 4;
 
-            var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+            bool complexEmoji = Context.ConsoleWindowImpl.Console.Capabilities
+                .HasFlag(ConsoleCapabilities.SupportsComplexEmoji);
 
-            using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
-
-            int stride = frameBuffer.RowBytes;
-            int bytesPerPixel = frameBuffer.Format.BitsPerPixel / 8;
-            unsafe
+            for (int cellY = 0; cellY < intersectedRect.Height; cellY++)
+            for (int cellX = 0; cellX < intersectedRect.Width; cellX++)
             {
-                ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                    ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
+                int top = cellY * 2 * rowBytes + cellX * 2 * 4;
+                int bottom = top + rowBytes;
 
-                int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
-                int startX = (intersectedRect.X - targetRect.TopLeft.X) * 2;
-                int endY = startY + intersectedRect.Height * 2;
-                int endX = startX + intersectedRect.Width * 2;
+                // the quad pixel from the bitmap as a quad of 4 BgraColor values
+                Span<BgraColor> quadPixelColors =
+                [
+                    PixelAt(bgra, top),
+                    PixelAt(bgra, top + 4),
+                    PixelAt(bgra, bottom),
+                    PixelAt(bgra, bottom + 4)
+                ];
 
-                int py = intersectedRect.Y;
+                // map it to a single char to represent the 4 pixels
+                char quadPixelChar = GetQuadPixelCharacter(quadPixelColors, complexEmoji);
 
-                for (int y = startY; y < endY; y += 2, py++)
-                {
-                    int px = intersectedRect.X;
-                    for (int x = startX; x < endX; x += 2, px++)
-                    {
-                        var point = new PixelPoint(px, py);
+                // get the combined colors for the quad pixel
+                Color foreground = GetForegroundColorForQuadPixel(quadPixelChar, quadPixelColors);
+                Color background = GetBackgroundColorForQuadPixel(quadPixelChar, quadPixelColors);
 
-                        // get the quad pixel from the bitmap as a quad of 4 BgraColor values
-                        Span<BgraColor> quadPixelColors =
-                        [
-                            GetPixelColor(pixelBytes, x, y, stride, bytesPerPixel),
-                            GetPixelColor(pixelBytes, x + 1, y, stride, bytesPerPixel),
-                            GetPixelColor(pixelBytes, x, y + 1, stride, bytesPerPixel),
-                            GetPixelColor(pixelBytes, x + 1, y + 1, stride, bytesPerPixel)
-                        ];
+                var imagePixel = new Pixel(
+                    new PixelForeground(new Symbol(quadPixelChar), foreground),
+                    new PixelBackground(background));
 
-                        // map it to a single char to represent the 4 pixels
-                        char quadPixelChar = GetQuadPixelCharacter(quadPixelColors);
-
-                        // get the combined colors for the quad pixel
-                        Color foreground = GetForegroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-                        Color background = GetBackgroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-
-                        var imagePixel = new Pixel(
-                            new PixelForeground(new Symbol(quadPixelChar), foreground),
-                            new PixelBackground(background));
-
-                        Context.PixelBuffer[point] = Context.PixelBuffer[point].Blend(imagePixel);
-                    }
-                }
+                var point = new PixelPoint(intersectedRect.X + cellX, intersectedRect.Y + cellY);
+                Context.PixelBuffer[point] = Context.PixelBuffer[point].Blend(imagePixel);
             }
 
             Context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
 
-        private static BgraColor GetPixelColor(ReadOnlySpan<byte> pixels, int x, int y, int stride,
-            int bytesPerPixel)
+        private static BgraColor PixelAt(byte[] bgra, int offset)
         {
-            int offset = y * stride + x * bytesPerPixel;
-
-            return bytesPerPixel switch
-            {
-                4 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]),
-                3 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], 255),
-                _ => throw new NotSupportedException(
-                    $"Unsupported bitmap format with {bytesPerPixel} bytes per pixel.")
-            };
+            return new BgraColor(bgra[offset], bgra[offset + 1], bgra[offset + 2], bgra[offset + 3]);
         }
 
-        private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
+        private static char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors, bool complexEmoji)
         {
-            char character = GetColorsPattern(colors) switch
+            char character = GetColorsPattern(colors, complexEmoji) switch
             {
                 // ReSharper disable StringLiteralTypo
                 0b0000 => ' ',
@@ -222,10 +198,11 @@ namespace Consolonia.Core.Drawing
         ///     Cluster the 4 quad colors into two groups by relative closeness.
         /// </summary>
         /// <param name="colors">the 4 colors, top left, top right, bottom left, bottom right</param>
+        /// <param name="complexEmoji">whether the console draws the quadrant characters</param>
         /// <returns>a 4-bit mask, one bit per color, set for the colors in the foreground group</returns>
-        private byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
+        private static byte GetColorsPattern(ReadOnlySpan<BgraColor> colors, bool complexEmoji)
         {
-            if (!Context.ConsoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
+            if (!complexEmoji)
             {
                 BgraColor topRowColor = Average(colors[0], colors[1]);
                 BgraColor bottomRowColor = Average(colors[2], colors[3]);

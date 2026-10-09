@@ -78,6 +78,21 @@ namespace Consolonia.Core.Infrastructure
             return Contains(new PixelPoint(x, y), inclusive);
         }
 
+        /// <summary>
+        ///     Marks every cell the rectangles cover, as <see cref="Contains(ushort, ushort, bool)" /> with
+        ///     inclusive false would answer, in a row-major mask <paramref name="width" /> cells wide. The
+        ///     rectangles must lie within the mask (see <see cref="Intersect" />).
+        /// </summary>
+        public void MarkCells(System.Span<bool> cells, int width)
+        {
+            for (int i = 0; i < _rectangles.Count; i++)
+            {
+                PixelRect rect = _rectangles[i];
+                for (int y = rect.Y; y < rect.Bottom; y++)
+                    cells.Slice(y * width + rect.X, rect.Width).Fill(true);
+            }
+        }
+
         public void Intersect(int x, int y, ushort width, ushort height)
         {
             var result = new List<PixelRect>();

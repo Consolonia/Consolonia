@@ -16,7 +16,7 @@ namespace Consolonia.Core.Drawing
     ///     Represents a sixel image with palette and indexed pixel data.
     ///     Supports composition via BitBlt and serialization via Render.
     /// </summary>
-    public class Sixel
+    public sealed class Sixel
     {
         /// <exception cref="ArgumentException">
         ///     The arrays are smaller than the counts and dimensions say. Render reads them with unchecked

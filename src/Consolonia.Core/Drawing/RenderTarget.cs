@@ -25,8 +25,11 @@ namespace Consolonia.Core.Drawing
         // cache of pixels written so we can ignore them if unchanged.
         private Pixel?[,] _cache = null!; //todo: why Pixel can be null
 
-        /// <summary>The sixel pass's per-cell scratch, kept between frames so it is not reallocated.</summary>
-        private bool[]? _sixelVisited;
+        /// <summary>Per frame, which cells are dirty: the dirty regions marked once, not searched per cell.</summary>
+        private bool[]? _dirtyCells;
+
+        /// <summary>The rectangle passes' per-cell scratch, kept between frames so it is not reallocated.</summary>
+        private bool[]? _rectangleVisited;
 
         private ConsoleCursor _consoleCursor;
 
@@ -199,8 +202,11 @@ namespace Consolonia.Core.Drawing
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
 
+            bool[] dirty = Scratch(ref _dirtyCells, pixelBuffer.Width * pixelBuffer.Height);
+            dirtyRegions.MarkCells(dirty, pixelBuffer.Width);
+
             // Pass 1: sixel regions
-            RenderSixelRegions(pixelBuffer, dirtyRegions);
+            RenderSixelRegions(pixelBuffer, dirty);
 
             // Pass 2: Render non-sixel dirty pixels.
             bool sawKittyTiles = false;
@@ -223,7 +229,7 @@ namespace Consolonia.Core.Drawing
                         caretStyle = pixel.CaretStyle;
                     }
 
-                    if (!dirtyRegions.Contains(x, y, false))
+                    if (!dirty[y * pixelBuffer.Width + x])
                         continue;
 
                     Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;
@@ -369,62 +375,27 @@ namespace Consolonia.Core.Drawing
             nextWash.Clear();
             DropWashImagesSmallerThan(pixelBuffer.Width, pixelBuffer.Height);
 
-            bool[,] visited = new bool[pixelBuffer.Width, pixelBuffer.Height];
+            int bufferWidth = pixelBuffer.Width;
+            bool[] visited = Scratch(ref _rectangleVisited, bufferWidth * pixelBuffer.Height);
 
             for (ushort y = 0; y < pixelBuffer.Height; y++)
-            for (ushort x = 0; x < pixelBuffer.Width; x++)
+            for (ushort x = 0; x < bufferWidth; x++)
             {
-                if (visited[x, y])
+                if (visited[y * bufferWidth + x])
                     continue;
 
-                KittyTile tile = pixelBuffer[x, y].Background.Tile;
+                ref readonly PixelBackground background = ref pixelBuffer.CellAt(x, y).Background;
+                KittyTile tile = background.Tile;
                 if (tile.IsEmpty)
                     continue;
-                Color wash = pixelBuffer[x, y].Background.Color;
+                Color wash = background.Color;
 
-                // expand rightward while the tiles continue the same image's row under the same wash
-                ushort width = 1;
-                while (x + width < pixelBuffer.Width && !visited[x + width, y])
-                {
-                    PixelBackground nextBackground = pixelBuffer[(ushort)(x + width), y].Background;
-                    KittyTile nextTile = nextBackground.Tile;
-                    if (nextTile.ImageId != tile.ImageId ||
-                        nextTile.X != tile.X + width ||
-                        nextTile.Y != tile.Y ||
-                        nextBackground.Color != wash)
-                        break;
-                    width++;
-                }
-
-                // expand downward while each row continues the same tile grid at full width
-                ushort height = 1;
-                while (y + height < pixelBuffer.Height)
-                {
-                    bool rowMatches = true;
-                    for (ushort i = 0; i < width; i++)
-                    {
-                        PixelBackground rowBackground =
-                            pixelBuffer[(ushort)(x + i), (ushort)(y + height)].Background;
-                        KittyTile rowTile = rowBackground.Tile;
-                        if (visited[x + i, y + height] ||
-                            rowTile.ImageId != tile.ImageId ||
-                            rowTile.X != tile.X + i ||
-                            rowTile.Y != tile.Y + height ||
-                            rowBackground.Color != wash)
-                        {
-                            rowMatches = false;
-                            break;
-                        }
-                    }
-
-                    if (!rowMatches)
-                        break;
-                    height++;
-                }
-
-                for (ushort dy = 0; dy < height; dy++)
-                for (ushort dx = 0; dx < width; dx++)
-                    visited[x + dx, y + dy] = true;
+                // rightward while the tiles continue the same image's row under the same wash, then
+                // downward while each row continues the same tile grid at full width
+                (int rectWidth, int rectHeight) = GrowRectangle(new KittyTileCells(pixelBuffer, tile, wash),
+                    visited, bufferWidth, pixelBuffer.Height, x, y, false);
+                ushort width = (ushort)rectWidth;
+                ushort height = (ushort)rectHeight;
 
                 var rect = new KittyRect(tile.ImageId, tile.X, tile.Y, width, height, x, y);
 
@@ -559,11 +530,11 @@ namespace Consolonia.Core.Drawing
         ///     The sixel cell (x, y) needs written this frame, or null when it doesn't: it is not a sixel
         ///     cell, not dirty, already on screen, or under the mouse cursor (pass 2 draws that as text).
         /// </summary>
-        private Sixel? SixelToWrite(PixelBuffer pixelBuffer, Snapshot dirtyRegions, int x, int y)
+        private Sixel? SixelToWrite(PixelBuffer pixelBuffer, bool[] dirty, int x, int y)
         {
-            Sixel? sixel = pixelBuffer[(ushort)x, (ushort)y].Foreground.Symbol.Sixel;
+            Sixel? sixel = pixelBuffer.CellAt(x, y).Foreground.Symbol.Sixel;
             if (sixel == null ||
-                !dirtyRegions.Contains((ushort)x, (ushort)y, false) ||
+                !dirty[y * pixelBuffer.Width + x] ||
                 ReferenceEquals(_cache[x, y]?.Foreground.Symbol.Sixel, sixel) ||
                 IsUnderMouseCursor(x, y))
                 return null;
@@ -578,7 +549,7 @@ namespace Consolonia.Core.Drawing
         ///     A dirty cell whose sixel the terminal already shows (the same instance as in the cache) is
         ///     not sent again: a mouse move or a neighbour repainting marks cells dirty without changing them.
         /// </remarks>
-        private void RenderSixelRegions(PixelBuffer pixelBuffer, Snapshot dirtyRegions)
+        private void RenderSixelRegions(PixelBuffer pixelBuffer, bool[] dirty)
         {
             // sixel cells only exist where the console draws sixels
             if (!_console.Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
@@ -593,54 +564,19 @@ namespace Consolonia.Core.Drawing
                 if (visited != null && visited[y * width + x])
                     continue;
 
-                Sixel? cellSixel = SixelToWrite(pixelBuffer, dirtyRegions, x, y);
+                Sixel? cellSixel = SixelToWrite(pixelBuffer, dirty, x, y);
                 if (cellSixel == null)
                     continue;
 
-                if (visited == null)
-                {
-                    int cells = width * pixelBuffer.Height;
-                    if (_sixelVisited == null || _sixelVisited.Length < cells)
-                        _sixelVisited = new bool[cells];
-                    else
-                        Array.Clear(_sixelVisited, 0, cells);
-                    visited = _sixelVisited;
-                }
+                visited ??= Scratch(ref _rectangleVisited, width * pixelBuffer.Height);
 
-                // expand to the maximal rectangle of cells to write sharing this palette instance
-                byte[] palette = cellSixel.Palette;
-                int cellPixelWidth = cellSixel.CellWidth;
-                int cellPixelHeight = cellSixel.CellHeight;
+                // the maximal rectangle of cells to write sharing this palette instance, narrowed rather
+                // than extended ragged: the region must stay rectangular
+                (int rectWidth, int rectHeight) = GrowRectangle(
+                    new SixelCells(this, pixelBuffer, dirty, cellSixel.Palette), visited, width,
+                    pixelBuffer.Height, x, y, true);
 
-                int maxWidth = 1;
-                while (x + maxWidth < width && !visited[y * width + x + maxWidth] &&
-                       ReferenceEquals(SixelToWrite(pixelBuffer, dirtyRegions, x + maxWidth, y)?.Palette, palette))
-                    maxWidth++;
-
-                int rectHeight = 1;
-                while (y + rectHeight < pixelBuffer.Height)
-                {
-                    int rowWidth = 0;
-                    int rowStart = (y + rectHeight) * width + x;
-                    while (rowWidth < maxWidth && !visited[rowStart + rowWidth] &&
-                           ReferenceEquals(
-                               SixelToWrite(pixelBuffer, dirtyRegions, x + rowWidth, y + rectHeight)?.Palette,
-                               palette))
-                        rowWidth++;
-
-                    if (rowWidth == 0)
-                        break;
-
-                    // narrow instead of extending ragged: the region must stay rectangular
-                    if (rowWidth < maxWidth)
-                        maxWidth = rowWidth;
-                    rectHeight++;
-                }
-
-                for (int ry = 0; ry < rectHeight; ry++)
-                    visited.AsSpan((y + ry) * width + x, maxWidth).Fill(true);
-
-                if (maxWidth == 1 && rectHeight == 1)
+                if (rectWidth == 1 && rectHeight == 1)
                 {
                     _console.WriteSixel(new PixelBufferCoordinate((ushort)x, (ushort)y), cellSixel);
                     _cache[x, y] = pixelBuffer[(ushort)x, (ushort)y];
@@ -649,24 +585,100 @@ namespace Consolonia.Core.Drawing
 
                 // one BitBlt'd sixel for the whole rectangle costs a single escape sequence; it is written
                 // once, so its bytes are not kept (IsTransient) and BitBlt fills every pixel
-                int combinedWidth = maxWidth * cellPixelWidth;
+                int cellPixelWidth = cellSixel.CellWidth;
+                int cellPixelHeight = cellSixel.CellHeight;
+                int combinedWidth = rectWidth * cellPixelWidth;
                 int combinedHeight = rectHeight * cellPixelHeight;
                 byte[] combinedPixels = GC.AllocateUninitializedArray<byte>(combinedWidth * combinedHeight);
-                var combined = new Sixel(palette, cellSixel.PaletteCount, combinedPixels,
+                var combined = new Sixel(cellSixel.Palette, cellSixel.PaletteCount, combinedPixels,
                     combinedWidth, combinedHeight, cellPixelWidth, cellPixelHeight) { IsTransient = true };
 
                 for (int ry = 0; ry < rectHeight; ry++)
-                for (int rx = 0; rx < maxWidth; rx++)
-                {
-                    Sixel cellData = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)].Foreground.Symbol.Sixel!;
-                    combined.BitBlt(cellData, rx * cellPixelWidth, ry * cellPixelHeight);
-                }
+                for (int rx = 0; rx < rectWidth; rx++)
+                    combined.BitBlt(pixelBuffer.CellAt(x + rx, y + ry).Foreground.Symbol.Sixel!,
+                        rx * cellPixelWidth, ry * cellPixelHeight);
 
                 _console.WriteSixel(new PixelBufferCoordinate((ushort)x, (ushort)y), combined);
 
                 for (int ry = 0; ry < rectHeight; ry++)
-                for (int rx = 0; rx < maxWidth; rx++)
+                for (int rx = 0; rx < rectWidth; rx++)
                     _cache[x + rx, y + ry] = pixelBuffer[(ushort)(x + rx), (ushort)(y + ry)];
+            }
+        }
+
+        /// <summary>A cleared scratch array of at least <paramref name="length" />, reused across frames.</summary>
+        private static bool[] Scratch(ref bool[]? scratch, int length)
+        {
+            if (scratch == null || scratch.Length < length)
+                scratch = new bool[length];
+            else
+                Array.Clear(scratch, 0, length);
+            return scratch;
+        }
+
+        /// <summary>Whether a cell joins the rectangle being grown from (x, y), at offset (dx, dy).</summary>
+        private interface IRectangleCells
+        {
+            bool Joins(int x, int y, int dx, int dy);
+        }
+
+        /// <summary>
+        ///     Grows a rectangle of cells from (x, y): rightward while cells join, then downward row by row,
+        ///     never into a cell already <paramref name="visited" />, and marks the cells it takes as visited.
+        /// </summary>
+        /// <param name="narrowToShortRows">
+        ///     A row that joins for only part of the width narrows the rectangle to it; otherwise such a row
+        ///     ends the rectangle.
+        /// </param>
+        private static (int Width, int Height) GrowRectangle<TCells>(TCells cells, bool[] visited,
+            int bufferWidth, int bufferHeight, int x, int y, bool narrowToShortRows)
+            where TCells : struct, IRectangleCells
+        {
+            int width = 1;
+            while (x + width < bufferWidth && !visited[y * bufferWidth + x + width] &&
+                   cells.Joins(x, y, width, 0))
+                width++;
+
+            int height = 1;
+            while (y + height < bufferHeight)
+            {
+                int rowStart = (y + height) * bufferWidth + x;
+                int rowWidth = 0;
+                while (rowWidth < width && !visited[rowStart + rowWidth] && cells.Joins(x, y, rowWidth, height))
+                    rowWidth++;
+
+                if (rowWidth == 0 || (rowWidth < width && !narrowToShortRows))
+                    break;
+                width = rowWidth;
+                height++;
+            }
+
+            for (int row = 0; row < height; row++)
+                visited.AsSpan((y + row) * bufferWidth + x, width).Fill(true);
+
+            return (width, height);
+        }
+
+        /// <summary>Kitty tile cells continuing one image's tile grid under one wash.</summary>
+        private readonly struct KittyTileCells(PixelBuffer pixelBuffer, KittyTile tile, Color wash) : IRectangleCells
+        {
+            public bool Joins(int x, int y, int dx, int dy)
+            {
+                ref readonly PixelBackground background = ref pixelBuffer.CellAt(x + dx, y + dy).Background;
+                return background.Tile.ImageId == tile.ImageId &&
+                       background.Tile.X == tile.X + dx &&
+                       background.Tile.Y == tile.Y + dy &&
+                       background.Color == wash;
+            }
+        }
+
+        /// <summary>Sixel cells to write this frame that share one palette.</summary>
+        private readonly struct SixelCells(RenderTarget target, PixelBuffer pixelBuffer, bool[] dirty, byte[] palette)
+            : IRectangleCells
+        {
+            public bool Joins(int x, int y, int dx, int dy)
+            {
+                return ReferenceEquals(target.SixelToWrite(pixelBuffer, dirty, x + dx, y + dy)?.Palette, palette);
             }
         }
 
