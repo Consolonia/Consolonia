@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -17,9 +18,26 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     public class Sixel
     {
+        /// <exception cref="ArgumentException">
+        ///     The arrays are smaller than the counts and dimensions say. Render reads them with unchecked
+        ///     offsets, so they are checked here.
+        /// </exception>
         public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height,
             int cellWidth, int cellHeight)
         {
+            ArgumentNullException.ThrowIfNull(palette);
+            ArgumentNullException.ThrowIfNull(pixels);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cellWidth);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cellHeight);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(paletteCount);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(paletteCount, 256);
+            if (palette.Length < paletteCount * 4)
+                throw new ArgumentException("The palette holds fewer colors than paletteCount.", nameof(palette));
+            if (pixels.Length < width * height)
+                throw new ArgumentException("There are fewer pixels than width * height.", nameof(pixels));
+
             Palette = palette;
             PaletteCount = paletteCount;
             Pixels = pixels;
@@ -102,6 +120,11 @@ namespace Consolonia.Core.Drawing
             if (width <= 0 || height <= 0 || bgrx.Length < width * height * 4)
                 throw new ArgumentException("Bitmap size does not match the given dimensions.", nameof(bgrx));
 
+            // only this image's pixels: a pooled buffer can be longer, and its tail would sway the palette
+            int byteCount = width * height * 4;
+            if (bgrx.Length > byteCount)
+                bgrx = bgrx[..byteCount];
+
             if (palette != null)
             {
                 int paletteCount = palette.Length / 4;
@@ -119,8 +142,15 @@ namespace Consolonia.Core.Drawing
         ///     Copy source image pixels into this image at pixel position (x, y).
         ///     Clips if source extends beyond this image's bounds.
         /// </summary>
+        /// <remarks>
+        ///     Pixel indices are copied as they are, so <paramref name="source" /> must use this image's
+        ///     palette. This changes <see cref="Pixels" /> in place, which a <see cref="Wash" /> variant
+        ///     shares: blit only into an image made for the purpose, never one already on screen.
+        /// </remarks>
         public void BitBlt(Sixel source, int x, int y)
         {
+            Debug.Assert(ReferenceEquals(source.Palette, Palette), "BitBlt copies indices into a different palette");
+
             for (int row = 0; row < source.Height; row++)
             {
                 int destY = y + row;

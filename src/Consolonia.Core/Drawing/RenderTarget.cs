@@ -317,7 +317,6 @@ namespace Consolonia.Core.Drawing
             if (sawKittyTiles || _kittyRectPlacements.Count > 0)
                 EmitKittyRectPlacements(pixelBuffer);
 
-            _console.Flush();
 #if FPS
             var fps = $"FPS: {_fps: 000}";
             for (ushort i = 0; i < fps.Length; i++)
@@ -326,19 +325,18 @@ namespace Consolonia.Core.Drawing
  new Pixel(new PixelForeground(new Symbol(fps[i]), Colors.White), new PixelBackground(Colors.Black));
                 _console.WritePixel(new PixelBufferCoordinate((ushort)(pixelBuffer.Width - fps.Length + i), (ushort)(pixelBuffer.Height - 1)), in pixel);
             }
-            _console.Flush();
 #endif
 
+            // the caret was hidden at the start of the frame
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
                 _console.SetCaretPosition((PixelBufferCoordinate)caretPosition);
                 _console.SetCaretStyle((CaretStyle)caretStyle!);
                 _console.ShowCaret();
             }
-            else
-            {
-                _console.HideCaret(); //todo: Caret was hidden at the beginning of this method, why to hide it again?
-            }
+
+            // one write for the whole frame, caret included, so a synchronized update covers all of it
+            _console.Flush();
         }
 
 
@@ -574,7 +572,8 @@ namespace Consolonia.Core.Drawing
                 {
                     Pixel nextPixel = pixelBuffer[(ushort)(x + maxWidth), y];
                     Sixel? nextSixel = nextPixel.Foreground.Symbol.Sixel;
-                    if (nextSixel == null || !ReferenceEquals(nextSixel.Palette, palette))
+                    if (nextSixel == null || !ReferenceEquals(nextSixel.Palette, palette) ||
+                        visited[x + maxWidth, y])
                         break;
                     if (!dirtyRegions.Contains((ushort)(x + maxWidth), y, false))
                         break;
@@ -589,7 +588,8 @@ namespace Consolonia.Core.Drawing
                     {
                         Pixel belowPixel = pixelBuffer[(ushort)(x + rowWidth), (ushort)(y + rectHeight)];
                         Sixel? belowSixel = belowPixel.Foreground.Symbol.Sixel;
-                        if (belowSixel == null || !ReferenceEquals(belowSixel.Palette, palette))
+                        if (belowSixel == null || !ReferenceEquals(belowSixel.Palette, palette) ||
+                            visited[x + rowWidth, y + rectHeight])
                             break;
                         if (!dirtyRegions.Contains((ushort)(x + rowWidth), (ushort)(y + rectHeight), false))
                             break;

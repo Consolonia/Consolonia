@@ -44,9 +44,9 @@ namespace Consolonia.Core.Dummy
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
-        public int CellPixelWidth => throw new NotImplementedException();
+        public int CellPixelWidth => DefaultCellPixelSize.Width;
 
-        public int CellPixelHeight => throw new NotImplementedException();
+        public int CellPixelHeight => DefaultCellPixelSize.Height;
 
         public PixelBufferCoordinate GetCaretPosition()
         {

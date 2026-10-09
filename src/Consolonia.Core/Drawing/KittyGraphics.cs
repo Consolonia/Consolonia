@@ -51,7 +51,16 @@ namespace Consolonia.Core.Drawing
 
         public static int AllocateImageId()
         {
-            return (Interlocked.Increment(ref _nextImageId) - 1) % 0xFFFFFF + 1;
+            return NextId(ref _nextImageId);
+        }
+
+        /// <summary>
+        ///     The next id in 1..0xFFFFFF. The counter is read as unsigned so it keeps wrapping within that
+        ///     range after it passes int.MaxValue, instead of turning negative.
+        /// </summary>
+        private static int NextId(ref int counter)
+        {
+            return (int)((uint)(Interlocked.Increment(ref counter) - 1) % 0xFFFFFFu) + 1;
         }
 
         /// <summary>
@@ -94,7 +103,7 @@ namespace Consolonia.Core.Drawing
 
         public static int AllocatePlacementId()
         {
-            return (Interlocked.Increment(ref _nextPlacementId) - 1) % 0xFFFFFF + 1;
+            return NextId(ref _nextPlacementId);
         }
 
         /// <summary>

@@ -241,7 +241,7 @@ namespace Consolonia.Core.Infrastructure
             if (widthPx > 0 && heightPx > 0 && cols > 0 && rows > 0)
                 return (widthPx / cols, heightPx / rows);
 
-            return (8, 16);
+            return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
         }
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)

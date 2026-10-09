@@ -25,6 +25,10 @@ namespace Consolonia.Core.Tests
             TestName = "EmptyResponseIsRejected")]
         [TestCase("garbage", ExpectedResult = false,
             TestName = "GarbageResponseIsRejected")]
+        [TestCase("[?2026;2$y[?62;4;22c", ExpectedResult = true,
+            TestName = "SixelFeatureAfterSynchronizedOutputReplyIsDetected")]
+        [TestCase("[?2026;2$y[?62;22c", ExpectedResult = false,
+            TestName = "SynchronizedOutputReplyIsNotReadAsDeviceAttributes")]
         public bool DetectsSixelSupportFromDeviceAttributes(string deviceAttributesResponse)
         {
             return AnsiConsoleOutput.DeviceAttributesIndicateSixelSupport(deviceAttributesResponse);
