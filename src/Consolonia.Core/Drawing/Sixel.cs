@@ -272,8 +272,16 @@ namespace Consolonia.Core.Drawing
         private int _dominantIndex = -1;
 
         /// <summary>
+        ///     An image made for a single write, such as the one the renderer combines from neighbouring
+        ///     cells each frame. <see cref="Render" /> does not keep its bytes: it returns them straight
+        ///     from a per-thread scratch buffer, valid only until the next render on the same thread.
+        /// </summary>
+        internal bool IsTransient { get; init; }
+
+        /// <summary>
         ///     Serialize this image to SIXEL escape sequence bytes.
-        ///     The returned span is cached on the instance after the first render.
+        ///     The returned span is cached on the instance after the first render, unless the image is
+        ///     <see cref="IsTransient" />.
         /// </summary>
         public ReadOnlySpan<byte> Render()
         {
@@ -286,7 +294,18 @@ namespace Consolonia.Core.Drawing
             int paletteCount = PaletteCount;
             byte[] indexed = Pixels;
 
-            int maxOutput = 64 + paletteCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
+            // Only the colors the image uses are defined. A cell uses a handful of a palette shared by a
+            // whole picture, and defining all of them made up most of the bytes sent.
+            Span<bool> used = stackalloc bool[paletteCount];
+            int usedCount = 0;
+            foreach (byte index in indexed.AsSpan(0, width * height))
+                if (!used[index])
+                {
+                    used[index] = true;
+                    usedCount++;
+                }
+
+            int maxOutput = 64 + usedCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
             byte[] output = RentOrGrow(ref _scratchRenderBuf, maxOutput);
             int pos = 0;
 
@@ -308,6 +327,9 @@ namespace Consolonia.Core.Drawing
             // Palette: #idx;2;R%;G%;B%
             for (int i = 0; i < paletteCount; i++)
             {
+                if (!used[i])
+                    continue;
+
                 // rounded, not truncated: 254 truncated to 99%, which the terminal reads back as 252
                 int r = (palette[i * 4 + 2] * 100 + 127) / 255;
                 int g = (palette[i * 4 + 1] * 100 + 127) / 255;
@@ -338,14 +360,22 @@ namespace Consolonia.Core.Drawing
                     int bandRows = Math.Min(6, height - yStart);
 
                     colorPresent.Clear();
+                    int bandColors = 0;
                     for (int row = 0; row < bandRows; row++)
                     {
                         int rowOff = (yStart + row) * width;
                         for (int x = 0; x < width; x++)
-                            colorPresent[indexed[rowOff + x]] = true;
+                        {
+                            ref bool present = ref colorPresent[indexed[rowOff + x]];
+                            if (!present)
+                            {
+                                present = true;
+                                bandColors++;
+                            }
+                        }
                     }
 
-                    int bandWorstCase = paletteCount * (width + 20);
+                    int bandWorstCase = bandColors * (width + 20);
                     if (pos + bandWorstCase > output.Length)
                     {
                         int newLen = Math.Max(output.Length * 2, pos + bandWorstCase + 4096);
@@ -384,6 +414,9 @@ namespace Consolonia.Core.Drawing
             output[pos++] = 0x1B;
             output[pos++] = (byte)'\\';
 
+            if (IsTransient)
+                return output.AsSpan(0, pos);
+
             byte[] rendered = GC.AllocateUninitializedArray<byte>(pos);
             output.AsSpan(0, pos).CopyTo(rendered);
             _renderedBytes = rendered;
@@ -395,17 +428,80 @@ namespace Consolonia.Core.Drawing
         #region Quantization
 
         /// <summary>
-        ///     Quantize BGRX pixel data using Wu's variance-minimizing algorithm.
+        ///     Quantize BGRX pixel data: exactly when it has at most 256 colors, otherwise using Wu's
+        ///     variance-minimizing algorithm.
         /// </summary>
-        private static void Quantize(byte[] bgrx,
+        /// <param name="indexed">One palette index per pixel, in the order of <paramref name="bgrx" />.</param>
+        internal static void Quantize(byte[] bgrx,
             out byte[] palette, out int paletteCount, out byte[] indexed)
         {
+            if (TryIndexExactly(bgrx, out palette, out paletteCount, out indexed))
+                return;
+
             WuColorQuantizer quantizer = _quantizer ??= new WuColorQuantizer();
             ColorQuantizerResult result = quantizer.Quantize(bgrx, 256);
 
             palette = result.Palette;
             paletteCount = palette.Length / 4;
             indexed = result.Bytes;
+        }
+
+        /// <summary>
+        ///     Indexes pixels with at most 256 distinct colors exactly: the palette is those colors. Gives
+        ///     up as soon as a 257th color appears.
+        /// </summary>
+        /// <remarks>
+        ///     Wu's quantizer has a large fixed cost however few pixels it is given (its color histogram
+        ///     and box cutting don't shrink with the image), while the cells a brush stroke changes hold a
+        ///     handful of colors. Exact indexing is cheaper for them and loses nothing.
+        /// </remarks>
+        private static bool TryIndexExactly(byte[] bgrx,
+            out byte[] palette, out int paletteCount, out byte[] indexed)
+        {
+            int pixelCount = bgrx.Length / 4;
+            var indices = new Dictionary<int, byte>(64);
+            byte[] result = GC.AllocateUninitializedArray<byte>(pixelCount);
+            int lastColor = -1;
+            byte lastIndex = 0;
+
+            for (int i = 0, offset = 0; i < pixelCount; i++, offset += 4)
+            {
+                int color = bgrx[offset] | (bgrx[offset + 1] << 8) | (bgrx[offset + 2] << 16);
+                if (color != lastColor)
+                {
+                    if (!indices.TryGetValue(color, out lastIndex))
+                    {
+                        if (indices.Count == 256)
+                        {
+                            palette = null;
+                            paletteCount = 0;
+                            indexed = null;
+                            return false;
+                        }
+
+                        lastIndex = (byte)indices.Count;
+                        indices.Add(color, lastIndex);
+                    }
+
+                    lastColor = color;
+                }
+
+                result[i] = lastIndex;
+            }
+
+            paletteCount = indices.Count;
+            palette = new byte[paletteCount * 4];
+            foreach ((int color, byte index) in indices)
+            {
+                int offset = index * 4;
+                palette[offset] = (byte)color;
+                palette[offset + 1] = (byte)(color >> 8);
+                palette[offset + 2] = (byte)(color >> 16);
+                palette[offset + 3] = 0xFF;
+            }
+
+            indexed = result;
+            return true;
         }
 
         /// <summary>
@@ -652,9 +748,14 @@ namespace Consolonia.Core.Drawing
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        ///     A per-thread scratch buffer of at least <paramref name="minSize" />. One very large render
+        ///     does not pin its buffer for the life of the thread: it is replaced once renders are small again.
+        /// </summary>
         private static T[] RentOrGrow<T>(ref T[] buf, int minSize)
         {
-            if (buf == null || buf.Length < minSize)
+            const int keepAtMost = 4 * 1024 * 1024;
+            if (buf == null || buf.Length < minSize || (buf.Length > keepAtMost && minSize <= keepAtMost / 4))
                 buf = GC.AllocateUninitializedArray<T>(Math.Max(minSize, 4096));
             return buf;
         }
