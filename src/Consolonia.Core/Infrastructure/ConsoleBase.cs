@@ -287,7 +287,7 @@ namespace Consolonia.Core.Infrastructure
                 return (widthPx / cols, heightPx / rows);
             }
 
-            return (8, 16);
+            return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
         }
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)

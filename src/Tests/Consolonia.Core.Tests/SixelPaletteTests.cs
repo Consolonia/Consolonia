@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using Consolonia.Core.Drawing;
 using NUnit.Framework;
@@ -60,6 +61,26 @@ namespace Consolonia.Core.Tests
         ///     Sixel colors are percentages. Truncating made 254 into 99%, which the terminal reads back
         ///     as 252; rounding keeps a near-white near white.
         /// </summary>
+        /// <summary>
+        ///     Render reads the arrays with unchecked offsets, so the constructor refuses arrays smaller
+        ///     than its counts and dimensions say.
+        /// </summary>
+        [Test]
+        public void The_constructor_refuses_arrays_too_small_for_its_dimensions()
+        {
+            byte[] palette = { 0, 0, 0, 255 };
+            byte[] pixels = new byte[Width * Height];
+
+            Assert.Throws<ArgumentException>(() => new Sixel(palette, 1, new byte[Width * Height - 1],
+                Width, Height, Width, Height));
+            Assert.Throws<ArgumentException>(() => new Sixel(palette, 2, pixels, Width, Height, Width, Height));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new Sixel(palette, 0, pixels, Width, Height, Width,
+                Height));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new Sixel(new byte[257 * 4], 257, pixels, Width,
+                Height, Width, Height));
+            Assert.That(new Sixel(palette, 1, pixels, Width, Height, Width, Height).Width, Is.EqualTo(Width));
+        }
+
         [Test]
         public void Palette_percentages_are_rounded()
         {

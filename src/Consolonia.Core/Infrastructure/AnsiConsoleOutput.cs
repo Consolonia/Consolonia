@@ -152,9 +152,11 @@ namespace Consolonia.Core.Infrastructure
             // below-text (z<0) placements under any explicit cell background, so painting the cell
             // a color -- even black -- hides the picture there; kitty draws them above either way.
             bool defaultBackground = !pixel.Background.Tile.IsEmpty;
+            bool backgroundChanged = defaultBackground
+                ? !_lastBackgroundIsDefault
+                : pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault;
 
-            if (pixel.Foreground.Color != _lastForeground || pixel.Background.Color != _lastBackground ||
-                defaultBackground != _lastBackgroundIsDefault)
+            if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
             {
                 (object mappedBackground, object mappedForeground) =
                     consoleColorMode.Value.MapColors(pixel.Background.Color, pixel.Foreground.Color,
@@ -171,13 +173,12 @@ namespace Consolonia.Core.Infrastructure
                     _lastForeground = pixel.Foreground.Color;
                 }
 
-                if (defaultBackground)
+                if (backgroundChanged && defaultBackground)
                 {
-                    if (!_lastBackgroundIsDefault)
-                        WriteText(Esc.DefaultBackground);
+                    WriteText(Esc.DefaultBackground);
                     _lastBackgroundIsDefault = true;
                 }
-                else if (pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault)
+                else if (backgroundChanged)
                 {
                     WriteText(Esc.Background(mappedBackground));
                     _lastBackground = pixel.Background.Color;
@@ -321,7 +322,8 @@ namespace Consolonia.Core.Infrastructure
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
             // 8x16 pixels is the fallback when the terminal does not report its cell size
-            (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ?? (8, 16);
+            (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ??
+                                     (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
             CellPixelHeight = cellH;
             CellPixelWidth = cellW;
 
@@ -361,9 +363,10 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
-            // close any update left open by an interrupted frame, else the terminal withholds output until it times out
+            // close any update left open by an interrupted frame, else the terminal withholds output until it
+            // times out. Written straight out: buffered, Flush would wrap it in an update of its own.
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
-                WriteText(Esc.EndSynchronizedUpdate);
+                Console.Out.Write(Esc.EndSynchronizedUpdate);
 
             // free terminal-side image storage held by kitty graphics placements
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
@@ -414,14 +417,12 @@ namespace Consolonia.Core.Infrastructure
         public void HideCaret()
         {
             WriteText(Esc.HideCursor);
-            Flush();
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void ShowCaret()
         {
             WriteText(Esc.ShowCursor);
-            Flush();
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -463,12 +464,14 @@ namespace Consolonia.Core.Infrastructure
             if (string.IsNullOrEmpty(deviceAttributesResponse))
                 return false;
 
-            int start = deviceAttributesResponse.IndexOf('?');
+            // the probe's other replies (DECRPM "ESC[?2026;2$y", kitty's APC) come first, so find the
+            // DA1 reply by its final 'c' and take the parameters from its own "[?"
             int end = deviceAttributesResponse.LastIndexOf('c');
-            if (start < 0 || end <= start)
+            int start = end > 0 ? deviceAttributesResponse.LastIndexOf("[?", end, StringComparison.Ordinal) : -1;
+            if (start < 0)
                 return false;
 
-            string[] parameters = deviceAttributesResponse[(start + 1)..end].Split(';');
+            string[] parameters = deviceAttributesResponse[(start + 2)..end].Split(';');
 
             // the first parameter is the device class, the rest are supported features
             for (int i = 1; i < parameters.Length; i++)

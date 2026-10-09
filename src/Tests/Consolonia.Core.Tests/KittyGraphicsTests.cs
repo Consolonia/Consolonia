@@ -23,6 +23,28 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
+        public void AllocatedIdsStayWithin24BitsAfterTheCounterOverflows()
+        {
+            System.Reflection.FieldInfo counter = typeof(KittyGraphics).GetField("_nextImageId",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(counter, Is.Not.Null, "_nextImageId has been renamed; this test needs updating");
+            object saved = counter!.GetValue(null);
+            try
+            {
+                counter.SetValue(null, int.MaxValue - 1);
+                for (int i = 0; i < 4; i++)
+                {
+                    int imageId = KittyGraphics.AllocateImageId();
+                    Assert.That(imageId, Is.InRange(1, 0xFFFFFF), "an id after the counter wrapped");
+                }
+            }
+            finally
+            {
+                counter.SetValue(null, saved);
+            }
+        }
+
+        [Test]
         public void DeleteSequenceIsWellFormed()
         {
             Assert.That(KittyGraphics.BuildDeleteSequence(7),
