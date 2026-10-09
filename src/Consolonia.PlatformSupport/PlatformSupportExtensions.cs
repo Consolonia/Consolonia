@@ -31,7 +31,7 @@ namespace Consolonia
             {
 #pragma warning disable CA1416 // Validate platform compatibility
                 PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT =>
-                    new Win32Console(Console.IsOutputRedirected || IsWindowsTerminal()
+                    new Win32Console(Console.IsOutputRedirected || IsPseudoConsole()
                         ? new AnsiConsoleOutput()
                         : new WindowsLegacyConsoleOutput()),
 #pragma warning restore CA1416 // Validate platform compatibility
@@ -134,8 +134,8 @@ namespace Consolonia
                 {
                     case PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT:
                     {
-                        // if output is redirected, or we are a windows terminal we use the win32 ANSI based console.
-                        if (Console.IsOutputRedirected || IsWindowsTerminal())
+                        // if output is redirected, or we are in a pseudoconsole we use the win32 ANSI based console.
+                        if (Console.IsOutputRedirected || IsPseudoConsole())
                             result = new RgbConsoleColorMode();
                         else
                             result = new EgaConsoleColorMode(true);
@@ -170,23 +170,17 @@ namespace Consolonia
         }
 
         /// <summary>
-        ///     True when the console is a modern, VT-capable terminal rather than the legacy console host.
+        ///     True when the console is a ConPTY pseudoconsole -- Windows Terminal, VS Code, WezTerm, an
+        ///     OpenSSH session -- rather than the legacy console host.
         /// </summary>
         /// <remarks>
-        ///     WT_SESSION is not enough on its own. When Windows Terminal is the default terminal and a
-        ///     console program is started from Start or Explorer, Windows creates the process first and
-        ///     hands its console to Windows Terminal afterwards, so the variable is never set -- and every
-        ///     program started from that shell inherits its absence. The console window says what the
-        ///     environment cannot: under ConPTY (Windows Terminal, VS Code, WezTerm, ...) it is a hidden
-        ///     PseudoConsoleWindow, under the legacy host a visible ConsoleWindowClass.
+        ///     Asked of the console window, not the environment. WT_SESSION is missing when Windows hands
+        ///     a console started from Start or Explorer to Windows Terminal after the process exists, and
+        ///     over SSH; and because the environment is inherited it is present in a legacy console window
+        ///     opened from a Windows Terminal tab. The console window belongs to the console this process
+        ///     is actually attached to: under ConPTY it is a hidden PseudoConsoleWindow, under the legacy
+        ///     host a ConsoleWindowClass.
         /// </remarks>
-        private static bool IsWindowsTerminal()
-        {
-            return Environment.GetEnvironmentVariable("WT_SESSION") is not null ||
-                   Environment.GetEnvironmentVariable("VSAPPIDNAME") != null ||
-                   IsPseudoConsole();
-        }
-
         private static bool IsPseudoConsole()
         {
             try
