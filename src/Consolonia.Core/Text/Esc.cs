@@ -15,6 +15,9 @@ namespace Consolonia.Core.Text
 
         // style modifiers
         public const string Reset = "\u001b[0m";
+
+        // the terminal's own background color (SGR 49), as opposed to any explicit one
+        public const string DefaultBackground = "\u001b[49m";
         public const string Normal = "\u001b[22m";
         public const string Bold = "\u001b[1m";
         public const string Dim = "\u001b[2m";

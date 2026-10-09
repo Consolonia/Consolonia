@@ -35,6 +35,7 @@ namespace Consolonia.Core.Infrastructure
 
         private PixelBufferCoordinate _headBufferPoint;
         private Color _lastBackground = Colors.Transparent;
+        private bool _lastBackgroundIsDefault;
         private Color _lastForeground = Colors.Transparent;
         private FontStyle? _lastStyle;
         private TextDecorationLocation? _lastTextDecoration;
@@ -153,7 +154,13 @@ namespace Consolonia.Core.Infrastructure
                 _lastWeight = weight;
             }
 
-            if (pixel.Foreground.Color != _lastForeground || pixel.Background.Color != _lastBackground)
+            // A cell showing a kitty image keeps the terminal's default background. Konsole draws
+            // below-text (z<0) placements under any explicit cell background, so painting the cell
+            // a color -- even black -- hides the picture there; kitty draws them above either way.
+            bool defaultBackground = !pixel.Background.Tile.IsEmpty;
+
+            if (pixel.Foreground.Color != _lastForeground || pixel.Background.Color != _lastBackground ||
+                defaultBackground != _lastBackgroundIsDefault)
             {
                 (object mappedBackground, object mappedForeground) =
                     consoleColorMode.Value.MapColors(pixel.Background.Color, pixel.Foreground.Color,
@@ -170,10 +177,17 @@ namespace Consolonia.Core.Infrastructure
                     _lastForeground = pixel.Foreground.Color;
                 }
 
-                if (pixel.Background.Color != _lastBackground)
+                if (defaultBackground)
+                {
+                    if (!_lastBackgroundIsDefault)
+                        WriteText(Esc.DefaultBackground);
+                    _lastBackgroundIsDefault = true;
+                }
+                else if (pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault)
                 {
                     WriteText(Esc.Background(mappedBackground));
                     _lastBackground = pixel.Background.Color;
+                    _lastBackgroundIsDefault = false;
                 }
             }
 
