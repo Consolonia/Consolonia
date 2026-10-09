@@ -43,6 +43,25 @@ namespace Consolonia.PlatformSupport
         }
 
         /// <summary>
+        ///     Sets the console up, then asks it which pointer shapes it has, then clears the screen.
+        /// </summary>
+        /// <remarks>
+        ///     The probe comes after the base setup because that is what moves output to the alternate
+        ///     screen (or the legacy console's second buffer); probing first would leave whatever the
+        ///     console makes of the queries on the user's own screen. The clear comes after the probe
+        ///     because a console that does not understand the queries prints them, and the renderer
+        ///     only draws cells it thinks changed -- the query text stayed wherever the first frame was
+        ///     blank.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public override void PrepareConsole()
+        {
+            base.PrepareConsole();
+            TryToSupportPointerShapes();
+            ClearScreen();
+        }
+
+        /// <summary>
         ///     Gives the pointer back to the terminal, as the curses console does, so it is not left
         ///     showing the last shape (an I-beam, say) after the program exits.
         /// </summary>
