@@ -1,25 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
+using System.IO.Hashing;
 
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     Identifies a block of pixels by what it shows: a SHA-256 digest of its BGRA bytes and its size.
+    ///     Identifies a block of pixels by what it shows: a 128-bit XXH3 hash of its BGRA bytes and its size.
     /// </summary>
     /// <remarks>
-    ///     A cryptographic digest, so two different blocks never share a key in practice and nothing
-    ///     needs keeping to compare against; SHA-256 is hardware accelerated, a screenful hashes in
-    ///     a few milliseconds.
+    ///     128 bits, so two different blocks never share a key in practice and nothing needs keeping to
+    ///     compare against. Every visible cell is hashed whenever a picture changes, which makes this
+    ///     most of the cost of a frame; XXH3 is several times faster than the SHA-256 it replaces. It is
+    ///     not cryptographic, which is fine: the pixels are the app's own, not an adversary's.
     /// </remarks>
     internal readonly record struct ContentKey(UInt128 Digest, int Width, int Height)
     {
         public static ContentKey Of(ReadOnlySpan<byte> bgra, int width, int height)
         {
-            Span<byte> digest = stackalloc byte[SHA256.HashSizeInBytes];
-            SHA256.HashData(bgra, digest);
-            return new ContentKey(MemoryMarshal.Read<UInt128>(digest), width, height);
+            return new ContentKey(XxHash128.HashToUInt128(bgra), width, height);
         }
     }
 
