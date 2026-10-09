@@ -70,10 +70,12 @@ namespace Consolonia.Core.Drawing
         {
             lock (_entries)
             {
-                if (_entries.ContainsKey(key))
+                ref LinkedListNode<Entry> slot =
+                    ref CollectionsMarshal.GetValueRefOrAddDefault(_entries, key, out bool held);
+                if (held)
                     return;
 
-                _entries[key] = _recency.AddFirst(new Entry(key, value, cost));
+                slot = _recency.AddFirst(new Entry(key, value, cost));
                 _cost += cost;
 
                 while (_cost > _budget && _recency.Count > 1)

@@ -28,12 +28,6 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal abstract class BitmapRenderer
     {
-        /// <summary>
-        ///     Renderings kept per bitmap. Each visible part is its own rendering, so scrolling a large
-        ///     picture makes new ones; the oldest go once there are more than this.
-        /// </summary>
-        private const int MaxRenderingsPerBitmap = 4;
-
         protected BitmapRenderer(DrawingContextImpl context)
         {
             Context = context;
@@ -83,6 +77,9 @@ namespace Consolonia.Core.Drawing
         ///     The pixels <paramref name="source" /> shows in <paramref name="visible" /> when it is drawn at
         ///     <paramref name="targetSize" />, as tightly packed BGRA rows.
         /// </summary>
+        /// <exception cref="NotSupportedException">
+        ///     The scaled pixels are not 32 bits each. Only BGRA and RGBA (converted) are read.
+        /// </exception>
         /// <remarks>
         ///     Only the visible part is scaled, never the whole picture at the size it is drawn. A picture
         ///     zoomed far past the screen would otherwise be scaled, and for the image protocols sent to the
@@ -99,8 +96,8 @@ namespace Consolonia.Core.Drawing
             // its height to layout, and measuring by that put the picture's top half where all of it goes.
             PixelSize sourceSize = sourceFrame.Size;
 
-            // drawn at its own size: the visible part is a plain copy
-            if (sourceSize == targetSize)
+            // drawn at its own size: the visible part is a plain copy, unless the pixels need converting
+            if (sourceSize == targetSize && sourceFrame.Format == PixelFormat.Bgra8888)
                 return CopyWindow(sourceFrame, visible.X, visible.Y, visible.Width, visible.Height);
 
             // the source pixels behind the visible part, widened to whole pixels
@@ -132,48 +129,33 @@ namespace Consolonia.Core.Drawing
 
         private static unsafe byte[] CopyWindow(ILockedFramebuffer frame, int x, int y, int width, int height)
         {
-            int rowBytes = width * 4;
-            byte[] window = GC.AllocateUninitializedArray<byte>(rowBytes * height);
+            if (frame.Format.BitsPerPixel != 32)
+                throw new NotSupportedException($"Bitmaps with {frame.Format.BitsPerPixel} bits per pixel are not supported.");
+
+            byte[] window = GC.AllocateUninitializedArray<byte>(width * height * 4);
             ReadOnlySpan<byte> pixels = MemoryMarshal.CreateReadOnlySpan(
                 ref Unsafe.AsRef<byte>((void*)frame.Address), frame.RowBytes * frame.Size.Height);
+            CopyBlock(pixels, frame.RowBytes, x, y, width, height, window);
 
-            for (int row = 0; row < height; row++)
-                pixels.Slice((y + row) * frame.RowBytes + x * 4, rowBytes)
-                    .CopyTo(window.AsSpan(row * rowBytes, rowBytes));
+            if (frame.Format == PixelFormat.Rgba8888)
+                for (int i = 0; i < window.Length; i += 4)
+                    (window[i], window[i + 2]) = (window[i + 2], window[i]);
 
             return window;
         }
 
         /// <summary>
-        ///     Returns the rendering cached for <paramref name="key" />, or makes one with
-        ///     <paramref name="render" />. A cached one that fails <paramref name="validate" /> is made again.
-        ///     Renderings of older versions are dropped, and the oldest of the current version once there are
-        ///     too many.
+        ///     Copies the <paramref name="width" /> x <paramref name="height" /> block at (x, y) out of an
+        ///     image of 4 bytes per pixel, <paramref name="imageRowBytes" /> per row, into the tightly packed
+        ///     <paramref name="block" />.
         /// </summary>
-        protected static T GetOrRender<T>(
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, T>>> cache,
-            IBitmapImpl source, RenderingKey key, Func<T> render, Func<T, bool> validate = null)
+        protected static void CopyBlock(ReadOnlySpan<byte> image, int imageRowBytes, int x, int y,
+            int width, int height, Span<byte> block)
         {
-            List<KeyValuePair<RenderingKey, T>> renderings =
-                cache.GetOrCreateValue(GetCacheBitmapImpl(source));
-
-            int cached = renderings.FindIndex(rendering => rendering.Key == key);
-            if (cached >= 0)
-            {
-                if (validate == null || validate(renderings[cached].Value))
-                    return renderings[cached].Value;
-                renderings.RemoveAt(cached);
-            }
-
-            // a new version (next animation frame) makes every older version's renderings unreachable
-            renderings.RemoveAll(rendering => rendering.Key.Version != key.Version);
-
-            while (renderings.Count >= MaxRenderingsPerBitmap)
-                renderings.RemoveAt(0);
-
-            T value = render();
-            renderings.Add(new KeyValuePair<RenderingKey, T>(key, value));
-            return value;
+            int blockRowBytes = width * 4;
+            for (int row = 0; row < height; row++)
+                image.Slice((y + row) * imageRowBytes + x * 4, blockRowBytes)
+                    .CopyTo(block.Slice(row * blockRowBytes, blockRowBytes));
         }
 
         /// <summary>
@@ -228,6 +210,114 @@ namespace Consolonia.Core.Drawing
             return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
                 ? adjustedBitmap.InnerBitmap
                 : bitmapImpl;
+        }
+    }
+
+    /// <summary>
+    ///     A renderer that turns the on-screen part of a picture into cells, once per picture, size and
+    ///     visible part: drawing the same again reuses the rendering, and copies only the cells that
+    ///     changed into the pixel buffer.
+    /// </summary>
+    /// <typeparam name="TRendering">What a rendering holds besides its cells.</typeparam>
+    internal abstract class CellBitmapRenderer<TRendering> : BitmapRenderer
+        where TRendering : class
+    {
+        /// <summary>
+        ///     Renderings kept per bitmap. Each visible part is its own rendering, so scrolling a large
+        ///     picture makes new ones; the oldest go once there are more than this.
+        /// </summary>
+        private const int MaxRenderingsPerBitmap = 4;
+
+        protected CellBitmapRenderer(DrawingContextImpl context)
+            : base(context)
+        {
+        }
+
+        /// <summary>The renderings of each picture, kept for as long as the picture is.</summary>
+        protected abstract ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, TRendering>>>
+            Renderings { get; }
+
+        /// <summary>Makes a rendering of the visible pixels, BGRA rows of exactly the visible cells.</summary>
+        protected abstract TRendering Render(byte[] visibleBytes, PixelRect visibleCells, int cellPixelWidth,
+            int cellPixelHeight, IPlatformRenderInterface renderInterface);
+
+        /// <summary>The cells of <paramref name="rendering" />, one per visible cell.</summary>
+        protected abstract PixelBuffer CellsOf(TRendering rendering);
+
+        /// <summary>Whether a cached rendering can still be shown, or must be made again.</summary>
+        protected virtual bool IsReusable(TRendering rendering)
+        {
+            return true;
+        }
+
+        /// <summary>Called once a rendering has been found or made, before its cells are copied.</summary>
+        protected virtual void AfterRendering()
+        {
+        }
+
+        public sealed override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
+        {
+            int cellPixelWidth = Context.ConsoleWindowImpl.Console.CellPixelWidth;
+            int cellPixelHeight = Context.ConsoleWindowImpl.Console.CellPixelHeight;
+
+            var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
+                targetRect.Height * cellPixelHeight);
+            PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
+            var key = new RenderingKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
+                interpolationMode);
+
+            List<KeyValuePair<RenderingKey, TRendering>> renderings =
+                Renderings.GetOrCreateValue(GetCacheBitmapImpl(source));
+            TRendering rendering = FindReusable(renderings, key);
+            if (rendering == null)
+            {
+                // only the visible cells are rendered, so the rendering starts at the first of them
+                byte[] visibleBytes = GetVisiblePixels(source, renderInterface, targetSize,
+                    new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
+                        visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight),
+                    interpolationMode);
+                rendering = Render(visibleBytes, visibleCells, cellPixelWidth, cellPixelHeight, renderInterface);
+                Remember(renderings, key, rendering);
+            }
+
+            AfterRendering();
+
+            CopyRenderedBitmapTrackingDirtyRegions(CellsOf(rendering), intersectedRect,
+                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
+        }
+
+        private TRendering FindReusable(List<KeyValuePair<RenderingKey, TRendering>> renderings, RenderingKey key)
+        {
+            for (int i = 0; i < renderings.Count; i++)
+            {
+                if (renderings[i].Key != key)
+                    continue;
+                if (IsReusable(renderings[i].Value))
+                    return renderings[i].Value;
+                renderings.RemoveAt(i);
+                return null;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        ///     Keeps <paramref name="rendering" />. Renderings of older versions are dropped, and the oldest
+        ///     of the current version once there are too many.
+        /// </summary>
+        private static void Remember(List<KeyValuePair<RenderingKey, TRendering>> renderings, RenderingKey key,
+            TRendering rendering)
+        {
+            // a new version (next animation frame) makes every older version's renderings unreachable
+            for (int i = renderings.Count - 1; i >= 0; i--)
+                if (renderings[i].Key.Version != key.Version)
+                    renderings.RemoveAt(i);
+
+            while (renderings.Count >= MaxRenderingsPerBitmap)
+                renderings.RemoveAt(0);
+
+            renderings.Add(new KeyValuePair<RenderingKey, TRendering>(key, rendering));
         }
     }
 }

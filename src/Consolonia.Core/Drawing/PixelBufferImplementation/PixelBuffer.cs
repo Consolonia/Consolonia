@@ -70,6 +70,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             set => this[(PixelBufferCoordinate)point] = value;
         }
 
+        /// <summary>The cell at (x, y), read in place rather than copied, for scans that only look.</summary>
+        internal ref readonly Pixel CellAt(int x, int y)
+        {
+            return ref _buffer[x, y];
+        }
+
         [JsonIgnore] public int Length => _buffer.Length;
 
         [JsonIgnore] public PixelRect Size => new(0, 0, Width, Height);

@@ -20,7 +20,7 @@ namespace Consolonia.Core.Drawing
     ///     the cells it touched. Every sixel carries its own palette, so one made with an earlier
     ///     rendering's palette sits beside new ones unchanged.
     /// </remarks>
-    internal sealed class SixelBitmapRenderer : BitmapRenderer
+    internal sealed class SixelBitmapRenderer : CellBitmapRenderer<PixelBuffer>
     {
         /// <summary>Cell sixels kept for reuse: a few screens' worth.</summary>
         private const int CellSixelBudget = 32 * 1024;
@@ -36,34 +36,19 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
+        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, PixelBuffer>>>
+            Renderings => RenderedBitmapCache;
+
+        protected override PixelBuffer Render(byte[] visibleBytes, PixelRect visibleCells, int cellPixelWidth,
+            int cellPixelHeight, IPlatformRenderInterface renderInterface)
         {
-            int cellPixelWidth = Context.ConsoleWindowImpl.Console.CellPixelWidth;
-            int cellPixelHeight = Context.ConsoleWindowImpl.Console.CellPixelHeight;
+            return RenderCells(visibleBytes, visibleCells.Width, visibleCells.Height, cellPixelWidth,
+                cellPixelHeight);
+        }
 
-            var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
-                targetRect.Height * cellPixelHeight);
-            PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
-            var key = new RenderingKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
-                interpolationMode);
-
-            // only the visible cells are rendered, so the rendering starts at the first of them
-            PixelBuffer renderedBitmap = GetOrRender(RenderedBitmapCache, source, key, () =>
-            {
-                var visibleSize = new PixelSize(visibleCells.Width * cellPixelWidth,
-                    visibleCells.Height * cellPixelHeight);
-                byte[] visibleBytes = GetVisiblePixels(source, renderInterface, targetSize,
-                    new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
-                        visibleSize.Width, visibleSize.Height),
-                    interpolationMode);
-
-                return RenderCells(visibleBytes, visibleCells.Width, visibleCells.Height,
-                    cellPixelWidth, cellPixelHeight);
-            });
-
-            CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect,
-                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
+        protected override PixelBuffer CellsOf(PixelBuffer rendering)
+        {
+            return rendering;
         }
 
         /// <summary>
@@ -91,7 +76,7 @@ namespace Consolonia.Core.Drawing
             for (int cellY = 0; cellY < cellsHigh; cellY++)
             for (int cellX = 0; cellX < cellsWide; cellX++)
             {
-                FillCellBgrxBuffer(visibleBytes, visibleWidth, cellX, cellY,
+                CopyBlock(visibleBytes, visibleWidth * 4, cellX * cellPixelWidth, cellY * cellPixelHeight,
                     cellPixelWidth, cellPixelHeight, cellBgrx);
 
                 ContentKey cellKey = ContentKey.Of(cellBgrx, cellPixelWidth, cellPixelHeight);
@@ -118,8 +103,9 @@ namespace Consolonia.Core.Drawing
             {
                 byte[] newCellsBgrx = GC.AllocateUninitializedArray<byte>(newCells.Count * cellBytes);
                 for (int i = 0; i < newCells.Count; i++)
-                    FillCellBgrxBuffer(visibleBytes, visibleWidth, newCells[i].CellX, newCells[i].CellY,
-                        cellPixelWidth, cellPixelHeight, newCellsBgrx.AsSpan(i * cellBytes, cellBytes));
+                    CopyBlock(visibleBytes, visibleWidth * 4, newCells[i].CellX * cellPixelWidth,
+                        newCells[i].CellY * cellPixelHeight, cellPixelWidth, cellPixelHeight,
+                        newCellsBgrx.AsSpan(i * cellBytes, cellBytes));
                 Sixel.Quantize(newCellsBgrx, out palette, out paletteCount, out indexed);
             }
 
@@ -148,22 +134,6 @@ namespace Consolonia.Core.Drawing
         {
             return new Pixel(new PixelForeground(new Symbol(cellSixel), Colors.Transparent),
                 PixelBackground.Transparent);
-        }
-
-        private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,
-            int cellPixelWidth, int cellPixelHeight, Span<byte> cellBgrx)
-        {
-            int bytesPerPixel = 4;
-            int srcRowBytes = imageWidth * bytesPerPixel;
-            int cellRowBytes = cellPixelWidth * bytesPerPixel;
-            for (int row = 0; row < cellPixelHeight; row++)
-            {
-                int sourceOffset = (cellY * cellPixelHeight + row) * srcRowBytes +
-                                   cellX * cellPixelWidth * bytesPerPixel;
-                int targetOffset = row * cellRowBytes;
-                bgrx.Slice(sourceOffset, cellRowBytes)
-                    .CopyTo(cellBgrx.Slice(targetOffset, cellRowBytes));
-            }
         }
     }
 }
