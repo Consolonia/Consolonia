@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -49,11 +50,38 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             foreach (string source in sources)
             {
                 var image = new Image { Stretch = Stretch.Uniform };
-                var border = new Border { Child = image };
+                var border = new Border { Child = new Panel { Children = { image, CreateCaption() } } };
                 border.Classes.Add("thumbnail");
                 WrapPanel.Children.Add(border);
                 _ = LoadBitmapAsync(image, source);
             }
+        }
+
+        /// <summary>
+        ///     Two lines of text drawn over a thumbnail: one on an opaque background, one on none, so
+        ///     both ways of putting text over an image can be seen on every picture.
+        /// </summary>
+        private static StackPanel CreateCaption()
+        {
+            return new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Top,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "White on dark blue",
+                        Foreground = Brushes.White,
+                        Background = Brushes.DarkBlue
+                    },
+                    new TextBlock
+                    {
+                        Text = "White on transparent",
+                        Foreground = Brushes.White,
+                        Background = Brushes.Transparent
+                    }
+                }
+            };
         }
 
         /// <summary>

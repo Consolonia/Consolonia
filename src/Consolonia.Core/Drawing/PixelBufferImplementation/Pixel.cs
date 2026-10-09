@@ -150,23 +150,24 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         /// <summary>
         ///     Composites an overlay onto a sixel cell without giving up the image: the
-        ///     <paramref name="wash" /> tints its palette and a block element glyph (a window edge, a
-        ///     shadow) is painted into its pixels. Any other glyph needs a text cell, so the image loses.
+        ///     <paramref name="wash" /> tints its palette. A glyph needs a text cell, so the image loses.
         /// </summary>
+        /// <remarks>
+        ///     Block element glyphs used to be painted into the image's pixels, but their color had to
+        ///     go into the image's palette and a full one gave them the nearest image color instead, so
+        ///     a blue window edge came out whatever the picture had closest to blue.
+        /// </remarks>
         private bool TryCompositeOverSixel(in PixelForeground foregroundAbove, Color wash,
             out PixelForeground result)
         {
             Sixel sixel = Foreground.Symbol.Sixel;
-            bool hasGlyph = !foregroundAbove.IsNothingToDraw();
-            if (sixel == null || hasGlyph && !Sixel.IsBlockGlyph(foregroundAbove.Symbol.Character))
+            if (sixel == null || !foregroundAbove.IsNothingToDraw())
             {
                 result = default;
                 return false;
             }
 
             sixel = sixel.Wash(wash);
-            if (hasGlyph)
-                sixel = sixel.DrawBlockGlyph(foregroundAbove.Symbol.Character, foregroundAbove.Color);
 
             result = new PixelForeground(new Symbol(sixel, Foreground.Symbol.Width), Foreground.Color,
                 Foreground.Weight, Foreground.Style, Foreground.TextDecoration);
@@ -244,7 +245,17 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             // Background is always blended. The tile survives a non-opaque overlay; only an opaque
             // one evicts it, via the tile-less fast path above. A tile cell's color starts out
             // transparent, so what accumulates here is exactly the wash to lay over the image.
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
+            Color backgroundBelow = Background.Color;
+
+            // A glyph the sixel lost to makes this a text cell. The image's dominant color stands in as
+            // the background below it, so a glyph without its own background sits on the picture
+            // instead of punching a hole in it. (Kitty tiles composite in the terminal, and quad pixels
+            // already carry their colors in the cell, so neither needs this.)
+            Sixel sixelBelow = Foreground.Symbol.Sixel;
+            if (sixelBelow != null && newForeground.Symbol.Sixel == null)
+                backgroundBelow = sixelBelow.DominantColor;
+
+            var newBackground = new PixelBackground(MergeColors(backgroundBelow, aboveBgColor, false),
                 Background.Tile);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);

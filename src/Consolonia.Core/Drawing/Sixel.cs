@@ -60,6 +60,38 @@ namespace Consolonia.Core.Drawing
         public int CellsHeight => Height / CellHeight;
 
         /// <summary>
+        ///     The palette color covering the most pixels. A glyph drawn over a sixel cell turns it into a
+        ///     text cell, and a glyph with a transparent background takes this as its background so the
+        ///     cell still looks like the picture instead of a hole in it.
+        /// </summary>
+        /// <remarks>
+        ///     Only the index is cached, so a washed variant (same pixels, washed palette) yields the
+        ///     washed color.
+        /// </remarks>
+        public Color DominantColor
+        {
+            get
+            {
+                int index = _dominantIndex;
+                if (index < 0)
+                {
+                    Span<int> counts = stackalloc int[256];
+                    foreach (byte pixel in Pixels)
+                        counts[pixel]++;
+
+                    index = 0;
+                    for (int i = 1; i < counts.Length; i++)
+                        if (counts[i] > counts[index])
+                            index = i;
+                    _dominantIndex = index;
+                }
+
+                int offset = index * 4;
+                return Color.FromRgb(Palette[offset + 2], Palette[offset + 1], Palette[offset]);
+            }
+        }
+
+        /// <summary>
         ///     Create a Sixel from raw BGRX pixel data.
         ///     If a palette is provided it is used to quantize against, otherwise a new palette is created.
         /// </summary>
@@ -120,6 +152,7 @@ namespace Consolonia.Core.Drawing
             }
 
             _renderedBytes = null;
+            _dominantIndex = -1;
         }
 
         /// <summary>
@@ -138,103 +171,25 @@ namespace Consolonia.Core.Drawing
             if (wash.A == 0)
                 return this;
 
-            return GetOrCreateVariant(char.MinValue, wash, () =>
+            return GetOrCreateVariant(wash, () =>
                 new Sixel(GetWashedPalette(Palette, PaletteCount, wash), PaletteCount, Pixels, Width, Height,
                     CellWidth, CellHeight));
         }
 
-        /// <summary>
-        ///     Whether <paramref name="glyph" /> is a block element <see cref="DrawBlockGlyph" /> can
-        ///     paint into the image's pixels.
-        /// </summary>
-        public static bool IsBlockGlyph(char glyph)
-        {
-            return glyph is >= '▀' and <= '▐' or >= '▔' and <= '▟';
-        }
-
-        /// <summary>
-        ///     Returns this image with the block element <paramref name="glyph" /> (an eighth, half or
-        ///     quadrant block, see <see cref="IsBlockGlyph" />) painted over it in
-        ///     <paramref name="color" />. A terminal cell shows either text or a sixel, so this is how a
-        ///     window edge or a shadow drawn over a picture keeps the picture around it.
-        /// </summary>
-        public Sixel DrawBlockGlyph(char glyph, Color color)
-        {
-            if (!IsBlockGlyph(glyph) || color.A == 0)
-                return this;
-
-            return GetOrCreateVariant(glyph, color, () =>
-            {
-                (byte[] palette, int paletteCount, byte index) = GetPaletteWithColor(Palette, PaletteCount, color);
-
-                byte[] pixels = (byte[])Pixels.Clone();
-                for (int y = 0; y < Height; y++)
-                for (int x = 0; x < Width; x++)
-                    if (BlockCovers(glyph, x, y, Width, Height))
-                        pixels[y * Width + x] = index;
-
-                return new Sixel(palette, paletteCount, pixels, Width, Height, CellWidth, CellHeight);
-            });
-        }
-
-        private Sixel GetOrCreateVariant(char glyph, Color color, Func<Sixel> create)
+        private Sixel GetOrCreateVariant(Color color, Func<Sixel> create)
         {
             lock (_variantsLock)
             {
-                if (_variants != null && _variants.TryGetValue((glyph, color), out Sixel variant))
+                if (_variants != null && _variants.TryGetValue(color, out Sixel variant))
                     return variant;
 
                 // an animated overlay produces a new color every frame; don't hoard them
                 if (_variants == null || _variants.Count >= MaxVariants)
-                    _variants = new Dictionary<(char, Color), Sixel>();
+                    _variants = new Dictionary<Color, Sixel>();
 
                 variant = create();
-                _variants[(glyph, color)] = variant;
+                _variants[color] = variant;
                 return variant;
-            }
-        }
-
-        /// <summary>
-        ///     Whether pixel (<paramref name="x" />, <paramref name="y" />) of a
-        ///     <paramref name="width" /> x <paramref name="height" /> cell is inside block element
-        ///     <paramref name="glyph" />.
-        /// </summary>
-        private static bool BlockCovers(char glyph, int x, int y, int width, int height)
-        {
-            bool left = x * 2 < width;
-            bool top = y * 2 < height;
-
-            switch (glyph)
-            {
-                case '▀': // ▀ upper half
-                    return top;
-                case >= '▁' and <= '█': // ▁..█ lower one to eight eighths
-                    return (height - y) * 8 <= (glyph - '▀') * height;
-                case >= '▉' and <= '▏': // ▉..▏ left seven to one eighths
-                    return x * 8 < ('▐' - glyph) * width;
-                case '▐': // ▐ right half
-                    return !left;
-                case '▔': // ▔ upper one eighth
-                    return y * 8 < height;
-                case '▕': // ▕ right one eighth
-                    return (width - x) * 8 <= width;
-                default: // ▖..▟ quadrants: bit 0 upper left, 1 upper right, 2 lower left, 3 lower right
-                    int quadrants = glyph switch
-                    {
-                        '▖' => 0b0100,
-                        '▗' => 0b1000,
-                        '▘' => 0b0001,
-                        '▙' => 0b1101,
-                        '▚' => 0b1001,
-                        '▛' => 0b0111,
-                        '▜' => 0b1011,
-                        '▝' => 0b0010,
-                        '▞' => 0b0110,
-                        '▟' => 0b1110,
-                        _ => 0
-                    };
-                    int quadrant = (top ? 0 : 2) + (left ? 0 : 1);
-                    return (quadrants & (1 << quadrant)) != 0;
             }
         }
 
@@ -266,68 +221,14 @@ namespace Consolonia.Core.Drawing
             }
         }
 
-        /// <summary>
-        ///     Finds <paramref name="color" /> in the palette, appending it when there is room (the
-        ///     existing indices stay valid) or settling for the nearest entry in a full palette.
-        ///     Cached per palette, so every cell of an image gets the same palette back.
-        /// </summary>
-        private static (byte[] Palette, int PaletteCount, byte Index) GetPaletteWithColor(byte[] palette,
-            int paletteCount, Color color)
-        {
-            Dictionary<Color, (byte[], int, byte)> palettesWithColor = PalettesWithColor.GetOrCreateValue(palette);
-            lock (palettesWithColor)
-            {
-                if (palettesWithColor.TryGetValue(color, out (byte[], int, byte) found))
-                    return found;
-
-                if (palettesWithColor.Count >= MaxVariants)
-                    palettesWithColor.Clear();
-
-                int nearest = 0;
-                int nearestDistance = int.MaxValue;
-                for (int i = 0; i < paletteCount; i++)
-                {
-                    int db = palette[i * 4] - color.B;
-                    int dg = palette[i * 4 + 1] - color.G;
-                    int dr = palette[i * 4 + 2] - color.R;
-                    int distance = dr * dr + dg * dg + db * db;
-                    if (distance < nearestDistance)
-                    {
-                        nearest = i;
-                        nearestDistance = distance;
-                    }
-                }
-
-                if (nearestDistance == 0 || paletteCount >= 256)
-                {
-                    found = (palette, paletteCount, (byte)nearest);
-                }
-                else
-                {
-                    byte[] extended = new byte[Math.Max(palette.Length, (paletteCount + 1) * 4)];
-                    Array.Copy(palette, extended, paletteCount * 4);
-                    extended[paletteCount * 4] = color.B;
-                    extended[paletteCount * 4 + 1] = color.G;
-                    extended[paletteCount * 4 + 2] = color.R;
-                    found = (extended, paletteCount + 1, (byte)paletteCount);
-                }
-
-                palettesWithColor[color] = found;
-                return found;
-            }
-        }
-
         #region Variants
 
         private const int MaxVariants = 8;
 
         private static readonly ConditionalWeakTable<byte[], Dictionary<Color, byte[]>> WashedPalettes = new();
 
-        private static readonly ConditionalWeakTable<byte[], Dictionary<Color, (byte[], int, byte)>>
-            PalettesWithColor = new();
-
         private readonly object _variantsLock = new();
-        private Dictionary<(char Glyph, Color Color), Sixel> _variants;
+        private Dictionary<Color, Sixel> _variants;
 
         #endregion
 
@@ -339,6 +240,7 @@ namespace Consolonia.Core.Drawing
         private static readonly ConditionalWeakTable<byte[], PaletteLookup> PaletteLookups = new();
 
         private byte[] _renderedBytes;
+        private int _dominantIndex = -1;
 
         /// <summary>
         ///     Serialize this image to SIXEL escape sequence bytes.
