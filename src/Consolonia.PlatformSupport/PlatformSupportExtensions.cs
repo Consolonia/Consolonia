@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
@@ -168,10 +169,48 @@ namespace Consolonia
             return builder.UseConsoleColorMode(result);
         }
 
+        /// <summary>
+        ///     True when the console is a modern, VT-capable terminal rather than the legacy console host.
+        /// </summary>
+        /// <remarks>
+        ///     WT_SESSION is not enough on its own. When Windows Terminal is the default terminal and a
+        ///     console program is started from Start or Explorer, Windows creates the process first and
+        ///     hands its console to Windows Terminal afterwards, so the variable is never set -- and every
+        ///     program started from that shell inherits its absence. The console window says what the
+        ///     environment cannot: under ConPTY (Windows Terminal, VS Code, WezTerm, ...) it is a hidden
+        ///     PseudoConsoleWindow, under the legacy host a visible ConsoleWindowClass.
+        /// </remarks>
         private static bool IsWindowsTerminal()
         {
             return Environment.GetEnvironmentVariable("WT_SESSION") is not null ||
-                   Environment.GetEnvironmentVariable("VSAPPIDNAME") != null;
+                   Environment.GetEnvironmentVariable("VSAPPIDNAME") != null ||
+                   IsPseudoConsole();
         }
+
+        private static bool IsPseudoConsole()
+        {
+            try
+            {
+                IntPtr window = GetConsoleWindow();
+                if (window == IntPtr.Zero)
+                    return false;
+
+                char[] className = new char[64];
+                int length = GetClassName(window, className, className.Length);
+                return new string(className, 0, Math.Max(length, 0)) == "PseudoConsoleWindow";
+            }
+            catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+            {
+                return false;
+            }
+        }
+
+#pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr hWnd, [Out] char[] lpClassName, int nMaxCount);
+#pragma warning restore CA5392
     }
 }
