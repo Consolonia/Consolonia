@@ -244,7 +244,17 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             // Background is always blended. The tile survives a non-opaque overlay; only an opaque
             // one evicts it, via the tile-less fast path above. A tile cell's color starts out
             // transparent, so what accumulates here is exactly the wash to lay over the image.
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
+            Color backgroundBelow = Background.Color;
+
+            // A glyph the sixel lost to makes this a text cell. The image's dominant color stands in as
+            // the background below it, so a glyph without its own background sits on the picture
+            // instead of punching a hole in it. (Kitty tiles composite in the terminal, and quad pixels
+            // already carry their colors in the cell, so neither needs this.)
+            Sixel sixelBelow = Foreground.Symbol.Sixel;
+            if (sixelBelow != null && newForeground.Symbol.Sixel == null)
+                backgroundBelow = sixelBelow.DominantColor;
+
+            var newBackground = new PixelBackground(MergeColors(backgroundBelow, aboveBgColor, false),
                 Background.Tile);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
