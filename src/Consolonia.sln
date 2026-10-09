@@ -66,7 +66,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sandbox", "Tests\Sandbox\Sa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consolonia.ManagedWindows", "Consolonia.ManagedWindows\Consolonia.ManagedWindows.csproj", "{8131DA3C-EAD5-4D0B-A91D-6A71D81B8137}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BenchmarkSuite1", "BenchmarkSuite1\BenchmarkSuite1.csproj", "{A20861A9-411E-6150-BF5C-69E8196E5D22}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Consolonia.Benchmarks", "Consolonia.Benchmarks\Consolonia.Benchmarks.csproj", "{A20861A9-411E-6150-BF5C-69E8196E5D22}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

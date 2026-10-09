@@ -61,39 +61,55 @@ namespace Consolonia.Core.Drawing
                         visibleSize.Width, visibleSize.Height),
                     interpolationMode);
 
-                // Quantize the visible image once to get a shared palette, only if some cell is new
-                byte[] palette = null;
-
-                var bitmapBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
-                byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
-
-                for (int cellY = 0; cellY < visibleCells.Height; cellY++)
-                for (int cellX = 0; cellX < visibleCells.Width; cellX++)
-                {
-                    FillCellBgrxBuffer(visibleBytes, visibleSize.Width, cellX, cellY,
-                        cellPixelWidth, cellPixelHeight, cellBgrx);
-
-                    ContentKey cellKey = ContentKey.Of(cellBgrx, cellPixelWidth, cellPixelHeight);
-                    if (!CellSixels.TryGet(cellKey, out Sixel cellSixel))
-                    {
-                        palette ??= Sixel.CreateFromBitmap(visibleBytes,
-                            visibleSize.Width, visibleSize.Height,
-                            cellPixelWidth, cellPixelHeight).Palette;
-                        cellSixel = Sixel.CreateFromBitmap(cellBgrx,
-                            cellPixelWidth, cellPixelHeight,
-                            cellPixelWidth, cellPixelHeight, palette);
-                        CellSixels.Add(cellKey, cellSixel, 1);
-                    }
-                    bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                        new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
-                        PixelBackground.Transparent);
-                }
-
-                return bitmapBuffer;
+                return RenderCells(visibleBytes, visibleCells.Width, visibleCells.Height,
+                    cellPixelWidth, cellPixelHeight);
             });
 
             CopyRenderedBitmapTrackingDirtyRegions(renderedBitmap, intersectedRect,
                 IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
+        }
+
+        /// <summary>
+        ///     Turns the visible pixels into a buffer of per-cell sixels, reusing every cell already
+        ///     made for the same pixels.
+        /// </summary>
+        /// <param name="visibleBytes">BGRX pixels of exactly the visible cells, row by row.</param>
+        internal static PixelBuffer RenderCells(byte[] visibleBytes, int cellsWide, int cellsHigh,
+            int cellPixelWidth, int cellPixelHeight)
+        {
+            int visibleWidth = cellsWide * cellPixelWidth;
+            int visibleHeight = cellsHigh * cellPixelHeight;
+
+            // Quantize the visible image once to get a shared palette, only if some cell is new
+            byte[] palette = null;
+
+            var bitmapBuffer = new PixelBuffer((ushort)cellsWide, (ushort)cellsHigh);
+            byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellPixelWidth * cellPixelHeight * 4);
+
+            for (int cellY = 0; cellY < cellsHigh; cellY++)
+            for (int cellX = 0; cellX < cellsWide; cellX++)
+            {
+                FillCellBgrxBuffer(visibleBytes, visibleWidth, cellX, cellY,
+                    cellPixelWidth, cellPixelHeight, cellBgrx);
+
+                ContentKey cellKey = ContentKey.Of(cellBgrx, cellPixelWidth, cellPixelHeight);
+                if (!CellSixels.TryGet(cellKey, out Sixel cellSixel))
+                {
+                    palette ??= Sixel.CreateFromBitmap(visibleBytes,
+                        visibleWidth, visibleHeight,
+                        cellPixelWidth, cellPixelHeight).Palette;
+                    cellSixel = Sixel.CreateFromBitmap(cellBgrx,
+                        cellPixelWidth, cellPixelHeight,
+                        cellPixelWidth, cellPixelHeight, palette);
+                    CellSixels.Add(cellKey, cellSixel, 1);
+                }
+
+                bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
+                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
+                    PixelBackground.Transparent);
+            }
+
+            return bitmapBuffer;
         }
 
         private static void FillCellBgrxBuffer(ReadOnlySpan<byte> bgrx, int imageWidth, int cellX, int cellY,
