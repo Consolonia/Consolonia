@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
@@ -30,7 +31,7 @@ namespace Consolonia
             {
 #pragma warning disable CA1416 // Validate platform compatibility
                 PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT =>
-                    new Win32Console(Console.IsOutputRedirected || IsWindowsTerminal()
+                    new Win32Console(Console.IsOutputRedirected || IsPseudoConsole()
                         ? new AnsiConsoleOutput()
                         : new WindowsLegacyConsoleOutput()),
 #pragma warning restore CA1416 // Validate platform compatibility
@@ -133,8 +134,8 @@ namespace Consolonia
                 {
                     case PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT:
                     {
-                        // if output is redirected, or we are a windows terminal we use the win32 ANSI based console.
-                        if (Console.IsOutputRedirected || IsWindowsTerminal())
+                        // if output is redirected, or we are in a pseudoconsole we use the win32 ANSI based console.
+                        if (Console.IsOutputRedirected || IsPseudoConsole())
                             result = new RgbConsoleColorMode();
                         else
                             result = new EgaConsoleColorMode(true);
@@ -168,10 +169,42 @@ namespace Consolonia
             return builder.UseConsoleColorMode(result);
         }
 
-        private static bool IsWindowsTerminal()
+        /// <summary>
+        ///     True when the console is a ConPTY pseudoconsole -- Windows Terminal, VS Code, WezTerm, an
+        ///     OpenSSH session -- rather than the legacy console host.
+        /// </summary>
+        /// <remarks>
+        ///     Asked of the console window, not the environment. WT_SESSION is missing when Windows hands
+        ///     a console started from Start or Explorer to Windows Terminal after the process exists, and
+        ///     over SSH; and because the environment is inherited it is present in a legacy console window
+        ///     opened from a Windows Terminal tab. The console window belongs to the console this process
+        ///     is actually attached to: under ConPTY it is a hidden PseudoConsoleWindow, under the legacy
+        ///     host a ConsoleWindowClass.
+        /// </remarks>
+        private static bool IsPseudoConsole()
         {
-            return Environment.GetEnvironmentVariable("WT_SESSION") is not null ||
-                   Environment.GetEnvironmentVariable("VSAPPIDNAME") != null;
+            try
+            {
+                IntPtr window = GetConsoleWindow();
+                if (window == IntPtr.Zero)
+                    return false;
+
+                char[] className = new char[64];
+                int length = GetClassName(window, className, className.Length);
+                return new string(className, 0, Math.Max(length, 0)) == "PseudoConsoleWindow";
+            }
+            catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+            {
+                return false;
+            }
         }
+
+#pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr hWnd, [Out] char[] lpClassName, int nMaxCount);
+#pragma warning restore CA5392
     }
 }
