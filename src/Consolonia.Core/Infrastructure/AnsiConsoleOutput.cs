@@ -332,7 +332,7 @@ namespace Consolonia.Core.Infrastructure
             // feature 4 = sixel). DA1 is answered by every terminal and is the only reply containing 'c',
             // so it fences the read.
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
-                Esc.QueryKittyGraphicsSupport + Esc.RequestSynchronizedOutputMode +
+                KittyGraphics.QuerySupport + Esc.RequestSynchronizedOutputMode +
                 Esc.RequestSgrPixelsMouseMode + Esc.RequestDeviceAttributes,
                 'c', 1000) ?? string.Empty;
             if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
@@ -370,7 +370,7 @@ namespace Consolonia.Core.Infrastructure
 
             // free terminal-side image storage held by kitty graphics placements
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
-                WriteText(Esc.KittyDeleteAllImages);
+                WriteText(KittyGraphics.DeleteAllImages);
 
             WriteText(Esc.DisableAlternateBuffer);
             WriteText(Esc.Reset);
@@ -482,7 +482,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Checks whether the response to <see cref="Esc.QueryKittyGraphicsSupport" /> contains the
+        ///     Checks whether the response to <see cref="KittyGraphics.QuerySupport" /> contains the
         ///     "APC _Gi=31;OK ST" reply a kitty-graphics-capable terminal sends.
         /// </summary>
         internal static bool ResponseIndicatesKittyGraphicsSupport(string response)

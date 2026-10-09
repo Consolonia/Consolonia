@@ -90,13 +90,6 @@ namespace Consolonia.Core.Text
         // where feature 4 means sixel graphics support.
         public const string RequestDeviceAttributes = "\u001b[c";
 
-        // Query kitty graphics support; a supporting terminal replies "APC _Gi=31;OK ST". Follow it
-        // with RequestDeviceAttributes as a fence: every terminal answers DA1.
-        public const string QueryKittyGraphicsSupport = "\u001b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\u001b\\";
-
-        // Delete all kitty images and placements, freeing terminal-side image storage.
-        public const string KittyDeleteAllImages = "\u001b_Ga=d,d=A,q=2\u001b\\";
-
         // DECRQM for DEC private mode 2026. Reply: "CSI ? 2026 ; <state> $ y", where state 1, 2 or
         // 3 means synchronized output is supported and 0 means the mode is unknown.
         public const string RequestSynchronizedOutputMode = "\u001b[?2026$p";

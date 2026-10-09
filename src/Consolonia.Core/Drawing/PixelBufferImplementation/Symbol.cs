@@ -204,10 +204,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Complex != null && Complex.Length > 1 ? Complex : new string(Character, 1);
         }
 
+        /// <summary>No character, no complex text and no sixel: blending this over a symbol leaves that symbol.</summary>
         public bool NothingToDraw()
         {
             return Character == char.MinValue &&
-                   string.IsNullOrEmpty(Complex);
+                   (_reference == null || _reference is string { Length: 0 });
         }
 
         public Symbol Blend(ref Symbol symbolAbove)

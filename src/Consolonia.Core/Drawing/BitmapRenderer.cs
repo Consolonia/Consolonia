@@ -250,11 +250,6 @@ namespace Consolonia.Core.Drawing
             return true;
         }
 
-        /// <summary>Called once a rendering has been found or made, before its cells are copied.</summary>
-        protected virtual void AfterRendering()
-        {
-        }
-
         public sealed override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
             PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
         {
@@ -280,8 +275,6 @@ namespace Consolonia.Core.Drawing
                 rendering = Render(visibleBytes, visibleCells, cellPixelWidth, cellPixelHeight, renderInterface);
                 Remember(renderings, key, rendering);
             }
-
-            AfterRendering();
 
             CopyRenderedBitmapTrackingDirtyRegions(CellsOf(rendering), intersectedRect,
                 IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
