@@ -136,31 +136,18 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
-        public void BlockGlyphIsPaintedIntoSixelInsteadOfReplacingIt()
+        public void BlockGlyphTakesATextCellOverSixel()
         {
-            // regression: a window edge (▁) drawn over a sixel picture turned the cell into text,
-            // showing a solid band of background color where the picture should continue
+            // a window edge is text like any glyph; painted into the image, its color had to come
+            // from the image's palette and shifted to the nearest image color
             Sixel sixel = CreateCellSixel(200);
             Pixel pixel = CreateSixelPixel(sixel);
             var edge = new Pixel(new PixelForeground(new Symbol('▁'), Color.FromRgb(0x10, 0x20, 0x30)));
 
             Pixel withEdge = pixel.Blend(edge);
-            Sixel painted = withEdge.Foreground.Symbol.Sixel;
 
-            Assert.That(painted, Is.Not.Null, "the cell must stay an image");
-            Assert.That(painted.PaletteCount, Is.EqualTo(2), "the edge color is appended to the palette");
-            byte edgeIndex = painted.Pixels[15 * 8];
-            Assert.That(edgeIndex, Is.EqualTo(1), "the bottom eighth (rows 14-15 of 16) is the edge");
-            Assert.That(painted.Pixels[14 * 8 + 7], Is.EqualTo(1));
-            Assert.That(painted.Pixels[13 * 8], Is.EqualTo(0), "above the eighth is still the picture");
-            Assert.That(painted.Palette[4 + 2], Is.EqualTo(0x10), "BGRX: red channel");
-            Assert.That(sixel.Pixels[15 * 8], Is.EqualTo(0), "the source image is untouched");
-            Assert.That(pixel.Blend(edge), Is.EqualTo(withEdge), "same glyph and color, same image");
-
-            // text can't be drawn into a sixel, so the text cell wins as before
-            Pixel withText = pixel.Blend(new Pixel(new PixelForeground(new Symbol('a'), Colors.Red)));
-            Assert.That(withText.Foreground.Symbol.Sixel, Is.Null);
-            Assert.That(withText.Foreground.Symbol.Character, Is.EqualTo('a'));
+            Assert.That(withEdge.Foreground.Symbol.Sixel, Is.Null);
+            Assert.That(withEdge.Foreground.Symbol.Character, Is.EqualTo('▁'));
         }
 
         [Test]

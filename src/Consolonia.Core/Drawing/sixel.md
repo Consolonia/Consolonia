@@ -23,9 +23,8 @@ before anything reaches the terminal.
    - *Translucent backdrop, no glyph* (modal dimmer, shade) → `Sixel.Wash` alpha-blends the wash
      into the tile's **palette**; the pixels are shared and the variant is cached, so a dimmed
      tile is only sent once.
-   - *Block element glyph* (`▀`–`▐`, `▔`–`▟`: window edges, shadows) → `Sixel.DrawBlockGlyph`
-     paints the block into the tile's pixels, so a border can cross a picture without punching a
-     full-cell hole in it.
+   - Block element glyphs (`▀`–`▐`, `▔`–`▟`: window edges, shadows) are ordinary glyphs here: they
+     take a text cell too. See "Block glyphs: removed" below.
 
 3. **Output runs in two passes** (`RenderTarget`):
    - Pass 1, `RenderSixelRegions`, joins runs of dirty tiles that share a palette into one larger
@@ -37,44 +36,19 @@ before anything reaches the terminal.
    image stays on screen.
 
 **What it can't do:** real transparency. No anti-aliased text with the image showing through
-behind the letters. Any cell holding a normal glyph shows no image; only a full-cell wash or a
-block glyph preserves it.
+behind the letters. Any cell holding a glyph shows no image; only a full-cell wash preserves it.
 
-## Block glyphs: no font involved
+## Block glyphs: removed
 
-`Sixel.BlockCovers` works out each glyph's coverage from the cell's pixel size:
+Block element glyphs used to be painted into the tile's pixels (`Sixel.DrawBlockGlyph`), so a
+window edge or shadow could cross a picture without turning cells into text. It was removed
+because the glyph's colour had to go into the tile's palette, and the palette is the whole visible
+image quantized to 256 colours, so it is almost always full. A full palette gave the glyph the
+nearest colour the image had, so a blue window edge came out as whatever the picture held closest
+to blue. Painting also depended on the cell pixel size and on the terminal drawing block elements
+as exact cell fractions, neither of which is guaranteed.
 
-| Glyphs | Coverage |
-|---|---|
-| `▀` | top half: `y * 2 < height` |
-| `▁`…`█` | bottom n/8: `(height - y) * 8 <= n * height` |
-| `▉`…`▏` | left n/8 |
-| `▐`, `▔`, `▕` | right half, top 1/8, right 1/8 |
-| `▖`…`▟` | 4-bit quadrant mask |
-
-Covered pixels are set to the glyph colour (added to the palette or matched to the nearest entry by
-`GetPaletteWithColor`).
-
-That's also why only this subset is supported: Unicode defines block elements as exact fractions
-of the cell. Most modern terminals (kitty, WezTerm, foot, Ghostty, iTerm2, Windows Terminal,
-recent VTE) also draw them themselves rather than from the font, so Consolonia's drawing should
-match real text cells to within about a pixel.
-
-### Known weaknesses
-
-- **Rounding:** with odd cell sizes (e.g. 17px tall, where `▀` covers 9 rows here and a terminal
-  might give it 8) there can be a 1px step where a shadow or edge goes from a text cell onto an
-  image cell.
-- **Terminals that use the font:** xterm with some fonts, and some Konsole setups, draw blocks from
-  the font, which may not fill the cell (ascent/descent gaps).
-- **Wrong cell size:** everything depends on `CellPixelWidth/Height` being right. If the terminal
-  reports the wrong size, or the font changes and nobody queries it again, the tiles are wrong
-  anyway.
-- **Box-drawing lines are not covered:** `─ │ ┌ ╔` and the rest are not in `IsBlockGlyph`, because
-  line thickness and position vary between terminals and fonts. A border drawn with them over an
-  image turns those cells into text cells, leaving a cell-sized hole along the edge.
-- **Colour:** the glyph colour has to fit into the tile's palette, so near a 256-entry limit it can
-  come out as an approximation rather than the exact colour.
+Block glyphs now take a text cell like any other glyph, on the tile's dominant colour (below).
 
 ## Text over an image: dominant colour as background
 
@@ -108,6 +82,6 @@ text over a cell whose dominant colour is pale sky can be hard to read. A possib
 flipping the foreground to black or white when the contrast ratio with the dominant colour is too
 low, only for transparent-background text over images.
 
-**Rejected alternative:** drawing the glyph into the tile's sixel pixels. Unlike block elements,
-this needs the terminal's font, size, hinting and weight, none of which Consolonia knows. The text
+**Rejected alternative:** drawing the glyph into the tile's sixel pixels. On top of the palette
+problem that removed block-glyph painting, this needs the terminal's font, size, hinting and weight, none of which Consolonia knows. The text
 would look different from every other glyph on screen.
