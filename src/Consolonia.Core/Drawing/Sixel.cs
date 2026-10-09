@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Threading;
 using Avalonia.Media;
 using JeremyAnsel.ColorQuant;
 
@@ -12,7 +13,7 @@ namespace Consolonia.Core.Drawing
 {
     /// <summary>
     ///     Represents a sixel image with palette and indexed pixel data.
-    ///     Supports composition via BitBlt and serialization via ToBytes.
+    ///     Supports composition via BitBlt and serialization via Render.
     /// </summary>
     public class Sixel
     {
@@ -55,9 +56,6 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>Width of this image in cells.</summary>
         public int CellsWidth => Width / CellWidth;
-
-        /// <summary>Height of this image in cells.</summary>
-        public int CellsHeight => Height / CellHeight;
 
         /// <summary>
         ///     The palette color covering the most pixels. A glyph drawn over a sixel cell turns it into a
@@ -171,24 +169,26 @@ namespace Consolonia.Core.Drawing
             if (wash.A == 0)
                 return this;
 
-            return GetOrCreateVariant(wash, () =>
-                new Sixel(GetWashedPalette(Palette, PaletteCount, wash), PaletteCount, Pixels, Width, Height,
-                    CellWidth, CellHeight));
-        }
-
-        private Sixel GetOrCreateVariant(Color color, Func<Sixel> create)
-        {
-            lock (_variantsLock)
+            // created on first use: most cells are never washed
+            Dictionary<Color, Sixel> variants = _variants;
+            if (variants == null)
             {
-                if (_variants != null && _variants.TryGetValue(color, out Sixel variant))
+                Interlocked.CompareExchange(ref _variants, new Dictionary<Color, Sixel>(), null);
+                variants = _variants;
+            }
+
+            lock (variants)
+            {
+                if (variants.TryGetValue(wash, out Sixel variant))
                     return variant;
 
                 // an animated overlay produces a new color every frame; don't hoard them
-                if (_variants == null || _variants.Count >= MaxVariants)
-                    _variants = new Dictionary<Color, Sixel>();
+                if (variants.Count >= MaxVariants)
+                    variants.Clear();
 
-                variant = create();
-                _variants[color] = variant;
+                variant = new Sixel(GetWashedPalette(Palette, PaletteCount, wash), PaletteCount, Pixels, Width,
+                    Height, CellWidth, CellHeight);
+                variants[wash] = variant;
                 return variant;
             }
         }
@@ -227,7 +227,6 @@ namespace Consolonia.Core.Drawing
 
         private static readonly ConditionalWeakTable<byte[], Dictionary<Color, byte[]>> WashedPalettes = new();
 
-        private readonly object _variantsLock = new();
         private Dictionary<Color, Sixel> _variants;
 
         #endregion
@@ -359,11 +358,6 @@ namespace Consolonia.Core.Drawing
             output.AsSpan(0, pos).CopyTo(rendered);
             _renderedBytes = rendered;
             return rendered;
-        }
-
-        public ReadOnlySpan<byte> ToBytes()
-        {
-            return Render();
         }
 
         #endregion

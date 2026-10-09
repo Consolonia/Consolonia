@@ -1,6 +1,3 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -29,7 +26,7 @@ namespace Consolonia.Core.Drawing
         private const int CellSixelBudget = 32 * 1024;
 
         private static readonly
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, PixelBuffer>>>
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, PixelBuffer>>>
             RenderedBitmapCache = new();
 
         private static readonly ContentCache<Sixel> CellSixels = new(CellSixelBudget);
@@ -48,7 +45,7 @@ namespace Consolonia.Core.Drawing
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
             PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
-            var key = new BitmapQuantizedCacheKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
+            var key = new RenderingKey(GetCacheBitmapImpl(source).Version, targetSize, visibleCells,
                 interpolationMode);
 
             // only the visible cells are rendered, so the rendering starts at the first of them
@@ -105,7 +102,7 @@ namespace Consolonia.Core.Drawing
                 }
 
                 bitmapBuffer[new PixelPoint(cellX, cellY)] = new Pixel(
-                    new PixelForeground(new Symbol(cellSixel, 1), Colors.Transparent),
+                    new PixelForeground(new Symbol(cellSixel), Colors.Transparent),
                     PixelBackground.Transparent);
             }
 

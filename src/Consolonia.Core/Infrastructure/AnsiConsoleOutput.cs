@@ -89,12 +89,6 @@ namespace Consolonia.Core.Infrastructure
 
             SetCaretPosition(position);
 
-            if (pixel.Foreground.Symbol.Sixel != null)
-            {
-                WriteSixel(position, pixel.Foreground.Symbol.Sixel);
-                return;
-            }
-
             if (pixel.Foreground.TextDecoration != _lastTextDecoration)
             {
                 // reset previous decoration

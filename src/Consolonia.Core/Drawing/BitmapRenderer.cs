@@ -1,6 +1,3 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -18,7 +15,7 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     // The properties are only read through the generated Equals/GetHashCode: together they are a cache key.
     // ReSharper disable NotAccessedPositionalProperty.Global
-    internal readonly record struct BitmapQuantizedCacheKey(
+    internal readonly record struct RenderingKey(
         int Version,
         PixelSize TargetSize,
         PixelRect VisibleCells,
@@ -154,10 +151,10 @@ namespace Consolonia.Core.Drawing
         ///     too many.
         /// </summary>
         protected static T GetOrRender<T>(
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<BitmapQuantizedCacheKey, T>>> cache,
-            IBitmapImpl source, BitmapQuantizedCacheKey key, Func<T> render, Func<T, bool> validate = null)
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, T>>> cache,
+            IBitmapImpl source, RenderingKey key, Func<T> render, Func<T, bool> validate = null)
         {
-            List<KeyValuePair<BitmapQuantizedCacheKey, T>> renderings =
+            List<KeyValuePair<RenderingKey, T>> renderings =
                 cache.GetOrCreateValue(GetCacheBitmapImpl(source));
 
             int cached = renderings.FindIndex(rendering => rendering.Key == key);
@@ -175,7 +172,7 @@ namespace Consolonia.Core.Drawing
                 renderings.RemoveAt(0);
 
             T value = render();
-            renderings.Add(new KeyValuePair<BitmapQuantizedCacheKey, T>(key, value));
+            renderings.Add(new KeyValuePair<RenderingKey, T>(key, value));
             return value;
         }
 

@@ -1,6 +1,3 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -135,9 +132,6 @@ namespace Consolonia.Core.Drawing
         /// <exception cref="NotImplementedException"></exception>
         private static Color GetForegroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
         {
-            if (pixelColors.Length != 4)
-                throw new ArgumentException($"{nameof(pixelColors)} must have 4 elements.");
-
             // TODO: Some of these chars don't work in IBM Codepage
             BgraColor bgraColor = quadPixel switch
             {
@@ -225,15 +219,12 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Cluster quad colors into a pattern (like: TTFF) based on relative closeness
+        ///     Cluster the 4 quad colors into two groups by relative closeness.
         /// </summary>
-        /// <param name="colors"></param>
-        /// <returns>T or F for each color as a string</returns>
-        /// <exception cref="ArgumentException"></exception>
+        /// <param name="colors">the 4 colors, top left, top right, bottom left, bottom right</param>
+        /// <returns>a 4-bit mask, one bit per color, set for the colors in the foreground group</returns>
         private byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
         {
-            if (colors.Length != 4) throw new ArgumentException("Array must contain exactly 4 colors.");
-
             if (!Context.ConsoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
             {
                 BgraColor topRowColor = Average(colors[0], colors[1]);

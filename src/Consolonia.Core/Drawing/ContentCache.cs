@@ -44,17 +44,6 @@ namespace Consolonia.Core.Drawing
             _evicted = evicted;
         }
 
-        public int Count
-        {
-            get
-            {
-                lock (_entries)
-                {
-                    return _entries.Count;
-                }
-            }
-        }
-
         /// <summary>The value made for <paramref name="key" />, marked most recently used.</summary>
         public bool TryGet(ContentKey key, out T value)
         {
@@ -71,12 +60,6 @@ namespace Consolonia.Core.Drawing
                 value = default;
                 return false;
             }
-        }
-
-        /// <summary>Marks <paramref name="key" /> most recently used, if it is still held.</summary>
-        public void Touch(ContentKey key)
-        {
-            TryGet(key, out _);
         }
 
         /// <summary>

@@ -37,10 +37,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Pattern = 0;
         }
 
-        public Symbol(Sixel sixel, byte width)
+        /// <summary>A cell of a sixel image: one cell wide, drawn from <paramref name="sixel" />.</summary>
+        public Symbol(Sixel sixel)
             : this()
         {
-            Width = width;
+            Width = 1;
             Sixel = sixel;
         }
 
