@@ -377,9 +377,10 @@ namespace Consolonia.Core.Drawing
             // Palette: #idx;2;R%;G%;B%
             for (int i = 0; i < paletteCount; i++)
             {
-                int r = palette[i * 4 + 2] * 100 / 255;
-                int g = palette[i * 4 + 1] * 100 / 255;
-                int b = palette[i * 4] * 100 / 255;
+                // rounded, not truncated: 254 truncated to 99%, which the terminal reads back as 252
+                int r = (palette[i * 4 + 2] * 100 + 127) / 255;
+                int g = (palette[i * 4 + 1] * 100 + 127) / 255;
+                int b = (palette[i * 4] * 100 + 127) / 255;
 
                 output[pos++] = (byte)'#';
                 pos = WriteIntBuf(output, pos, i);
@@ -489,14 +490,25 @@ namespace Consolonia.Core.Drawing
             int pixelCount = bgrx.Length / 4;
             byte[] indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
             ReadOnlySpan<byte> bgrxSpan = bgrx;
-            ReadOnlySpan<byte> paletteLookup = PaletteLookups.GetValue(palette, static currentPalette =>
-                new PaletteLookup(currentPalette)).Lookup;
+            PaletteLookup lookup = PaletteLookups.GetValue(palette, static currentPalette =>
+                new PaletteLookup(currentPalette));
+            ReadOnlySpan<byte> paletteLookup = lookup.Lookup;
+            Dictionary<int, byte> exact = lookup.Exact;
 
             for (int i = 0, offset = 0; i < pixelCount; i++, offset += 4)
             {
                 int b = bgrxSpan[offset];
                 int g = bgrxSpan[offset + 1];
                 int r = bgrxSpan[offset + 2];
+
+                // A color the palette holds is that entry, never a neighbour the binned lookup
+                // happens to land nearer to.
+                if (exact.TryGetValue((r << 16) | (g << 8) | b, out byte exactIndex))
+                {
+                    indexed[i] = exactIndex;
+                    continue;
+                }
+
                 int lookupIndex = ((r >> PaletteLookup.ChannelShift) << (PaletteLookup.ChannelBits * 2)) |
                                   ((g >> PaletteLookup.ChannelShift) << PaletteLookup.ChannelBits) |
                                   (b >> PaletteLookup.ChannelShift);
@@ -727,16 +739,28 @@ namespace Consolonia.Core.Drawing
             public const int ChannelShift = 8 - ChannelBits;
             private const int LookupSize = 1 << (ChannelBits * 3);
 
+            // Each bin is matched by its centre. Matching by its low corner treated white as 248,
+            // so a palette that also held a light antialiasing gray mapped white onto the gray.
+            private const int BinCentre = 1 << (ChannelShift - 1);
+
             public PaletteLookup(byte[] palette)
             {
                 Lookup = GC.AllocateUninitializedArray<byte>(LookupSize);
 
                 int paletteCount = palette.Length / 4;
+                Exact = new Dictionary<int, byte>(paletteCount);
+                for (int paletteIndex = paletteCount - 1; paletteIndex >= 0; paletteIndex--)
+                {
+                    int paletteOffset = paletteIndex * 4;
+                    Exact[(palette[paletteOffset + 2] << 16) | (palette[paletteOffset + 1] << 8) |
+                          palette[paletteOffset]] = (byte)paletteIndex;
+                }
+
                 for (int index = 0; index < Lookup.Length; index++)
                 {
-                    int r = ((index >> (ChannelBits * 2)) & ((1 << ChannelBits) - 1)) << ChannelShift;
-                    int g = ((index >> ChannelBits) & ((1 << ChannelBits) - 1)) << ChannelShift;
-                    int b = (index & ((1 << ChannelBits) - 1)) << ChannelShift;
+                    int r = (((index >> (ChannelBits * 2)) & ((1 << ChannelBits) - 1)) << ChannelShift) | BinCentre;
+                    int g = (((index >> ChannelBits) & ((1 << ChannelBits) - 1)) << ChannelShift) | BinCentre;
+                    int b = ((index & ((1 << ChannelBits) - 1)) << ChannelShift) | BinCentre;
 
                     int bestPaletteIndex = 0;
                     int bestDistance = int.MaxValue;
@@ -760,6 +784,9 @@ namespace Consolonia.Core.Drawing
             }
 
             public byte[] Lookup { get; }
+
+            /// <summary>Palette colors (0xRRGGBB) to their index, so an exact color is never approximated.</summary>
+            public Dictionary<int, byte> Exact { get; }
         }
 
         #endregion
