@@ -54,7 +54,9 @@ namespace Consolonia.Core.Drawing
         /// </summary>
         public const int WashPlacementZIndex = -1;
 
-        // Kept in the range 1..0xFFFFFF (0 is not a valid id).
+        // Kept in the range 1..int.MaxValue (0 is not a valid id; the protocol allows 32 bits). The wider
+        // the range, the longer before a wrapped id lands on an image still shown: re-transmitting an id
+        // the terminal holds deletes that image and its placements.
         private static int _nextImageId;
 
         private static int _nextPlacementId;
@@ -65,12 +67,12 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     The next id in 1..0xFFFFFF. The counter is read as unsigned so it keeps wrapping within that
-        ///     range after it passes int.MaxValue, instead of turning negative.
+        ///     The next id in 1..int.MaxValue. The counter is read as unsigned so it keeps wrapping within
+        ///     that range after it passes int.MaxValue, instead of turning negative.
         /// </summary>
         private static int NextId(ref int counter)
         {
-            return (int)((uint)(Interlocked.Increment(ref counter) - 1) % 0xFFFFFFu) + 1;
+            return (int)((uint)(Interlocked.Increment(ref counter) - 1) % int.MaxValue) + 1;
         }
 
         /// <summary>

@@ -15,15 +15,14 @@ namespace Consolonia.Core.Tests
         private static readonly string St = (char)27 + @"\";
 
         [Test]
-        public void AllocatedImageIdsStayWithin24Bits()
+        public void AllocatedImageIdsArePositive()
         {
             int imageId = KittyGraphics.AllocateImageId();
             Assert.That(imageId, Is.GreaterThan(0));
-            Assert.That(imageId, Is.LessThanOrEqualTo(0xFFFFFF));
         }
 
         [Test]
-        public void AllocatedIdsStayWithin24BitsAfterTheCounterOverflows()
+        public void AllocatedIdsStayPositiveAfterTheCounterOverflows()
         {
             System.Reflection.FieldInfo counter = typeof(KittyGraphics).GetField("_nextImageId",
                 System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
@@ -35,7 +34,7 @@ namespace Consolonia.Core.Tests
                 for (int i = 0; i < 4; i++)
                 {
                     int imageId = KittyGraphics.AllocateImageId();
-                    Assert.That(imageId, Is.InRange(1, 0xFFFFFF), "an id after the counter wrapped");
+                    Assert.That(imageId, Is.InRange(1, int.MaxValue), "an id after the counter wrapped");
                 }
             }
             finally

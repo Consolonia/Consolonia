@@ -5,7 +5,8 @@ using Consolonia.Core.Drawing;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     The sixel encoder's building blocks on one small image: quantizing and serializing.
+    ///     The sixel encoder's building blocks: quantizing (exactly, for a cell of few colors; with Wu's
+    ///     algorithm for one of many) and serializing.
     /// </summary>
     [MemoryDiagnoser]
     public class SixelBenchmarks
@@ -15,8 +16,8 @@ namespace Consolonia.Benchmarks
         private const int CellWidth = 8;
         private const int CellHeight = 16;
         private byte[] _bitmap = null!;
-        private byte[] _cellBitmap = null!;
-        private byte[] _palette = null!;
+        private byte[] _photoCell = null!;
+        private byte[] _flatCell = null!;
         private Sixel _sixel = null!;
         private Sixel _cellSixel = null!;
 
@@ -34,35 +35,34 @@ namespace Consolonia.Benchmarks
                 _bitmap[offset + 3] = 0xFF;
             }
 
-            _cellBitmap = new byte[CellWidth * CellHeight * 4];
+            _photoCell = new byte[CellWidth * CellHeight * 4];
             for (int row = 0; row < CellHeight; row++)
-                Array.Copy(_bitmap, row * Width * 4, _cellBitmap, row * CellWidth * 4, CellWidth * 4);
+                Array.Copy(_bitmap, row * Width * 4, _photoCell, row * CellWidth * 4, CellWidth * 4);
+
+            // a brush stroke's cell: canvas white with a few dark pixels
+            _flatCell = new byte[CellWidth * CellHeight * 4];
+            Array.Fill(_flatCell, (byte)0xFF);
+            for (int i = 0; i < 5 * 4; i += 4)
+                _flatCell[i] = _flatCell[i + 1] = _flatCell[i + 2] = 0x20;
 
             _sixel = Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight);
-            _palette = _sixel.Palette;
-            _cellSixel = Sixel.CreateFromBitmap(_cellBitmap, CellWidth, CellHeight, CellWidth, CellHeight,
-                _palette);
+            _cellSixel = Sixel.CreateFromBitmap(_photoCell, CellWidth, CellHeight, CellWidth, CellHeight);
         }
 
-        /// <summary>
-        ///     Maps the image onto a palette it has seen before, so the palette's lookup table is
-        ///     already built. Only the per-pixel mapping is measured.
-        /// </summary>
+        /// <summary>One cell of few colors, indexed exactly: what a brush stroke costs per cell.</summary>
         [Benchmark(Baseline = true)]
-        public Sixel QuantizeWithSharedPalette()
+        public int QuantizeFlatCell()
         {
-            return Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight, _palette);
+            Sixel.Quantize(_flatCell, out _, out int paletteCount, out _);
+            return paletteCount;
         }
 
-        /// <summary>
-        ///     Maps one cell onto a palette it has never seen, as the renderer does for the first new
-        ///     cell after every change to a picture.
-        /// </summary>
+        /// <summary>One cell of more than 256 colors: Wu's fixed cost, however small the image.</summary>
         [Benchmark]
-        public Sixel QuantizeCellWithFreshPalette()
+        public int QuantizePhotoCell()
         {
-            return Sixel.CreateFromBitmap(_cellBitmap, CellWidth, CellHeight, CellWidth, CellHeight,
-                (byte[])_palette.Clone());
+            Sixel.Quantize(_photoCell, out _, out int paletteCount, out _);
+            return paletteCount;
         }
 
         [Benchmark]
@@ -77,7 +77,8 @@ namespace Consolonia.Benchmarks
         [IterationSetup(Target = nameof(SerializeToBytes))]
         public void SetupSerializeToBytes()
         {
-            _sixel = Sixel.CreateFromBitmap(_bitmap, Width, Height, CellWidth, CellHeight, _palette);
+            _sixel = new Sixel(_sixel.Palette, _sixel.PaletteCount, _sixel.Pixels, Width, Height, CellWidth,
+                CellHeight);
         }
 
         [Benchmark]

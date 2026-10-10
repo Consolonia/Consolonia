@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,6 +31,9 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>The rectangle passes' per-cell scratch, kept between frames so it is not reallocated.</summary>
         private bool[]? _rectangleVisited;
+
+        /// <summary>Pixels of the sixel combined from a rectangle of cells, kept between frames.</summary>
+        private byte[]? _combinedPixels;
 
         private ConsoleCursor _consoleCursor;
 
@@ -192,7 +196,8 @@ namespace Consolonia.Core.Drawing
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             Snapshot dirtyRegions = regions.GetSnapshotAndClear();
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
-            if (dirtyRegions.IsEmpty) return;
+            // a frame with nothing to draw still deletes tile images evicted since the last one
+            if (dirtyRegions.IsEmpty && !KittyBitmapRenderer.HasEvictedImages) return;
 
             // a new cache means everything is redrawn, kitty placements included
             bool kittyCellsChanged = false;
@@ -662,14 +667,21 @@ namespace Consolonia.Core.Drawing
                 int cellPixelHeight = cellSixel.CellHeight;
                 int combinedWidth = rectWidth * cellPixelWidth;
                 int combinedHeight = rectHeight * cellPixelHeight;
-                byte[] combinedPixels = GC.AllocateUninitializedArray<byte>(combinedWidth * combinedHeight);
-                var combined = new Sixel(cellSixel.Palette, cellSixel.PaletteCount, combinedPixels,
+                int combinedLength = combinedWidth * combinedHeight;
+                if (_combinedPixels == null || _combinedPixels.Length < combinedLength)
+                    _combinedPixels = GC.AllocateUninitializedArray<byte>(Math.Max(combinedLength, 64 * 1024));
+                var combined = new Sixel(cellSixel.Palette, cellSixel.PaletteCount, _combinedPixels,
                     combinedWidth, combinedHeight, cellPixelWidth, cellPixelHeight) { IsTransient = true };
 
                 for (int ry = 0; ry < rectHeight; ry++)
                 for (int rx = 0; rx < rectWidth; rx++)
-                    combined.BitBlt(pixelBuffer.CellAt(x + rx, y + ry).Foreground.Symbol.Sixel!,
-                        rx * cellPixelWidth, ry * cellPixelHeight);
+                {
+                    Sixel cell = pixelBuffer.CellAt(x + rx, y + ry).Foreground.Symbol.Sixel!;
+                    // every cell fills its own part, so nothing of the scratch's earlier contents shows
+                    Debug.Assert(cell.Width == cellPixelWidth && cell.Height == cellPixelHeight,
+                        "cells joined into one sixel must be the same size");
+                    combined.BitBlt(cell, rx * cellPixelWidth, ry * cellPixelHeight);
+                }
 
                 _console.WriteSixel(new PixelBufferCoordinate((ushort)x, (ushort)y), combined);
 

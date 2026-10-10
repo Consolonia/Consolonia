@@ -108,11 +108,9 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Create a Sixel from raw BGRX pixel data.
-        ///     If a palette is provided it is used to quantize against, otherwise a new palette is created.
+        ///     Create a Sixel from raw BGRX pixel data, quantized to a palette of its own.
         /// </summary>
-        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height,
-            int cellWidth, int cellHeight, byte[] palette = null)
+        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, int cellWidth, int cellHeight)
         {
             ArgumentNullException.ThrowIfNull(bgrx);
             // Render and BuildSixelRow index Pixels with unchecked Unsafe.Add offsets derived from
@@ -125,17 +123,8 @@ namespace Consolonia.Core.Drawing
             if (bgrx.Length > byteCount)
                 bgrx = bgrx[..byteCount];
 
-            if (palette != null)
-            {
-                int paletteCount = palette.Length / 4;
-                byte[] indexed = QuantizeWithPalette(bgrx, palette);
-                return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
-            }
-            else
-            {
-                Quantize(bgrx, out byte[] newPalette, out int paletteCount, out byte[] indexed);
-                return new Sixel(newPalette, paletteCount, indexed, width, height, cellWidth, cellHeight);
-            }
+            Quantize(bgrx, out byte[] palette, out int paletteCount, out byte[] indexed);
+            return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
         }
 
         /// <summary>
@@ -265,8 +254,6 @@ namespace Consolonia.Core.Drawing
 
         [ThreadStatic] private static byte[] _scratchRenderBuf;
         [ThreadStatic] private static WuColorQuantizer _quantizer;
-
-        private static readonly ConditionalWeakTable<byte[], PaletteLookup> PaletteLookups = new();
 
         private byte[] _renderedBytes;
         private int _dominantIndex = -1;
@@ -460,7 +447,9 @@ namespace Consolonia.Core.Drawing
         {
             int pixelCount = bgrx.Length / 4;
             var indices = new Dictionary<int, byte>(64);
-            byte[] result = GC.AllocateUninitializedArray<byte>(pixelCount);
+            // rented: a photo gives up at its 257th color, usually within the first rows, and the result
+            // for a whole screen would be a large-object allocation thrown away
+            byte[] result = ArrayPool<byte>.Shared.Rent(pixelCount);
             int lastColor = -1;
             byte lastIndex = 0;
 
@@ -473,6 +462,7 @@ namespace Consolonia.Core.Drawing
                     {
                         if (indices.Count == 256)
                         {
+                            ArrayPool<byte>.Shared.Return(result);
                             palette = null;
                             paletteCount = 0;
                             indexed = null;
@@ -500,44 +490,10 @@ namespace Consolonia.Core.Drawing
                 palette[offset + 3] = 0xFF;
             }
 
-            indexed = result;
+            indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
+            result.AsSpan(0, pixelCount).CopyTo(indexed);
+            ArrayPool<byte>.Shared.Return(result);
             return true;
-        }
-
-        /// <summary>
-        ///     Map BGRX pixel data to an existing palette using nearest-color matching.
-        /// </summary>
-        private static byte[] QuantizeWithPalette(byte[] bgrx, byte[] palette)
-        {
-            int pixelCount = bgrx.Length / 4;
-            byte[] indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
-            ReadOnlySpan<byte> bgrxSpan = bgrx;
-            PaletteLookup lookup = PaletteLookups.GetValue(palette, static currentPalette =>
-                new PaletteLookup(currentPalette));
-            ReadOnlySpan<byte> paletteLookup = lookup.Lookup;
-            Dictionary<int, byte> exact = lookup.Exact;
-
-            for (int i = 0, offset = 0; i < pixelCount; i++, offset += 4)
-            {
-                int b = bgrxSpan[offset];
-                int g = bgrxSpan[offset + 1];
-                int r = bgrxSpan[offset + 2];
-
-                // A color the palette holds is that entry, never a neighbour the binned lookup
-                // happens to land nearer to.
-                if (exact.TryGetValue((r << 16) | (g << 8) | b, out byte exactIndex))
-                {
-                    indexed[i] = exactIndex;
-                    continue;
-                }
-
-                int lookupIndex = ((r >> PaletteLookup.ChannelShift) << (PaletteLookup.ChannelBits * 2)) |
-                                  ((g >> PaletteLookup.ChannelShift) << PaletteLookup.ChannelBits) |
-                                  (b >> PaletteLookup.ChannelShift);
-                indexed[i] = paletteLookup[lookupIndex];
-            }
-
-            return indexed;
         }
 
         #endregion
@@ -747,7 +703,6 @@ namespace Consolonia.Core.Drawing
             return pos;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         /// <summary>
         ///     A per-thread scratch buffer of at least <paramref name="minSize" />. One very large render
         ///     does not pin its buffer for the life of the thread: it is replaced once renders are small again.
@@ -760,61 +715,6 @@ namespace Consolonia.Core.Drawing
             return buf;
         }
 
-        private sealed class PaletteLookup
-        {
-            public const int ChannelBits = 5;
-            public const int ChannelShift = 8 - ChannelBits;
-            private const int LookupSize = 1 << (ChannelBits * 3);
-
-            // Each bin is matched by its centre. Matching by its low corner treated white as 248,
-            // so a palette that also held a light antialiasing gray mapped white onto the gray.
-            private const int BinCentre = 1 << (ChannelShift - 1);
-
-            public PaletteLookup(byte[] palette)
-            {
-                Lookup = GC.AllocateUninitializedArray<byte>(LookupSize);
-
-                int paletteCount = palette.Length / 4;
-                Exact = new Dictionary<int, byte>(paletteCount);
-                for (int paletteIndex = paletteCount - 1; paletteIndex >= 0; paletteIndex--)
-                {
-                    int paletteOffset = paletteIndex * 4;
-                    Exact[(palette[paletteOffset + 2] << 16) | (palette[paletteOffset + 1] << 8) |
-                          palette[paletteOffset]] = (byte)paletteIndex;
-                }
-
-                for (int index = 0; index < Lookup.Length; index++)
-                {
-                    int r = (((index >> (ChannelBits * 2)) & ((1 << ChannelBits) - 1)) << ChannelShift) | BinCentre;
-                    int g = (((index >> ChannelBits) & ((1 << ChannelBits) - 1)) << ChannelShift) | BinCentre;
-                    int b = ((index & ((1 << ChannelBits) - 1)) << ChannelShift) | BinCentre;
-
-                    int bestPaletteIndex = 0;
-                    int bestDistance = int.MaxValue;
-
-                    for (int paletteIndex = 0; paletteIndex < paletteCount; paletteIndex++)
-                    {
-                        int paletteOffset = paletteIndex * 4;
-                        int db = b - palette[paletteOffset];
-                        int dg = g - palette[paletteOffset + 1];
-                        int dr = r - palette[paletteOffset + 2];
-                        int distance = dr * dr + dg * dg + db * db;
-                        if (distance < bestDistance)
-                        {
-                            bestDistance = distance;
-                            bestPaletteIndex = paletteIndex;
-                        }
-                    }
-
-                    Lookup[index] = (byte)bestPaletteIndex;
-                }
-            }
-
-            public byte[] Lookup { get; }
-
-            /// <summary>Palette colors (0xRRGGBB) to their index, so an exact color is never approximated.</summary>
-            public Dictionary<int, byte> Exact { get; }
-        }
 
         #endregion
     }

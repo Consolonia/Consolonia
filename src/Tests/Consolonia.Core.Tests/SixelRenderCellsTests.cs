@@ -50,7 +50,7 @@ namespace Consolonia.Core.Tests
         private static int _seed = Environment.TickCount & 0x7FFF;
 
         [Test]
-        public void An_edited_cell_is_the_only_one_made_again()
+        public void AnEditedCellIsTheOnlyOneMadeAgain()
         {
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
@@ -67,8 +67,36 @@ namespace Consolonia.Core.Tests
                     Assert.That(CellAt(second, x, y), Is.SameAs(CellAt(first, x, y)), $"cell {x},{y} is reused");
         }
 
+        /// <summary>
+        ///     A flat canvas (Paintty's blank picture) is one distinct block repeated: every cell must
+        ///     share ONE cached sixel from the first frame, or the first brush stroke, which makes every
+        ///     cell hit the cache's single instance, re-sends the whole canvas as "changed".
+        /// </summary>
         [Test]
-        public void New_cells_share_one_palette_so_neighbours_can_be_joined()
+        public void IdenticalCellsShareOneSixelFromTheFirstFrame()
+        {
+            int seed = _seed += 0x100;
+            byte[] canvas = new byte[CellsWide * CellWidth * CellsHigh * CellHeight * 4];
+            for (int cellY = 0; cellY < CellsHigh; cellY++)
+            for (int cellX = 0; cellX < CellsWide; cellX++)
+                FillCell(canvas, cellX, cellY, (byte)seed, (byte)(seed >> 8), 0x7F);
+
+            PixelBuffer first = SixelBitmapRenderer.RenderCells(canvas, CellsWide, CellsHigh, CellWidth, CellHeight);
+            Sixel shared = CellAt(first, 0, 0);
+            for (int y = 0; y < CellsHigh; y++)
+            for (int x = 0; x < CellsWide; x++)
+                Assert.That(CellAt(first, x, y), Is.SameAs(shared), $"cell {x},{y} in the first frame");
+
+            FillCell(canvas, 1, 1, 0x11, 0x22, 0x33);
+            PixelBuffer second = SixelBitmapRenderer.RenderCells(canvas, CellsWide, CellsHigh, CellWidth, CellHeight);
+            for (int y = 0; y < CellsHigh; y++)
+            for (int x = 0; x < CellsWide; x++)
+                if (x != 1 || y != 1)
+                    Assert.That(CellAt(second, x, y), Is.SameAs(shared), $"cell {x},{y} after the stroke");
+        }
+
+        [Test]
+        public void NewCellsShareOnePaletteSoNeighboursCanBeJoined()
         {
             PixelBuffer buffer = SixelBitmapRenderer.RenderCells(Picture(_seed += 0x100), CellsWide, CellsHigh,
                 CellWidth, CellHeight);
@@ -84,7 +112,7 @@ namespace Consolonia.Core.Tests
         ///     them exactly: no nearest-color match against a palette made for something else.
         /// </summary>
         [Test]
-        public void A_new_cell_keeps_its_exact_color()
+        public void ANewCellKeepsItsExactColor()
         {
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
@@ -101,7 +129,7 @@ namespace Consolonia.Core.Tests
         ///     its escape sequence.
         /// </summary>
         [Test]
-        public void Render_defines_only_the_colors_the_image_uses()
+        public void RenderDefinesOnlyTheColorsTheImageUses()
         {
             byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 255, 255 };
             byte[] pixels = new byte[CellWidth * CellHeight];
@@ -116,7 +144,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void A_transient_image_renders_the_same_bytes_without_keeping_them()
+        public void ATransientImageRendersTheSameBytesWithoutKeepingThem()
         {
             byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255 };
             byte[] pixels = new byte[CellWidth * CellHeight];
