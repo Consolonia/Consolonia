@@ -121,9 +121,8 @@ namespace Consolonia.Core.Drawing
                     imageId = KittyGraphics.AllocateImageId();
                     byte[] imageData = EncodeImageData(tile, tileSize, renderInterface,
                         out KittyImageFormat imageFormat);
-                    Context.ConsoleWindowImpl.Console.WriteText(
-                        KittyGraphics.BuildTransmitSequence(imageId, tileSize.Width, tileSize.Height, imageData,
-                            imageFormat));
+                    KittyGraphics.WriteTransmitSequence(Context.ConsoleWindowImpl.Console, imageId,
+                        tileSize.Width, tileSize.Height, imageData, imageFormat);
                     TileImages.GetOrAdd(tileKey, imageId, tile.Length);
                 }
 

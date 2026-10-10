@@ -14,6 +14,12 @@ namespace Consolonia.Benchmarks
         /// </summary>
         private static void Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == "--digest")
+            {
+                ConsoleOutputBenchmarks.PrintDigests();
+                return;
+            }
+
             ManualConfig config = ManualConfig.Create(DefaultConfig.Instance)
                 .WithArtifactsPath(Path.Combine(Path.GetTempPath(), "Consolonia.Benchmarks"));
             IEnumerable<Summary> _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
