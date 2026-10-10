@@ -44,8 +44,12 @@ namespace Consolonia.PlatformSupport
         {
             if (disposing && _vtInputDecoder != null)
             {
-                // written ahead of the base restore, which flushes them with the rest
+                // Written ahead of the base restore, which flushes them with the rest. Every mode set
+                // above goes: with only the pixel mode off, the terminal kept reporting the mouse in
+                // the oldest encoding, and the shell echoed "^[[M" and three bytes per movement.
                 WriteText(Esc.DisableSgrPixelsMouse);
+                WriteText(Esc.DisableExtendedMouseTracking);
+                WriteText(Esc.DisableAllMouseEvents);
                 WriteText(Esc.DisableWin32InputMode);
                 _windowsConsole.ConsoleMode &= ~CONSOLE_INPUT_MODE.ENABLE_VIRTUAL_TERMINAL_INPUT;
                 _vtInputDecoder = null;
