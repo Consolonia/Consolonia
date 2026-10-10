@@ -64,6 +64,15 @@ namespace Consolonia.Core.Drawing
         private readonly List<Color> _washesToDelete = new();
         private readonly List<(KittyRect Rect, Color Wash)> _washPlacementsToRemove = new();
 
+        /// <summary>
+        ///     Kitty images to delete at the end of the next frame, once it has placed what replaces them.
+        ///     Deleted first, the screen would be black where the picture was until the new tiles arrived.
+        /// </summary>
+        private string? _imagesToDeleteAfterFrame;
+
+        /// <summary>Placements to delete at the end of the next frame, once it has placed theirs anew.</summary>
+        private readonly List<(int ImageId, int PlacementId)> _placementsToDeleteAfterFrame = new();
+
         private readonly record struct KittyRect(
             int ImageId,
             ushort TileX,
@@ -207,10 +216,11 @@ namespace Consolonia.Core.Drawing
             _evictedTileImages.Clear();
             KittyBitmapRenderer.ForgetTileImages();
 
-            // nothing is placed anymore, so deleting the images leaves no hole in anything
+            // deleted once the next frame has transmitted and placed their replacements, so a picture the
+            // terminal does still show stays on screen until the new one is there
             string deletes = KittyGraphics.BuildDeleteTransmittedImagesSequence();
             if (deletes.Length > 0)
-                _console.WriteText(deletes);
+                _imagesToDeleteAfterFrame += deletes;
 
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             _consoleTopLevelImpl.DirtyRegions.AddRect(new PixelRect(0, 0, pixelBuffer.Width, pixelBuffer.Height));
@@ -218,19 +228,35 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     The screen was resized. Terminals differ in what becomes of placements then (kept on their
-        ///     cells, moved with them, or dropped), so every live one is deleted and the frame places them
-        ///     all again from the cells. The images stay in the terminal.
+        ///     cells, moved with them, or dropped), so the frame places every one again from the cells and
+        ///     deletes the old ones at its end. The images stay in the terminal.
         /// </summary>
         private void ForgetPlacements()
         {
             foreach ((KittyRect rect, int placementId) in _kittyRectPlacements)
-                _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(rect.ImageId, placementId));
+                _placementsToDeleteAfterFrame.Add((rect.ImageId, placementId));
             _kittyRectPlacements.Clear();
 
             foreach (((KittyRect _, Color wash), int placementId) in _kittyWashPlacements)
-                _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(_kittyWashImages[wash].ImageId,
-                    placementId));
+                _placementsToDeleteAfterFrame.Add((_kittyWashImages[wash].ImageId, placementId));
             _kittyWashPlacements.Clear();
+        }
+
+        /// <summary>
+        ///     Deletes what <see cref="ForgetTerminalContents" /> and <see cref="ForgetPlacements" /> left for
+        ///     the end of the frame, now that it has placed the replacements: the old picture, where the
+        ///     terminal still showed it, gives way to the new one without a black gap between.
+        /// </summary>
+        private void DeleteWhatTheFrameReplaced()
+        {
+            foreach ((int imageId, int placementId) in _placementsToDeleteAfterFrame)
+                _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(imageId, placementId));
+            _placementsToDeleteAfterFrame.Clear();
+
+            if (_imagesToDeleteAfterFrame == null)
+                return;
+            _console.WriteText(_imagesToDeleteAfterFrame);
+            _imagesToDeleteAfterFrame = null;
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -401,6 +427,7 @@ namespace Consolonia.Core.Drawing
             // change, which is the only way the placement showing it can go.
             if (kittyCellsChanged || KittyBitmapRenderer.HasEvictedImages)
                 EmitKittyRectPlacements(pixelBuffer);
+            DeleteWhatTheFrameReplaced();
 
 #if FPS
             var fps = $"FPS: {_fps: 000}";
