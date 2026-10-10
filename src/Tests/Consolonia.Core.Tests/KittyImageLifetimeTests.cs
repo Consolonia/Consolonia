@@ -61,22 +61,6 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void ClearingTheCacheDropsEverythingWithoutEvicting()
-        {
-            var evicted = new List<int>();
-            var cache = new ContentCache<int>(10, evicted.Add);
-            cache.GetOrAdd(Key(1), 1, 1);
-            cache.GetOrAdd(Key(2), 2, 1);
-
-            cache.Clear();
-
-            Assert.That(cache.TryGet(Key(1), out _), Is.False);
-            Assert.That(cache.TryGet(Key(2), out _), Is.False);
-            Assert.That(evicted, Is.Empty, "the caller deletes them itself, or the terminal lost them");
-            Assert.That(cache.GetOrAdd(Key(1), 11, 1), Is.EqualTo(11), "made again");
-        }
-
-        [Test]
         public void ASixelSymbolIsSomethingToDraw()
         {
             var sixel = new Sixel(new byte[] { 0, 0, 0, 255 }, 1, new byte[8 * 16], 8, 16, 8, 16);

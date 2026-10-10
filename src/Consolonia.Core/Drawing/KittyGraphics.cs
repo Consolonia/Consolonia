@@ -237,8 +237,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>
         ///     Builds the APC sequences deleting every image transmitted and not deleted since, each with
         ///     its placements, and counts them all as gone. Empty when there is none. For leaving the
-        ///     terminal, or forgetting what it shows: deleting the visible placements alone would leave the
-        ///     images kept for showing again.
+        ///     terminal: deleting the visible placements alone would leave the images kept for showing again.
         /// </summary>
         public static string BuildDeleteTransmittedImagesSequence()
         {

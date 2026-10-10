@@ -65,12 +65,9 @@ namespace Consolonia.Core.Drawing
         private readonly List<(KittyRect Rect, Color Wash)> _washPlacementsToRemove = new();
 
         /// <summary>
-        ///     Kitty images to delete at the end of the next frame, once it has placed what replaces them.
-        ///     Deleted first, the screen would be black where the picture was until the new tiles arrived.
+        ///     Placements to delete at the end of the next frame, once it has placed theirs anew: deleted
+        ///     first, the screen would show nothing where the picture was until the frame got that far.
         /// </summary>
-        private string? _imagesToDeleteAfterFrame;
-
-        /// <summary>Placements to delete at the end of the next frame, once it has placed theirs anew.</summary>
         private readonly List<(int ImageId, int PlacementId)> _placementsToDeleteAfterFrame = new();
 
         private readonly record struct KittyRect(
@@ -201,35 +198,28 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     The terminal no longer shows what was written to it: another program drew while console I/O
-        ///     was paused. Everything written is forgotten, so the next frame writes every cell again, and
-        ///     the terminal is told to drop every kitty image sent to it. It may have dropped them already
-        ///     (kitty does when the alternate screen is left); either way nothing counts on them being there.
+        ///     The terminal may no longer show what was written to it: another program drew while console
+        ///     I/O was paused. Everything written is forgotten, so the next frame writes every cell again
+        ///     and places every kitty picture again. The images stay: the terminal still holds them (the
+        ///     alternate screen was never left, and nothing but this app deletes by id), so a picture is
+        ///     placed from the tiles already there rather than transmitted and decoded anew, and where the
+        ///     terminal still shows it nothing changes on screen.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         internal void ForgetTerminalContents()
         {
             InitializeCacheInternal();
-            _kittyRectPlacements.Clear();
-            _kittyWashPlacements.Clear();
-            _kittyWashImages.Clear();
-            _evictedTileImages.Clear();
-            KittyBitmapRenderer.ForgetTileImages();
-
-            // deleted once the next frame has transmitted and placed their replacements, so a picture the
-            // terminal does still show stays on screen until the new one is there
-            string deletes = KittyGraphics.BuildDeleteTransmittedImagesSequence();
-            if (deletes.Length > 0)
-                _imagesToDeleteAfterFrame += deletes;
+            ForgetPlacements();
 
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             _consoleTopLevelImpl.DirtyRegions.AddRect(new PixelRect(0, 0, pixelBuffer.Width, pixelBuffer.Height));
         }
 
         /// <summary>
-        ///     The screen was resized. Terminals differ in what becomes of placements then (kept on their
-        ///     cells, moved with them, or dropped), so the frame places every one again from the cells and
-        ///     deletes the old ones at its end. The images stay in the terminal.
+        ///     The placements on screen can no longer be counted on (the screen was resized, and terminals
+        ///     differ in what becomes of placements then; or another program had the terminal), so the
+        ///     frame places every one again from the cells and deletes the old ones at its end. The images
+        ///     stay in the terminal.
         /// </summary>
         private void ForgetPlacements()
         {
@@ -243,20 +233,15 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Deletes what <see cref="ForgetTerminalContents" /> and <see cref="ForgetPlacements" /> left for
-        ///     the end of the frame, now that it has placed the replacements: the old picture, where the
-        ///     terminal still showed it, gives way to the new one without a black gap between.
+        ///     Deletes the placements <see cref="ForgetPlacements" /> left for the end of the frame, now that
+        ///     it has placed their replacements: where the terminal still showed the old picture, the new one
+        ///     is there before the old one goes.
         /// </summary>
         private void DeleteWhatTheFrameReplaced()
         {
             foreach ((int imageId, int placementId) in _placementsToDeleteAfterFrame)
                 _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(imageId, placementId));
             _placementsToDeleteAfterFrame.Clear();
-
-            if (_imagesToDeleteAfterFrame == null)
-                return;
-            _console.WriteText(_imagesToDeleteAfterFrame);
-            _imagesToDeleteAfterFrame = null;
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]

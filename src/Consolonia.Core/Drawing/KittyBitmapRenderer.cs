@@ -68,16 +68,6 @@ namespace Consolonia.Core.Drawing
             return EvictedTileImages.TryDequeue(out imageId);
         }
 
-        /// <summary>
-        ///     Forgets every tile image in the terminal: the caller is deleting them all, or the terminal has
-        ///     lost them. Renderings showing them are made again, transmitting their tiles anew.
-        /// </summary>
-        internal static void ForgetTileImages()
-        {
-            TileImages.Clear();
-            EvictedTileImages.Clear();
-        }
-
         public KittyBitmapRenderer(DrawingContextImpl context)
             : base(context)
         {
