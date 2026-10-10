@@ -71,17 +71,22 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Holds <paramref name="value" /> for <paramref name="key" />, then drops the least recently
-        ///     used until the total cost is back within budget. The newest is never dropped.
+        ///     Holds <paramref name="value" /> for <paramref name="key" /> unless one is already held, then
+        ///     drops the least recently used until the total cost is back within budget. The newest is never
+        ///     dropped.
         /// </summary>
-        public void Add(ContentKey key, T value, long cost)
+        /// <returns>
+        ///     The value held for the key: <paramref name="value" />, or the one already there. Callers keep
+        ///     THAT one, so every cell showing the same block shares one instance and compares equal.
+        /// </returns>
+        public T GetOrAdd(ContentKey key, T value, long cost)
         {
             lock (_entries)
             {
                 ref LinkedListNode<Entry> slot =
                     ref CollectionsMarshal.GetValueRefOrAddDefault(_entries, key, out bool held);
                 if (held)
-                    return;
+                    return slot.Value.Value;
 
                 slot = _recency.AddFirst(new Entry(key, value, cost));
                 _cost += cost;
@@ -94,6 +99,8 @@ namespace Consolonia.Core.Drawing
                     _cost -= oldest.Value.Cost;
                     _evicted?.Invoke(oldest.Value.Value);
                 }
+
+                return value;
             }
         }
 

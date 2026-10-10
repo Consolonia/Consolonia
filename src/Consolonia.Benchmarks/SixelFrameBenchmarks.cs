@@ -54,6 +54,10 @@ namespace Consolonia.Benchmarks
             return bgrx;
         }
 
+        /// <summary>
+        ///     Every cell already cached, as after scrolling back to a picture: a rendering-key miss that
+        ///     only hashes. (A frame where nothing changed at all reuses its rendering and never gets here.)
+        /// </summary>
         [Benchmark(Baseline = true)]
         public PixelBuffer FrameUnchanged()
         {

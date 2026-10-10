@@ -71,7 +71,13 @@ namespace Consolonia.Core.Drawing
 
             var bitmapBuffer = new PixelBuffer((ushort)cellsWide, (ushort)cellsHigh);
             byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellBytes);
-            List<(int CellX, int CellY, ContentKey Key)> newCells = null;
+
+            // The cells not in the cache, by distinct block: a flat canvas is one block repeated, and
+            // every cell showing it must end up with the SAME sixel, or the first edit finds each cell
+            // "changed" against the one instance the cache kept and re-sends the whole picture.
+            List<(int CellX, int CellY, int Block)> newCells = null;
+            Dictionary<ContentKey, int> blocks = null;
+            List<(int CellX, int CellY, ContentKey Key)> blockFirstCells = null;
 
             for (int cellY = 0; cellY < cellsHigh; cellY++)
             for (int cellX = 0; cellX < cellsWide; cellX++)
@@ -81,17 +87,30 @@ namespace Consolonia.Core.Drawing
 
                 ContentKey cellKey = ContentKey.Of(cellBgrx, cellPixelWidth, cellPixelHeight);
                 if (CellSixels.TryGet(cellKey, out Sixel cellSixel))
+                {
                     bitmapBuffer[new PixelPoint(cellX, cellY)] = CellPixel(cellSixel);
-                else
-                    (newCells ??= new List<(int, int, ContentKey)>()).Add((cellX, cellY, cellKey));
+                    continue;
+                }
+
+                blocks ??= new Dictionary<ContentKey, int>();
+                blockFirstCells ??= new List<(int, int, ContentKey)>();
+                newCells ??= new List<(int, int, int)>();
+                if (!blocks.TryGetValue(cellKey, out int block))
+                {
+                    block = blockFirstCells.Count;
+                    blocks[cellKey] = block;
+                    blockFirstCells.Add((cellX, cellY, cellKey));
+                }
+
+                newCells.Add((cellX, cellY, block));
             }
 
             if (newCells == null)
                 return bitmapBuffer;
 
             // When every cell is new (a new picture, a scroll) the visible image is quantized as it is and
-            // each cell's indices are gathered from its rows. Otherwise the new cells are copied side by
-            // side, one cell after another, and quantized as one image.
+            // each block's indices are gathered from its first cell's rows. Otherwise the distinct blocks
+            // are copied side by side and quantized as one image.
             bool allNew = newCells.Count == cellsWide * cellsHigh;
             byte[] palette, indexed;
             int paletteCount;
@@ -101,31 +120,34 @@ namespace Consolonia.Core.Drawing
             }
             else
             {
-                byte[] newCellsBgrx = GC.AllocateUninitializedArray<byte>(newCells.Count * cellBytes);
-                for (int i = 0; i < newCells.Count; i++)
-                    CopyBlock(visibleBytes, visibleWidth * 4, newCells[i].CellX * cellPixelWidth,
-                        newCells[i].CellY * cellPixelHeight, cellPixelWidth, cellPixelHeight,
-                        newCellsBgrx.AsSpan(i * cellBytes, cellBytes));
-                Sixel.Quantize(newCellsBgrx, out palette, out paletteCount, out indexed);
+                byte[] blocksBgrx = GC.AllocateUninitializedArray<byte>(blockFirstCells.Count * cellBytes);
+                for (int i = 0; i < blockFirstCells.Count; i++)
+                    CopyBlock(visibleBytes, visibleWidth * 4, blockFirstCells[i].CellX * cellPixelWidth,
+                        blockFirstCells[i].CellY * cellPixelHeight, cellPixelWidth, cellPixelHeight,
+                        blocksBgrx.AsSpan(i * cellBytes, cellBytes));
+                Sixel.Quantize(blocksBgrx, out palette, out paletteCount, out indexed);
             }
 
-            for (int i = 0; i < newCells.Count; i++)
+            var made = new Sixel[blockFirstCells.Count];
+            for (int i = 0; i < made.Length; i++)
             {
                 byte[] pixels = GC.AllocateUninitializedArray<byte>(cellPixels);
                 if (allNew)
                     for (int row = 0; row < cellPixelHeight; row++)
                         indexed.AsSpan(
-                                (newCells[i].CellY * cellPixelHeight + row) * visibleWidth +
-                                newCells[i].CellX * cellPixelWidth, cellPixelWidth)
+                                (blockFirstCells[i].CellY * cellPixelHeight + row) * visibleWidth +
+                                blockFirstCells[i].CellX * cellPixelWidth, cellPixelWidth)
                             .CopyTo(pixels.AsSpan(row * cellPixelWidth));
                 else
                     indexed.AsSpan(i * cellPixels, cellPixels).CopyTo(pixels);
 
                 var cellSixel = new Sixel(palette, paletteCount, pixels,
                     cellPixelWidth, cellPixelHeight, cellPixelWidth, cellPixelHeight);
-                CellSixels.Add(newCells[i].Key, cellSixel, 1);
-                bitmapBuffer[new PixelPoint(newCells[i].CellX, newCells[i].CellY)] = CellPixel(cellSixel);
+                made[i] = CellSixels.GetOrAdd(blockFirstCells[i].Key, cellSixel, 1);
             }
+
+            foreach ((int cellX, int cellY, int block) in newCells)
+                bitmapBuffer[new PixelPoint(cellX, cellY)] = CellPixel(made[block]);
 
             return bitmapBuffer;
         }

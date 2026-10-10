@@ -158,9 +158,10 @@ namespace Consolonia.Core.Infrastructure
 
             if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
             {
+                // a tile cell's color is a wash, not a background the console could map
                 (object mappedBackground, object mappedForeground) =
-                    consoleColorMode.Value.MapColors(pixel.Background.Color, pixel.Foreground.Color,
-                        pixel.Foreground.Weight);
+                    consoleColorMode.Value.MapColors(defaultBackground ? Colors.Black : pixel.Background.Color,
+                        pixel.Foreground.Color, pixel.Foreground.Weight);
                 if (pixel.Foreground.Color != _lastForeground)
                 {
                     if (weight is not FontWeight.Bold
@@ -248,7 +249,12 @@ namespace Consolonia.Core.Infrastructure
         {
             // RenderTarget calls this outside WritePixel, so it needs the same lock and pause handling as WriteText
             WaitPauseTaskIfNecessary();
-            SetCaretPosition(position);
+
+            // Always an explicit cursor move. After a glyph in the last column the position is modelled as
+            // the start of the next row, but the terminal's cursor is still on the old row with a pending
+            // wrap that only the next printable character resolves; a sixel is not one, so without the
+            // move it would land a row up. Eight bytes against a payload of kilobytes.
+            SetCaretPositionInternal(position);
 
             // sixel payloads are strictly ASCII (data bytes are 0x3F..0x7E), so widening to chars
             // and re-encoding through the UTF-8 writer reproduces the same bytes

@@ -13,7 +13,7 @@ namespace Consolonia.Core.Tests
     public class KittyImageLifetimeTests
     {
         [Test]
-        public void An_evicted_image_nothing_shows_is_an_orphan()
+        public void AnEvictedImageNothingShowsIsAnOrphan()
         {
             var evicted = new HashSet<int> { 1, 2, 3 };
             var orphans = new List<int>();
@@ -25,7 +25,7 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void An_evicted_image_still_shown_is_deleted_once_its_placement_goes()
+        public void AnEvictedImageStillShownIsDeletedOnceItsPlacementGoes()
         {
             var evicted = new HashSet<int> { 7 };
             var orphans = new List<int>();
@@ -39,28 +39,29 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void The_cache_evicts_beyond_its_budget_and_a_raised_budget_holds_more()
+        public void TheCacheEvictsBeyondItsBudgetAndARaisedBudgetHoldsMore()
         {
             var evicted = new List<int>();
             var cache = new ContentCache<int>(2, evicted.Add);
 
-            cache.Add(Key(1), 1, 1);
-            cache.Add(Key(2), 2, 1);
-            cache.Add(Key(3), 3, 1);
+            Assert.That(cache.GetOrAdd(Key(1), 1, 1), Is.EqualTo(1));
+            Assert.That(cache.GetOrAdd(Key(1), 99, 1), Is.EqualTo(1), "the value already held is returned");
+            cache.GetOrAdd(Key(2), 2, 1);
+            cache.GetOrAdd(Key(3), 3, 1);
             Assert.That(evicted, Is.EquivalentTo(new[] { 1 }), "the least recently used goes");
 
             cache.EnsureBudget(10);
-            cache.Add(Key(4), 4, 1);
-            cache.Add(Key(5), 5, 1);
+            cache.GetOrAdd(Key(4), 4, 1);
+            cache.GetOrAdd(Key(5), 5, 1);
             Assert.That(evicted, Is.EquivalentTo(new[] { 1 }), "nothing more once the budget is raised");
 
             cache.EnsureBudget(1);
-            cache.Add(Key(6), 6, 1);
+            cache.GetOrAdd(Key(6), 6, 1);
             Assert.That(evicted, Is.EquivalentTo(new[] { 1 }), "the budget never shrinks");
         }
 
         [Test]
-        public void A_sixel_symbol_is_something_to_draw()
+        public void ASixelSymbolIsSomethingToDraw()
         {
             var sixel = new Sixel(new byte[] { 0, 0, 0, 255 }, 1, new byte[8 * 16], 8, 16, 8, 16);
 

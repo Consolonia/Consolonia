@@ -30,9 +30,11 @@ namespace Consolonia.Core.Drawing
         internal const int TileRows = 4;
 
         /// <summary>
-        ///     Pixel bytes of tile images kept in the terminal at least: XTerm.NET, for one, holds 64MB of
-        ///     live images. The budget grows to <see cref="ScreensOfTileImages" /> screens on a larger
-        ///     screen, so one full-screen picture never evicts its own tiles while transmitting them.
+        ///     Pixel bytes of tile images kept in the terminal at least. The budget grows to
+        ///     <see cref="ScreensOfTileImages" /> screens on a larger screen, so one full-screen picture
+        ///     never evicts its own tiles while transmitting them. The terminal has to keep at least as
+        ///     much by id, or it drops tiles this cache still counts on and placing them again shows
+        ///     nothing: XTerm.NET keeps the same three screens' worth (its MaxImageRegistryBytes floor).
         /// </summary>
         private const long MinTileImageBudgetBytes = 24L * 1024 * 1024;
 
@@ -125,7 +127,7 @@ namespace Consolonia.Core.Drawing
                     Context.ConsoleWindowImpl.Console.WriteText(
                         KittyGraphics.BuildTransmitSequence(imageId, tileSize.Width, tileSize.Height, imageData,
                             imageFormat));
-                    TileImages.Add(tileKey, imageId, tile.Length);
+                    TileImages.GetOrAdd(tileKey, imageId, tile.Length);
                 }
 
                 // image as cell BACKGROUND, foreground left free so glyphs drawn later composite
