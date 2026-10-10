@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -48,6 +49,25 @@ namespace Consolonia.Core.Tests
         {
             Assert.That(KittyGraphics.BuildDeleteSequence(7),
                 Is.EqualTo(Apc + "a=d,d=I,q=2,i=7" + St));
+        }
+
+        /// <summary>
+        ///     Every image transmitted is in the terminal until deleted, and at exit or when the terminal's
+        ///     contents are forgotten they are all deleted by id: deleting the visible placements alone
+        ///     (d=A) would leave the ones kept for showing again.
+        /// </summary>
+        [Test]
+        public void TransmittedImagesAreDeletedTogetherUnlessDeletedOneByOne()
+        {
+            KittyGraphics.BuildDeleteTransmittedImagesSequence(); // whatever other tests left in
+            int kept = KittyGraphics.AllocateImageId();
+            int deleted = KittyGraphics.AllocateImageId();
+            KittyGraphics.BuildDeleteSequence(deleted);
+
+            Assert.That(KittyGraphics.BuildDeleteTransmittedImagesSequence(),
+                Is.EqualTo(Apc + "a=d,d=I,q=2,i=" + kept.ToString(CultureInfo.InvariantCulture) + St),
+                "the one still in the terminal");
+            Assert.That(KittyGraphics.BuildDeleteTransmittedImagesSequence(), Is.Empty, "all counted as gone");
         }
 
         [Test]

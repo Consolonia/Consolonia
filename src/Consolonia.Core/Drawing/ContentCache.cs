@@ -104,6 +104,20 @@ namespace Consolonia.Core.Drawing
             }
         }
 
+        /// <summary>
+        ///     Drops everything, without the eviction callback: for when what the values stand for is gone
+        ///     already, or the caller frees it all itself.
+        /// </summary>
+        public void Clear()
+        {
+            lock (_entries)
+            {
+                _entries.Clear();
+                _recency.Clear();
+                _cost = 0;
+            }
+        }
+
         private readonly record struct Entry(ContentKey Key, T Value, long Cost);
     }
 }

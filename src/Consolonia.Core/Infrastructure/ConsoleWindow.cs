@@ -357,6 +357,17 @@ namespace Consolonia.Core.Infrastructure
 
         public event Action<ConsoleCursor> CursorChanged;
 
+        /// <summary>
+        ///     The terminal may no longer show what was written to it: console I/O resumed after another
+        ///     program had the terminal. Whatever renders to it forgets what it wrote and writes it all again.
+        /// </summary>
+        internal event Action TerminalContentsLost;
+
+        internal void NotifyTerminalContentsLost()
+        {
+            TerminalContentsLost?.Invoke();
+        }
+
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
             var presentationSource = (IPresentationSource)_inputRoot;
