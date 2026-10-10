@@ -105,6 +105,7 @@ namespace Consolonia.Core.Drawing
                 }, null, Timeout.Infinite,
                 Timeout.Infinite);
             _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
+            _consoleTopLevelImpl.TerminalContentsLost += ForgetTerminalContents;
         }
 
         private void InitializeCacheInternal()
@@ -122,6 +123,7 @@ namespace Consolonia.Core.Drawing
         public void Dispose()
         {
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
+            _consoleTopLevelImpl.TerminalContentsLost -= ForgetTerminalContents;
             _cursorTimer!.Dispose();
             _cursorTimer = null;
         }
@@ -189,6 +191,47 @@ namespace Consolonia.Core.Drawing
             return cache;
         }
 
+        /// <summary>
+        ///     The terminal no longer shows what was written to it: another program drew while console I/O
+        ///     was paused. Everything written is forgotten, so the next frame writes every cell again, and
+        ///     the terminal is told to drop every kitty image sent to it. It may have dropped them already
+        ///     (kitty does when the alternate screen is left); either way nothing counts on them being there.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        internal void ForgetTerminalContents()
+        {
+            InitializeCacheInternal();
+            _kittyRectPlacements.Clear();
+            _kittyWashPlacements.Clear();
+            _kittyWashImages.Clear();
+            _evictedTileImages.Clear();
+            KittyBitmapRenderer.ForgetTileImages();
+
+            // nothing is placed anymore, so deleting the images leaves no hole in anything
+            string deletes = KittyGraphics.BuildDeleteTransmittedImagesSequence();
+            if (deletes.Length > 0)
+                _console.WriteText(deletes);
+
+            PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
+            _consoleTopLevelImpl.DirtyRegions.AddRect(new PixelRect(0, 0, pixelBuffer.Width, pixelBuffer.Height));
+        }
+
+        /// <summary>
+        ///     The screen was resized. Terminals differ in what becomes of placements then (kept on their
+        ///     cells, moved with them, or dropped), so every live one is deleted and the frame places them
+        ///     all again from the cells. The images stay in the terminal.
+        /// </summary>
+        private void ForgetPlacements()
+        {
+            foreach ((KittyRect rect, int placementId) in _kittyRectPlacements)
+                _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(rect.ImageId, placementId));
+            _kittyRectPlacements.Clear();
+
+            foreach (((KittyRect _, Color wash), int placementId) in _kittyWashPlacements)
+                _console.WriteText(KittyGraphics.BuildDeletePlacementSequence(_kittyWashImages[wash].ImageId,
+                    placementId));
+            _kittyWashPlacements.Clear();
+        }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice(Snapshot.Regions regions)
@@ -204,6 +247,7 @@ namespace Consolonia.Core.Drawing
             if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
             {
                 InitializeCacheInternal();
+                ForgetPlacements();
                 kittyCellsChanged = true;
             }
 

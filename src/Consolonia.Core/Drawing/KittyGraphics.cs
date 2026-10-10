@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -61,9 +62,26 @@ namespace Consolonia.Core.Drawing
 
         private static int _nextPlacementId;
 
+        // The images in the terminal, by id: allocated for transmission and not deleted since. Deleting
+        // every visible placement (d=A) leaves the images nothing shows, and the tile cache keeps a few
+        // screens of those in the terminal to show again without resending; at exit, and when the
+        // terminal's contents are forgotten, they are deleted one by one.
+        private static readonly HashSet<int> TransmittedImages = new();
+
+        /// <summary>
+        ///     An id for an image about to be transmitted. It counts as in the terminal until
+        ///     <see cref="BuildDeleteSequence" /> is built for it, or every image is deleted with
+        ///     <see cref="BuildDeleteTransmittedImagesSequence" />.
+        /// </summary>
         public static int AllocateImageId()
         {
-            return NextId(ref _nextImageId);
+            int imageId = NextId(ref _nextImageId);
+            lock (TransmittedImages)
+            {
+                TransmittedImages.Add(imageId);
+            }
+
+            return imageId;
         }
 
         /// <summary>
@@ -204,9 +222,40 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Builds the APC sequence deleting an image and its placements (uppercase d=I), freeing
-        ///     the image storage in the terminal.
+        ///     the image storage in the terminal. The image no longer counts as in the terminal.
         /// </summary>
         public static string BuildDeleteSequence(int imageId)
+        {
+            lock (TransmittedImages)
+            {
+                TransmittedImages.Remove(imageId);
+            }
+
+            return DeleteSequence(imageId);
+        }
+
+        /// <summary>
+        ///     Builds the APC sequences deleting every image transmitted and not deleted since, each with
+        ///     its placements, and counts them all as gone. Empty when there is none. For leaving the
+        ///     terminal, or forgetting what it shows: deleting the visible placements alone would leave the
+        ///     images kept for showing again.
+        /// </summary>
+        public static string BuildDeleteTransmittedImagesSequence()
+        {
+            lock (TransmittedImages)
+            {
+                if (TransmittedImages.Count == 0)
+                    return string.Empty;
+
+                var stringBuilder = new StringBuilder(TransmittedImages.Count * 32);
+                foreach (int imageId in TransmittedImages)
+                    stringBuilder.Append(DeleteSequence(imageId));
+                TransmittedImages.Clear();
+                return stringBuilder.ToString();
+            }
+        }
+
+        private static string DeleteSequence(int imageId)
         {
             return string.Create(CultureInfo.InvariantCulture, $"\u001b_Ga=d,d=I,q=2,i={imageId}\u001b\\");
         }

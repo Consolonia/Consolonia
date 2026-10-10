@@ -361,9 +361,13 @@ namespace Consolonia.Core.Infrastructure
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
                 Console.Out.Write(Esc.EndSynchronizedUpdate);
 
-            // free terminal-side image storage held by kitty graphics placements
+            // free the terminal-side storage of every kitty image sent: the ones kept for showing again as
+            // well as the ones placed, which deleting the visible placements alone would leave behind
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
+            {
+                WriteText(KittyGraphics.BuildDeleteTransmittedImagesSequence());
                 WriteText(KittyGraphics.DeleteAllImages);
+            }
 
             WriteText(Esc.DisableAlternateBuffer);
             WriteText(Esc.Reset);
