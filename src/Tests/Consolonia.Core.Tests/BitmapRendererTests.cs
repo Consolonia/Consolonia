@@ -25,8 +25,8 @@ namespace Consolonia.Core.Tests
             IBitmapImpl source = wrappedForLayout ? new AspectRatioAdjustedBitmap(bitmap) : bitmap;
             var visible = new PixelRect(3, 2, 4, 5);
 
-            byte[] pixels = BitmapRenderer.GetVisiblePixels(source, null, size, visible,
-                BitmapInterpolationMode.None);
+            byte[] pixels = new byte[visible.Width * visible.Height * 4];
+            BitmapRenderer.GetVisiblePixels(source, null, size, visible, BitmapInterpolationMode.None, pixels);
 
             byte[] expected = new byte[visible.Width * visible.Height * 4];
             using (ILockedFramebuffer frame = bitmap.Lock())

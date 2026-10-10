@@ -20,13 +20,13 @@ namespace Consolonia.Core.Drawing
     ///     the cells it touched. Every sixel carries its own palette, so one made with an earlier
     ///     rendering's palette sits beside new ones unchanged.
     /// </remarks>
-    internal sealed class SixelBitmapRenderer : CellBitmapRenderer<PixelBuffer>
+    internal sealed class SixelBitmapRenderer : CellBitmapRenderer<CellRendering>
     {
         /// <summary>Cell sixels kept for reuse: a few screens' worth.</summary>
         private const int CellSixelBudget = 32 * 1024;
 
         private static readonly
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, PixelBuffer>>>
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
             RenderedBitmapCache = new();
 
         private static readonly ContentCache<Sixel> CellSixels = new(CellSixelBudget);
@@ -36,19 +36,13 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, PixelBuffer>>>
+        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
             Renderings => RenderedBitmapCache;
 
-        protected override PixelBuffer Render(byte[] visibleBytes, PixelRect visibleCells, int cellPixelWidth,
-            int cellPixelHeight, IPlatformRenderInterface renderInterface)
+        protected override void Render(CellRendering rendering, int cellPixelWidth, int cellPixelHeight,
+            IPlatformRenderInterface renderInterface)
         {
-            return RenderCells(visibleBytes, visibleCells.Width, visibleCells.Height, cellPixelWidth,
-                cellPixelHeight);
-        }
-
-        protected override PixelBuffer CellsOf(PixelBuffer rendering)
-        {
-            return rendering;
+            RenderCells(rendering.Pixels, rendering.Cells, cellPixelWidth, cellPixelHeight);
         }
 
         /// <summary>
@@ -62,14 +56,21 @@ namespace Consolonia.Core.Drawing
         ///     stroke that changes one cell quantizes that one cell, not the whole picture.
         /// </remarks>
         /// <param name="visibleBytes">BGRX pixels of exactly the visible cells, row by row.</param>
-        internal static PixelBuffer RenderCells(byte[] visibleBytes, int cellsWide, int cellsHigh,
-            int cellPixelWidth, int cellPixelHeight)
+        /// <param name="cells">One cell per visible cell. Every cell is written; what it held is not read.</param>
+        /// <exception cref="ArgumentException">
+        ///     <paramref name="visibleBytes" /> is not the pixels of exactly the cells.
+        /// </exception>
+        internal static void RenderCells(byte[] visibleBytes, PixelBuffer cells, int cellPixelWidth,
+            int cellPixelHeight)
         {
+            int cellsWide = cells.Width;
+            int cellsHigh = cells.Height;
             int visibleWidth = cellsWide * cellPixelWidth;
             int cellPixels = cellPixelWidth * cellPixelHeight;
             int cellBytes = cellPixels * 4;
+            if (visibleBytes.Length != visibleWidth * cellsHigh * cellPixelHeight * 4)
+                throw new ArgumentException("The pixels are not those of exactly the cells.", nameof(visibleBytes));
 
-            var bitmapBuffer = new PixelBuffer((ushort)cellsWide, (ushort)cellsHigh);
             byte[] cellBgrx = GC.AllocateUninitializedArray<byte>(cellBytes);
 
             // The cells not in the cache, by distinct block: a flat canvas is one block repeated, and
@@ -88,7 +89,7 @@ namespace Consolonia.Core.Drawing
                 ContentKey cellKey = ContentKey.Of(cellBgrx, cellPixelWidth, cellPixelHeight);
                 if (CellSixels.TryGet(cellKey, out Sixel cellSixel))
                 {
-                    bitmapBuffer[new PixelPoint(cellX, cellY)] = CellPixel(cellSixel);
+                    cells[new PixelPoint(cellX, cellY)] = CellPixel(cellSixel);
                     continue;
                 }
 
@@ -106,7 +107,7 @@ namespace Consolonia.Core.Drawing
             }
 
             if (newCells == null)
-                return bitmapBuffer;
+                return;
 
             // When every cell is new (a new picture, a scroll) the visible image is quantized as it is and
             // each block's indices are gathered from its first cell's rows. Otherwise the distinct blocks
@@ -147,9 +148,7 @@ namespace Consolonia.Core.Drawing
             }
 
             foreach ((int cellX, int cellY, int block) in newCells)
-                bitmapBuffer[new PixelPoint(cellX, cellY)] = CellPixel(made[block]);
-
-            return bitmapBuffer;
+                cells[new PixelPoint(cellX, cellY)] = CellPixel(made[block]);
         }
 
         private static Pixel CellPixel(Sixel cellSixel)

@@ -22,7 +22,7 @@ namespace Consolonia.Core.Drawing
     ///     composite over the picture, an opaque background evicts it, and pixel buffer diffing and
     ///     occlusion work unchanged.
     /// </summary>
-    internal sealed class KittyBitmapRenderer : CellBitmapRenderer<KittyBitmapRenderer.KittyRenderedBitmap>
+    internal sealed class KittyBitmapRenderer : CellBitmapRenderer<KittyBitmapRenderer.KittyRendering>
     {
         /// <summary>Tile size in cells: small enough that a stroke touches few, large enough to be few.</summary>
         internal const int TileColumns = 8;
@@ -42,7 +42,7 @@ namespace Consolonia.Core.Drawing
         private const int ScreensOfTileImages = 3;
 
         private static readonly
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRenderedBitmap>>>
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRendering>>>
             RenderedBitmapCache = new();
 
         /// <summary>
@@ -73,19 +73,14 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRenderedBitmap>>>
+        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRendering>>>
             Renderings => RenderedBitmapCache;
-
-        protected override PixelBuffer CellsOf(KittyRenderedBitmap rendering)
-        {
-            return rendering.Cells;
-        }
 
         /// <summary>
         ///     A rendering is reused only while every tile image it shows is still in the terminal; using one
         ///     keeps them all fresh, so a picture on screen does not lose tiles to the budget.
         /// </summary>
-        protected override bool IsReusable(KittyRenderedBitmap rendering)
+        protected override bool IsReusable(KittyRendering rendering)
         {
             foreach (ContentKey tileKey in rendering.TileKeys)
                 if (!TileImages.TryGet(tileKey, out _))
@@ -94,18 +89,20 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>Cuts the visible pixels into tiles and transmits each tile not already in the terminal.</summary>
-        protected override KittyRenderedBitmap Render(byte[] visibleBytes, PixelRect visibleCells,
-            int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface)
+        protected override void Render(KittyRendering rendering, int cellPixelWidth, int cellPixelHeight,
+            IPlatformRenderInterface renderInterface)
         {
+            PixelRect visibleCells = rendering.VisibleCells;
+            byte[] visibleBytes = rendering.Pixels;
+            PixelBuffer cellBuffer = rendering.Cells;
             int visibleWidth = visibleCells.Width * cellPixelWidth;
             TileImages.EnsureBudget(ScreensOfTileImages * 4L *
                                     Context.PixelBuffer.Width * cellPixelWidth *
                                     Context.PixelBuffer.Height * cellPixelHeight);
 
-            var cellBuffer = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
-            var tileKeys = new List<ContentKey>();
-            byte[] tileBytes = GC.AllocateUninitializedArray<byte>(
-                TileColumns * cellPixelWidth * TileRows * cellPixelHeight * 4);
+            List<ContentKey> tileKeys = rendering.TileKeys;
+            tileKeys.Clear();
+            byte[] tileBytes = rendering.TileScratch(TileColumns * cellPixelWidth * TileRows * cellPixelHeight * 4);
 
             for (int tileY = 0; tileY < visibleCells.Height; tileY += TileRows)
             for (int tileX = 0; tileX < visibleCells.Width; tileX += TileColumns)
@@ -141,8 +138,6 @@ namespace Consolonia.Core.Drawing
                         new PixelBackground(Colors.Transparent,
                             new KittyTile(imageId, (ushort)cellX, (ushort)cellY)));
             }
-
-            return new KittyRenderedBitmap(tileKeys, cellBuffer);
         }
 
         private static byte[] EncodeImageData(ReadOnlySpan<byte> bgra, PixelSize size,
@@ -208,18 +203,21 @@ namespace Consolonia.Core.Drawing
             return rgba;
         }
 
-        internal sealed class KittyRenderedBitmap
+        /// <summary>A cell rendering with the tiles it shows, and room to cut one out.</summary>
+        internal sealed class KittyRendering : CellRendering
         {
-            public KittyRenderedBitmap(List<ContentKey> tileKeys, PixelBuffer cells)
-            {
-                TileKeys = tileKeys;
-                Cells = cells;
-            }
+            private byte[] _tileScratch;
 
             /// <summary>The tiles the cells show, which must still be in the terminal to reuse them.</summary>
-            public List<ContentKey> TileKeys { get; }
+            public List<ContentKey> TileKeys { get; } = new();
 
-            public PixelBuffer Cells { get; }
+            /// <summary>Room for the pixels of one tile, at least <paramref name="bytes" />, kept between renders.</summary>
+            internal byte[] TileScratch(int bytes)
+            {
+                if (_tileScratch == null || _tileScratch.Length < bytes)
+                    _tileScratch = GC.AllocateUninitializedArray<byte>(bytes);
+                return _tileScratch;
+            }
         }
     }
 }
