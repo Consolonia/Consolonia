@@ -250,6 +250,11 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.WriteText(str);
         }
 
+        public virtual void WriteBytes(ReadOnlySpan<byte> ascii)
+        {
+            _consoleOutput.WriteBytes(ascii);
+        }
+
         protected bool CheckSize()
         {
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;

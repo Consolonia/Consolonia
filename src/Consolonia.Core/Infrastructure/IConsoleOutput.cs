@@ -94,6 +94,16 @@ namespace Consolonia.Core.Infrastructure
         void WriteText(string str);
 
         /// <summary>
+        ///     Write raw ASCII escape sequences given as bytes, such as image payloads, which an output that
+        ///     buffers bytes takes without converting them to text and back.
+        /// </summary>
+        /// <remarks>Like <see cref="WriteText" />, this does not move the caret position.</remarks>
+        void WriteBytes(System.ReadOnlySpan<byte> ascii)
+        {
+            WriteText(System.Text.Encoding.ASCII.GetString(ascii));
+        }
+
+        /// <summary>
         ///     Flush any buffered output
         /// </summary>
         void Flush();

@@ -1,10 +1,13 @@
 using System;
 using System.Buffers;
+using System.Buffers.Text;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Unicode;
 using System.Threading;
 using Avalonia.Media;
 
@@ -103,48 +106,93 @@ namespace Consolonia.Core.Drawing
         {
             ArgumentNullException.ThrowIfNull(data);
 
-            int payloadLength = (data.Length + 2) / 3 * 4;
-            char[] payload = ArrayPool<char>.Shared.Rent(payloadLength);
+            byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
             try
             {
-                Convert.TryToBase64Chars(data, payload, out payloadLength);
-                return BuildChunks(imageId, pixelWidth, pixelHeight, payload.AsSpan(0, payloadLength), format,
+                int length = ComposeTransmit(sequence, imageId, pixelWidth, pixelHeight, data, format,
                     zlibCompressed);
+                return Encoding.ASCII.GetString(sequence, 0, length);
             }
             finally
             {
-                ArrayPool<char>.Shared.Return(payload);
+                ArrayPool<byte>.Shared.Return(sequence);
             }
         }
 
-        private static string BuildChunks(int imageId, int pixelWidth, int pixelHeight, ReadOnlySpan<char> payload,
-            KittyImageFormat format, bool zlibCompressed)
+        /// <summary>
+        ///     Writes the transmit sequence of <see cref="BuildTransmitSequence" /> to <paramref name="console" />
+        ///     as bytes: a payload of megabytes is never turned into text and back.
+        /// </summary>
+        public static void WriteTransmitSequence(Infrastructure.IConsoleOutput console, int imageId, int pixelWidth,
+            int pixelHeight, byte[] data, KittyImageFormat format, bool zlibCompressed = false)
         {
-            var stringBuilder = new StringBuilder(payload.Length + payload.Length / MaxChunkSize * 12 + 128);
+            ArgumentNullException.ThrowIfNull(console);
+            ArgumentNullException.ThrowIfNull(data);
+
+            byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
+            try
+            {
+                int length = ComposeTransmit(sequence, imageId, pixelWidth, pixelHeight, data, format,
+                    zlibCompressed);
+                console.WriteBytes(sequence.AsSpan(0, length));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(sequence);
+            }
+        }
+
+        /// <summary>Payload bytes per chunk: exactly <see cref="MaxChunkSize" /> base64 characters.</summary>
+        private const int RawChunkSize = MaxChunkSize / 4 * 3;
+
+        private static int MaxTransmitLength(int dataLength)
+        {
+            int chunks = (dataLength + RawChunkSize - 1) / RawChunkSize;
+            // per chunk "ESC_G" "m=1;" "ESC\", and the first chunk's header
+            return (dataLength + 2) / 3 * 4 + chunks * 16 + 96;
+        }
+
+        private static int ComposeTransmit(Span<byte> destination, int imageId, int pixelWidth, int pixelHeight,
+            ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed)
+        {
+            int position = 0;
             int offset = 0;
             bool first = true;
-            while (offset < payload.Length)
+            while (offset < data.Length)
             {
-                int chunkLength = Math.Min(MaxChunkSize, payload.Length - offset);
-                bool last = offset + chunkLength >= payload.Length;
-                stringBuilder.Append("\u001b_G");
+                int chunkLength = Math.Min(RawChunkSize, data.Length - offset);
+                bool last = offset + chunkLength >= data.Length;
+
+                "\u001b_G"u8.CopyTo(destination[position..]);
+                position += 3;
                 if (first)
                 {
-                    string header = format == KittyImageFormat.Png
-                        ? string.Create(CultureInfo.InvariantCulture, $"a=t,f=100,q=2,i={imageId},")
-                        : string.Create(CultureInfo.InvariantCulture,
-                            $"a=t,f=32,{(zlibCompressed ? "o=z," : "")}q=2,i={imageId},s={pixelWidth},v={pixelHeight},");
-                    stringBuilder.Append(header);
+                    int headerLength;
+                    bool written = format == KittyImageFormat.Png
+                        ? Utf8.TryWrite(destination[position..], CultureInfo.InvariantCulture,
+                            $"a=t,f=100,q=2,i={imageId},", out headerLength)
+                        : Utf8.TryWrite(destination[position..], CultureInfo.InvariantCulture,
+                            $"a=t,f=32,{(zlibCompressed ? "o=z," : "")}q=2,i={imageId},s={pixelWidth},v={pixelHeight},",
+                            out headerLength);
+                    Debug.Assert(written, "MaxTransmitLength leaves room for the header");
+                    position += headerLength;
                     first = false;
                 }
 
-                stringBuilder.Append(last ? "m=0;" : "m=1;")
-                    .Append(payload.Slice(offset, chunkLength))
-                    .Append("\u001b\\");
+                (last ? "m=0;"u8 : "m=1;"u8).CopyTo(destination[position..]);
+                position += 4;
+
+                // whole groups of three bytes until the last chunk, so each chunk's base64 stands alone
+                Base64.EncodeToUtf8(data.Slice(offset, chunkLength), destination[position..], out _,
+                    out int encoded);
+                position += encoded;
+
+                "\u001b\\"u8.CopyTo(destination[position..]);
+                position += 2;
                 offset += chunkLength;
             }
 
-            return stringBuilder.ToString();
+            return position;
         }
 
         public static int AllocatePlacementId()
