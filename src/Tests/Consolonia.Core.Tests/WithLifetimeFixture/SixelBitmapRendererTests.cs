@@ -186,6 +186,38 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     $"cell {x},{y}");
         }
 
+        /// <summary>
+        ///     A picture edited in place (a writeable bitmap, as a paint program draws into) is the same
+        ///     bitmap at a new version. Its rendering is refilled, not remade: untouched cells keep their
+        ///     sixels and the touched one gets a new one.
+        /// </summary>
+        [Test]
+        public void ANewVersionOfTheSameBitmapRefillsItsRendering()
+        {
+            const int cellsWide = 4;
+            const int cellsHigh = 3;
+            int cellWidth = _console.CellPixelWidth;
+            int cellHeight = _console.CellPixelHeight;
+            var size = new PixelSize(cellsWide * cellWidth, cellsHigh * cellHeight);
+            var destRect = new Rect(0, 0, cellsWide, cellsHigh);
+
+            using var bitmap = new FakeReadableBitmap(size);
+            _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect);
+            var sixels = new Sixel[cellsWide, cellsHigh];
+            for (ushort y = 0; y < cellsHigh; y++)
+            for (ushort x = 0; x < cellsWide; x++)
+                sixels[x, y] = _buffer[x, y].Foreground.Symbol.Sixel;
+
+            bitmap.Fill(new PixelRect(cellWidth + 2, 2 * cellHeight + 3, 1, 1), 255, 0, 0).Version++;
+            _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect);
+
+            for (ushort y = 0; y < cellsHigh; y++)
+            for (ushort x = 0; x < cellsWide; x++)
+                Assert.That(_buffer[x, y].Foreground.Symbol.Sixel,
+                    x == 1 && y == 2 ? Is.Not.SameAs(sixels[x, y]) : Is.SameAs(sixels[x, y]),
+                    $"cell {x},{y}");
+        }
+
         public void Dispose()
         {
             _consoleWindowImpl?.Dispose();
@@ -239,7 +271,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             public PixelSize PixelSize { get; }
 
-            public int Version => 1;
+            public int Version { get; set; } = 1;
 
             public PixelFormat? Format => PixelFormat.Bgra8888;
 

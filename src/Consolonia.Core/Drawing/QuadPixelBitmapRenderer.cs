@@ -28,7 +28,8 @@ namespace Consolonia.Core.Drawing
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
             var visible = new PixelRect((intersectedRect.X - targetRect.X) * 2, (intersectedRect.Y - targetRect.Y) * 2,
                 intersectedRect.Width * 2, intersectedRect.Height * 2);
-            byte[] bgra = GetVisiblePixels(source, renderInterface, targetSize, visible, interpolationMode);
+            byte[] bgra = GC.AllocateUninitializedArray<byte>(visible.Width * visible.Height * 4);
+            GetVisiblePixels(source, renderInterface, targetSize, visible, interpolationMode, bgra);
             int rowBytes = visible.Width * 4;
 
             bool complexEmoji = Context.ConsoleWindowImpl.Console.Capabilities

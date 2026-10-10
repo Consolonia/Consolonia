@@ -47,6 +47,13 @@ namespace Consolonia.Core.Tests
             return buffer[new Avalonia.PixelPoint(x, y)].Foreground.Symbol.Sixel;
         }
 
+        private static PixelBuffer Render(byte[] picture)
+        {
+            var cells = new PixelBuffer(CellsWide, CellsHigh);
+            SixelBitmapRenderer.RenderCells(picture, cells, CellWidth, CellHeight);
+            return cells;
+        }
+
         private static int _seed = Environment.TickCount & 0x7FFF;
 
         [Test]
@@ -54,10 +61,10 @@ namespace Consolonia.Core.Tests
         {
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
-            PixelBuffer first = SixelBitmapRenderer.RenderCells(picture, CellsWide, CellsHigh, CellWidth, CellHeight);
+            PixelBuffer first = Render(picture);
 
             FillCell(picture, 2, 1, 0x11, 0x22, 0x33);
-            PixelBuffer second = SixelBitmapRenderer.RenderCells(picture, CellsWide, CellsHigh, CellWidth, CellHeight);
+            PixelBuffer second = Render(picture);
 
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
@@ -81,25 +88,52 @@ namespace Consolonia.Core.Tests
             for (int cellX = 0; cellX < CellsWide; cellX++)
                 FillCell(canvas, cellX, cellY, (byte)seed, (byte)(seed >> 8), 0x7F);
 
-            PixelBuffer first = SixelBitmapRenderer.RenderCells(canvas, CellsWide, CellsHigh, CellWidth, CellHeight);
+            PixelBuffer first = Render(canvas);
             Sixel shared = CellAt(first, 0, 0);
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
                 Assert.That(CellAt(first, x, y), Is.SameAs(shared), $"cell {x},{y} in the first frame");
 
             FillCell(canvas, 1, 1, 0x11, 0x22, 0x33);
-            PixelBuffer second = SixelBitmapRenderer.RenderCells(canvas, CellsWide, CellsHigh, CellWidth, CellHeight);
+            PixelBuffer second = Render(canvas);
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
                 if (x != 1 || y != 1)
                     Assert.That(CellAt(second, x, y), Is.SameAs(shared), $"cell {x},{y} after the stroke");
         }
 
+        /// <summary>
+        ///     The renderer refills one cell buffer per picture on every edit rather than making a new one:
+        ///     rendering into the buffer that holds the previous frame gives exactly the cells a fresh one gets.
+        /// </summary>
+        [Test]
+        public void RenderingIntoTheBufferOfThePreviousFrameGivesTheSameCells()
+        {
+            int seed = _seed += 0x100;
+            byte[] picture = Picture(seed);
+            var reused = new PixelBuffer(CellsWide, CellsHigh);
+            SixelBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
+
+            FillCell(picture, 3, 0, 0x44, 0x55, 0x66);
+            SixelBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
+            PixelBuffer fresh = Render(picture);
+
+            for (int y = 0; y < CellsHigh; y++)
+            for (int x = 0; x < CellsWide; x++)
+                Assert.That(CellAt(reused, x, y), Is.SameAs(CellAt(fresh, x, y)), $"cell {x},{y}");
+        }
+
+        [Test]
+        public void PixelsThatAreNotExactlyTheCellsAreRefused()
+        {
+            Assert.Throws<ArgumentException>(() => SixelBitmapRenderer.RenderCells(
+                new byte[Width * CellHeight * 4], new PixelBuffer(CellsWide, CellsHigh), CellWidth, CellHeight));
+        }
+
         [Test]
         public void NewCellsShareOnePaletteSoNeighboursCanBeJoined()
         {
-            PixelBuffer buffer = SixelBitmapRenderer.RenderCells(Picture(_seed += 0x100), CellsWide, CellsHigh,
-                CellWidth, CellHeight);
+            PixelBuffer buffer = Render(Picture(_seed += 0x100));
 
             byte[] palette = CellAt(buffer, 0, 0).Palette;
             for (int y = 0; y < CellsHigh; y++)
@@ -118,7 +152,7 @@ namespace Consolonia.Core.Tests
             byte[] picture = Picture(seed);
             FillCell(picture, 1, 0, 0xFE, 0xFE, 0xFE);
 
-            PixelBuffer buffer = SixelBitmapRenderer.RenderCells(picture, CellsWide, CellsHigh, CellWidth, CellHeight);
+            PixelBuffer buffer = Render(picture);
 
             Sixel cell = CellAt(buffer, 1, 0);
             Assert.That(cell.DominantColor, Is.EqualTo(Avalonia.Media.Color.FromRgb(0xFE, 0xFE, 0xFE)));
