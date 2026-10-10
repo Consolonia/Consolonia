@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Consolonia.Fonts;
+using Consolonia.ManagedWindows;
 using Consolonia.ManagedWindows.Storage;
 
 namespace Consolonia.Gallery
@@ -34,6 +35,7 @@ namespace Consolonia.Gallery
                 // adding skia to have bitmap support
                 .UseSkia()
                 .UseConsoloniaStorage()
+                .UseManagedWindows()
                 .UseConsolonia()
                 .UseAutoDetectedConsole()
                 .WithConsoleFonts()
