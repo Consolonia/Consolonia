@@ -12,33 +12,16 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal sealed partial class KittyBitmapRenderer : IRenderTargetHook
     {
-        // classic rect placements coalesced from KittyTile cell backgrounds at z=-2, diffed across frames
-        // so only changed rectangles cross the wire; scratch collects the next frame, then the two swap
-        private Dictionary<KittyRect, int> _rectPlacements = new();
-        private Dictionary<KittyRect, int> _rectPlacementsScratch = new();
-
-        // wash placements tinting rect placements (a translucent overlay over a picture), keyed by the
-        // rect they cover and their color, diffed across frames the same way
-        private Dictionary<(KittyRect Rect, Color Wash), int> _washPlacements = new();
-        private Dictionary<(KittyRect Rect, Color Wash), int> _washPlacementsScratch = new();
-
-        // wash images live in the terminal, by color, one pixel per cell of the screen they were sent
-        // for; freed once no wash placement uses them
-        private readonly Dictionary<Color, (int ImageId, ushort Columns, ushort Rows)> _washImages = new();
-
         /// <summary>
         ///     Tile images evicted from <see cref="TileImages" /> that a placement still showed when they
         ///     were taken; each is deleted from the terminal once no placement does.
         /// </summary>
         private readonly HashSet<int> _evictedTileImages = new();
 
+        private readonly List<int> _orphanedTileImages = new();
+
         // scratch for the bookkeeping, kept between frames so it is not reallocated
         private readonly HashSet<int> _placedTileImages = new();
-        private readonly List<int> _orphanedTileImages = new();
-        private readonly HashSet<Color> _washesInUse = new();
-        private readonly List<Color> _washesToDelete = new();
-        private readonly List<(KittyRect Rect, Color Wash)> _washPlacementsToRemove = new();
-        private bool[] _rectangleVisited;
 
         /// <summary>
         ///     Placements to delete at the end of the next frame, once it has placed theirs anew: deleted
@@ -46,14 +29,24 @@ namespace Consolonia.Core.Drawing
         /// </summary>
         private readonly List<(int ImageId, int PlacementId)> _placementsToDeleteAfterFrame = new();
 
-        private readonly record struct KittyRect(
-            int ImageId,
-            ushort TileX,
-            ushort TileY,
-            ushort Width,
-            ushort Height,
-            ushort ScreenX,
-            ushort ScreenY);
+        // wash images live in the terminal, by color, one pixel per cell of the screen they were sent
+        // for; freed once no wash placement uses them
+        private readonly Dictionary<Color, (int ImageId, ushort Columns, ushort Rows)> _washImages = new();
+        private readonly List<(KittyRect Rect, Color Wash)> _washPlacementsToRemove = new();
+        private readonly HashSet<Color> _washesInUse = new();
+
+        private readonly List<Color> _washesToDelete = new();
+
+        // classic rect placements coalesced from KittyTile cell backgrounds at z=-2, diffed across frames
+        // so only changed rectangles cross the wire; scratch collects the next frame, then the two swap
+        private Dictionary<KittyRect, int> _rectPlacements = new();
+        private Dictionary<KittyRect, int> _rectPlacementsScratch = new();
+        private bool[] _rectangleVisited;
+
+        // wash placements tinting rect placements (a translucent overlay over a picture), keyed by the
+        // rect they cover and their color, diffed across frames the same way
+        private Dictionary<(KittyRect Rect, Color Wash), int> _washPlacements = new();
+        private Dictionary<(KittyRect Rect, Color Wash), int> _washPlacementsScratch = new();
 
         public void BeginFrame()
         {
@@ -302,6 +295,15 @@ namespace Consolonia.Core.Drawing
                 _washImages.Remove(wash);
             }
         }
+
+        private readonly record struct KittyRect(
+            int ImageId,
+            ushort TileX,
+            ushort TileY,
+            ushort Width,
+            ushort Height,
+            ushort ScreenX,
+            ushort ScreenY);
 
         /// <summary>Kitty tile cells continuing one image's tile grid under one wash.</summary>
         private readonly struct KittyTileCells(PixelBuffer pixelBuffer, KittyTile tile, Color wash) : IRectangleCells

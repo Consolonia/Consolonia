@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Platform;
@@ -29,16 +30,16 @@ namespace Consolonia.Benchmarks
     {
         private const int Width = SixelFrameBenchmarks.Width;
         private const int Height = SixelFrameBenchmarks.Height;
-
-        private System.IDisposable _scope = null!;
-        private ConsoloniaLifetime _lifetime = null!;
-        private ConsoleWindowImpl _window = null!;
-        private RenderTarget _renderTarget = null!;
-        private DrawingContextImpl _context = null!;
         private PinnedBitmap _bitmap = null!;
-        private PinnedBitmap _newPicture;
+        private DrawingContextImpl _context = null!;
         private Rect _destRect;
+        private ConsoloniaLifetime _lifetime = null!;
+        private PinnedBitmap _newPicture;
+        private RenderTarget _renderTarget = null!;
+
+        private IDisposable _scope = null!;
         private int _stroke;
+        private ConsoleWindowImpl _window = null!;
 
         // ReSharper disable once UnusedAutoPropertyAccessor.Global BenchmarkDotNet sets it per run
         [Params(ConsoleCapabilities.SupportsSixel, ConsoleCapabilities.SupportsKittyGraphics)]
