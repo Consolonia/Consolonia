@@ -18,26 +18,40 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
+        /// <summary>
+        ///     A background which is a slice of a kitty image (drawn by the terminal below any
+        ///     foreground glyph). <paramref name="color" /> is the wash laid over the image: transparent
+        ///     for none, and translucent overlays blended onto the cell accumulate into it.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public PixelBackground(Color color, KittyTile tile) : this(color)
+        {
+            Tile = tile;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground Shade()
         {
-            return new PixelBackground(Color.Shade());
+            // image cells never get here: Pixel.Shade tints them with a wash instead
+            return new PixelBackground(Color.Shade(), Tile);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground Brighten()
         {
-            return new PixelBackground(Color.Brighten());
+            return new PixelBackground(Color.Brighten(), Tile);
         }
 
 #pragma warning disable CA1051 // Do not declare visible instance fields
         public readonly Color Color = color;
+
+        /// <summary>The image slice this background shows, or <see cref="KittyTile.None" />.</summary>
+        [JsonIgnore] public readonly KittyTile Tile;
 #pragma warning restore CA1051 // Do not declare visible instance fields
 
         public bool Equals(PixelBackground other)
         {
-            return Color.Equals(other.Color);
+            return Color.Equals(other.Color) && Tile.Equals(other.Tile);
         }
 
         public override bool Equals([NotNullWhen(true)] object obj)
@@ -47,7 +61,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Color);
+            return HashCode.Combine(Color, Tile);
         }
 
         public static bool operator ==(PixelBackground left, PixelBackground right)

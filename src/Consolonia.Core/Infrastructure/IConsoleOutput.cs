@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 // ReSharper disable UnusedMember.Global
@@ -71,10 +72,27 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
+        ///     Write a sixel image to the console at the given position.
+        /// </summary>
+        /// <param name="position">top-left cell coordinate</param>
+        /// <param name="sixel">the sixel image to write</param>
+        void WriteSixel(PixelBufferCoordinate position, Sixel sixel);
+
+        /// <summary>
         ///     Write raw text to the console
         /// </summary>
         /// <param name="str"></param>
         void WriteText(string str);
+
+        /// <summary>
+        ///     Write raw ASCII escape sequences given as bytes, such as image payloads, which an output that
+        ///     buffers bytes takes without converting them to text and back.
+        /// </summary>
+        /// <remarks>Like <see cref="WriteText" />, this does not move the caret position.</remarks>
+        void WriteBytes(System.ReadOnlySpan<byte> ascii)
+        {
+            WriteText(System.Text.Encoding.ASCII.GetString(ascii));
+        }
 
         /// <summary>
         ///     Flush any buffered output

@@ -14,6 +14,9 @@ namespace Consolonia.Core.Text
 
         // style modifiers
         public const string Reset = "\u001b[0m";
+
+        // the terminal's own background color (SGR 49), as opposed to any explicit one
+        public const string DefaultBackground = "\u001b[49m";
         public const string Normal = "\u001b[22m";
         public const string Bold = "\u001b[1m";
         public const string Dim = "\u001b[2m";
@@ -81,6 +84,19 @@ namespace Consolonia.Core.Text
         // Query current progressive enhancement flags. A terminal supporting the
         // Kitty keyboard protocol will reply with "CSI ? <flags> u".
         public const string QueryKittyKeyboardFlags = "\u001b[?u";
+
+        // Query Primary Device Attributes (DA1). Reply: "CSI ? <class> ; <feature> ; ... c",
+        // where feature 4 means sixel graphics support.
+        public const string RequestDeviceAttributes = "\u001b[c";
+
+        // DECRQM for DEC private mode 2026. Reply: "CSI ? 2026 ; <state> $ y", where state 1, 2 or
+        // 3 means synchronized output is supported and 0 means the mode is unknown.
+        public const string RequestSynchronizedOutputMode = "\u001b[?2026$p";
+
+        // Synchronized output: the terminal withholds repainting between begin and end, so a frame
+        // parsed in chunks is applied atomically instead of tearing.
+        public const string BeginSynchronizedUpdate = "\u001b[?2026h";
+        public const string EndSynchronizedUpdate = "\u001b[?2026l";
 
         // move cursor
         public static string MoveCursorUp(int n)

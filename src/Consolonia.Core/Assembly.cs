@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Avalonia.Metadata;
 
 [assembly: InternalsVisibleTo("Consolonia.Core.Tests")]
+[assembly: InternalsVisibleTo("Consolonia.Benchmarks")]
 [assembly: InternalsVisibleTo("Consolonia.Designer")]
 [assembly: InternalsVisibleTo("Consolonia.PlatformSupport")]
 

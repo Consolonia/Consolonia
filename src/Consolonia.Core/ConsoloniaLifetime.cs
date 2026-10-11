@@ -29,6 +29,13 @@ namespace Consolonia
         public static IConsole Console => AvaloniaLocator.Current.GetRequiredService<IConsole>();
 
         /// <summary>
+        ///     How colors are written to the console. Bitmaps are drawn with kitty graphics only in
+        ///     <see cref="RgbConsoleColorMode" />, so this is part of telling which protocol draws them.
+        /// </summary>
+        public static IConsoleColorMode ConsoleColorMode =>
+            AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>();
+
+        /// <summary>
         ///     Gets the arguments passed to the AppBuilder Start method.
         /// </summary>
 #pragma warning disable CA1819 // Properties should not return arrays
@@ -168,6 +175,8 @@ namespace Consolonia
             {
                 Dispatcher.UIThread.Post(() =>
                 {
+                    // the program that had the terminal may have drawn over or cleared anything
+                    consoleWindow.NotifyTerminalContentsLost();
                     consoleWindow.Paint(new Rect(0, 0, consoleWindow.ClientSize.Width,
                         consoleWindow.ClientSize.Height));
                     MainWindow.InvalidateVisual();

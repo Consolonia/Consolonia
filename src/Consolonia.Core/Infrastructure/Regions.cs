@@ -14,68 +14,23 @@ namespace Consolonia.Core.Infrastructure
         private Snapshot(IReadOnlyList<PixelRect> rectangles)
         {
             _rectangles = rectangles;
-
-            CalculateMinMax();
         }
-
-        public ushort MinY { get; private set; }
-        public ushort MaxY { get; private set; }
-        public ushort MinX { get; private set; }
-        public ushort MaxX { get; private set; }
 
         public bool IsEmpty => _rectangles.Count == 0;
 
-        private void InitializeMinMax()
-        {
-            MinY = ushort.MaxValue;
-            MaxY = ushort.MinValue;
-            MinX = ushort.MaxValue;
-            MaxX = ushort.MinValue;
-        }
-
-        private void CalculateMinMax()
-        {
-            InitializeMinMax();
-
-            for (int i = 0; i < _rectangles.Count; i++)
-            {
-                PixelRect rect = _rectangles[i];
-                MinY = ushort.Min(MinY, (ushort)rect.Y);
-                MaxY = ushort.Max(MaxY, (ushort)rect.Bottom);
-                MinX = ushort.Min(MinX, (ushort)rect.X);
-                MaxX = ushort.Max(MaxX, (ushort)rect.Right);
-            }
-        }
-
-
         /// <summary>
-        ///     Checks if a point is contained within any rectangle.
+        ///     Marks every cell the rectangles cover (their right and bottom edges exclusive) in a row-major
+        ///     mask <paramref name="width" /> cells wide. The rectangles must lie within the mask (see
+        ///     <see cref="Intersect" />).
         /// </summary>
-        /// <param name="point">The point to check.</param>
-        /// <param name="inclusive">If true, uses inclusive containment; if false, uses exclusive containment.</param>
-        /// <returns>True if the point is contained, false otherwise.</returns>
-        public bool Contains(PixelPoint point, bool inclusive)
+        public void MarkCells(System.Span<bool> cells, int width)
         {
             for (int i = 0; i < _rectangles.Count; i++)
             {
                 PixelRect rect = _rectangles[i];
-                if (inclusive ? rect.Contains(point) : rect.ContainsExclusive(point))
-                    return true;
+                for (int y = rect.Y; y < rect.Bottom; y++)
+                    cells.Slice(y * width + rect.X, rect.Width).Fill(true);
             }
-
-            return false;
-        }
-
-        /// <summary>
-        ///     Checks if a coordinate is contained within any rectangle
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="inclusive"></param>
-        /// <returns></returns>
-        public bool Contains(ushort x, ushort y, bool inclusive)
-        {
-            return Contains(new PixelPoint(x, y), inclusive);
         }
 
         public void Intersect(int x, int y, ushort width, ushort height)
@@ -89,7 +44,6 @@ namespace Consolonia.Core.Infrastructure
             }
 
             _rectangles = result.AsReadOnly();
-            CalculateMinMax();
         }
 
         /// <summary>
