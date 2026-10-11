@@ -21,12 +21,15 @@ of the image put at a cell position. Consolonia uses it as follows:
    foreground stays free, so glyphs drawn later composite over the picture. An opaque background
    drawn over the cell evicts the tile, through `Pixel.Blend`'s opaque fast path. Diffing and
    occlusion therefore work unchanged.
-4. **Coalesce tile cells into placements.** `KittyBitmapRenderer.EmitPlacements`
-   (`KittyBitmapRenderer.Placements.cs`) runs at the end of every frame, from
-   `IRenderTargetHook.EndFrame`. It joins tile cells into maximal rectangles and creates one classic placement per
-   rectangle, at z=-2 (below text, above background colours), with `C=1` so the cursor doesn't
-   move. Each rectangle continues one image's tile grid under one wash. The image is pre-scaled to
-   the cell grid, so a placement is a 1:1 crop and needs no `c=`/`r=` stretching.
+4. **Coalesce tile cells into placements.** A placement is a terminal object below the text, not
+   the content of a cell, so writing cells shows nothing by itself. `KittyBitmapRenderer` is
+   therefore an `IRenderTargetHook` (`KittyBitmapRenderer.Placements.cs`): `EndFrame` runs
+   `EmitPlacements` once the frame's cells are written, `ResetCache` forgets the live placements,
+   and `BeginFrame` has nothing to do. `EmitPlacements` joins tile cells into maximal rectangles
+   (`CellRectangles.GrowRectangle`) and creates one classic placement per rectangle, at z=-2 (below
+   text, above background colours), with `C=1` so the cursor doesn't move. Each rectangle continues
+   one image's tile grid under one wash. The image is pre-scaled to the cell grid, so a placement
+   is a 1:1 crop and needs no `c=`/`r=` stretching.
 5. **Diff placements across frames.** Live placements are a `Dictionary<KittyRect, int>`. An
    unchanged rectangle costs nothing. A new one is placed. A vanished one is deleted by placement
    id (`a=d,d=i`), and the image stays for cheap re-placement. The pass runs every frame; a screen
@@ -78,8 +81,9 @@ is exactly the **wash** to lay over the image, for example a modal backdrop dimm
 ### Resize, resume and exit
 
 - **Resize, and resume after another program had the terminal.** `RenderTarget.ResetCache` calls
-  the hook's `ResetCache`, which moves every live placement to `_placementsToDeleteAfterFrame`. The frame places everything again from the
-  cells, and `DeleteWhatTheFrameReplaced` deletes the old placements at its end. The images stay in
+  the hook's `ResetCache`, which moves every live placement to `_placementsToDeleteAfterFrame`. The
+  frame places everything again from the cells, and `DeleteWhatTheFrameReplaced` (the end of
+  `EndFrame`) deletes the old placements at its end. The images stay in
   the terminal, because the alternate screen was never left and nothing but this app deletes by id.
   A resumed picture is placed again from tiles already there. This was the fix for a black flash on
   resume: deleting and retransmitting left the cells empty until the new images decoded.
@@ -125,8 +129,11 @@ bytes are identical (SHA-256 digests match). PNG encoding and the terminal's dec
 this measurement. Both scale with the number of tiles sent, which is what the tile cache keeps
 down.
 
-Not benchmarked: a whole kitty frame through the renderer (tiling, hashing, PNG encoding). The
-hashing and rendering reuse it shares with sixel are measured by `SixelFrameBenchmarks`.
+A whole kitty frame (drawing into the pixel buffer, the placement scan, `RenderToDevice`, on the
+unit test console) is `BitmapFrameBenchmarks`: about 5.8 ms for a full-screen picture redrawn
+unchanged, 8.3 ms for a brush stroke, 10.9 ms for a new picture, PNG encoding included. The table
+is in [bitmap.md](bitmap.md#benchmarks). The placement scan runs every frame and is not visible in
+those numbers at 240×67 cells.
 
 ## Tests
 

@@ -112,6 +112,12 @@ Before, the rendered bytes were widened to a string, appended to a `StringBuilde
 encoded back to UTF-8 by the `StreamWriter`. Now they are one copy into the frame and one write.
 The output bytes are identical (SHA-256 digests match).
 
+**Cost of not joining cells** (same benchmark, 2026-10-11). A full-screen sixel appends in 36 µs; a
+one-cell sixel in 280 ns, so the 16,080 cells of a new full-screen picture append in about 4.5 ms,
+once each, with their bytes cached on the instance. That is the whole CPU cost of writing cells one
+by one instead of joined, against the ~110 ms such a picture takes to quantise, and a brush stroke
+writes one cell either way. What this cannot measure is the terminal's own cost per sequence.
+
 ## Block glyphs: removed
 
 Block element glyphs used to be painted into the cell's pixels (`Sixel.DrawBlockGlyph`), so a

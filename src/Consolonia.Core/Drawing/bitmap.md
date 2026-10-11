@@ -9,7 +9,7 @@ pixels. Each renderer has its own notes: [kittybitmap.md](kittybitmap.md),
 ```
 Avalonia Image / DrawingContext.DrawImage
   └─ DrawingContextImpl.DrawBitmap                     (DrawingContextImpl.Bitmaps.cs)
-       └─ BitmapRenderer.Draw                          (one renderer per drawing context)
+       └─ BitmapRenderer.Draw                          (one renderer per terminal, owned by RenderTarget)
             ├─ KittyBitmapRenderer   ─┐
             ├─ SixelBitmapRenderer   ─┤ CellBitmapRenderer<TRendering>: one CellRendering per picture and size
             └─ QuadPixelBitmapRenderer  (no rendering kept: blends quad glyphs straight into the buffer)
@@ -27,8 +27,9 @@ Avalonia Image / DrawingContext.DrawImage
 ```
 
 Pictures are drawn into the same `PixelBuffer` as text. This means layering, occlusion, dirty
-tracking and diffing work for pictures as they do for text. Only the last step, turning cells into
-escape sequences, knows about image protocols.
+tracking and diffing work for pictures as they do for text. Only the last step knows about image
+protocols: `AnsiConsoleOutput` turns an image cell into its escape sequence, and the kitty renderer
+places its images once per frame through `IRenderTargetHook`. `RenderTarget` itself names neither.
 
 ## Choosing a renderer
 
@@ -241,6 +242,27 @@ and after the byte frame:
 The output bytes are identical before and after in all five scenarios. The text path costs the
 same because the ASCII fast path matches the old buffered writer. A full-screen kitty transmit
 still allocates about 64 B per tile, from a source not yet identified.
+
+**Whole frame per protocol** (`BitmapFrameBenchmarks`, default job, unit test console, measured
+2026-10-11, noise about ±5 ms between runs). Three states of `RenderTarget`: the image renderers
+comparing each cell with the buffer and marking only changed runs dirty; copying like every other
+drawing (blend, one dirty rectangle); and the frame work moved into `IRenderTargetHook`, with the
+sixel join gone and kitty scanning for placements every frame.
+
+| Frame | Per-cell compare in the renderer | Blend + one dirty rect | Hooks |
+|---|---|---|---|
+| Sixel, redrawn unchanged | 1.1 ms | 3.6 ms | 4.0 ms |
+| Sixel, brush stroke | 12.0 ms | 9.4 ms | 10.0 ms |
+| Sixel, new picture | — | — | 111 ms |
+| Kitty, redrawn unchanged | 1.6 ms | 5.6 ms | 5.8 ms |
+| Kitty, brush stroke | 9.0 ms | 8.7 ms | 8.3 ms |
+| Kitty, new picture | — | — | 10.9 ms |
+
+The unchanged redraw got slower when the renderers stopped comparing cells themselves: every
+dirty cell now goes through the render target's compare with its `_cache`, as every other drawing
+does. That compare (a 72-byte `Pixel` by value, a nullable cache) is the general cost to bring down
+next. Brush strokes are unchanged. A new sixel picture is quantising, not output. The kitty
+placement scan on every frame costs nothing measurable at this screen size.
 
 ## Tests
 
