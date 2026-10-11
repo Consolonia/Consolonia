@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -71,7 +72,7 @@ namespace Consolonia.Core.Tests
 
         private static ContentKey Key(int value)
         {
-            return ContentKey.Of(System.BitConverter.GetBytes(value), 1, 1);
+            return ContentKey.Of(BitConverter.GetBytes(value), 1, 1);
         }
     }
 }

@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using System.Threading.Tasks;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
@@ -89,9 +91,9 @@ namespace Consolonia.Core.Infrastructure
         ///     buffers bytes takes without converting them to text and back.
         /// </summary>
         /// <remarks>Like <see cref="WriteText" />, this does not move the caret position.</remarks>
-        void WriteBytes(System.ReadOnlySpan<byte> ascii)
+        void WriteBytes(ReadOnlySpan<byte> ascii)
         {
-            WriteText(System.Text.Encoding.ASCII.GetString(ascii));
+            WriteText(Encoding.ASCII.GetString(ascii));
         }
 
         /// <summary>

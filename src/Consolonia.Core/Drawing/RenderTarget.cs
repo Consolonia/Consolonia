@@ -1,7 +1,7 @@
 #nullable enable
 using System;
-using System.Diagnostics;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -794,7 +794,7 @@ namespace Consolonia.Core.Drawing
                 while (rowWidth < width && !visited[rowStart + rowWidth] && cells.Joins(x, y, rowWidth, height))
                     rowWidth++;
 
-                if (rowWidth == 0 || (rowWidth < width && !narrowToShortRows))
+                if (rowWidth == 0 || rowWidth < width && !narrowToShortRows)
                     break;
                 width = rowWidth;
                 height++;

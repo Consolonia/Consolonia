@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.IO.Hashing;
+using System.Runtime.InteropServices;
 
 namespace Consolonia.Core.Drawing
 {
@@ -29,10 +29,10 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal sealed class ContentCache<T>
     {
-        private readonly Action<T> _evicted;
-        private long _budget;
         private readonly Dictionary<ContentKey, LinkedListNode<Entry>> _entries = new();
+        private readonly Action<T> _evicted;
         private readonly LinkedList<Entry> _recency = new();
+        private long _budget;
         private long _cost;
 
         /// <param name="budget">Total cost to hold before the least recently used are dropped.</param>

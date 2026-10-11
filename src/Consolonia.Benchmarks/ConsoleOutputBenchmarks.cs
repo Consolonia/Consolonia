@@ -32,12 +32,12 @@ namespace Consolonia.Benchmarks
         private const int Height = CellsHigh * CellHeight;
         private const int Tiles = 510;
         private const int TileBytes = 8 * 1024;
+        private Sixel _cellSixel = null!;
+        private TextWriter _originalOut = null!;
 
         private AnsiConsoleOutput _output = null!;
-        private TextWriter _originalOut = null!;
-        private Pixel[] _text = null!;
         private Sixel _screenSixel = null!;
-        private Sixel _cellSixel = null!;
+        private Pixel[] _text = null!;
         private byte[][] _tiles = null!;
 
         [GlobalSetup]
@@ -55,8 +55,8 @@ namespace Consolonia.Benchmarks
             for (int i = 0; i < _text.Length; i++)
             {
                 int run = i / 8;
-                var foreground = Color.FromRgb((byte)(run * 37), (byte)(run * 11), 200);
-                var background = Color.FromRgb(20, (byte)(run * 5), (byte)(run * 3));
+                Color foreground = Color.FromRgb((byte)(run * 37), (byte)(run * 11), 200);
+                Color background = Color.FromRgb(20, (byte)(run * 5), (byte)(run * 3));
                 _text[i] = new Pixel(new PixelForeground(new Symbol((char)('A' + i % 26)), foreground),
                     new PixelBackground(background));
             }
@@ -100,7 +100,7 @@ namespace Consolonia.Benchmarks
             for (int x = 0; x < width; x++)
             {
                 int offset = (y * width + x) * 4;
-                int noise = (int)((uint)(x * 73856093 ^ y * 19349663) >> 13) & 7;
+                int noise = (int)((uint)((x * 73856093) ^ (y * 19349663)) >> 13) & 7;
                 bgrx[offset] = (byte)(x * 255 / width + noise);
                 bgrx[offset + 1] = (byte)(y * 255 / height + noise);
                 bgrx[offset + 2] = (byte)((x + y) * 255 / (width + height) + noise);

@@ -149,7 +149,8 @@ namespace Consolonia.Core.Drawing
             byte[] window)
         {
             if (frame.Format.BitsPerPixel != 32)
-                throw new NotSupportedException($"Bitmaps with {frame.Format.BitsPerPixel} bits per pixel are not supported.");
+                throw new NotSupportedException(
+                    $"Bitmaps with {frame.Format.BitsPerPixel} bits per pixel are not supported.");
 
             ReadOnlySpan<byte> pixels = MemoryMarshal.CreateReadOnlySpan(
                 ref Unsafe.AsRef<byte>((void*)frame.Address), frame.RowBytes * frame.Size.Height);

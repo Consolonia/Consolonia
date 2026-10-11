@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;

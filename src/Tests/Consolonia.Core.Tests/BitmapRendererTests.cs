@@ -30,9 +30,12 @@ namespace Consolonia.Core.Tests
 
             byte[] expected = new byte[visible.Width * visible.Height * 4];
             using (ILockedFramebuffer frame = bitmap.Lock())
+            {
                 for (int row = 0; row < visible.Height; row++)
                     Marshal.Copy(frame.Address + (visible.Y + row) * frame.RowBytes + visible.X * 4, expected,
                         row * visible.Width * 4, visible.Width * 4);
+            }
+
             Assert.That(pixels, Is.EqualTo(expected));
         }
     }

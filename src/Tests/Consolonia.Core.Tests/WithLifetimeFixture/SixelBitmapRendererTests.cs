@@ -255,22 +255,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             private int RowBytes { get; }
 
-            /// <summary>Paints <paramref name="area" /> one opaque color.</summary>
-            public FakeReadableBitmap Fill(PixelRect area, byte blue, byte green, byte red)
-            {
-                for (int y = area.Y; y < area.Bottom; y++)
-                for (int x = area.X; x < area.Right; x++)
-                {
-                    int offset = y * RowBytes + x * 4;
-                    _pixels[offset] = blue;
-                    _pixels[offset + 1] = green;
-                    _pixels[offset + 2] = red;
-                    _pixels[offset + 3] = 255;
-                }
-
-                return this;
-            }
-
             public Vector Dpi => new(96, 96);
 
             public PixelSize PixelSize { get; }
@@ -298,6 +282,22 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             public void Save(Stream stream, int? quality = null)
             {
                 throw new NotSupportedException();
+            }
+
+            /// <summary>Paints <paramref name="area" /> one opaque color.</summary>
+            public FakeReadableBitmap Fill(PixelRect area, byte blue, byte green, byte red)
+            {
+                for (int y = area.Y; y < area.Bottom; y++)
+                for (int x = area.X; x < area.Right; x++)
+                {
+                    int offset = y * RowBytes + x * 4;
+                    _pixels[offset] = blue;
+                    _pixels[offset + 1] = green;
+                    _pixels[offset + 2] = red;
+                    _pixels[offset + 3] = 255;
+                }
+
+                return this;
             }
         }
 

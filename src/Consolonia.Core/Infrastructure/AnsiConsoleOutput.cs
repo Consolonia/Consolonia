@@ -24,6 +24,14 @@ namespace Consolonia.Core.Infrastructure
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
 
+        /// <summary>
+        ///     A frame buffer grown past this (a full-screen kitty picture is megabytes) goes back to the pool
+        ///     after it is written, rather than staying the size of the largest frame ever sent.
+        /// </summary>
+        private const int KeptFrameBytes = 1024 * 1024;
+
+        private const int InitialFrameBytes = 64 * 1024;
+
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
@@ -40,13 +48,10 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>Room left at the start of the frame for <see cref="BeginSynchronizedUpdate" />.</summary>
         private static readonly int FramePrefix = BeginSynchronizedUpdate.Length;
 
-        /// <summary>
-        ///     A frame buffer grown past this (a full-screen kitty picture is megabytes) goes back to the pool
-        ///     after it is written, rather than staying the size of the largest frame ever sent.
-        /// </summary>
-        private const int KeptFrameBytes = 1024 * 1024;
+        private readonly Encoder _encoder = Utf8NoBom.GetEncoder();
 
-        private const int InitialFrameBytes = 64 * 1024;
+        /// <summary>Whether the encoder holds a high surrogate waiting for the low one in the next text.</summary>
+        private bool _encoderPending;
 
         /// <summary>
         ///     The frame being built, as the UTF-8 bytes the terminal receives, after
@@ -57,18 +62,11 @@ namespace Consolonia.Core.Infrastructure
 
         private int _frameLength = FramePrefix;
 
-        private readonly Encoder _encoder = Utf8NoBom.GetEncoder();
-
-        /// <summary>Whether the encoder holds a high surrogate waiting for the low one in the next text.</summary>
-        private bool _encoderPending;
-
-        /// <summary>The stream frames are written to as bytes, while Console.Out is still the writer over it.</summary>
-        private Stream _stream;
+        private PixelBufferCoordinate _headBufferPoint;
 
         /// <summary>Console.Out as installed over <see cref="_stream" />: anything else means it was redirected.</summary>
         private TextWriter _installedOut;
 
-        private PixelBufferCoordinate _headBufferPoint;
         private Color _lastBackground = Colors.Transparent;
         private bool _lastBackgroundIsDefault;
         private Color _lastForeground = Colors.Transparent;
@@ -78,6 +76,9 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
         private TextWriter _originalOut;
+
+        /// <summary>The stream frames are written to as bytes, while Console.Out is still the writer over it.</summary>
+        private Stream _stream;
 
         internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
 

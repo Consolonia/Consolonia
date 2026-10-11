@@ -1,5 +1,7 @@
 using System;
 using System.Text;
+using Avalonia;
+using Avalonia.Media;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
@@ -44,7 +46,7 @@ namespace Consolonia.Core.Tests
 
         private static Sixel CellAt(PixelBuffer buffer, int x, int y)
         {
-            return buffer[new Avalonia.PixelPoint(x, y)].Foreground.Symbol.Sixel;
+            return buffer[new PixelPoint(x, y)].Foreground.Symbol.Sixel;
         }
 
         private static PixelBuffer Render(byte[] picture)
@@ -155,7 +157,7 @@ namespace Consolonia.Core.Tests
             PixelBuffer buffer = Render(picture);
 
             Sixel cell = CellAt(buffer, 1, 0);
-            Assert.That(cell.DominantColor, Is.EqualTo(Avalonia.Media.Color.FromRgb(0xFE, 0xFE, 0xFE)));
+            Assert.That(cell.DominantColor, Is.EqualTo(Color.FromRgb(0xFE, 0xFE, 0xFE)));
         }
 
         /// <summary>

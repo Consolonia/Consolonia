@@ -62,7 +62,7 @@ namespace Consolonia.Core.Drawing
                 Color foreground = pattern == 0b0000
                     ? BgraColor.Transparent.ToColor()
                     : CombineQuadrants(quadPixelColors, pattern).ToColor();
-                Color background = CombineQuadrants(quadPixelColors,
+                var background = CombineQuadrants(quadPixelColors,
                     pattern == 0b1111 ? (byte)0b1111 : (byte)(~pattern & 0b1111)).ToColor();
 
                 var imagePixel = new Pixel(

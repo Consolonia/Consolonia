@@ -16,10 +16,10 @@ namespace Consolonia.Benchmarks
         private const int CellWidth = 8;
         private const int CellHeight = 16;
         private byte[] _bitmap = null!;
-        private byte[] _photoCell = null!;
-        private byte[] _flatCell = null!;
-        private Sixel _sixel = null!;
         private Sixel _cellSixel = null!;
+        private byte[] _flatCell = null!;
+        private byte[] _photoCell = null!;
+        private Sixel _sixel = null!;
 
         [GlobalSetup]
         public void Setup()

@@ -13,15 +13,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
     [TestFixture]
     public sealed class KittyBitmapRendererTests : IDisposable
     {
-        private const int TileColumns = KittyBitmapRenderer.TileColumns;
-        private const int TileRows = KittyBitmapRenderer.TileRows;
-
-        private UnitTestConsole _console;
-        private ConsoleCapabilities _originalCapabilities;
-        private ConsoleWindowImpl _consoleWindowImpl;
-        private PixelBuffer _buffer;
-        private DrawingContextImpl _dc;
-
         [SetUp]
         public void Setup()
         {
@@ -41,6 +32,15 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _consoleWindowImpl?.Dispose();
             _consoleWindowImpl = null;
         }
+
+        private const int TileColumns = KittyBitmapRenderer.TileColumns;
+        private const int TileRows = KittyBitmapRenderer.TileRows;
+
+        private UnitTestConsole _console;
+        private ConsoleCapabilities _originalCapabilities;
+        private ConsoleWindowImpl _consoleWindowImpl;
+        private PixelBuffer _buffer;
+        private DrawingContextImpl _dc;
 
         public void Dispose()
         {
@@ -74,7 +74,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(ImageAt(TileColumns, 0), Is.Not.EqualTo(ImageAt(0, 0)), "next tile across");
             Assert.That(ImageAt(0, TileRows), Is.Not.EqualTo(ImageAt(0, 0)), "next tile down");
 
-            KittyTile tile = _buffer[(ushort)(TileColumns + 1), (ushort)(TileRows + 1)].Background.Tile;
+            KittyTile tile = _buffer[TileColumns + 1, TileRows + 1].Background.Tile;
             Assert.That((tile.X, tile.Y), Is.EqualTo((1, 1)), "cells are placed within their tile");
         }
 
@@ -141,7 +141,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private int[,] Images(Rect dest)
         {
-            var images = new int[(int)dest.Width, (int)dest.Height];
+            int[,] images = new int[(int)dest.Width, (int)dest.Height];
             for (int y = 0; y < (int)dest.Height; y++)
             for (int x = 0; x < (int)dest.Width; x++)
                 images[x, y] = ImageAt(x, y);

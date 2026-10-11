@@ -42,6 +42,11 @@ namespace Consolonia.Core.Drawing
             _bitmapRenderer.Draw(source, _renderInterface, targetRect, intersectedRect, GetBitmapInterpolationMode());
         }
 
+        public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
         ///     The interpolation the innermost render options ask for (RenderOptions.BitmapInterpolationMode, so
         ///     an Image can keep its pixels hard-edged when enlarged), or medium quality when none do.
@@ -53,11 +58,6 @@ namespace Consolonia.Core.Drawing
                     return renderOptions.BitmapInterpolationMode;
 
             return BitmapInterpolationMode.MediumQuality;
-        }
-
-        public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
-        {
-            throw new NotImplementedException();
         }
 
         /// <summary>

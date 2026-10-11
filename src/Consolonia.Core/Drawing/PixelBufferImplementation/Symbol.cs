@@ -158,8 +158,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                    // without this the pixel buffer diff would keep a stale image when a new one lands on
                    // the same cells), or equal text
                    (ReferenceEquals(_reference, other._reference) ||
-                    (_reference is string text && other._reference is string otherText &&
-                     string.Equals(text, otherText, StringComparison.Ordinal)));
+                    _reference is string text && other._reference is string otherText &&
+                    string.Equals(text, otherText, StringComparison.Ordinal));
         }
 
 

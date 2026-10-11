@@ -713,11 +713,10 @@ namespace Consolonia.Core.Drawing
         private static T[] RentOrGrow<T>(ref T[] buf, int minSize)
         {
             const int keepAtMost = 4 * 1024 * 1024;
-            if (buf == null || buf.Length < minSize || (buf.Length > keepAtMost && minSize <= keepAtMost / 4))
+            if (buf == null || buf.Length < minSize || buf.Length > keepAtMost && minSize <= keepAtMost / 4)
                 buf = GC.AllocateUninitializedArray<T>(Math.Max(minSize, 4096));
             return buf;
         }
-
 
         #endregion
     }

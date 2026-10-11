@@ -18,10 +18,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
     [TestFixture]
     public sealed class RenderTargetTests : IDisposable
     {
-        private UnitTestConsole _console;
-        private ConsoleWindowImpl _consoleWindowImpl;
-        private RenderTarget _renderTarget;
-
         [SetUp]
         public void Setup()
         {
@@ -35,6 +31,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             Dispose();
         }
+
+        private UnitTestConsole _console;
+        private ConsoleWindowImpl _consoleWindowImpl;
+        private RenderTarget _renderTarget;
 
         public void Dispose()
         {

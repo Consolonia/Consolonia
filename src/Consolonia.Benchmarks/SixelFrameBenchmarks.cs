@@ -33,11 +33,11 @@ namespace Consolonia.Benchmarks
         private const int CellsHigh = 67;
         private const int Width = CellsWide * CellWidth;
         private const int Height = CellsHigh * CellHeight;
+        private PinnedBitmap _bitmap = null!;
+        private PixelBuffer _cells = null!;
 
         private byte[] _frame = null!;
         private byte[] _newFrame = null!;
-        private PixelBuffer _cells = null!;
-        private PinnedBitmap _bitmap = null!;
         private int _stroke;
 
         [GlobalSetup]
@@ -58,7 +58,7 @@ namespace Consolonia.Benchmarks
             {
                 int offset = (y * Width + x) * 4;
                 // a hash of the position: fine noise that is the same picture for the same seed
-                int noise = (int)((uint)(x * 73856093 ^ y * 19349663 ^ seed * 83492791) >> 13) & 7;
+                int noise = (int)((uint)((x * 73856093) ^ (y * 19349663) ^ (seed * 83492791)) >> 13) & 7;
                 bgrx[offset] = (byte)((x * 255 / Width + noise + seed) & 0xFF);
                 bgrx[offset + 1] = (byte)((y * 255 / Height + noise) & 0xFF);
                 bgrx[offset + 2] = (byte)(((x + y) * 255 / (Width + Height) + noise) & 0xFF);
@@ -145,11 +145,6 @@ namespace Consolonia.Benchmarks
                 bgra.CopyTo(_pixels, 0);
             }
 
-            public void Stroke(int stroke)
-            {
-                SixelFrameBenchmarks.Stroke(_pixels, stroke);
-            }
-
             public Vector Dpi => new(96, 96);
 
             public PixelSize PixelSize => new(Width, Height);
@@ -177,6 +172,11 @@ namespace Consolonia.Benchmarks
             public void Save(Stream stream, int? quality = null)
             {
                 throw new NotSupportedException();
+            }
+
+            public void Stroke(int stroke)
+            {
+                SixelFrameBenchmarks.Stroke(_pixels, stroke);
             }
         }
 

@@ -5,7 +5,6 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -56,8 +55,16 @@ namespace Consolonia.Core.Drawing
         private static readonly ContentCache<int> TileImages =
             new(MinTileImageBudgetBytes, imageId => EvictedTileImages.Enqueue(imageId));
 
+        public KittyBitmapRenderer(DrawingContextImpl context)
+            : base(context)
+        {
+        }
+
         /// <summary>Whether tile images have been evicted that RenderTarget has not taken yet.</summary>
         internal static bool HasEvictedImages => !EvictedTileImages.IsEmpty;
+
+        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRendering>>>
+            Renderings => RenderedBitmapCache;
 
         /// <summary>
         ///     Takes the next image id evicted from the tile cache. No rendering will place it again, so
@@ -67,14 +74,6 @@ namespace Consolonia.Core.Drawing
         {
             return EvictedTileImages.TryDequeue(out imageId);
         }
-
-        public KittyBitmapRenderer(DrawingContextImpl context)
-            : base(context)
-        {
-        }
-
-        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRendering>>>
-            Renderings => RenderedBitmapCache;
 
         /// <summary>
         ///     A rendering is reused only while every tile image it shows is still in the terminal; using one

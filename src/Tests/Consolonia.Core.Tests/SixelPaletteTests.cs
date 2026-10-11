@@ -58,7 +58,7 @@ namespace Consolonia.Core.Tests
                 twoColors[i + 3] = 0xFF;
             }
 
-            Sixel exact = Sixel.CreateFromBitmap(twoColors, Width, Height, Width, Height);
+            var exact = Sixel.CreateFromBitmap(twoColors, Width, Height, Width, Height);
             Assert.That(exact.PaletteCount, Is.EqualTo(2));
             Assert.That(exact.Pixels[0], Is.Not.EqualTo(exact.Pixels[1]));
 
@@ -66,12 +66,12 @@ namespace Consolonia.Core.Tests
             for (int i = 0; i < manyColors.Length; i += 4)
             {
                 manyColors[i] = (byte)(i / 4);
-                manyColors[i + 1] = (byte)(i / 4 >> 6);
-                manyColors[i + 2] = (byte)(i / 4 >> 3);
+                manyColors[i + 1] = (byte)((i / 4) >> 6);
+                manyColors[i + 2] = (byte)((i / 4) >> 3);
                 manyColors[i + 3] = 0xFF;
             }
 
-            Sixel quantized = Sixel.CreateFromBitmap(manyColors, 64, 64, Width, Height);
+            var quantized = Sixel.CreateFromBitmap(manyColors, 64, 64, Width, Height);
             Assert.That(quantized.PaletteCount, Is.InRange(2, 256));
         }
     }

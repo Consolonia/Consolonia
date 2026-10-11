@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Unicode;
 using System.Threading;
 using Avalonia.Media;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -57,6 +58,9 @@ namespace Consolonia.Core.Drawing
         ///     backdrop over a picture), above the image and still below text.
         /// </summary>
         public const int WashPlacementZIndex = -1;
+
+        /// <summary>Payload bytes per chunk: exactly <see cref="MaxChunkSize" /> base64 characters.</summary>
+        private const int RawChunkSize = MaxChunkSize / 4 * 3;
 
         // Kept in the range 1..int.MaxValue (0 is not a valid id; the protocol allows 32 bits). The wider
         // the range, the longer before a wrapped id lands on an image still shown: re-transmitting an id
@@ -123,7 +127,7 @@ namespace Consolonia.Core.Drawing
         ///     Writes the transmit sequence of <see cref="BuildTransmitSequence" /> to <paramref name="console" />
         ///     as bytes: a payload of megabytes is never turned into text and back.
         /// </summary>
-        public static void WriteTransmitSequence(Infrastructure.IConsoleOutput console, int imageId, int pixelWidth,
+        public static void WriteTransmitSequence(IConsoleOutput console, int imageId, int pixelWidth,
             int pixelHeight, byte[] data, KittyImageFormat format, bool zlibCompressed = false)
         {
             ArgumentNullException.ThrowIfNull(console);
@@ -141,9 +145,6 @@ namespace Consolonia.Core.Drawing
                 ArrayPool<byte>.Shared.Return(sequence);
             }
         }
-
-        /// <summary>Payload bytes per chunk: exactly <see cref="MaxChunkSize" /> base64 characters.</summary>
-        private const int RawChunkSize = MaxChunkSize / 4 * 3;
 
         private static int MaxTransmitLength(int dataLength)
         {
