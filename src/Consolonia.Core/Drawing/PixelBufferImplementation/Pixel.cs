@@ -193,6 +193,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             PixelForeground newForeground;
             CaretStyle newCaretStyle;
 
+            // An image cell (a sixel, or a kitty tile) takes the cell whole: its colors are in the image,
+            // and its own colors are transparent, which would otherwise read as nothing drawn on top
+            if (pixelAbove.IsImage())
+                return pixelAbove;
+
             Color aboveBgColor = pixelAbove.Background.Color;
             byte aboveBgA = aboveBgColor.A;
 

@@ -306,9 +306,13 @@ namespace Consolonia.Core.Drawing
                     if (!dirty[y * pixelBuffer.Width + x])
                         continue;
 
-                    // Placements change only where a cell shows a kitty tile or showed one, and every
-                    // change to the pixel buffer marks its cells dirty, so clean cells never need a look.
-                    if (!pixel.Background.Tile.IsEmpty || _cache[x, y]?.Background.Tile.IsEmpty == false)
+                    // Placements change only where a cell shows a kitty tile or showed one, and only when
+                    // its tile or wash (the background) differs from what was last placed. Every change to
+                    // the pixel buffer marks its cells dirty, so clean cells never need a look; a dirty
+                    // cell drawn again as it was (a picture redrawn) needs no placements.
+                    if (!kittyCellsChanged &&
+                        (!pixel.Background.Tile.IsEmpty || _cache[x, y]?.Background.Tile.IsEmpty == false) &&
+                        !pixel.Background.Equals(_cache[x, y]?.Background ?? PixelBackground.Transparent))
                         kittyCellsChanged = true;
 
                     Sixel? cellSixel = pixel.Foreground.Symbol.Sixel;

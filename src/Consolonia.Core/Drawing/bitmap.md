@@ -92,9 +92,10 @@ renderers.
   version.
 - **Reuse check.** `IsReusable` lets a renderer refuse a rendering that would otherwise be reused.
   Kitty uses it to redo a rendering when one of its tile images has been evicted.
-- **Only changed cells are copied.** `CopyRenderedBitmapTrackingDirtyRegions` compares each rendered
-  cell with the pixel buffer and marks dirty only cells that changed, in horizontal runs. A redraw
-  that changes nothing marks nothing.
+- **Copied like any drawing.** `CopyRenderedBitmap` blends each rendered cell into the pixel buffer
+  (`Pixel.Blend` lets an image cell take the cell) and marks the whole drawn rectangle dirty. The
+  render target then skips every dirty cell that matches what it last wrote, so a redraw that
+  changes nothing writes nothing to the terminal.
 
 The quad-pixel renderer has no rendering to keep. It scales just the intersected cells at two
 pixels per cell each way and blends a glyph per cell straight into the buffer.

@@ -176,52 +176,27 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Copies the visible part of a rendered per-cell bitmap into the pixel buffer,
-        ///     tracking only the cells that actually changed as dirty (in horizontal runs).
+        ///     Blends the visible part of a rendered per-cell bitmap into the pixel buffer and marks it
+        ///     dirty, as every drawing operation does. Cells that did not change are not written to the
+        ///     terminal again: the render target compares each dirty cell with what it last wrote.
         /// </summary>
         /// <param name="renderedBitmap">The rendering, one cell per cell.</param>
         /// <param name="intersectedRect">The cells of the pixel buffer to fill.</param>
         /// <param name="renderedOrigin">
         ///     The cell of the rendering that goes to the top-left cell of <paramref name="intersectedRect" />.
         /// </param>
-        protected void CopyRenderedBitmapTrackingDirtyRegions(PixelBuffer renderedBitmap,
+        protected void CopyRenderedBitmap(PixelBuffer renderedBitmap,
             PixelRect intersectedRect, PixelPoint renderedOrigin)
         {
             for (int y = 0; y < intersectedRect.Height; y++)
+            for (int x = 0; x < intersectedRect.Width; x++)
             {
-                int dirtyRunStart = -1;
-                for (int x = 0; x < intersectedRect.Width; x++)
-                {
-                    var sourcePoint = new PixelPoint(renderedOrigin.X + x, renderedOrigin.Y + y);
-                    var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
-                    Pixel newPixel = renderedBitmap[sourcePoint];
-                    if (Context.PixelBuffer[destPoint] == newPixel)
-                    {
-                        if (dirtyRunStart >= 0)
-                        {
-                            Context.ConsoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
-                                intersectedRect.X + dirtyRunStart,
-                                intersectedRect.Y + y,
-                                x - dirtyRunStart,
-                                1));
-                            dirtyRunStart = -1;
-                        }
-
-                        continue;
-                    }
-
-                    Context.PixelBuffer[destPoint] = newPixel;
-                    if (dirtyRunStart < 0)
-                        dirtyRunStart = x;
-                }
-
-                if (dirtyRunStart >= 0)
-                    Context.ConsoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
-                        intersectedRect.X + dirtyRunStart,
-                        intersectedRect.Y + y,
-                        intersectedRect.Width - dirtyRunStart,
-                        1));
+                var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
+                Context.PixelBuffer[destPoint] = Context.PixelBuffer[destPoint]
+                    .Blend(renderedBitmap[new PixelPoint(renderedOrigin.X + x, renderedOrigin.Y + y)]);
             }
+
+            Context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
 
         /// <summary>
@@ -298,7 +273,7 @@ namespace Consolonia.Core.Drawing
                 rendering.Complete(bitmap.Version);
             }
 
-            CopyRenderedBitmapTrackingDirtyRegions(rendering.Cells, intersectedRect,
+            CopyRenderedBitmap(rendering.Cells, intersectedRect,
                 IntersectedRectInRendering(targetRect, visibleCells, intersectedRect).Position);
         }
 
