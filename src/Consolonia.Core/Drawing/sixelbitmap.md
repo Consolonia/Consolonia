@@ -1,6 +1,6 @@
 # Sixel: per-cell images, how text and images share the screen
 
-Architecture notes for `SixelBitmapRenderer`, `Sixel` and the sixel pass of `RenderTarget`. The
+Architecture notes for `SixelBitmapRenderer`, `Sixel` and how sixel cells reach the terminal. The
 pipeline shared with the other renderers is in [bitmap.md](bitmap.md). The later sections are
 design notes from 2026-10-09 on compositing text over sixel images.
 
@@ -19,8 +19,7 @@ before anything reaches the terminal.
    that cell is not dirty and is not sent again. A brush stroke rewrites only the cells it touched.
 3. **Quantise only the new cells, together.** The cells not in the cache are grouped by distinct
    content. A flat canvas is one block repeated, and every cell showing it must get the same sixel.
-   They are then quantised in one go, so they share one palette, which lets the sixel pass join
-   neighbours into one image:
+   They are then quantised in one go, so they share one palette:
    - **Every cell new** (a new picture, a scroll): the visible image is quantised as it is, and each
      block's indices are sliced from its first cell's rows.
    - **Some cells new**: the distinct blocks are copied side by side and quantised as one image.
@@ -40,19 +39,21 @@ before anything reaches the terminal.
      8), so a dimmed cell is the same instance every frame and is sent once.
    - Block element glyphs (`▀`–`▐`, `▔`–`▟`: window edges, shadows) are ordinary glyphs and take a
      text cell too. See "Block glyphs: removed" below.
-6. **The sixel pass** (`RenderTarget.RenderSixelRegions`). This is pass 1, before text:
-   - **What is written.** A cell is written when it holds a sixel, is dirty, isn't the instance the
-     terminal already shows (`_cache`), and isn't under the mouse cursor (`SixelToWrite`). A mouse
-     move or a neighbour repainting marks cells dirty without changing them, and those send nothing.
-   - **Joining cells.** Cells to write that share a palette instance are grown into maximal
-     rectangles. Each rectangle is `BitBlt`ted into one combined sixel and written with a single
-     escape sequence. The combined sixel is `IsTransient`: its bytes come from a per-thread scratch
-     buffer and are not kept, and its pixel array is reused across frames.
-   - **Cursor moves.** `AnsiConsoleOutput.WriteSixel` always moves the cursor explicitly first.
-     After a glyph in the last column, the terminal's cursor still sits on the old row with a
-     pending wrap, and a sixel would otherwise land a row up.
-7. **The text pass** (pass 2) skips sixel cells. The one exception is the cell under the mouse
-   cursor: the cursor is text, so it is drawn on the sixel's dominant colour.
+6. **Writing sixel cells.** A sixel cell is a cell like any other to `RenderTarget`: it is written
+   when it is dirty and differs from what the terminal shows (`_cache`; `Symbol` compares sixels by
+   reference, so a mouse move or a neighbour repainting, which marks cells dirty without changing
+   them, sends nothing). `AnsiConsoleOutput.WritePixel` writes a cell whose symbol is a sixel as
+   that sixel, one escape sequence per cell.
+   - **Cursor moves.** `WriteSixel` always moves the cursor explicitly first. After a glyph in the
+     last column, the terminal's cursor still sits on the old row with a pending wrap, and a sixel
+     would otherwise land a row up.
+   - **Joining cells: removed.** Neighbouring cells to write that shared a palette used to be
+     `BitBlt`ted into one sixel and sent as one sequence. That took a pass of its own in
+     `RenderTarget`, before the text, and it was an output optimisation rather than a need. It went
+     when the frame code moved out of `RenderTarget`. If the per-cell overhead turns out to matter,
+     joining belongs in `AnsiConsoleOutput`, which already joins consecutive text cells into runs.
+7. **The mouse cursor** is text, so the cell under it is written as a text cell (`Pixel.AsText`): a
+   space on the sixel's dominant colour.
 8. **The terminal does the rest.** Writing a character into a cell replaces the sixel pixels in
    that cell. Neighbouring cells are not sent again because they did not change, so the rest of the
    picture stays on screen.
@@ -144,7 +145,6 @@ background over it as usual:
 256-bucket histogram of `Pixels`.
 - **Washed variants.** Only the index is cached. A washed variant has the same pixels with a washed
   palette, so it gives the washed colour automatically, and a dimmed picture's text cells match it.
-- **`BitBlt`** resets the cached index, because it changes the pixels.
 
 The dominant colour was chosen over a mean because a cell split between two colours (an edge
 between sky and roof) averages to a muddy colour that appears in neither.

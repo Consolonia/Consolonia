@@ -6,6 +6,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -15,13 +16,14 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal sealed class QuadPixelBitmapRenderer : BitmapRenderer
     {
-        public QuadPixelBitmapRenderer(DrawingContextImpl context)
-            : base(context)
+        public QuadPixelBitmapRenderer(IConsoleOutput console)
+            : base(console)
         {
         }
 
-        public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
+        public override void Draw(DrawingContextImpl context, IBitmapImpl source,
+            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
+            BitmapInterpolationMode interpolationMode)
         {
             // two pixels across and two down per cell, and only the cells being drawn are scaled: a
             // picture zoomed far past the screen is not scaled whole every frame
@@ -32,8 +34,8 @@ namespace Consolonia.Core.Drawing
             GetVisiblePixels(source, renderInterface, targetSize, visible, interpolationMode, bgra);
             int rowBytes = visible.Width * 4;
 
-            bool complexEmoji = Context.ConsoleWindowImpl.Console.Capabilities
-                .HasFlag(ConsoleCapabilities.SupportsComplexEmoji);
+            bool complexEmoji = ConsoleOutput.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji);
+            PixelBuffer pixelBuffer = context.PixelBuffer;
 
             for (int cellY = 0; cellY < intersectedRect.Height; cellY++)
             for (int cellX = 0; cellX < intersectedRect.Width; cellX++)
@@ -70,10 +72,10 @@ namespace Consolonia.Core.Drawing
                     new PixelBackground(background));
 
                 var point = new PixelPoint(intersectedRect.X + cellX, intersectedRect.Y + cellY);
-                Context.PixelBuffer[point] = Context.PixelBuffer[point].Blend(imagePixel);
+                pixelBuffer[point] = pixelBuffer[point].Blend(imagePixel);
             }
 
-            Context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
 
         private static BgraColor PixelAt(byte[] bgra, int offset)

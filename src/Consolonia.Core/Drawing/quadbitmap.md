@@ -32,7 +32,7 @@ the rest of the UI like any other glyph.
 
 - **No caching.** Nothing is kept between frames: no `CellRendering`, no content cache. Every draw
   scales and classifies the intersected cells again. Each cell is a glyph and two colours, and the
-  text pass already skips cells that match what the terminal shows (`RenderTarget._cache`), so a
+  render target already skips cells that match what the terminal shows (`RenderTarget._cache`), so a
   redraw that changes nothing writes nothing.
 - **One allocation per draw.** Each draw allocates its pixel destination: 16 bytes per intersected
   cell (four pixels of BGRA), about 257 KB for a full 240×67 screen. That is far smaller than the

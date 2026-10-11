@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -30,16 +31,16 @@ namespace Consolonia.Core.Drawing
 
         private static readonly ContentCache<Sixel> CellSixels = new(CellSixelBudget);
 
-        public SixelBitmapRenderer(DrawingContextImpl context)
-            : base(context)
+        public SixelBitmapRenderer(IConsoleOutput console)
+            : base(console)
         {
         }
 
         protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
             Renderings => RenderedBitmapCache;
 
-        protected override void Render(CellRendering rendering, int cellPixelWidth, int cellPixelHeight,
-            IPlatformRenderInterface renderInterface)
+        protected override void Render(DrawingContextImpl context, CellRendering rendering, int cellPixelWidth,
+            int cellPixelHeight, IPlatformRenderInterface renderInterface)
         {
             RenderCells(rendering.Pixels, rendering.Cells, cellPixelWidth, cellPixelHeight);
         }

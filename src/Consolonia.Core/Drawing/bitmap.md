@@ -19,9 +19,8 @@ Avalonia Image / DrawingContext.DrawImage
                  │  dirty regions: only cells whose Pixel changed
                  ▼
             RenderTarget.RenderToDevice                (RenderTarget.cs)
-              pass 1  RenderSixelRegions        sixel cells → combined rectangles → WriteSixel
-              pass 2  text cells                → WritePixel (kitty tile cells are written as blank cells)
-              then    EmitKittyRectPlacements   kitty tiles → placements, washes, orphan deletes
+              every changed cell           → WritePixel (a sixel cell as its sixel, a tile cell blank)
+              IRenderTargetHook.EndFrame   → KittyBitmapRenderer: tiles → placements, washes, orphan deletes
                  │
                  ▼
             AnsiConsoleOutput frame buffer (UTF-8 bytes) → one write to stdout per frame
@@ -33,8 +32,8 @@ escape sequences, knows about image protocols.
 
 ## Choosing a renderer
 
-`DrawingContextImpl.CreateBitmapRenderer` picks the best renderer the terminal supports. It decides
-once per drawing context:
+`BitmapRenderer.Create` picks the best renderer the terminal supports. The render target makes one
+per terminal, and the drawing contexts (replaced on every resize) borrow it:
 
 1. **Kitty** when the console reports `SupportsKittyGraphics` and the colour mode is RGB.
 2. **Sixel** when it reports `SupportsSixel`.
@@ -117,15 +116,21 @@ per cell, and the first edit changes only the cells it touched.
 
 ## Writing a frame
 
-`RenderTarget.RenderToDevice` turns the dirty cells into output:
+`RenderTarget.RenderToDevice` turns the dirty cells into output. It knows nothing about image
+protocols: a cell is a cell.
 
-1. **Sixel pass** (`RenderSixelRegions`). It joins dirty sixel cells that share a palette into
-   rectangles and writes one sixel for each. See [sixelbitmap.md](sixelbitmap.md).
-2. **Text pass.** It writes the remaining dirty cells that differ from what the terminal shows (the
-   `_cache` of written pixels). It also detects whether any kitty tile cell changed.
-3. **Kitty placements** (`EmitKittyRectPlacements`). This runs only when a tile cell changed or an
-   evicted image is waiting. See [kittybitmap.md](kittybitmap.md).
-4. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
+1. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
+   pixels) goes through `IConsoleOutput.WritePixel`. `AnsiConsoleOutput` writes a sixel cell as its
+   sixel and a kitty tile cell as a blank cell with the default background. The cell under the mouse
+   cursor is text for that frame (`Pixel.AsText`): a sixel cell becomes a space on the picture's
+   dominant colour, a tile cell takes its wash over black.
+2. **Hooks** (`IRenderTargetHook`): `BeginFrame` before the cells, `EndFrame` after them, and
+   `ResetCache` when the render target forgets what the terminal shows. A renderer with work to do
+   per frame is registered when the render target creates it. Only kitty has such work: its
+   pictures are placements, terminal objects below the text rather than cell contents, so `EndFrame`
+   coalesces the tile cells into placements and reconciles them with the live ones. See
+   [kittybitmap.md](kittybitmap.md).
+3. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
    synchronized update covers all of it.
 
 ### The byte frame (`AnsiConsoleOutput`)
@@ -156,12 +161,13 @@ garbage per frame, with gen-1 collections.
 
 ### Lifecycle: resize, resume, exit
 
-- **Resize.** A size change resets the written-pixel cache. Every kitty placement is then placed
-  again from the cells, and the old placements are deleted at the end of the frame.
+- **Resize.** A size change calls `RenderTarget.ResetCache`: the written-pixel cache is rebuilt and
+  every hook's `ResetCache` runs. Kitty then places every picture again from the cells and deletes
+  the old placements at the end of the frame.
 - **Resume after a suspend.** `ConsoleWindowImpl.TerminalContentsLost` is raised when another
-  program had the terminal (`ConsoloniaLifetime.DisconnectFromConsoleAsync`).
-  `RenderTarget.ForgetTerminalContents` resets the cache, forgets placements and marks the whole
-  screen dirty. Kitty images are kept and only placed again, so the picture does not flash.
+  program had the terminal (`ConsoloniaLifetime.DisconnectFromConsoleAsync`). It calls the same
+  `RenderTarget.ResetCache`, which also marks the whole screen dirty. Kitty images are kept and only
+  placed again, so the picture does not flash.
 - **Exit.** `RestoreConsole` deletes every kitty image still in the terminal, then the visible
   placements.
 
@@ -178,6 +184,7 @@ dotnet run -c Release --project src/Consolonia.Benchmarks -- --digest
 | Class | What it measures |
 |---|---|
 | `SixelFrameBenchmarks` | The sixel renderer's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. |
+| `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console, for sixel and kitty: redrawn unchanged, one pixel painted, a new picture. What Consolonia does per frame, not the terminal. |
 | `SixelBenchmarks` | Quantising (flat cell, photo cell, full image) and serialising sixels. |
 | `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream: a screen of text, full-screen and one-cell sixels, a full-screen kitty transmit (510 tiles of 8 KB) and one tile. The terminal's side is not measured. |
 

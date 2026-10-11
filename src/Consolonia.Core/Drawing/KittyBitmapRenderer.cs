@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -16,12 +17,12 @@ namespace Consolonia.Core.Drawing
     ///     tiles of a few cells, and each tile is transmitted to the terminal as its own image, once per
     ///     distinct content: a change to the picture retransmits only the tiles it touched, and tiles
     ///     that look alike (a blank canvas) share one image. Every covered cell carries a
-    ///     <see cref="KittyTile" /> in its BACKGROUND, which RenderTarget coalesces into classic placements
-    ///     below text (z=-2); a tile whose image is unchanged keeps its placement. Glyphs drawn later
-    ///     composite over the picture, an opaque background evicts it, and pixel buffer diffing and
-    ///     occlusion work unchanged.
+    ///     <see cref="KittyTile" /> in its BACKGROUND, which the frame's end coalesces into classic placements
+    ///     below text (z=-2, see KittyBitmapRenderer.Placements.cs); a tile whose image is unchanged keeps its
+    ///     placement. Glyphs drawn later composite over the picture, an opaque background evicts it, and
+    ///     pixel buffer diffing and occlusion work unchanged.
     /// </summary>
-    internal sealed class KittyBitmapRenderer : CellBitmapRenderer<KittyBitmapRenderer.KittyRendering>
+    internal sealed partial class KittyBitmapRenderer : CellBitmapRenderer<KittyBitmapRenderer.KittyRendering>
     {
         /// <summary>Tile size in cells: small enough that a stroke touches few, large enough to be few.</summary>
         internal const int TileColumns = 8;
@@ -46,8 +47,8 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Image ids of tiles evicted from <see cref="TileImages" />. They are not deleted here: a tile
-        ///     can be evicted while a picture that is not being redrawn still shows it. RenderTarget deletes
-        ///     each one once no placement shows it (see <see cref="TryTakeEvictedImage" />).
+        ///     can be evicted while a picture that is not being redrawn still shows it. The frame's end
+        ///     deletes each one once no placement shows it (<see cref="DeleteOrphanedTileImages" />).
         /// </summary>
         private static readonly ConcurrentQueue<int> EvictedTileImages = new();
 
@@ -55,25 +56,13 @@ namespace Consolonia.Core.Drawing
         private static readonly ContentCache<int> TileImages =
             new(MinTileImageBudgetBytes, imageId => EvictedTileImages.Enqueue(imageId));
 
-        public KittyBitmapRenderer(DrawingContextImpl context)
-            : base(context)
+        public KittyBitmapRenderer(IConsoleOutput console)
+            : base(console)
         {
         }
-
-        /// <summary>Whether tile images have been evicted that RenderTarget has not taken yet.</summary>
-        internal static bool HasEvictedImages => !EvictedTileImages.IsEmpty;
 
         protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, KittyRendering>>>
             Renderings => RenderedBitmapCache;
-
-        /// <summary>
-        ///     Takes the next image id evicted from the tile cache. No rendering will place it again, so
-        ///     once no placement on screen shows it, it is an orphan and must be deleted from the terminal.
-        /// </summary>
-        internal static bool TryTakeEvictedImage(out int imageId)
-        {
-            return EvictedTileImages.TryDequeue(out imageId);
-        }
 
         /// <summary>
         ///     A rendering is reused only while every tile image it shows is still in the terminal; using one
@@ -88,16 +77,16 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>Cuts the visible pixels into tiles and transmits each tile not already in the terminal.</summary>
-        protected override void Render(KittyRendering rendering, int cellPixelWidth, int cellPixelHeight,
-            IPlatformRenderInterface renderInterface)
+        protected override void Render(DrawingContextImpl context, KittyRendering rendering, int cellPixelWidth,
+            int cellPixelHeight, IPlatformRenderInterface renderInterface)
         {
             PixelRect visibleCells = rendering.VisibleCells;
             byte[] visibleBytes = rendering.Pixels;
             PixelBuffer cellBuffer = rendering.Cells;
             int visibleWidth = visibleCells.Width * cellPixelWidth;
             TileImages.EnsureBudget(ScreensOfTileImages * 4L *
-                                    Context.PixelBuffer.Width * cellPixelWidth *
-                                    Context.PixelBuffer.Height * cellPixelHeight);
+                                    context.PixelBuffer.Width * cellPixelWidth *
+                                    context.PixelBuffer.Height * cellPixelHeight);
 
             List<ContentKey> tileKeys = rendering.TileKeys;
             tileKeys.Clear();
@@ -120,14 +109,14 @@ namespace Consolonia.Core.Drawing
                     imageId = KittyGraphics.AllocateImageId();
                     byte[] imageData = EncodeImageData(tile, tileSize, renderInterface,
                         out KittyImageFormat imageFormat);
-                    KittyGraphics.WriteTransmitSequence(Context.ConsoleWindowImpl.Console, imageId,
+                    KittyGraphics.WriteTransmitSequence(ConsoleOutput, imageId,
                         tileSize.Width, tileSize.Height, imageData, imageFormat);
                     TileImages.GetOrAdd(tileKey, imageId, tile.Length);
                 }
 
                 // image as cell BACKGROUND, foreground left free so glyphs drawn later composite
                 // over the picture. The background color starts transparent: it is the wash that
-                // translucent overlays accumulate, which RenderTarget lays over the image, and the
+                // translucent overlays accumulate, which the frame's end lays over the image, and the
                 // terminal cell itself is written black (occluding what the picture was drawn over)
                 for (int cellY = 0; cellY < rows; cellY++)
                 for (int cellX = 0; cellX < columns; cellX++)

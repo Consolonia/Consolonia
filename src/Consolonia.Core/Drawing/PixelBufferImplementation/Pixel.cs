@@ -182,6 +182,34 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
+        ///     This cell as a text cell, for a glyph written into it (the mouse cursor). A sixel cell becomes
+        ///     a space on the picture's dominant color: the terminal drops a sixel where text is written, and
+        ///     the dominant color keeps the cell looking like the picture rather than a hole in it. A tile
+        ///     cell keeps its tile (the terminal composites text over the picture) and takes its wash over
+        ///     black as the color the glyph sits on, as the terminal shows it. Any other cell is itself.
+        /// </summary>
+        internal Pixel AsText()
+        {
+            Sixel sixel = Foreground.Symbol.Sixel;
+            if (sixel != null)
+                return new Pixel(new PixelForeground(Symbol.Space, Colors.Transparent),
+                    new PixelBackground(sixel.DominantColor));
+
+            if (!Background.Tile.IsEmpty)
+                return new Pixel(Foreground,
+                    new PixelBackground(CompositeOverBlack(Background.Color), Background.Tile), CaretStyle);
+
+            return this;
+        }
+
+        /// <summary>Composites a (possibly translucent) color over opaque black.</summary>
+        private static Color CompositeOverBlack(Color color)
+        {
+            return Color.FromRgb((byte)(color.R * color.A / 255), (byte)(color.G * color.A / 255),
+                (byte)(color.B * color.A / 255));
+        }
+
+        /// <summary>
         ///     Blend the pixelAbove with this pixel.
         /// </summary>
         /// <param name="pixelAbove"></param>

@@ -13,8 +13,7 @@ using JeremyAnsel.ColorQuant;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     Represents a sixel image with palette and indexed pixel data.
-    ///     Supports composition via BitBlt and serialization via Render.
+    ///     Represents a sixel image with palette and indexed pixel data, serialized via Render.
     /// </summary>
     public sealed class Sixel
     {
@@ -127,50 +126,6 @@ namespace Consolonia.Core.Drawing
             return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
         }
 
-        /// <summary>
-        ///     Copy source image pixels into this image at pixel position (x, y).
-        ///     Clips if source extends beyond this image's bounds.
-        /// </summary>
-        /// <remarks>
-        ///     Pixel indices are copied as they are, so <paramref name="source" /> must use this image's
-        ///     palette. This changes <see cref="Pixels" /> in place, which a <see cref="Wash" /> variant
-        ///     shares: blit only into an image made for the purpose, never one already on screen.
-        /// </remarks>
-        public void BitBlt(Sixel source, int x, int y)
-        {
-            Debug.Assert(ReferenceEquals(source.Palette, Palette), "BitBlt copies indices into a different palette");
-
-            for (int row = 0; row < source.Height; row++)
-            {
-                int destY = y + row;
-                if (destY < 0)
-                    continue;
-                if (destY >= Height)
-                    break;
-
-                int srcOffset = row * source.Width;
-                int dstOffset = destY * Width + x;
-
-                int srcX = 0;
-                int dstX = x;
-
-                if (dstX < 0)
-                {
-                    srcX = -dstX;
-                    dstX = 0;
-                    dstOffset = destY * Width;
-                }
-
-                int copyLen = Math.Min(source.Width - srcX, Width - dstX);
-                if (copyLen <= 0)
-                    continue;
-
-                Array.Copy(source.Pixels, srcOffset + srcX, Pixels, dstOffset, copyLen);
-            }
-
-            _renderedBytes = null;
-            _dominantIndex = -1;
-        }
 
         /// <summary>
         ///     Returns this image with <paramref name="wash" /> alpha-composited over every palette

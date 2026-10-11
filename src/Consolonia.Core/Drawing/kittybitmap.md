@@ -21,17 +21,19 @@ of the image put at a cell position. Consolonia uses it as follows:
    foreground stays free, so glyphs drawn later composite over the picture. An opaque background
    drawn over the cell evicts the tile, through `Pixel.Blend`'s opaque fast path. Diffing and
    occlusion therefore work unchanged.
-4. **Coalesce tile cells into placements.** `RenderTarget.EmitKittyRectPlacements` runs at the end
-   of a frame. It joins tile cells into maximal rectangles and creates one classic placement per
+4. **Coalesce tile cells into placements.** `KittyBitmapRenderer.EmitPlacements`
+   (`KittyBitmapRenderer.Placements.cs`) runs at the end of every frame, from
+   `IRenderTargetHook.EndFrame`. It joins tile cells into maximal rectangles and creates one classic placement per
    rectangle, at z=-2 (below text, above background colours), with `C=1` so the cursor doesn't
    move. Each rectangle continues one image's tile grid under one wash. The image is pre-scaled to
    the cell grid, so a placement is a 1:1 crop and needs no `c=`/`r=` stretching.
 5. **Diff placements across frames.** Live placements are a `Dictionary<KittyRect, int>`. An
    unchanged rectangle costs nothing. A new one is placed. A vanished one is deleted by placement
-   id (`a=d,d=i`), and the image stays for cheap re-placement. The pass runs only when a tile cell
-   changed, or when an evicted image is waiting to be deleted.
-6. **Write text cells blank.** In pass 2, a tile cell is written as a blank cell with the terminal's
-   default background. That clears what the picture was drawn over, and the placement shows on top.
+   id (`a=d,d=i`), and the image stays for cheap re-placement. The pass runs every frame; a screen
+   whose tiles did not change costs the scan and sends nothing.
+6. **Write tile cells blank.** `AnsiConsoleOutput.WritePixel` writes a tile cell as a blank cell
+   with the terminal's default background. That clears what the picture was drawn over, and the
+   placement shows on top. `RenderTarget` treats the cell like any other.
 
 ## Translucent overlays: washes
 
@@ -48,8 +50,8 @@ is exactly the **wash** to lay over the image, for example a modal backdrop dimm
   - Wash images are kept by colour. One is freed once no placement uses it
     (`FreeUnusedWashImages`), and sent again sized up when the screen grows
     (`DropWashImagesSmallerThan`).
-- **Mouse cursor.** Only for the mouse cursor cell is the wash composited over black in the text
-  cell.
+- **Mouse cursor.** The cursor is text written into the cell, so for that cell alone the wash is
+  composited over black, the colour the glyph sits on (`Pixel.AsText`).
 
 ## Image ids and their lifetime
 
@@ -67,7 +69,7 @@ is exactly the **wash** to lay over the image, for example a modal backdrop dimm
   them again would show nothing.
 - **Eviction is deferred.** A tile evicted from `TileImages` is not deleted immediately. A picture
   that isn't being redrawn may still show it, and deleting the image (`d=I`) takes its placements
-  with it. Evicted ids go to `EvictedTileImages`. `RenderTarget.DeleteOrphanedTileImages` deletes
+  with it. Evicted ids go to `EvictedTileImages`. `KittyBitmapRenderer.DeleteOrphanedTileImages` deletes
   each one once no live placement shows it (`SelectOrphans`).
 - **Reuse.** A rendering is reused only while every tile it shows is still in the terminal
   (`IsReusable`). Using a rendering refreshes all its tiles in the least-recently-used order, so a
@@ -75,8 +77,8 @@ is exactly the **wash** to lay over the image, for example a modal backdrop dimm
 
 ### Resize, resume and exit
 
-- **Resize, and resume after another program had the terminal.** `ForgetPlacements` moves every
-  live placement to `_placementsToDeleteAfterFrame`. The frame places everything again from the
+- **Resize, and resume after another program had the terminal.** `RenderTarget.ResetCache` calls
+  the hook's `ResetCache`, which moves every live placement to `_placementsToDeleteAfterFrame`. The frame places everything again from the
   cells, and `DeleteWhatTheFrameReplaced` deletes the old placements at its end. The images stay in
   the terminal, because the alternate screen was never left and nothing but this app deletes by id.
   A resumed picture is placed again from tiles already there. This was the fix for a black flash on

@@ -36,6 +36,7 @@ namespace Consolonia.Benchmarks
         private RenderTarget _renderTarget = null!;
         private DrawingContextImpl _context = null!;
         private PinnedBitmap _bitmap = null!;
+        private PinnedBitmap _newPicture;
         private Rect _destRect;
         private int _stroke;
 
@@ -70,10 +71,15 @@ namespace Consolonia.Benchmarks
             Frame();
         }
 
+        private void Frame(PinnedBitmap picture)
+        {
+            _context.DrawBitmap(picture, 1, new Rect(_destRect.Size), _destRect);
+            _renderTarget.RenderToDevice();
+        }
+
         private void Frame()
         {
-            _context.DrawBitmap(_bitmap, 1, new Rect(_destRect.Size), _destRect);
-            _renderTarget.RenderToDevice();
+            Frame(_bitmap);
         }
 
         /// <summary>The picture drawn again as it was: nothing reaches the terminal.</summary>
@@ -92,12 +98,27 @@ namespace Consolonia.Benchmarks
             Frame();
         }
 
+        [IterationSetup(Target = nameof(NewPicture))]
+        public void SetupNewPicture()
+        {
+            _newPicture?.Dispose();
+            _newPicture = new PinnedBitmap(SixelFrameBenchmarks.MakePicture(++_stroke), Width, Height);
+        }
+
+        /// <summary>A picture never shown before over the whole screen: every cell is new and written.</summary>
+        [Benchmark]
+        public void NewPicture()
+        {
+            Frame(_newPicture);
+        }
+
         [GlobalCleanup]
         public void Cleanup()
         {
             _renderTarget?.Dispose();
             _window?.Dispose();
             _bitmap?.Dispose();
+            _newPicture?.Dispose();
             _lifetime?.Dispose();
             _scope?.Dispose();
         }

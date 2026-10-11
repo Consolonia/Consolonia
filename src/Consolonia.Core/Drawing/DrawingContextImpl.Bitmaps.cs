@@ -3,8 +3,6 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Consolonia.Controls;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Dummy;
 
 namespace Consolonia.Core.Drawing
@@ -38,13 +36,10 @@ namespace Consolonia.Core.Drawing
                 return;
 
             _renderInterface ??= AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
-            _bitmapRenderer ??= CreateBitmapRenderer();
-            _bitmapRenderer.Draw(source, _renderInterface, targetRect, intersectedRect, GetBitmapInterpolationMode());
-        }
-
-        public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
-        {
-            throw new NotImplementedException();
+            // the render target's renderer, kept for the terminal; a context without one (tests) makes its own
+            _bitmapRenderer ??= _renderTarget?.BitmapRenderer ?? BitmapRenderer.Create(ConsoleWindowImpl.Console);
+            _bitmapRenderer.Draw(this, source, _renderInterface, targetRect, intersectedRect,
+                GetBitmapInterpolationMode());
         }
 
         /// <summary>
@@ -60,21 +55,9 @@ namespace Consolonia.Core.Drawing
             return BitmapInterpolationMode.MediumQuality;
         }
 
-        /// <summary>
-        ///     Picks the best bitmap renderer the terminal is capable of (capabilities are detected in PrepareConsole).
-        /// </summary>
-        private BitmapRenderer CreateBitmapRenderer()
+        public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
         {
-            ConsoleCapabilities capabilities = ConsoleWindowImpl.Console.Capabilities;
-
-            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
-                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(this);
-
-            if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
-                return new SixelBitmapRenderer(this);
-
-            return new QuadPixelBitmapRenderer(this);
+            throw new NotImplementedException();
         }
     }
 }

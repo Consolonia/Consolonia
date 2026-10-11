@@ -120,6 +120,13 @@ namespace Consolonia.Core.Infrastructure
                 0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
                 return;
 
+            // a sixel cell is its image, not a glyph in colors
+            if (pixel.Foreground.Symbol.Sixel != null)
+            {
+                WriteSixel(position, pixel.Foreground.Symbol.Sixel);
+                return;
+            }
+
             //todo: performance of retrieval of the service, at least can be retrieved once
             Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
 
@@ -303,7 +310,7 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
-            // RenderTarget calls this outside WritePixel, so it needs the same lock and pause handling as WriteText
+            // also called on its own (benchmarks), so it has the same lock and pause handling as WriteText
             WaitPauseTaskIfNecessary();
 
             // Always an explicit cursor move. After a glyph in the last column the position is modelled as

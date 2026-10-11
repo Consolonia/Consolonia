@@ -19,7 +19,7 @@ namespace Consolonia.Core.Tests
             var evicted = new HashSet<int> { 1, 2, 3 };
             var orphans = new List<int>();
 
-            RenderTarget.SelectOrphans(evicted, new HashSet<int> { 2 }, orphans);
+            KittyBitmapRenderer.SelectOrphans(evicted, new HashSet<int> { 2 }, orphans);
 
             Assert.That(orphans, Is.EquivalentTo(new[] { 1, 3 }));
             Assert.That(evicted, Is.EquivalentTo(new[] { 2 }), "the image still shown waits");
@@ -31,10 +31,10 @@ namespace Consolonia.Core.Tests
             var evicted = new HashSet<int> { 7 };
             var orphans = new List<int>();
 
-            RenderTarget.SelectOrphans(evicted, new HashSet<int> { 7 }, orphans);
+            KittyBitmapRenderer.SelectOrphans(evicted, new HashSet<int> { 7 }, orphans);
             Assert.That(orphans, Is.Empty, "deleting it now would leave a hole in a picture on screen");
 
-            RenderTarget.SelectOrphans(evicted, new HashSet<int>(), orphans);
+            KittyBitmapRenderer.SelectOrphans(evicted, new HashSet<int>(), orphans);
             Assert.That(orphans, Is.EquivalentTo(new[] { 7 }));
             Assert.That(evicted, Is.Empty);
         }
