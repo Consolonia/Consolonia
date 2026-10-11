@@ -22,12 +22,12 @@ namespace Consolonia.Core.Tests
             byte[] palette = { 0, 0, 0, 255 };
             byte[] pixels = new byte[Width * Height];
 
-            Assert.Throws<ArgumentException>(() => new Sixel(palette, 1, new byte[Width * Height - 1],
+            Assert.Throws<ArgumentException>(() => _ = new Sixel(palette, 1, new byte[Width * Height - 1],
                 Width, Height, Width, Height));
-            Assert.Throws<ArgumentException>(() => new Sixel(palette, 2, pixels, Width, Height, Width, Height));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new Sixel(palette, 0, pixels, Width, Height, Width,
+            Assert.Throws<ArgumentException>(() => _ = new Sixel(palette, 2, pixels, Width, Height, Width, Height));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _ = new Sixel(palette, 0, pixels, Width, Height, Width,
                 Height));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new Sixel(new byte[257 * 4], 257, pixels, Width,
+            Assert.Throws<ArgumentOutOfRangeException>(() => _ = new Sixel(new byte[257 * 4], 257, pixels, Width,
                 Height, Width, Height));
             Assert.That(new Sixel(palette, 1, pixels, Width, Height, Width, Height).Width, Is.EqualTo(Width));
         }

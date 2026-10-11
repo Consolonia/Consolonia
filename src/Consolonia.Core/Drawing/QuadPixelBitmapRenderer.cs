@@ -50,12 +50,20 @@ namespace Consolonia.Core.Drawing
                     PixelAt(bgra, bottom + 4)
                 ];
 
-                // map it to a single char to represent the 4 pixels
-                char quadPixelChar = GetQuadPixelCharacter(quadPixelColors, complexEmoji);
+                // split the 4 pixels into a foreground and a background group, and map the split to the
+                // block character that draws the foreground quadrants
+                byte pattern = GetColorsPattern(quadPixelColors, complexEmoji);
+                char quadPixelChar = GetQuadPixelCharacter(pattern);
 
-                // get the combined colors for the quad pixel
-                Color foreground = GetForegroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-                Color background = GetBackgroundColorForQuadPixel(quadPixelChar, quadPixelColors);
+                // nothing in the foreground draws nothing; with no quadrant left for the background, the
+                // background takes all four colours. It is NOT transparent: a transparent background lets
+                // the color under the picture show through the hairlines terminals leave around a full
+                // block glyph
+                Color foreground = pattern == 0b0000
+                    ? BgraColor.Transparent.ToColor()
+                    : CombineQuadrants(quadPixelColors, pattern).ToColor();
+                Color background = CombineQuadrants(quadPixelColors,
+                    pattern == 0b1111 ? (byte)0b1111 : (byte)(~pattern & 0b1111)).ToColor();
 
                 var imagePixel = new Pixel(
                     new PixelForeground(new Symbol(quadPixelChar), foreground),
@@ -73,9 +81,9 @@ namespace Consolonia.Core.Drawing
             return new BgraColor(bgra[offset], bgra[offset + 1], bgra[offset + 2], bgra[offset + 3]);
         }
 
-        private static char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors, bool complexEmoji)
+        private static char GetQuadPixelCharacter(byte pattern)
         {
-            char character = GetColorsPattern(colors, complexEmoji) switch
+            char character = pattern switch
             {
                 // ReSharper disable StringLiteralTypo
                 0b0000 => ' ',
@@ -101,75 +109,19 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Combine the colors for the white part of the quad pixel character.
+        ///     Combines the colors of the quadrants in a pattern, one bit per quadrant as
+        ///     <see cref="GetColorsPattern" /> returns it. A single quadrant keeps its color as it is.
         /// </summary>
-        /// <param name="quadPixel"></param>
-        /// <param name="pixelColors">4 colors</param>
-        /// <returns>foreground color</returns>
-        /// <exception cref="NotImplementedException"></exception>
-        private static Color GetForegroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
+        private static BgraColor CombineQuadrants(ReadOnlySpan<BgraColor> colors, byte pattern)
         {
-            // TODO: Some of these chars don't work in IBM Codepage
-            BgraColor bgraColor = quadPixel switch
-            {
-                ' ' => BgraColor.Transparent,
-                '▘' => pixelColors[0],
-                '▝' => pixelColors[1],
-                '▖' => pixelColors[2],
-                '▗' => pixelColors[3],
-                '▚' => CombineColors([pixelColors[0], pixelColors[3]]),
-                '▞' => CombineColors([pixelColors[1], pixelColors[2]]),
-                '▌' => CombineColors([pixelColors[0], pixelColors[2]]),
-                '▐' => CombineColors([pixelColors[1], pixelColors[3]]),
-                '▄' => CombineColors([pixelColors[2], pixelColors[3]]),
-                '▀' => CombineColors([pixelColors[0], pixelColors[1]]),
-                '▛' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
-                '▜' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
-                '▙' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
-                '▟' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
-                '█' => CombineColors(pixelColors),
-                _ => throw new NotImplementedException()
-            };
+            Span<BgraColor> selected = stackalloc BgraColor[4];
+            int count = 0;
+            for (int i = 0; i < 4; i++)
+                if ((pattern & (0b1000 >> i)) != 0)
+                    selected[count++] = colors[i];
 
-            return bgraColor.ToColor();
+            return count == 1 ? selected[0] : CombineColors(selected[..count]);
         }
-
-
-        /// <summary>
-        ///     Combine the colors for the black part of the quad pixel character.
-        /// </summary>
-        /// <param name="quadPixel"></param>
-        /// <param name="pixelColors"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        private static Color GetBackgroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
-        {
-            // TODO: Some of these chars don't work in IBM Codepage
-            BgraColor bgraColor = quadPixel switch
-            {
-                ' ' => CombineColors(pixelColors),
-                '▘' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
-                '▝' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
-                '▖' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
-                '▗' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
-                '▚' => CombineColors([pixelColors[1], pixelColors[2]]),
-                '▞' => CombineColors([pixelColors[0], pixelColors[3]]),
-                '▌' => CombineColors([pixelColors[1], pixelColors[3]]),
-                '▐' => CombineColors([pixelColors[0], pixelColors[2]]),
-                '▄' => CombineColors([pixelColors[0], pixelColors[1]]),
-                '▀' => CombineColors([pixelColors[2], pixelColors[3]]),
-                '▛' => pixelColors[3],
-                '▜' => pixelColors[2],
-                '▙' => pixelColors[1],
-                '▟' => pixelColors[0],
-                // NOT transparent: a transparent background let the color under the picture show
-                // through the hairlines terminals leave around a full block glyph
-                '█' => CombineColors(pixelColors),
-                _ => throw new NotImplementedException()
-            };
-            return bgraColor.ToColor();
-        }
-
 
         private static BgraColor CombineColors(ReadOnlySpan<BgraColor> colors)
         {

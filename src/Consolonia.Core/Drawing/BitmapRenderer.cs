@@ -76,6 +76,11 @@ namespace Consolonia.Core.Drawing
         ///     Copies the pixels <paramref name="source" /> shows in <paramref name="visible" /> when it is drawn
         ///     at <paramref name="targetSize" /> into <paramref name="destination" />, as tightly packed BGRA rows.
         /// </summary>
+        /// <param name="source">The picture.</param>
+        /// <param name="renderInterface">Scales the picture when it is not drawn at its own size.</param>
+        /// <param name="targetSize">The size in pixels the whole picture is drawn at.</param>
+        /// <param name="visible">The part of the drawn picture to copy, in pixels of <paramref name="targetSize" />.</param>
+        /// <param name="interpolationMode">How the picture is scaled.</param>
         /// <param name="destination">
         ///     Exactly 4 bytes per visible pixel. The caller owns it, so a rendering refilled on every edit of
         ///     a picture keeps one rather than allocating a screen of pixels each time.
@@ -173,15 +178,20 @@ namespace Consolonia.Core.Drawing
         ///     Copies the visible part of a rendered per-cell bitmap into the pixel buffer,
         ///     tracking only the cells that actually changed as dirty (in horizontal runs).
         /// </summary>
+        /// <param name="renderedBitmap">The rendering, one cell per cell.</param>
+        /// <param name="intersectedRect">The cells of the pixel buffer to fill.</param>
+        /// <param name="renderedOrigin">
+        ///     The cell of the rendering that goes to the top-left cell of <paramref name="intersectedRect" />.
+        /// </param>
         protected void CopyRenderedBitmapTrackingDirtyRegions(PixelBuffer renderedBitmap,
-            PixelRect intersectedRect, PixelRect visibleRectInTarget)
+            PixelRect intersectedRect, PixelPoint renderedOrigin)
         {
             for (int y = 0; y < intersectedRect.Height; y++)
             {
                 int dirtyRunStart = -1;
                 for (int x = 0; x < intersectedRect.Width; x++)
                 {
-                    var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
+                    var sourcePoint = new PixelPoint(renderedOrigin.X + x, renderedOrigin.Y + y);
                     var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
                     Pixel newPixel = renderedBitmap[sourcePoint];
                     if (Context.PixelBuffer[destPoint] == newPixel)
@@ -214,9 +224,10 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Unwraps the bitmap used as identity for render caches.
+        ///     The picture itself, out of the <see cref="AspectRatioAdjustedBitmap" /> it may be wrapped in:
+        ///     the renderings are kept per picture, and a wrapper is made anew each time it is drawn.
         /// </summary>
-        protected static IBitmapImpl GetCacheBitmapImpl(IBitmapImpl bitmapImpl)
+        protected static IBitmapImpl UnwrapBitmap(IBitmapImpl bitmapImpl)
         {
             return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
                 ? adjustedBitmap.InnerBitmap
@@ -270,7 +281,7 @@ namespace Consolonia.Core.Drawing
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
             PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
-            IBitmapImpl bitmap = GetCacheBitmapImpl(source);
+            IBitmapImpl bitmap = UnwrapBitmap(source);
 
             TRendering rendering = FindOrAdd(Renderings.GetOrCreateValue(bitmap),
                 new RenderingKey(targetSize, interpolationMode));
@@ -287,7 +298,7 @@ namespace Consolonia.Core.Drawing
             }
 
             CopyRenderedBitmapTrackingDirtyRegions(rendering.Cells, intersectedRect,
-                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
+                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect).Position);
         }
 
         /// <summary>

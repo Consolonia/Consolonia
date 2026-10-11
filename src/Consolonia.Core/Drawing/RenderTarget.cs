@@ -767,6 +767,12 @@ namespace Consolonia.Core.Drawing
         ///     Grows a rectangle of cells from (x, y): rightward while cells join, then downward row by row,
         ///     never into a cell already <paramref name="visited" />, and marks the cells it takes as visited.
         /// </summary>
+        /// <param name="cells">Which cells join the rectangle.</param>
+        /// <param name="visited">One flag per cell of the buffer, row by row.</param>
+        /// <param name="bufferWidth">The width of the buffer in cells.</param>
+        /// <param name="bufferHeight">The height of the buffer in cells.</param>
+        /// <param name="x">The column of the cell the rectangle grows from.</param>
+        /// <param name="y">The row of the cell the rectangle grows from.</param>
         /// <param name="narrowToShortRows">
         ///     A row that joins for only part of the width narrows the rectangle to it; otherwise such a row
         ///     ends the rectangle.

@@ -167,8 +167,6 @@ namespace Consolonia.Core.Drawing
                 {
                     using IBitmapImpl bitmap = renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
                         (IntPtr)pixels, size, new Vector(96, 96), size.Width * 4);
-                    if (bitmap == null)
-                        return null;
                     using var stream = new MemoryStream();
                     bitmap.Save(stream);
                     return stream.ToArray();

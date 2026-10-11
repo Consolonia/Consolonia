@@ -418,6 +418,9 @@ namespace Consolonia.Core.Drawing
         ///     Quantize BGRX pixel data: exactly when it has at most 256 colors, otherwise using Wu's
         ///     variance-minimizing algorithm.
         /// </summary>
+        /// <param name="bgrx">The pixels, 4 bytes each; the fourth byte is ignored.</param>
+        /// <param name="palette">The colors, 4 bytes each, <paramref name="paletteCount" /> of them used.</param>
+        /// <param name="paletteCount">How many colors the palette holds, at most 256.</param>
         /// <param name="indexed">One palette index per pixel, in the order of <paramref name="bgrx" />.</param>
         internal static void Quantize(byte[] bgrx,
             out byte[] palette, out int paletteCount, out byte[] indexed)

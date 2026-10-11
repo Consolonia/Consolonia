@@ -360,8 +360,7 @@ namespace Consolonia.Core.Infrastructure
             // If the cursor moves 2 positions, it indicates proper rendering of composite surrogate pairs.
             (int left, _) = Console.GetCursorPosition();
             Console.Write(TestEmoji);
-            // The writer no longer flushes on its own, and the position read below asks the
-            // console -- which cannot have moved the cursor for text it has not received.
+            // the writer buffers, so flush the emoji before asking where the cursor is
             Console.Out.Flush();
             (int left2, _) = Console.GetCursorPosition();
             if (left2 - left == 2)

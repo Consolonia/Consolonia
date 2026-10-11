@@ -57,6 +57,8 @@ namespace Consolonia.Core.Drawing
         /// </remarks>
         /// <param name="visibleBytes">BGRX pixels of exactly the visible cells, row by row.</param>
         /// <param name="cells">One cell per visible cell. Every cell is written; what it held is not read.</param>
+        /// <param name="cellPixelWidth">The width of a cell in pixels.</param>
+        /// <param name="cellPixelHeight">The height of a cell in pixels.</param>
         /// <exception cref="ArgumentException">
         ///     <paramref name="visibleBytes" /> is not the pixels of exactly the cells.
         /// </exception>

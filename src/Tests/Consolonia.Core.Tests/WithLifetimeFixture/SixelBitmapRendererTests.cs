@@ -160,30 +160,18 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void EditedPictureKeepsTheSixelsOfUntouchedCells()
         {
-            const int cellsWide = 4;
-            const int cellsHigh = 3;
             int cellWidth = _console.CellPixelWidth;
             int cellHeight = _console.CellPixelHeight;
-            var size = new PixelSize(cellsWide * cellWidth, cellsHigh * cellHeight);
-            var destRect = new Rect(0, 0, cellsWide, cellsHigh);
 
-            using var before = new FakeReadableBitmap(size);
-            _dc.DrawBitmap(before, 1, new Rect(destRect.Size), destRect);
-            var sixels = new Sixel[cellsWide, cellsHigh];
-            for (ushort y = 0; y < cellsHigh; y++)
-            for (ushort x = 0; x < cellsWide; x++)
-                sixels[x, y] = _buffer[x, y].Foreground.Symbol.Sixel;
+            using var before = new FakeReadableBitmap(PictureSize);
+            Sixel[,] sixels = DrawPicture(before);
 
             // the same picture with one pixel of cell 2,1 painted over
-            using FakeReadableBitmap after = new FakeReadableBitmap(size)
+            using FakeReadableBitmap after = new FakeReadableBitmap(PictureSize)
                 .Fill(new PixelRect(2 * cellWidth + 1, cellHeight + 1, 1, 1), 0, 0, 255);
-            _dc.DrawBitmap(after, 1, new Rect(destRect.Size), destRect);
+            DrawPicture(after);
 
-            for (ushort y = 0; y < cellsHigh; y++)
-            for (ushort x = 0; x < cellsWide; x++)
-                Assert.That(_buffer[x, y].Foreground.Symbol.Sixel,
-                    x == 2 && y == 1 ? Is.Not.SameAs(sixels[x, y]) : Is.SameAs(sixels[x, y]),
-                    $"cell {x},{y}");
+            AssertOnlyCellHasANewSixel(sixels, 2, 1);
         }
 
         /// <summary>
@@ -194,27 +182,43 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void ANewVersionOfTheSameBitmapRefillsItsRendering()
         {
-            const int cellsWide = 4;
-            const int cellsHigh = 3;
             int cellWidth = _console.CellPixelWidth;
             int cellHeight = _console.CellPixelHeight;
-            var size = new PixelSize(cellsWide * cellWidth, cellsHigh * cellHeight);
-            var destRect = new Rect(0, 0, cellsWide, cellsHigh);
 
-            using var bitmap = new FakeReadableBitmap(size);
-            _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect);
-            var sixels = new Sixel[cellsWide, cellsHigh];
-            for (ushort y = 0; y < cellsHigh; y++)
-            for (ushort x = 0; x < cellsWide; x++)
-                sixels[x, y] = _buffer[x, y].Foreground.Symbol.Sixel;
+            using var bitmap = new FakeReadableBitmap(PictureSize);
+            Sixel[,] sixels = DrawPicture(bitmap);
 
             bitmap.Fill(new PixelRect(cellWidth + 2, 2 * cellHeight + 3, 1, 1), 255, 0, 0).Version++;
+            DrawPicture(bitmap);
+
+            AssertOnlyCellHasANewSixel(sixels, 1, 2);
+        }
+
+        private const int PictureCellsWide = 4;
+        private const int PictureCellsHigh = 3;
+
+        private PixelSize PictureSize => new(PictureCellsWide * _console.CellPixelWidth,
+            PictureCellsHigh * _console.CellPixelHeight);
+
+        /// <summary>Draws a picture over the top-left cells and returns the sixel each cell got.</summary>
+        private Sixel[,] DrawPicture(FakeReadableBitmap bitmap)
+        {
+            var destRect = new Rect(0, 0, PictureCellsWide, PictureCellsHigh);
             _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect);
 
-            for (ushort y = 0; y < cellsHigh; y++)
-            for (ushort x = 0; x < cellsWide; x++)
+            var sixels = new Sixel[PictureCellsWide, PictureCellsHigh];
+            for (ushort y = 0; y < PictureCellsHigh; y++)
+            for (ushort x = 0; x < PictureCellsWide; x++)
+                sixels[x, y] = _buffer[x, y].Foreground.Symbol.Sixel;
+            return sixels;
+        }
+
+        private void AssertOnlyCellHasANewSixel(Sixel[,] before, int changedX, int changedY)
+        {
+            for (ushort y = 0; y < PictureCellsHigh; y++)
+            for (ushort x = 0; x < PictureCellsWide; x++)
                 Assert.That(_buffer[x, y].Foreground.Symbol.Sixel,
-                    x == 1 && y == 2 ? Is.Not.SameAs(sixels[x, y]) : Is.SameAs(sixels[x, y]),
+                    x == changedX && y == changedY ? Is.Not.SameAs(before[x, y]) : Is.SameAs(before[x, y]),
                     $"cell {x},{y}");
         }
 
