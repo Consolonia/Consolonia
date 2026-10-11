@@ -40,6 +40,7 @@ namespace Consolonia.Benchmarks
         private Rect _destRect;
         private int _stroke;
 
+        // ReSharper disable once UnusedAutoPropertyAccessor.Global BenchmarkDotNet sets it per run
         [Params(ConsoleCapabilities.SupportsSixel, ConsoleCapabilities.SupportsKittyGraphics)]
         public ConsoleCapabilities Protocol { get; set; }
 
