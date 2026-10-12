@@ -192,9 +192,9 @@ namespace Consolonia.Benchmarks
             WholeScreen(_kittyOutput, _newPicture);
         }
 
-        /// <summary>Every block placed again, as after a resize; the images are in the terminal already.</summary>
+        /// <summary>Every block sent again under its id, as after a resize or a resume.</summary>
         [Benchmark]
-        public void KittyReplaced()
+        public void KittyAfterReset()
         {
             _kittyOutput.ResetCache();
             WholeScreen(_kittyOutput, _picture);
@@ -219,7 +219,7 @@ namespace Consolonia.Benchmarks
                 (nameof(SixelDialogClosed), b => b.SixelDialogClosed()),
                 (nameof(SixelOneCell), b => b.SixelOneCell()),
                 (nameof(KittyNewPicture), b => b.KittyNewPicture()),
-                (nameof(KittyReplaced), b => b.KittyReplaced()),
+                (nameof(KittyAfterReset), b => b.KittyAfterReset()),
                 (nameof(KittyOneCell), b => b.KittyOneCell())
             ];
 

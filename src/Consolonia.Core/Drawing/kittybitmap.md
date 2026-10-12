@@ -1,24 +1,27 @@
-# Kitty graphics: blocks, placements and washes
+# Kitty graphics: blocks sent when they change
 
-Architecture notes for `KittyConsoleImageEncoder` (`Consolonia.Core.Infrastructure`) and
-`KittyGraphics`. The pipeline shared with the other protocols is in [bitmap.md](bitmap.md). The
-protocol is specified at https://sw.kovidgoyal.net/kitty/graphics-protocol/.
+Architecture notes for `KittyConsoleImageEncoder` and `KittyGraphics` (both in
+`Consolonia.Core.Infrastructure`). The pipeline shared with the other protocols is in
+[bitmap.md](bitmap.md). The protocol is specified at
+https://sw.kovidgoyal.net/kitty/graphics-protocol/.
 
 ## How it works
 
-The kitty protocol transmits an image once, by id, and then shows it through **placements**: an
-image put at a cell position, below the text. A placement is a terminal object, not the content of
-a cell, so writing cells shows nothing by itself. The encoder therefore does its work once per
-frame, from the whole screen:
+The kitty protocol transmits an image under an id and shows it through **placements**: an image put
+at a cell position, below the text. A placement is a terminal object, not the content of a cell, so
+writing cells shows nothing by itself. The encoder uses the protocol the way the sixel encoder uses
+sixel: pixels are sent when they change, and nothing is remembered about the terminal.
 
 1. **Cells are written on the default background.** `WriteCell` writes an image cell as an ordinary
    text cell, glyph or blank, with the terminal's default background (`WriteTextCell(…, true)`).
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
-   cell a colour, even black, hides the picture there; kitty draws them above either way.
+   cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph
+   over a picture is drawn by the terminal over the picture, so no dominant-colour fallback is needed.
 2. **The screen is walked in blocks.** `EndFrame(screen)` goes over the buffer in blocks of 8×4
    cells (`DefaultBlockColumns`, `DefaultBlockRows`) aligned to the screen grid. A block with at
-   least one image cell is described by its cells' digests: each image cell's `ContentKey` digest,
-   zero for a cell without one.
+   least one image cell gets a key: the XXH3 of each cell's image digest and paint, zero for a cell
+   without an image. The key changes when a cell's picture changes, when its paint changes, and
+   when a cell stops or starts showing a picture.
    - **Why blocks.** Kitty cannot portably change part of an image once transmitted (the animation
      extension can, and WezTerm, Konsole and Ghostty do not implement it reliably), so the image is
      the unit of retransmission. One image per picture meant a brush stroke re-sent the whole
@@ -26,91 +29,71 @@ frame, from the whole screen:
      and how much a change re-sends (one block). The size is the encoder's and nothing outside it
      knows it; `CONSOLONIA_KITTY_BLOCK=<columns>x<rows>` (for instance `1x1`) overrides it, to try
      another size on a terminal.
-3. **Each distinct block is transmitted once.** `_blockImages`, a `ContentCache<int>`, maps the
-   digests to the terminal's image id. A block already in the terminal is not sent again; blocks
-   that look alike, such as a blank canvas, share one image. A new block is sent as PNG through the
-   platform's bitmaps when there are any, as RGBA with zlib otherwise (`TransmitBlock`): its cells'
-   pixels side by side, a cell without an image transparent.
-   - **A block's image is good for any subset of its cells**, since a placement only ever covers
-     image cells. The encoder keeps, per block position, the image last used there and what each
-     of its cells showed (`_blocksAtPositions`), and reuses that image while every cell now showing
-     the picture shows what it did; the cells that became text are simply not placed. A dialog
-     dragged across a picture therefore transmits nothing: its leading edge crops the placements,
-     and its trailing edge finds the full block in the content cache. Without this every block
-     along the dialog's edges was a new image on every frame, which filled the terminal's registry
-     in seconds.
-4. **Placements cover image cells only.** Within each block the image cells are grown into maximal
-   rectangles (`CellRectangles.GrowRectangle`), and each rectangle is placed at its cells as a crop
-   of the block's image (`x=`, `y=`, `w=`, `h=` in pixels), z=-2 (below text, above background
-   colours), `C=1` so the cursor doesn't move. A block the picture fills is one placement; a block
-   with a dialog's corner in it is a few. A text cell is never under a placement: a placement below
-   the text is drawn above the cells' background colours, and a terminal need not show a cell's
-   colour through the image's transparent pixels. Placing whole blocks put the picture over a
-   dialog's body and left only its border glyphs.
-5. **Placements are diffed across frames.** Live placements are a
-   `Dictionary<(ImageId, X, Y, Width, Height), int>`. An unchanged rectangle costs nothing. A new one
-   is placed. A vanished one is deleted by placement id (`a=d,d=i`), and the image stays for cheap
-   re-placement. The pass runs every frame; a screen whose blocks did not change costs the scan and
-   sends nothing.
+3. **One image id per block position, for the session.** `_blocks` holds, per position, the id
+   allocated for it and the key last sent under it. A block whose key is unchanged costs nothing. A
+   block whose key changed is **transmitted again under its id**: the protocol replaces the image
+   the terminal holds under that id and every placement of it, so the old picture is gone with no
+   delete. A block with no image cells left has its image deleted (`a=d,d=I`), and blocks beyond a
+   screen that shrank are deleted too. The terminal therefore never holds more images than the
+   screen has blocks.
+4. **Placements cover image cells only, placed right after the transmit.** Within the block the
+   image cells are grown into maximal rectangles (`CellRectangles.GrowRectangle`), and each is placed
+   at its cells as a crop of the block's image (`x=`, `y=`, `w=`, `h=` in pixels; placement ids 1, 2,
+   … within the image), z=-2 (below text, above background colours), `C=1` so the cursor doesn't
+   move. A block the picture fills is one placement; a block with a dialog's corner in it is a few.
+   A text cell is never under a placement: a placement below the text is drawn above the cells'
+   background colours, and a terminal need not show a cell's colour through the image's
+   transparent pixels. Placing whole blocks put the picture over a dialog's body and left only its
+   border glyphs.
+5. **Paint is in the pixels.** The colour of an image cell is the paint over the picture (a modal
+   backdrop dimming it, a shade); `TransmitBlock` composites it into the cell's pixels before
+   encoding, exactly as the sixel encoder does. A dimmed block is a different block and is sent
+   again; so is the block when the dialog closes.
+6. **The pixels.** A block is sent as PNG through the platform's bitmaps when there are any (a
+   bitmap loaded from the pixels and saved, which Avalonia does through Skia; every kitty terminal
+   decodes PNG, and a photograph is half the bytes), as RGBA with zlib level 6 otherwise: the
+   headless tests, the benchmarks, a platform without an image codec.
 
-## Translucent overlays: washes
+## Why nothing is remembered about the terminal
 
-The colour of an image cell is the **paint** over the picture: transparent to start with, and
-`Pixel.Blend` merges every translucent overlay into it while keeping the image. A modal backdrop
-dimming a picture is such a paint.
+The earlier encoder kept every transmitted block by content, placed blocks again by id when they
+came back into view, kept washes as separate placements, and tracked evictions, orphans and
+deferred deletes to keep its picture of the terminal true. Two things broke it: dragging a dialog
+across a picture made a new block image for every block along its edges on every frame, which
+filled the terminal's image registry in seconds; and a terminal that then trimmed a block still on
+screen (XTerm.NET did, oldest first) left a hole wherever that block had to be placed again,
+because the placement named an id the terminal no longer had. The protocol gives a client no way to
+learn that an image is gone except asking for error replies (`q=1`) and parsing them from the
+input, which Consolonia does not do.
 
-- **Wash placement.** Every maximal rectangle of image cells under one visible paint
-  (`CellRectangles.GrowRectangle`) gets a second placement, at z=-1 (above the picture, below text),
-  of a solid image in that colour.
-- **Wash image.** One pixel per cell of the screen, zlib compressed (`BuildTransmitWashSequence`).
-  It is a few hundred bytes whatever the screen size.
-  - Why one pixel per cell: a single pixel stretched with `c=`/`r=` works on kitty, but terminals
-    that map every cell to whole source pixels drop a placement whose cells get less than one pixel.
-  - Wash images are kept by colour. One is freed once no placement uses it
-    (`FreeUnusedWashImages`), and sent again sized up when the screen grows
-    (`DropWashImagesSmallerThan`).
-- **Mouse cursor.** The cursor glyph is written into the cell, which keeps its image; its contrast
-  colour is computed against `PixelBackground.EffectiveColor`, the paint over the picture's dominant
-  colour.
+Sending under a fixed id per position removes the belief instead of defending it. Nothing is ever
+placed that was not transmitted in the same frame, so no placement can name an image the terminal
+dropped; the set of images is bounded by the screen; and the only state is what each position was
+last sent, which is the encoder's own. What it costs against the earlier encoder:
+
+| Case | Earlier encoder | This one |
+|---|---|---|
+| New picture, brush stroke | one block | the same |
+| Dialog dragged across the picture | nothing (crops only) | the blocks along the dialog's edges again, each frame |
+| Modal dims or undims the picture | a few KB of wash placements | every covered block again, about half a megabyte at full HD |
+| Resize, resume | placed again from retained images | the screen again |
+| A terminal that drops an image on screen | a hole until the block's content changes | the same, and nothing else can make one |
 
 ## Image ids and their lifetime
 
-- **Ids.** Image and placement ids come from `KittyGraphics.AllocateImageId` and
-  `AllocatePlacementId`. They count through 1..int.MaxValue and wrap within that range. A wide
-  range matters because retransmitting an id the terminal still holds deletes that image and its
-  placements.
+- **Ids.** Image ids come from `KittyGraphics.AllocateImageId`, once per block position, and
+  placement ids count from 1 within each image. Ids count through 1..int.MaxValue and wrap within
+  that range.
 - **Registry.** `TransmittedImages` records every id transmitted and not deleted since.
   `BuildDeleteSequence` removes an id from it.
-- **Block budget.** At least 24 MB of block pixels (`MinBlockImageBudgetBytes`), or three screens'
-  worth (`ScreensOfBlockImages`) on a larger screen. One full-screen picture therefore never evicts
-  its own blocks while transmitting them, and a picture shown again within a few screens is placed,
-  not resent.
-- **The terminal's own eviction.** A terminal keeps images under a budget of its own, and the
-  protocol does not tell a client when one goes. If the terminal drops a block Consolonia still
-  counts on, placing it again shows nothing. XTerm.NET keeps 32 MB, trims least recently used, and
-  never trims an image a placement shows (that was a fix: it trimmed oldest first, on screen or not,
-  and a drag left holes wherever an uncovered block had to be placed again). The way to find out
-  from the terminal is to place with `q=1`, which answers a missing id with `ENOENT`, and to parse
-  that reply on the input side; Consolonia places with `q=2` today and does not. That is the
-  robust follow-up.
-- **Eviction is deferred.** A block evicted from the cache is not deleted immediately. A picture
-  that isn't being redrawn may still show it, and deleting the image (`d=I`) takes its placements
-  with it. Evicted ids go to `_evictedBlockImages`, and `DeleteOrphanedBlockImages` deletes each one
-  once no live placement shows it (`SelectOrphans`).
-
-### Resize, resume and exit
-
 - **Resize, and resume after another program had the terminal.** `RenderTarget.ResetCache` calls
-  the console's `ResetCache`, and the encoder's `Reset` moves every live placement to
-  `_placementsToDeleteAfterFrame`. The frame places everything again from the cells, and
-  `DeleteWhatTheFrameReplaced` (the end of `EndFrame`) deletes the old placements at its end. The
-  images stay in the terminal, because the alternate screen was never left and nothing but this app
-  deletes by id. A resumed picture is placed again from blocks already there. This was the fix for a
-  black flash on resume: deleting and retransmitting left the cells empty until the new images
-  decoded.
+  the console's `ResetCache`, and the encoder's `Reset` forgets what every position was sent. The
+  next frame sends every block again under its id, which replaces whatever the terminal still
+  holds for it: where the terminal still showed the picture, the new one is there before the old
+  one goes, since a transmit replaces rather than deletes first.
 - **Exit.** `RestoreConsole` writes `BuildDeleteTransmittedImagesSequence()`, which deletes every
   image in the registry one by one, and then `DeleteAllImages` (`a=d,d=A`). `d=A` alone deletes only
-  visible placements. It would leave the images kept for showing again in the terminal's memory.
+  visible placements. It would leave the images in the terminal's memory.
 
 ## Writing a transmit
 
@@ -127,32 +110,23 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
 - **Encoding.** Base64 is written with `Base64.EncodeToUtf8`. The buffer is sized up front by
   `MaxTransmitLength`.
 - **Same bytes as a string.** `BuildTransmitSequence` composes the same bytes and decodes them to a
-  string. It serves the wash images and the tests (`AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs`).
-- **PNG first, RGBA with zlib otherwise.** Every kitty terminal decodes PNG (`f=100` is mandatory in
-  the protocol), and a photograph is about half the bytes as PNG that it is as zlib RGBA: on three
-  Gallery photos at full HD, cut into 64×64 blocks, 0.29 to 0.59 MB as PNG against 0.39 to 1.00 MB
-  as zlib level 6 and 0.61 to 1.32 MB at level 1. The encoder asks the locator for the platform's
-  `IPlatformRenderInterface` and encodes through it: a bitmap loaded from the pixels and saved, which
-  Avalonia does through Skia. Where there is none or it cannot encode (the headless tests, the
-  benchmarks, a platform without an image codec) the block goes as RGBA, zlib level 6
-  (`CompressionLevel.Optimal`): on photographs a quarter fewer bytes than level 1 for a few tens of
-  milliseconds more per new picture.
+  string, for the tests (`AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs`).
+- **PNG first, RGBA with zlib otherwise.** On three Gallery photos at full HD, cut into 64×64
+  blocks, 0.29 to 0.59 MB as PNG against 0.39 to 1.00 MB as zlib level 6 and 0.61 to 1.32 MB at
+  level 1.
 - **`q=2`** suppresses the terminal's replies on every command.
 
 ## Benchmarks
 
 `ConsoleOutputBenchmarks`, default job, in-process, writing to a null stream (see
 [bitmap.md](bitmap.md#benchmarks)), driven as the render target drives the output: the changed
-cells written, then `EndFrame`.
+cells written, then `EndFrame`. The benchmark has no platform, so its blocks go as zlib RGBA.
 
 | Scenario | Time | Allocated | Bytes on the wire |
 |---|---|---|---|
-| New full-screen picture: every block transmitted and placed | 97 to 148 ms (noisy, zlib level 1) | 13.6 MB | 2,759,505 (level 6; 3,254,735 at level 1) |
-| Every block placed again (after a reset; images in the terminal) | 2.0 ms | 135 KB | 62,718 |
-| One cell: one block re-sent, one placement replaced | 83 µs | 40 B | 16,220 |
-
-For comparison, before this model a full-screen transmit of 510 PNG tiles of 8 KB each cost 1.38 ms
-and 32 KB allocated for 5,595,102 bytes on the wire, the PNG encoding not included.
+| New full-screen picture: every block transmitted and placed | 323 ms (zlib level 6; 97 to 148 ms at level 1) | 12.7 MB | 2,742,628 |
+| After a reset: every block sent again (the earlier encoder placed them again: 2.0 ms, 62,718 bytes) | 209 ms | 7.2 MB | 2,744,889 |
+| One cell: one block re-sent and placed | 131 µs | 40 B | 12,571 |
 
 A whole kitty frame on the unit test console (drawing into the pixel buffer and `RenderToDevice`,
 nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.md#benchmarks).
@@ -162,7 +136,6 @@ nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.
 | Tests | Cover |
 |---|---|
 | `KittyGraphicsTests` | Sequence formats (single chunk, chunked reassembly, PNG without dimensions, placements, washes, deletes), ids staying positive past overflow, and the registry: transmitted images are deleted together unless deleted one by one. |
-| `KittyImageLifetimeTests` | An evicted image nothing shows is an orphan; one still shown is deleted once its placement goes; the cache's budget. |
-| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | A block of cells is one image (RGBA, zlib) and one placement, written on the default background; only the image cells of a block are placed, as crops; a stroke re-sends and re-places the block it touched and deletes the old placement; paint over a picture is a wash image and placement, gone with the paint; after a reset everything is placed again before the old placements go. |
+| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | A block of cells is one image and one placement, written on the default background; only the image cells of a block are placed, as crops; a stroke re-sends the block under the same id with no delete; paint is sent in the pixels and undimming sends the block again as it was; a reset sends everything again under the same ids; a block with no picture left has its image deleted; a dialog dragged across a picture leaves the live placements covering exactly the image cells after every frame, with only the blocks along its edges re-sent. |
 | `WithLifetimeFixture/CellImageBitmapRendererTests` | With the kitty capability, the same renderer tests as with sixel. |
 | `AnsiConsoleOutputWriteTests` | A transmit written as bytes is the same as the one built as a string. |

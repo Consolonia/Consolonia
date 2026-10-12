@@ -106,7 +106,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         private const string SixelStart = "\u001bPq";
         private const string KittyTransmit = "\u001b_Ga=t,";
         private const string KittyPlace = "\u001b_Ga=p,";
-        private const string KittyDeletePlacement = "\u001b_Ga=d,d=i,";
 
         [Test]
         public void SixelNeighboursOnARowAreOneSixel()
@@ -223,58 +222,95 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(frame, Does.Contain(Esc.SetCursorPosition(2, 0)), "placed where those cells are");
         }
 
+        /// <summary>
+        ///     A block is sent again under its own image id, which replaces the image and its placements in
+        ///     the terminal: a change is a transmit and the new placements, never a delete.
+        /// </summary>
         [Test]
-        public void KittyStrokeReplacesTheBlockItTouched()
+        public void KittyStrokeResendsTheBlockItTouchedUnderTheSameId()
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             CellImage image = SolidImage(10, 20, 30);
-            Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)), (9, 0, ImageCell(image)));
+            string first = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)), (9, 0, ImageCell(image)));
+            string firstBlockId = ImageIdOfFirstTransmit(first);
 
             string stroke = Frame((1, 0, ImageCell(SolidImage(200, 0, 0))));
 
             Assert.That(Count(stroke, KittyTransmit), Is.EqualTo(1), "the touched block is sent anew");
+            Assert.That(ImageIdOfFirstTransmit(stroke), Is.EqualTo(firstBlockId), "under the id it had");
             Assert.That(Count(stroke, KittyPlace), Is.EqualTo(1), "and placed anew");
-            Assert.That(Count(stroke, KittyDeletePlacement), Is.EqualTo(1), "its old placement goes");
+            Assert.That(stroke, Does.Not.Contain("a=d,"), "nothing is deleted: the transmit replaced it");
 
             string unchanged = Frame();
             Assert.That(unchanged, Does.Not.Contain("\u001b_G"), "a frame that changes nothing sends nothing");
         }
 
+        /// <summary>Paint is composited into the pixels: a dimmed block is sent again, and so is an undimmed one.</summary>
         [Test]
-        public void KittyPaintOverAPictureIsAWashPlacement()
+        public void KittyPaintOverAPictureIsSentInThePixels()
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             CellImage image = SolidImage(10, 20, 30);
             var paint = Color.Parse("#7F000000");
-            Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
+            string shown = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
 
             string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
 
-            Assert.That(Count(dimmed, KittyTransmit), Is.EqualTo(1), "the wash image");
-            Assert.That(Count(dimmed, "z=-1,"), Is.EqualTo(1), "placed between the picture and the text");
-            Assert.That(dimmed, Does.Contain("w=2,h=1,c=2,r=1"), "over the two painted cells");
+            Assert.That(Count(dimmed, KittyTransmit), Is.EqualTo(1), "the block again, darker");
+            Assert.That(dimmed, Does.Not.Contain("z=-1,"), "no wash placement: the paint is in the pixels");
+            Assert.That(TransmitPayload(dimmed), Is.Not.EqualTo(TransmitPayload(shown)));
 
             string undimmed = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
-            Assert.That(Count(undimmed, KittyDeletePlacement), Is.EqualTo(1), "the wash placement goes");
-            Assert.That(undimmed, Does.Contain("a=d,d=I,"), "and so does the wash image nothing shows");
+            Assert.That(Count(undimmed, KittyTransmit), Is.EqualTo(1), "and again as it was");
+            Assert.That(TransmitPayload(undimmed), Is.EqualTo(TransmitPayload(shown)));
         }
 
+        /// <summary>
+        ///     After a reset nothing the terminal shows is trusted: every block is sent again under its id,
+        ///     which replaces whatever the terminal still had for it.
+        /// </summary>
         [Test]
-        public void KittyPlacesEverythingAgainAfterTheCacheIsReset()
+        public void KittySendsEverythingAgainAfterTheCacheIsReset()
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             CellImage image = SolidImage(10, 20, 30);
-            Frame((0, 0, ImageCell(image)));
+            string first = Frame((0, 0, ImageCell(image)));
 
             _output.ResetCache();
             string again = Frame((0, 0, ImageCell(image)));
 
-            Assert.That(Count(again, KittyTransmit), Is.Zero, "the image is still in the terminal");
+            Assert.That(Count(again, KittyTransmit), Is.EqualTo(1), "sent again");
+            Assert.That(ImageIdOfFirstTransmit(again), Is.EqualTo(ImageIdOfFirstTransmit(first)), "under the same id");
             Assert.That(Count(again, KittyPlace), Is.EqualTo(1), "placed again");
-            Assert.That(Count(again, KittyDeletePlacement), Is.EqualTo(1), "the old placement deleted after");
-            Assert.That(again.IndexOf(KittyPlace, StringComparison.Ordinal),
-                Is.LessThan(again.IndexOf(KittyDeletePlacement, StringComparison.Ordinal)),
-                "the new placement is there before the old one goes");
+            Assert.That(again, Does.Not.Contain("a=d,"));
+        }
+
+        /// <summary>A block with no picture left has its image deleted, and the terminal holds nothing for it.</summary>
+        [Test]
+        public void KittyDeletesTheImageOfABlockWithNoPictureLeft()
+        {
+            Open(ConsoleCapabilities.SupportsKittyGraphics);
+            var text = new Pixel(new PixelForeground(new Symbol('x'), Colors.White), new PixelBackground(Colors.Blue));
+            string first = Frame((0, 0, ImageCell(SolidImage(10, 20, 30))));
+
+            string covered = Frame((0, 0, text));
+
+            Assert.That(covered, Does.Contain($"a=d,d=I,q=2,i={ImageIdOfFirstTransmit(first)}"), "the block's image goes");
+            Assert.That(Count(covered, KittyTransmit), Is.Zero);
+        }
+
+        private static string ImageIdOfFirstTransmit(string frame)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(frame, @"\u001b_Ga=t,[^;]*?i=(\d+)");
+            Assert.That(match.Success, Is.True, "no transmit in the frame");
+            return match.Groups[1].Value;
+        }
+
+        private static string TransmitPayload(string frame)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(frame, @"\u001b_Ga=t,[^;]*;([^\u001b]*)");
+            Assert.That(match.Success, Is.True, "no transmit in the frame");
+            return match.Groups[1].Value;
         }
 
         /// <summary>
@@ -332,9 +368,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 Assert.That(covered, Is.EquivalentTo(expected), $"dialog at {at}");
             }
 
-            // a block's image is good for any subset of its cells, and a block uncovered again shows
-            // what it showed before, so the whole drag sends no pixels: it places and deletes crops
-            Assert.That(transmitsAfterThePicture, Is.Zero, "dragging a dialog over a picture re-sends no image");
+            // every block the dialog's edge crossed is sent again, each one under its own id; the fully
+            // covered ones are deleted and the untouched ones are not sent at all
+            Assert.That(transmitsAfterThePicture, Is.GreaterThan(0).And.LessThan(dialogs.Length * 8),
+                "dragging a dialog over a picture re-sends the blocks along its edges, not the screen");
         }
 
         [Test]
@@ -372,7 +409,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 if (!keys.TryGetValue("a", out string action))
                     continue;
 
-                if (action == "p" && keys.TryGetValue("i", out string image) && keys.TryGetValue("p", out string placement))
+                if (action == "t" && keys.TryGetValue("i", out string transmitted))
+                {
+                    // a transmit under an id the terminal holds replaces the image and its placements
+                    int replaced = int.Parse(transmitted);
+                    foreach ((int Image, int Placement) key in live.Keys.Where(k => k.Image == replaced).ToList())
+                        live.Remove(key);
+                }
+                else if (action == "p" && keys.TryGetValue("i", out string image) && keys.TryGetValue("p", out string placement))
                 {
                     int cols = keys.TryGetValue("c", out string c) ? int.Parse(c) : int.Parse(keys["w"]) / CellWidth;
                     int rows = keys.TryGetValue("r", out string r) ? int.Parse(r) : int.Parse(keys["h"]) / CellHeight;
