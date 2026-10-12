@@ -55,7 +55,8 @@ namespace Consolonia.Core.Infrastructure
 
         public void WriteCell(PixelBufferCoordinate position, in Pixel pixel)
         {
-            if (!pixel.Foreground.IsNothingToDraw())
+            // a blank symbol shows nothing, whatever color an overlay blended into it: the cell is the picture
+            if (!pixel.Foreground.IsNothingToDraw() && !pixel.Foreground.Symbol.IsBlank())
             {
                 // text over a picture: the glyph on the color the cell looks, as a text cell
                 var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.Background.EffectiveColor),

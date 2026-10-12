@@ -190,6 +190,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Character == char.MinValue && string.IsNullOrEmpty(_reference);
         }
 
+        /// <summary>
+        ///     Shows nothing in the cell: nothing to draw, or white space. A cell showing a picture under a
+        ///     blank symbol is still the picture, whatever color the symbol has.
+        /// </summary>
+        public bool IsBlank()
+        {
+            return string.IsNullOrEmpty(_reference) && (Character == char.MinValue || char.IsWhiteSpace(Character));
+        }
+
         public Symbol Blend(ref Symbol symbolAbove)
         {
             if (symbolAbove.NothingToDraw())

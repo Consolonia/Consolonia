@@ -16,6 +16,9 @@ protocol; the choice between sixel and text is made when the cell is written.
 2. **A glyph wins the cell.** An image cell with a glyph (the mouse cursor, a window edge crossing
    the picture) is written as text at once, on `PixelBackground.EffectiveColor`: the paint over the
    picture's dominant colour, so the cell still looks like the picture rather than a hole in it.
+   A blank symbol is not a glyph (`Symbol.IsBlank`: nothing, or white space): a translucent overlay
+   blended over a picture cell leaves its space with the overlay's colour as the foreground, and
+   that cell is still the picture, dimmed.
 3. **Runs at the frame's end.** `EndFrame` joins consecutive recorded cells on a row into runs and
    sends each run as **one sixel**: one escape sequence, one palette, one cursor move. A brush
    stroke is a one-cell run; a new picture is one run per row.

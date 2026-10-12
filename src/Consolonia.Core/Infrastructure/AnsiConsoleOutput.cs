@@ -155,7 +155,7 @@ namespace Consolonia.Core.Infrastructure
                     PixelBackground.ColorOver(paint, quad.Foreground.Color)),
                 new PixelBackground(PixelBackground.ColorOver(paint, quad.Background.Color)),
                 pixel.CaretStyle);
-            return pixel.Foreground.IsNothingToDraw()
+            return pixel.Foreground.IsNothingToDraw() || pixel.Foreground.Symbol.IsBlank()
                 ? painted
                 : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
         }

@@ -160,6 +160,25 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(shownAgain, Is.EqualTo(shown), "the un-dimmed run is the bytes sent before");
         }
 
+        /// <summary>
+        ///     A translucent overlay blended over a picture cell (a modal's backdrop) leaves the cell's space
+        ///     with the overlay's color as its foreground. A space draws nothing, so the cell is still a
+        ///     picture, dimmed, not text on the picture's color.
+        /// </summary>
+        [Test]
+        public void SixelDimmedByAnOverlayBlendIsStillASixel()
+        {
+            Open(ConsoleCapabilities.SupportsSixel);
+            CellImage image = SolidImage(10, 20, 30);
+            Pixel dimmed = ImageCell(image).Blend(new Pixel(new PixelBackground(Color.Parse("#7F767676"))));
+            Assert.That(dimmed.Background.Image, Is.SameAs(image));
+
+            string frame = Frame((0, 0, dimmed));
+
+            Assert.That(Count(frame, SixelStart), Is.EqualTo(1), "a dimmed picture cell is still a picture");
+            Assert.That(frame, Does.Contain("#0;2;25;27;29"), "half grey (118) over (10,20,30) in sixel percent");
+        }
+
         [Test]
         public void KittyBlockOfCellsIsOneImageAndOnePlacement()
         {
