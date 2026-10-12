@@ -210,6 +210,9 @@ The frame is built as the bytes the terminal receives:
 - **Flush.** `Flush` fills in the begin marker and appends the end marker when the terminal supports
   synchronized output. It flushes `Console.Out`, so text written there directly goes first, then
   writes the frame to stdout in **one** `Stream.Write`.
+- **Diagnostics.** `CONSOLONIA_DEBUG_FLUSH=<file>` logs each flushed frame's size and kitty
+  transmit count; `CONSOLONIA_DEBUG_FRAMES=<file>` appends every frame's bytes as sent, to read
+  back what a terminal was given.
 - **Redirected output.** `PrepareConsole` installs the writer over the stdout stream. If
   `Console.Out` was replaced since then (a test, or a host capturing output), the frame is decoded
   and written to that writer instead. `RedirectOutput(stream, capabilities)` sets the same up

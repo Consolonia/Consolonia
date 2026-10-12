@@ -39,6 +39,10 @@ namespace Consolonia.Core.Infrastructure
         private static readonly string DebugFlushLogPath =
             Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FLUSH");
 
+        // set CONSOLONIA_DEBUG_FRAMES to a file path to append every flushed frame's bytes to it, as sent
+        private static readonly string DebugFramesPath =
+            Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FRAMES");
+
         private static readonly UTF8Encoding Utf8NoBom = new(false);
 
         private static readonly byte[] BeginSynchronizedUpdate = Encoding.ASCII.GetBytes(Esc.BeginSynchronizedUpdate);
@@ -298,6 +302,8 @@ namespace Consolonia.Core.Infrastructure
 
             if (DebugFlushLogPath != null)
                 LogFlushDiagnostics(Utf8NoBom.GetString(_frame, FramePrefix, _frameLength - FramePrefix));
+            if (DebugFramesPath != null)
+                DumpFrame(_frame.AsSpan(FramePrefix, _frameLength - FramePrefix));
 
             // synchronized update (DEC 2026) makes the terminal apply the batch atomically; wrapping here
             // rather than in the render loop keeps begin/end paired even if a frame is abandoned
@@ -570,6 +576,19 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        private static void DumpFrame(ReadOnlySpan<byte> frame)
+        {
+            try
+            {
+                using var file = new FileStream(DebugFramesPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+                file.Write(frame);
+            }
+            catch (IOException)
+            {
+                // diagnostics must never take the app down
+            }
         }
 
         private static void LogFlushDiagnostics(string text)

@@ -29,13 +29,19 @@ frame, from the whole screen:
    to the terminal's image id. A block already in the terminal is not sent again; blocks that look
    alike, such as a blank canvas, share one image. A new block is sent as RGBA with zlib
    (`TransmitBlock`): its cells' pixels side by side, a cell without an image transparent.
-4. **One placement per block.** The block is placed at its cells, z=-2 (below text, above
-   background colours), `C=1` so the cursor doesn't move. The image is the block, pre-scaled to the
-   cell grid, so the placement is the whole image and needs no crop or stretch.
-5. **Placements are diffed across frames.** Live placements are a `Dictionary<(ImageId, X, Y), int>`.
-   An unchanged block costs nothing. A new one is placed. A vanished one is deleted by placement id
-   (`a=d,d=i`), and the image stays for cheap re-placement. The pass runs every frame; a screen whose
-   blocks did not change costs the scan and sends nothing.
+4. **Placements cover image cells only.** Within each block the image cells are grown into maximal
+   rectangles (`CellRectangles.GrowRectangle`), and each rectangle is placed at its cells as a crop
+   of the block's image (`x=`, `y=`, `w=`, `h=` in pixels), z=-2 (below text, above background
+   colours), `C=1` so the cursor doesn't move. A block the picture fills is one placement; a block
+   with a dialog's corner in it is a few. A text cell is never under a placement: a placement below
+   the text is drawn above the cells' background colours, and a terminal need not show a cell's
+   colour through the image's transparent pixels. Placing whole blocks put the picture over a
+   dialog's body and left only its border glyphs.
+5. **Placements are diffed across frames.** Live placements are a
+   `Dictionary<(ImageId, X, Y, Width, Height), int>`. An unchanged rectangle costs nothing. A new one
+   is placed. A vanished one is deleted by placement id (`a=d,d=i`), and the image stays for cheap
+   re-placement. The pass runs every frame; a screen whose blocks did not change costs the scan and
+   sends nothing.
 
 ## Translucent overlays: washes
 
@@ -136,6 +142,6 @@ nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.
 |---|---|
 | `KittyGraphicsTests` | Sequence formats (single chunk, chunked reassembly, PNG without dimensions, placements, washes, deletes), ids staying positive past overflow, and the registry: transmitted images are deleted together unless deleted one by one. |
 | `KittyImageLifetimeTests` | An evicted image nothing shows is an orphan; one still shown is deleted once its placement goes; the cache's budget. |
-| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | A block of cells is one image (RGBA, zlib) and one placement, written on the default background; a stroke re-sends and re-places the block it touched and deletes the old placement; paint over a picture is a wash image and placement, gone with the paint; after a reset everything is placed again before the old placements go. |
+| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | A block of cells is one image (RGBA, zlib) and one placement, written on the default background; only the image cells of a block are placed, as crops; a stroke re-sends and re-places the block it touched and deletes the old placement; paint over a picture is a wash image and placement, gone with the paint; after a reset everything is placed again before the old placements go. |
 | `WithLifetimeFixture/CellImageBitmapRendererTests` | With the kitty capability, the same renderer tests as with sixel. |
 | `AnsiConsoleOutputWriteTests` | A transmit written as bytes is the same as the one built as a string. |

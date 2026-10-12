@@ -199,6 +199,28 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 "the cells are written on the default background so the placement shows through");
         }
 
+        /// <summary>
+        ///     A placement below the text is drawn above the cells' background colors, so a text cell must
+        ///     never be under one: a dialog over a picture would show the picture through its body. Only
+        ///     the rectangles of image cells of a block are placed, as crops of the block's image.
+        /// </summary>
+        [Test]
+        public void KittyPlacesOnlyTheImageCellsOfABlock()
+        {
+            Open(ConsoleCapabilities.SupportsKittyGraphics);
+            CellImage image = SolidImage(10, 20, 30);
+            var text = new Pixel(new PixelForeground(new Symbol('x'), Colors.White), new PixelBackground(Colors.Blue));
+
+            string frame = Frame((0, 0, ImageCell(image)), (1, 0, text), (2, 0, ImageCell(image)),
+                (3, 0, ImageCell(image)));
+
+            Assert.That(Count(frame, KittyTransmit), Is.EqualTo(1), "one block image");
+            Assert.That(Count(frame, KittyPlace), Is.EqualTo(2), "the image cells either side of the text cell");
+            Assert.That(frame, Does.Contain("x=0,y=0,w=8,h=16"), "the first cell");
+            Assert.That(frame, Does.Contain("x=16,y=0,w=16,h=16"), "the two cells after the text cell");
+            Assert.That(frame, Does.Contain(Esc.SetCursorPosition(2, 0)), "placed where those cells are");
+        }
+
         [Test]
         public void KittyStrokeReplacesTheBlockItTouched()
         {

@@ -77,6 +77,7 @@ namespace Consolonia.Core.Infrastructure
         private readonly List<Color> _washesToDelete = new();
         private readonly List<(WashRect Rect, Color Paint)> _washPlacementsToRemove = new();
         private bool[] _rectangleVisited;
+        private bool[] _blockVisited;
         private byte[] _blockKeyScratch;
         private byte[] _blockScratch;
 
@@ -92,7 +93,13 @@ namespace Consolonia.Core.Infrastructure
             _blockImages = new ContentCache<int>(MinBlockImageBudgetBytes, imageId => _evictedBlockImages.Add(imageId));
         }
 
-        private readonly record struct BlockPlacement(int ImageId, ushort ScreenX, ushort ScreenY);
+        /// <summary>A rectangle of image cells within one block, placed as a crop of the block's image.</summary>
+        private readonly record struct BlockPlacement(
+            int ImageId,
+            ushort ScreenX,
+            ushort ScreenY,
+            ushort Width,
+            ushort Height);
 
         private readonly record struct WashRect(ushort ScreenX, ushort ScreenY, ushort Width, ushort Height);
 
@@ -149,12 +156,18 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Walks the screen in blocks, transmits each block of image cells whose content the terminal
-        ///     does not hold yet, places each block not already placed (at its cells, z=-2 so text drawn on
-        ///     the covered cells composites over the picture), and deletes the placements of blocks no
-        ///     longer there, with the image data retained for cheap re-placement. A rectangle of image cells
-        ///     under one paint gets a wash placement of a translucent image at z=-1, which is how a modal
-        ///     backdrop dims a picture.
+        ///     does not hold yet, places the rectangles of image cells of each block not already placed
+        ///     (crops of the block's image at their cells, z=-2 so text drawn on the covered cells composites
+        ///     over the picture), and deletes the placements no longer backed by cells, with the image data
+        ///     retained for cheap re-placement. A rectangle of image cells under one paint gets a wash
+        ///     placement of a translucent image at z=-1, which is how a modal backdrop dims a picture.
         /// </summary>
+        /// <remarks>
+        ///     Only image cells are ever under a placement. A placement below the text is drawn above the
+        ///     cells' background colors, and a terminal need not show a cell's color through the image's
+        ///     transparent pixels: placing a whole block put the picture over a dialog's body and left only
+        ///     its border glyphs.
+        /// </remarks>
         private void EmitPlacements(PixelBuffer screen)
         {
             int cellPixelWidth = _output.CellPixelWidth;
@@ -165,6 +178,8 @@ namespace Consolonia.Core.Infrastructure
             Dictionary<BlockPlacement, int> live = _placements;
             Dictionary<BlockPlacement, int> next = _placementsScratch;
             next.Clear();
+            int screenWidth = screen.Width;
+            bool[] visited = CellRectangles.Scratch(ref _blockVisited, screenWidth * screen.Height);
 
             for (ushort blockY = 0; blockY < screen.Height; blockY += BlockRows)
             for (ushort blockX = 0; blockX < screen.Width; blockX += BlockColumns)
@@ -183,18 +198,30 @@ namespace Consolonia.Core.Infrastructure
                         columns * cellPixelWidth * rows * cellPixelHeight * 4L);
                 }
 
-                var placement = new BlockPlacement(imageId, blockX, blockY);
-                if (live.Remove(placement, out int placementId))
+                var block = new ImageCellsInBlock(screen, blockX, blockY, columns, rows);
+                for (int y = blockY; y < blockY + rows; y++)
+                for (int x = blockX; x < blockX + columns; x++)
                 {
-                    next[placement] = placementId;
-                    continue;
-                }
+                    if (visited[y * screenWidth + x] || screen.CellAt(x, y).Background.Image == null)
+                        continue;
 
-                placementId = KittyGraphics.AllocatePlacementId();
-                next[placement] = placementId;
-                _output.SetCaretPosition(new PixelBufferCoordinate(blockX, blockY));
-                _output.WriteText(KittyGraphics.BuildRectPlacementSequence(imageId, placementId, 0, 0,
-                    columns * cellPixelWidth, rows * cellPixelHeight));
+                    (int width, int height) = CellRectangles.GrowRectangle(block, visited, screenWidth,
+                        screen.Height, x, y, false);
+                    var placement = new BlockPlacement(imageId, (ushort)x, (ushort)y, (ushort)width,
+                        (ushort)height);
+                    if (live.Remove(placement, out int placementId))
+                    {
+                        next[placement] = placementId;
+                        continue;
+                    }
+
+                    placementId = KittyGraphics.AllocatePlacementId();
+                    next[placement] = placementId;
+                    _output.SetCaretPosition(new PixelBufferCoordinate((ushort)x, (ushort)y));
+                    _output.WriteText(KittyGraphics.BuildRectPlacementSequence(imageId, placementId,
+                        (x - blockX) * cellPixelWidth, (y - blockY) * cellPixelHeight,
+                        width * cellPixelWidth, height * cellPixelHeight));
+                }
             }
 
             // whatever is left in the live set has no cells backing it anymore
@@ -446,6 +473,19 @@ namespace Consolonia.Core.Infrastructure
             {
                 _output.WriteText(KittyGraphics.BuildDeleteSequence(_washImages[paint].ImageId));
                 _washImages.Remove(paint);
+            }
+        }
+
+        /// <summary>Image cells within one block.</summary>
+        private readonly struct ImageCellsInBlock(PixelBuffer screen, int blockX, int blockY, int columns, int rows)
+            : IRectangleCells
+        {
+            public bool Joins(int x, int y, int dx, int dy)
+            {
+                int cellX = x + dx;
+                int cellY = y + dy;
+                return cellX < blockX + columns && cellY < blockY + rows &&
+                       screen.CellAt(cellX, cellY).Background.Image != null;
             }
         }
 
