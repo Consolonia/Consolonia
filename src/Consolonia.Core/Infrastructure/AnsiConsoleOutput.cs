@@ -68,7 +68,10 @@ namespace Consolonia.Core.Infrastructure
 
         private PixelBufferCoordinate _headBufferPoint;
 
-        /// <summary>Shows the image cells, for the console's image protocol; null when it has none.</summary>
+        /// <summary>
+        ///     Shows the image cells, for the image protocol the console answered the probe with; null when
+        ///     it answered none. See <see cref="PrepareConsole" />.
+        /// </summary>
         private IConsoleImageEncoder _imageEncoder;
 
         /// <summary>Console.Out as installed over <see cref="_stream" />: anything else means it was redirected.</summary>
@@ -135,7 +138,7 @@ namespace Consolonia.Core.Infrastructure
                     return;
                 }
 
-                // a picture the console claims to show but this output has no protocol for: block glyphs
+                // a picture on a console the probe found no image protocol for: block glyphs
                 WriteTextCell(position, AsQuadCell(in pixel), false);
                 return;
             }
@@ -400,13 +403,12 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     The encoder for the console's image protocol, kitty before sixel, or null when it has none
-        ///     this output can use (kitty needs the RGB color mode).
+        ///     The encoder for the image protocol the capabilities name, kitty before sixel, or null when
+        ///     they name none: the probe's answer and nothing else.
         /// </summary>
         private IConsoleImageEncoder CreateImageEncoder()
         {
-            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
-                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
                 return new KittyConsoleImageEncoder(this);
 
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))

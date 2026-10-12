@@ -79,7 +79,7 @@ and the drawing contexts (replaced on every resize) borrow it:
 
 `AnsiConsoleOutput.PrepareConsole` detects the capabilities and chooses its encoder:
 
-- Kitty: a kitty query (`a=q`). The encoder also needs the RGB colour mode.
+- Kitty: a kitty query (`a=q`).
 - Sixel: the DA1 reply.
 - Synchronized output: a DEC 2026 mode request.
 
@@ -181,7 +181,7 @@ console's `IConsoleImageEncoder`:
 |---|---|---|
 | **Sixel** | A cell with a glyph is written as text on `EffectiveColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
 | **Kitty** | Written as text on the terminal's default background (Konsole hides below-text placements under any explicit cell background), glyph or blank. | The screen is walked in 8×4-cell blocks. A block with image cells is keyed by its cells' image digests, transmitted once per distinct content (RGBA, zlib), and placed at its position; placements and washes are diffed against the live ones. |
-| **None** (the console claims a protocol the output cannot use) | The cell as a block glyph in the picture's colours under its paint (`QuadPixelBitmapRenderer.FromPixels`), its own glyph kept. | Nothing. |
+| **None** (a console that reports no image protocol, given an image cell anyway) | The cell as a block glyph in the picture's colours under its paint (`QuadPixelBitmapRenderer.FromPixels`), its own glyph kept. | Nothing. |
 
 Why the per-cell call is needed: the dirty rectangles say which cells were redrawn, but only the
 render target's compare knows which cells *changed*, and it says so by calling `WritePixel`. The
