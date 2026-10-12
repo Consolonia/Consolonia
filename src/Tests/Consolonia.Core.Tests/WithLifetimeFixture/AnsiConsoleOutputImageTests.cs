@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Controls;
@@ -273,6 +275,104 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(again.IndexOf(KittyPlace, StringComparison.Ordinal),
                 Is.LessThan(again.IndexOf(KittyDeletePlacement, StringComparison.Ordinal)),
                 "the new placement is there before the old one goes");
+        }
+
+        /// <summary>
+        ///     A dialog dragged across a picture: after every frame the placements alive in the terminal
+        ///     cover exactly the cells that show the picture, no more and no fewer. Judged from the
+        ///     sequences sent, applied as a terminal applies them: a placement covers its cells until a
+        ///     delete names it or its image.
+        /// </summary>
+        [Test]
+        public void KittyPlacementsCoverExactlyTheImageCellsAsADialogMoves()
+        {
+            Open(ConsoleCapabilities.SupportsKittyGraphics);
+            var live = new Dictionary<(int Image, int Placement), HashSet<(int X, int Y)>>();
+            var previous = new PixelBuffer(Columns, Rows);
+
+            // every cell of the picture distinct, so no two blocks share an image
+            var picture = new CellImage[Columns, Rows];
+            for (int y = 0; y < Rows; y++)
+            for (int x = 0; x < Columns; x++)
+                picture[x, y] = SolidImage((byte)(x * 16), (byte)(y * 32), 7);
+
+            var dialog = new Pixel(new PixelForeground(new Symbol('d'), Colors.Black), new PixelBackground(Colors.White));
+            (int X, int Y, int W, int H)?[] dialogs = { null, (2, 2, 7, 5), (3, 2, 7, 5), (5, 3, 7, 5), (9, 1, 6, 6), null, (0, 0, 16, 8), null };
+
+            foreach ((int X, int Y, int W, int H)? at in dialogs)
+            {
+                var screen = new PixelBuffer(Columns, Rows);
+                var changed = new List<(int, int, Pixel)>();
+                for (int y = 0; y < Rows; y++)
+                for (int x = 0; x < Columns; x++)
+                {
+                    bool underDialog = at is { } d && x >= d.X && x < d.X + d.W && y >= d.Y && y < d.Y + d.H;
+                    Pixel pixel = underDialog ? dialog : ImageCell(picture[x, y]);
+                    screen[(ushort)x, (ushort)y] = pixel;
+                    if (pixel != previous[(ushort)x, (ushort)y])
+                        changed.Add((x, y, pixel));
+                }
+
+                _screen = screen;
+                string frame = Frame(changed.ToArray());
+                ApplyToTerminal(frame, live);
+                previous = screen;
+
+                var covered = new HashSet<(int, int)>(live.Values.SelectMany(cells => cells));
+                var expected = new HashSet<(int, int)>();
+                for (int y = 0; y < Rows; y++)
+                for (int x = 0; x < Columns; x++)
+                    if (screen[(ushort)x, (ushort)y].Background.Image != null)
+                        expected.Add((x, y));
+
+                Assert.That(covered, Is.EquivalentTo(expected), $"dialog at {at}");
+            }
+        }
+
+        /// <summary>Applies a frame's kitty placements and deletes to <paramref name="live" />, as a terminal would.</summary>
+        private static void ApplyToTerminal(string frame, Dictionary<(int Image, int Placement), HashSet<(int X, int Y)>> live)
+        {
+            var cursor = (X: 0, Y: 0);
+            var tokens = System.Text.RegularExpressions.Regex.Matches(frame,
+                @"\u001b\[(\d+);(\d+)f|\u001b_G([^\u001b]*)\u001b\\");
+            foreach (System.Text.RegularExpressions.Match token in tokens)
+            {
+                if (token.Groups[1].Success)
+                {
+                    cursor = (int.Parse(token.Groups[2].Value) - 1, int.Parse(token.Groups[1].Value) - 1);
+                    continue;
+                }
+
+                string command = token.Groups[3].Value;
+                var keys = command.Split(';')[0].Split(',')
+                    .Select(part => part.Split('='))
+                    .Where(part => part.Length == 2)
+                    .ToDictionary(part => part[0], part => part[1]);
+                if (!keys.TryGetValue("a", out string action))
+                    continue;
+
+                if (action == "p" && keys.TryGetValue("i", out string image) && keys.TryGetValue("p", out string placement))
+                {
+                    int cols = keys.TryGetValue("c", out string c) ? int.Parse(c) : int.Parse(keys["w"]) / CellWidth;
+                    int rows = keys.TryGetValue("r", out string r) ? int.Parse(r) : int.Parse(keys["h"]) / CellHeight;
+                    var cells = new HashSet<(int, int)>();
+                    for (int y = 0; y < rows; y++)
+                    for (int x = 0; x < cols; x++)
+                        cells.Add((cursor.X + x, cursor.Y + y));
+                    if (keys.TryGetValue("z", out string z) && z == "-1")
+                        continue; // a wash is not the picture
+                    live[(int.Parse(image), int.Parse(placement))] = cells;
+                }
+                else if (action == "d" && keys.TryGetValue("d", out string target) && keys.TryGetValue("i", out string deleted))
+                {
+                    int imageId = int.Parse(deleted);
+                    if (target == "i" && keys.TryGetValue("p", out string p))
+                        live.Remove((imageId, int.Parse(p)));
+                    else if (target == "I")
+                        foreach ((int Image, int Placement) key in live.Keys.Where(k => k.Image == imageId).ToList())
+                            live.Remove(key);
+                }
+            }
         }
 
         [Test]
