@@ -27,10 +27,19 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
      the unit of retransmission. One image per picture meant a brush stroke re-sent the whole
      picture. A block is the compromise between how many images a screen is (about 500 at 240×67)
      and how much a change re-sends (one block). The size is the encoder's constant and nothing
-     outside it knows it. Measured once at 1×1 (one image and one placement per cell): a new
-     full-screen picture 273 ms and 6.08 MB against 82 ms and 3.24 MB at 8×4, since every cell
-     carries its own header, base64 padding and placement, and one cell 1.1 ms against 0.4 ms,
-     since every frame walks 16,080 blocks instead of 503.
+     outside it knows it. Measured across sizes (`ConsoleOutputBenchmarks`, zlib fallback, quiet
+     machine), the full-screen cost flattens out at 8×4 while the cost of a stroke keeps growing
+     with the block, so 8×4 is the knee; 4×2 is the alternative if strokes matter more than loads:
+
+     | Block | Images per screen | New full-screen picture | One brush stroke |
+     |---|---|---|---|
+     | 1×1 | 16,080 | 273 ms, 6.08 MB | 1.1 ms, 0.7 KB |
+     | 4×2 | 2,010 | 125 ms, 3.52 MB | 381 µs, 2.3 KB |
+     | 8×4 | 503 | 82 ms, 3.24 MB | 425 µs, 7.1 KB |
+     | 16×8 | 128 | 79 ms, 3.22 MB | 734 µs, 25.6 KB |
+
+     Per cell every block carries its own header, base64 padding and placement, and every frame
+     walks 16,080 blocks instead of 503.
 3. **One image id per block position, for the session.** `_blocks` holds, per position, the id
    allocated for it and the key last sent under it. A block whose key is unchanged costs nothing. A
    block whose key changed is **transmitted again under its id**: the protocol replaces the image
