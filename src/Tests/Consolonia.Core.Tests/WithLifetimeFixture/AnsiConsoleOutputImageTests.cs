@@ -186,9 +186,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             CellImage image = SolidImage(10, 20, 30);
-            var cells = new (int, int, Pixel)[KittyConsoleImageEncoder.BlockColumns * KittyConsoleImageEncoder.BlockRows];
+            var cells = new (int, int, Pixel)[KittyConsoleImageEncoder.DefaultBlockColumns * KittyConsoleImageEncoder.DefaultBlockRows];
             for (int i = 0; i < cells.Length; i++)
-                cells[i] = (i % KittyConsoleImageEncoder.BlockColumns, i / KittyConsoleImageEncoder.BlockColumns,
+                cells[i] = (i % KittyConsoleImageEncoder.DefaultBlockColumns, i / KittyConsoleImageEncoder.DefaultBlockColumns,
                     ImageCell(image));
 
             string frame = Frame(cells);
@@ -299,8 +299,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             var dialog = new Pixel(new PixelForeground(new Symbol('d'), Colors.Black), new PixelBackground(Colors.White));
             (int X, int Y, int W, int H)?[] dialogs = { null, (2, 2, 7, 5), (3, 2, 7, 5), (5, 3, 7, 5), (9, 1, 6, 6), null, (0, 0, 16, 8), null };
 
-            foreach ((int X, int Y, int W, int H)? at in dialogs)
+            int transmitsAfterThePicture = 0;
+            for (int step = 0; step < dialogs.Length; step++)
             {
+                (int X, int Y, int W, int H)? at = dialogs[step];
                 var screen = new PixelBuffer(Columns, Rows);
                 var changed = new List<(int, int, Pixel)>();
                 for (int y = 0; y < Rows; y++)
@@ -316,6 +318,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 _screen = screen;
                 string frame = Frame(changed.ToArray());
                 ApplyToTerminal(frame, live);
+                if (step > 0)
+                    transmitsAfterThePicture += Count(frame, KittyTransmit);
                 previous = screen;
 
                 var covered = new HashSet<(int, int)>(live.Values.SelectMany(cells => cells));
@@ -327,6 +331,23 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
                 Assert.That(covered, Is.EquivalentTo(expected), $"dialog at {at}");
             }
+
+            // a block's image is good for any subset of its cells, and a block uncovered again shows
+            // what it showed before, so the whole drag sends no pixels: it places and deletes crops
+            Assert.That(transmitsAfterThePicture, Is.Zero, "dragging a dialog over a picture re-sends no image");
+        }
+
+        [Test]
+        public void TheKittyBlockSizeCanBeOverridden()
+        {
+            Assert.That(KittyConsoleImageEncoder.BlockSize(null),
+                Is.EqualTo((KittyConsoleImageEncoder.DefaultBlockColumns, KittyConsoleImageEncoder.DefaultBlockRows)));
+            Assert.That(KittyConsoleImageEncoder.BlockSize("1x1"), Is.EqualTo((1, 1)));
+            Assert.That(KittyConsoleImageEncoder.BlockSize(" 16X8 "), Is.EqualTo((16, 8)));
+            Assert.That(KittyConsoleImageEncoder.BlockSize("0x4"),
+                Is.EqualTo((KittyConsoleImageEncoder.DefaultBlockColumns, KittyConsoleImageEncoder.DefaultBlockRows)));
+            Assert.That(KittyConsoleImageEncoder.BlockSize("big"),
+                Is.EqualTo((KittyConsoleImageEncoder.DefaultBlockColumns, KittyConsoleImageEncoder.DefaultBlockRows)));
         }
 
         /// <summary>Applies a frame's kitty placements and deletes to <paramref name="live" />, as a terminal would.</summary>

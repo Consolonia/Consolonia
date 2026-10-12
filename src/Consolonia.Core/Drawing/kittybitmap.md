@@ -16,19 +16,28 @@ frame, from the whole screen:
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
    cell a colour, even black, hides the picture there; kitty draws them above either way.
 2. **The screen is walked in blocks.** `EndFrame(screen)` goes over the buffer in blocks of 8×4
-   cells (`BlockColumns`, `BlockRows`) aligned to the screen grid. A block with at least one image
-   cell gets a content key: the XXH3 of its cells' image digests, a zero marker for a cell without
-   one.
+   cells (`DefaultBlockColumns`, `DefaultBlockRows`) aligned to the screen grid. A block with at
+   least one image cell is described by its cells' digests: each image cell's `ContentKey` digest,
+   zero for a cell without one.
    - **Why blocks.** Kitty cannot portably change part of an image once transmitted (the animation
      extension can, and WezTerm, Konsole and Ghostty do not implement it reliably), so the image is
      the unit of retransmission. One image per picture meant a brush stroke re-sent the whole
      picture. A block is the compromise between how many images a screen is (about 500 at 240×67)
-     and how much a change re-sends (one block). The size is the encoder's constant and nothing
-     outside it knows it.
-3. **Each distinct block is transmitted once.** `_blockImages`, a `ContentCache<int>`, maps content
-   to the terminal's image id. A block already in the terminal is not sent again; blocks that look
-   alike, such as a blank canvas, share one image. A new block is sent as RGBA with zlib
+     and how much a change re-sends (one block). The size is the encoder's and nothing outside it
+     knows it; `CONSOLONIA_KITTY_BLOCK=<columns>x<rows>` (for instance `1x1`) overrides it, to try
+     another size on a terminal.
+3. **Each distinct block is transmitted once.** `_blockImages`, a `ContentCache<int>`, maps the
+   digests to the terminal's image id. A block already in the terminal is not sent again; blocks
+   that look alike, such as a blank canvas, share one image. A new block is sent as RGBA with zlib
    (`TransmitBlock`): its cells' pixels side by side, a cell without an image transparent.
+   - **A block's image is good for any subset of its cells**, since a placement only ever covers
+     image cells. The encoder keeps, per block position, the image last used there and what each
+     of its cells showed (`_blocksAtPositions`), and reuses that image while every cell now showing
+     the picture shows what it did; the cells that became text are simply not placed. A dialog
+     dragged across a picture therefore transmits nothing: its leading edge crops the placements,
+     and its trailing edge finds the full block in the content cache. Without this every block
+     along the dialog's edges was a new image on every frame, which filled the terminal's registry
+     in seconds.
 4. **Placements cover image cells only.** Within each block the image cells are grown into maximal
    rectangles (`CellRectangles.GrowRectangle`), and each rectangle is placed at its cells as a crop
    of the block's image (`x=`, `y=`, `w=`, `h=` in pixels), z=-2 (below text, above background
@@ -74,9 +83,15 @@ dimming a picture is such a paint.
 - **Block budget.** At least 24 MB of block pixels (`MinBlockImageBudgetBytes`), or three screens'
   worth (`ScreensOfBlockImages`) on a larger screen. One full-screen picture therefore never evicts
   its own blocks while transmitting them, and a picture shown again within a few screens is placed,
-  not resent. The terminal has to keep at least as much: XTerm.NET keeps the same three screens
-  (`MaxImageRegistryBytes`). If the terminal dropped blocks that Consolonia still counts on, placing
-  them again would show nothing.
+  not resent.
+- **The terminal's own eviction.** A terminal keeps images under a budget of its own, and the
+  protocol does not tell a client when one goes. If the terminal drops a block Consolonia still
+  counts on, placing it again shows nothing. XTerm.NET keeps 32 MB, trims least recently used, and
+  never trims an image a placement shows (that was a fix: it trimmed oldest first, on screen or not,
+  and a drag left holes wherever an uncovered block had to be placed again). The way to find out
+  from the terminal is to place with `q=1`, which answers a missing id with `ENOENT`, and to parse
+  that reply on the input side; Consolonia places with `q=2` today and does not. That is the
+  robust follow-up.
 - **Eviction is deferred.** A block evicted from the cache is not deleted immediately. A picture
   that isn't being redrawn may still show it, and deleting the image (`d=I`) takes its placements
   with it. Evicted ids go to `_evictedBlockImages`, and `DeleteOrphanedBlockImages` deletes each one

@@ -21,14 +21,23 @@ namespace Consolonia.Core.Infrastructure
     ///     the unit of retransmission: one image per picture meant a brush stroke re-sent the whole picture.
     ///     A block of a few cells is the compromise between how many images a screen is and how much a
     ///     change re-sends. Blocks are aligned to the screen grid; a block's content is the images of its
-    ///     cells, so a block that looks like one already in the terminal reuses its image.
+    ///     cells, so a block that looks like one already in the terminal reuses its image. And a block
+    ///     image is good for any subset of its cells, since a placement only ever covers image cells: a
+    ///     dialog crossing a block does not remake the block's image, it crops the placements.
     /// </remarks>
     internal sealed class KittyConsoleImageEncoder : IConsoleImageEncoder
     {
-        /// <summary>Block size in cells: small enough that a stroke touches few, large enough to be few.</summary>
-        internal const int BlockColumns = 8;
+        /// <summary>
+        ///     Block size in cells: small enough that a stroke touches few, large enough to be few.
+        ///     CONSOLONIA_KITTY_BLOCK=&lt;columns&gt;x&lt;rows&gt; overrides it, to try another on a terminal.
+        /// </summary>
+        internal const int DefaultBlockColumns = 8;
 
-        internal const int BlockRows = 4;
+        internal const int DefaultBlockRows = 4;
+
+        internal int BlockColumns { get; }
+
+        internal int BlockRows { get; }
 
         /// <summary>
         ///     Pixel bytes of block images kept in the terminal at least. The budget grows to
@@ -42,9 +51,6 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>Screens' worth of block images kept, so pictures shown again need not be resent.</summary>
         private const int ScreensOfBlockImages = 3;
 
-        /// <summary>Stands in for a cell without an image in a block's content key.</summary>
-        private static readonly byte[] NoImageMarker = new byte[16];
-
         private readonly AnsiConsoleOutput _output;
 
         /// <summary>
@@ -55,6 +61,17 @@ namespace Consolonia.Core.Infrastructure
         private readonly ContentCache<int> _blockImages;
 
         private readonly HashSet<int> _evictedBlockImages = new();
+
+        /// <summary>
+        ///     The image last used at each block position and what its cells showed, image cells by
+        ///     their digest and text cells as zero. The image is reused while every cell now showing the
+        ///     picture shows the same as it did: the cells that became text are simply not placed. That is
+        ///     what keeps a dialog dragged across a picture from transmitting a new image for every block
+        ///     along its edges on every frame.
+        /// </summary>
+        private readonly Dictionary<(int X, int Y), BlockRecord> _blocksAtPositions = new();
+
+        private UInt128[] _blockDigests;
 
         // placements of blocks at z=-2, keyed by the block's image and screen position, diffed across
         // frames so only changed blocks cross the wire; scratch collects the next frame, then the two swap
@@ -78,7 +95,6 @@ namespace Consolonia.Core.Infrastructure
         private readonly List<(WashRect Rect, Color Paint)> _washPlacementsToRemove = new();
         private bool[] _rectangleVisited;
         private bool[] _blockVisited;
-        private byte[] _blockKeyScratch;
         private byte[] _blockScratch;
 
         /// <summary>
@@ -91,7 +107,22 @@ namespace Consolonia.Core.Infrastructure
         {
             _output = output;
             _blockImages = new ContentCache<int>(MinBlockImageBudgetBytes, imageId => _evictedBlockImages.Add(imageId));
+            (BlockColumns, BlockRows) = BlockSize(Environment.GetEnvironmentVariable("CONSOLONIA_KITTY_BLOCK"));
         }
+
+        /// <summary>The block size an override names, as "columns x rows", or the default.</summary>
+        internal static (int Columns, int Rows) BlockSize(string overrideValue)
+        {
+            string[] parts = overrideValue?.Trim().ToUpperInvariant().Split('X') ?? Array.Empty<string>();
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], out int columns) && int.TryParse(parts[1], out int rows) &&
+                columns > 0 && rows > 0)
+                return (columns, rows);
+            return (DefaultBlockColumns, DefaultBlockRows);
+        }
+
+        /// <summary>The image at a block position and the digest of each of its cells (zero for a text cell).</summary>
+        private readonly record struct BlockRecord(ContentKey Key, UInt128[] Digests);
 
         /// <summary>A rectangle of image cells within one block, placed as a crop of the block's image.</summary>
         private readonly record struct BlockPlacement(
@@ -181,21 +212,34 @@ namespace Consolonia.Core.Infrastructure
             int screenWidth = screen.Width;
             bool[] visited = CellRectangles.Scratch(ref _blockVisited, screenWidth * screen.Height);
 
-            for (ushort blockY = 0; blockY < screen.Height; blockY += BlockRows)
-            for (ushort blockX = 0; blockX < screen.Width; blockX += BlockColumns)
+            for (int blockY = 0; blockY < screen.Height; blockY += BlockRows)
+            for (int blockX = 0; blockX < screen.Width; blockX += BlockColumns)
             {
                 int columns = Math.Min(BlockColumns, screen.Width - blockX);
                 int rows = Math.Min(BlockRows, screen.Height - blockY);
-                if (!TryGetBlockKey(screen, blockX, blockY, columns, rows, cellPixelWidth, cellPixelHeight,
-                        out ContentKey blockKey))
+                if (!TryGetBlockDigests(screen, blockX, blockY, columns, rows, out Span<UInt128> digests))
                     continue;
 
-                if (!_blockImages.TryGet(blockKey, out int imageId))
+                int imageId;
+                if (_blocksAtPositions.TryGetValue((blockX, blockY), out BlockRecord record) &&
+                    ShowsTheSame(record.Digests, digests) && _blockImages.TryGet(record.Key, out imageId))
                 {
-                    imageId = KittyGraphics.AllocateImageId();
-                    TransmitBlock(imageId, screen, blockX, blockY, columns, rows, cellPixelWidth, cellPixelHeight);
-                    _blockImages.GetOrAdd(blockKey, imageId,
-                        columns * cellPixelWidth * rows * cellPixelHeight * 4L);
+                    // the image last used here still shows every picture cell as it is now
+                }
+                else
+                {
+                    ContentKey blockKey = ContentKey.Of(MemoryMarshal.AsBytes(digests),
+                        columns * cellPixelWidth, rows * cellPixelHeight);
+                    if (!_blockImages.TryGet(blockKey, out imageId))
+                    {
+                        imageId = KittyGraphics.AllocateImageId();
+                        TransmitBlock(imageId, screen, blockX, blockY, columns, rows, cellPixelWidth,
+                            cellPixelHeight);
+                        _blockImages.GetOrAdd(blockKey, imageId,
+                            columns * cellPixelWidth * rows * cellPixelHeight * 4L);
+                    }
+
+                    _blocksAtPositions[(blockX, blockY)] = new BlockRecord(blockKey, digests.ToArray());
                 }
 
                 var block = new ImageCellsInBlock(screen, blockX, blockY, columns, rows);
@@ -236,37 +280,42 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     The content of a block: the images of its cells, a marker for a cell without one. False when
-        ///     no cell of the block shows an image.
+        ///     What a block's cells show: each image cell's digest, zero for a cell without an image, row by
+        ///     row. False when no cell of the block shows an image.
         /// </summary>
-        private bool TryGetBlockKey(PixelBuffer screen, int blockX, int blockY, int columns, int rows,
-            int cellPixelWidth, int cellPixelHeight, out ContentKey blockKey)
+        private bool TryGetBlockDigests(PixelBuffer screen, int blockX, int blockY, int columns, int rows,
+            out Span<UInt128> digests)
         {
-            int keyBytes = columns * rows * NoImageMarker.Length;
-            if (_blockKeyScratch == null || _blockKeyScratch.Length < keyBytes)
-                _blockKeyScratch = new byte[BlockColumns * BlockRows * NoImageMarker.Length];
-            Span<byte> key = _blockKeyScratch.AsSpan(0, keyBytes);
+            int cells = columns * rows;
+            if (_blockDigests == null || _blockDigests.Length < cells)
+                _blockDigests = new UInt128[BlockColumns * BlockRows];
+            digests = _blockDigests.AsSpan(0, cells);
 
             bool anyImage = false;
-            int offset = 0;
+            int i = 0;
             for (int row = 0; row < rows; row++)
-            for (int column = 0; column < columns; column++, offset += NoImageMarker.Length)
+            for (int column = 0; column < columns; column++, i++)
             {
                 CellImage image = screen.CellAt(blockX + column, blockY + row).Background.Image;
-                if (image == null)
-                {
-                    NoImageMarker.CopyTo(key[offset..]);
-                    continue;
-                }
-
-                anyImage = true;
-                MemoryMarshal.Write(key[offset..], image.Key.Digest);
+                digests[i] = image?.Key.Digest ?? default;
+                anyImage |= image != null;
             }
 
-            blockKey = anyImage
-                ? ContentKey.Of(key, columns * cellPixelWidth, rows * cellPixelHeight)
-                : default;
             return anyImage;
+        }
+
+        /// <summary>
+        ///     Whether an image whose cells showed <paramref name="recorded" /> shows every cell that now
+        ///     has a picture (<paramref name="current" />, zero for a text cell) as it is now.
+        /// </summary>
+        private static bool ShowsTheSame(UInt128[] recorded, ReadOnlySpan<UInt128> current)
+        {
+            if (recorded.Length != current.Length)
+                return false;
+            for (int i = 0; i < current.Length; i++)
+                if (current[i] != default && current[i] != recorded[i])
+                    return false;
+            return true;
         }
 
         /// <summary>
