@@ -357,8 +357,12 @@ namespace Consolonia.Core.Infrastructure
                 }
             }
 
+            // Optimal is zlib level 6: on photographs a quarter fewer bytes than Fastest (level 1), for
+            // a few tens of milliseconds more per full-screen picture. A block is sent once and the
+            // bytes go down a terminal link; PNG would halve them again, at the price of an encoder the
+            // output does not have (see kittybitmap.md).
             using var compressed = new MemoryStream();
-            using (var zlib = new ZLibStream(compressed, CompressionLevel.Fastest, true))
+            using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, true))
             {
                 zlib.Write(rgba);
             }

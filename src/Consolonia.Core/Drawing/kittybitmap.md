@@ -127,7 +127,7 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
   `MaxTransmitLength`.
 - **Same bytes as a string.** `BuildTransmitSequence` composes the same bytes and decodes them to a
   string. It serves the wash images and the tests (`AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs`).
-- **RGBA with zlib.** Blocks are sent as raw RGBA, zlib compressed at the fastest level. The earlier
+- **RGBA with zlib.** Blocks are sent as raw RGBA, zlib compressed at level 6 (`CompressionLevel.Optimal`): on photographs a quarter fewer bytes than level 1 for a few tens of milliseconds more per new picture. The earlier
   renderer sent PNG through Avalonia/Skia, which needs a render interface the output does not have;
   the bytes per picture are in the benchmarks below. The PNG form of the sequence remains for a
   caller that has one.
@@ -141,9 +141,9 @@ cells written, then `EndFrame`.
 
 | Scenario | Time | Allocated | Bytes on the wire |
 |---|---|---|---|
-| New full-screen picture: every block transmitted and placed | 97 to 148 ms (noisy) | 13.6 MB | 3,254,735 |
+| New full-screen picture: every block transmitted and placed | 97 to 148 ms (noisy, zlib level 1) | 13.6 MB | 2,759,505 (level 6; 3,254,735 at level 1) |
 | Every block placed again (after a reset; images in the terminal) | 2.0 ms | 135 KB | 62,718 |
-| One cell: one block re-sent, one placement replaced | 83 µs | 40 B | 16,282 |
+| One cell: one block re-sent, one placement replaced | 83 µs | 40 B | 16,220 |
 
 For comparison, before this model a full-screen transmit of 510 PNG tiles of 8 KB each cost 1.38 ms
 and 32 KB allocated for 5,595,102 bytes on the wire, the PNG encoding not included.
