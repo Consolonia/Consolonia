@@ -33,9 +33,6 @@ namespace Consolonia.Core.Drawing
         /// <summary>The renderer drawing bitmaps on this terminal; see <see cref="BitmapRenderer" />.</summary>
         private BitmapRenderer? _bitmapRenderer;
 
-        /// <summary>Called around every frame for work that is not per cell (see <see cref="IRenderTargetHook" />).</summary>
-        private readonly List<IRenderTargetHook> _hooks = new();
-
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
 
@@ -107,23 +104,10 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     The renderer drawing bitmaps on this terminal, made on first use so that the console's
-        ///     capabilities are known. The drawing contexts borrow it: a resize replaces them, and what the
-        ///     renderer keeps about the terminal (an image protocol's placements) has to outlive them. A
-        ///     renderer with work to do per frame is a hook.
+        ///     capabilities are known. The drawing contexts borrow it: a resize replaces them, and the
+        ///     renderings it keeps outlive them.
         /// </summary>
-        internal BitmapRenderer BitmapRenderer
-        {
-            get
-            {
-                if (_bitmapRenderer != null)
-                    return _bitmapRenderer;
-
-                _bitmapRenderer = BitmapRenderer.Create(_console);
-                if (_bitmapRenderer is IRenderTargetHook hook)
-                    _hooks.Add(hook);
-                return _bitmapRenderer;
-            }
-        }
+        internal BitmapRenderer BitmapRenderer => _bitmapRenderer ??= BitmapRenderer.Create(_console);
 
         internal void RenderToDevice()
         {
@@ -177,15 +161,14 @@ namespace Consolonia.Core.Drawing
         /// <summary>
         ///     The terminal may no longer show what was written to it: the screen was resized, or another
         ///     program drew while console I/O was paused. Everything written is forgotten, so the next
-        ///     frame writes every cell again, and so is whatever the hooks keep about the terminal (an image
-        ///     protocol places every picture again).
+        ///     frame writes every cell again, and so is whatever the console keeps about the terminal (an
+        ///     image protocol places every picture again).
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         internal void ResetCache()
         {
             InitializeCacheInternal();
-            foreach (IRenderTargetHook hook in _hooks)
-                hook.ResetCache();
+            _console.ResetCache();
 
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
             _consoleTopLevelImpl.DirtyRegions.AddRect(new PixelRect(0, 0, pixelBuffer.Width, pixelBuffer.Height));
@@ -198,9 +181,6 @@ namespace Consolonia.Core.Drawing
             Snapshot dirtyRegions = regions.GetSnapshotAndClear();
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;
-
-            // made before the first frame is written, so that its hook sees every frame
-            _ = BitmapRenderer;
 
             // a new cache means everything is redrawn
             if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
@@ -220,8 +200,7 @@ namespace Consolonia.Core.Drawing
             }
 #endif
             _console.HideCaret();
-            foreach (IRenderTargetHook hook in _hooks)
-                hook.BeginFrame();
+            _console.BeginFrame();
 
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
@@ -251,8 +230,9 @@ namespace Consolonia.Core.Drawing
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (IsUnderMouseCursor(x, y))
                     {
-                        // the cursor is a glyph written into the cell, so the cell is a text cell this frame
-                        pixel = pixel.AsText();
+                        // the color the cursor glyph sits on: for a cell showing a picture, the paint over
+                        // the picture's dominant color
+                        Color cellColor = pixel.Background.EffectiveColor;
 
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
                         {
@@ -262,8 +242,8 @@ namespace Consolonia.Core.Drawing
                             char cursorChar = pixel.Foreground.Symbol.Character != '\0'
                                 ? pixel.Foreground.Symbol.Character
                                 : ' ';
-                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
-                                new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), cellColor),
+                                new PixelBackground(GetContrastColor(cellColor)));
                         }
                         else
                         {
@@ -271,7 +251,7 @@ namespace Consolonia.Core.Drawing
                             // simply draw the mouse cursor character in the current pixel colors.
                             Color foreground = pixel.Foreground.Color != Colors.Transparent
                                 ? pixel.Foreground.Color
-                                : GetContrastColor(pixel.Background.Color);
+                                : GetContrastColor(cellColor);
                             pixel = new Pixel(
                                 new PixelForeground(new Symbol(cursorChar, 1), foreground,
                                     pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
@@ -328,8 +308,7 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            foreach (IRenderTargetHook hook in _hooks)
-                hook.EndFrame(pixelBuffer);
+            _console.EndFrame(pixelBuffer);
 
 #if FPS
             var fps = $"FPS: {_fps: 000}";

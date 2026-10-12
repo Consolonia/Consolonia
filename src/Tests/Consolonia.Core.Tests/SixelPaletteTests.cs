@@ -74,5 +74,39 @@ namespace Consolonia.Core.Tests
             var quantized = Sixel.CreateFromBitmap(manyColors, 64, 64, Width, Height);
             Assert.That(quantized.PaletteCount, Is.InRange(2, 256));
         }
+
+        /// <summary>
+        ///     A cell uses a few colors of a palette shared by a whole run; only those are defined in its
+        ///     escape sequence.
+        /// </summary>
+        [Test]
+        public void RenderDefinesOnlyTheColorsTheImageUses()
+        {
+            byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 255, 255 };
+            byte[] pixels = new byte[Width * Height];
+            Array.Fill(pixels, (byte)1);
+
+            string rendered = Encoding.ASCII.GetString(
+                new Sixel(palette, 3, pixels, Width, Height, Width, Height).Render());
+
+            Assert.That(rendered, Does.Contain("#1;2;100;100;100"));
+            Assert.That(rendered, Does.Not.Contain("#0;2;"));
+            Assert.That(rendered, Does.Not.Contain("#2;2;"));
+        }
+
+        [Test]
+        public void ATransientImageRendersTheSameBytesWithoutKeepingThem()
+        {
+            byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255 };
+            byte[] pixels = new byte[Width * Height];
+            pixels[3] = 1;
+
+            string kept = Encoding.ASCII.GetString(
+                new Sixel(palette, 2, pixels, Width, Height, Width, Height).Render());
+            var transient = new Sixel(palette, 2, pixels, Width, Height, Width, Height)
+                { IsTransient = true };
+
+            Assert.That(Encoding.ASCII.GetString(transient.Render()), Is.EqualTo(kept));
+        }
     }
 }

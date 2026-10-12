@@ -66,10 +66,6 @@ namespace Consolonia.Core.Dummy
         {
         }
 
-        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
-        {
-        }
-
         public void WriteText(string str)
         {
         }

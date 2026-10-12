@@ -75,41 +75,11 @@ namespace Consolonia.Core.Drawing
         public int CellsWidth => Width / CellWidth;
 
         /// <summary>
-        ///     The palette color covering the most pixels. A glyph drawn over a sixel cell turns it into a
-        ///     text cell, and a glyph with a transparent background takes this as its background so the
-        ///     cell still looks like the picture instead of a hole in it.
-        /// </summary>
-        /// <remarks>
-        ///     Only the index is cached, so a washed variant (same pixels, washed palette) yields the
-        ///     washed color.
-        /// </remarks>
-        public Color DominantColor
-        {
-            get
-            {
-                int index = _dominantIndex;
-                if (index < 0)
-                {
-                    Span<int> counts = stackalloc int[256];
-                    foreach (byte pixel in Pixels)
-                        counts[pixel]++;
-
-                    index = 0;
-                    for (int i = 1; i < counts.Length; i++)
-                        if (counts[i] > counts[index])
-                            index = i;
-                    _dominantIndex = index;
-                }
-
-                int offset = index * 4;
-                return Color.FromRgb(Palette[offset + 2], Palette[offset + 1], Palette[offset]);
-            }
-        }
-
-        /// <summary>
         ///     Create a Sixel from raw BGRX pixel data, quantized to a palette of its own.
         /// </summary>
-        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, int cellWidth, int cellHeight)
+        /// <param name="transient">Whether the image is for a single write; see <see cref="IsTransient" />.</param>
+        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, int cellWidth, int cellHeight,
+            bool transient = false)
         {
             ArgumentNullException.ThrowIfNull(bgrx);
             // Render and BuildSixelRow index Pixels with unchecked Unsafe.Add offsets derived from
@@ -123,87 +93,10 @@ namespace Consolonia.Core.Drawing
                 bgrx = bgrx[..byteCount];
 
             Quantize(bgrx, out byte[] palette, out int paletteCount, out byte[] indexed);
-            return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
+            return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight)
+                { IsTransient = transient };
         }
 
-
-        /// <summary>
-        ///     Returns this image with <paramref name="wash" /> alpha-composited over every palette
-        ///     color, which is how a translucent overlay (a modal backdrop, a shade) tints a sixel.
-        ///     Only the palette changes, so the copy shares <see cref="Pixels" /> with this image.
-        /// </summary>
-        /// <remarks>
-        ///     Variants are cached: overlays are re-blended onto the pixel buffer every frame, and
-        ///     since symbols compare sixels by reference, returning the same instance is what keeps an
-        ///     unchanged dimmed image from being re-sent to the terminal. Cells of one image also share
-        ///     the derived palette, so the renderer can still combine them.
-        /// </remarks>
-        public Sixel Wash(Color wash)
-        {
-            if (wash.A == 0)
-                return this;
-
-            // created on first use: most cells are never washed
-            Dictionary<Color, Sixel> variants = _variants;
-            if (variants == null)
-            {
-                Interlocked.CompareExchange(ref _variants, new Dictionary<Color, Sixel>(), null);
-                variants = _variants;
-            }
-
-            lock (variants)
-            {
-                if (variants.TryGetValue(wash, out Sixel variant))
-                    return variant;
-
-                // an animated overlay produces a new color every frame; don't hoard them
-                if (variants.Count >= MaxVariants)
-                    variants.Clear();
-
-                variant = new Sixel(GetWashedPalette(Palette, PaletteCount, wash), PaletteCount, Pixels, Width,
-                    Height, CellWidth, CellHeight);
-                variants[wash] = variant;
-                return variant;
-            }
-        }
-
-        private static byte[] GetWashedPalette(byte[] palette, int paletteCount, Color wash)
-        {
-            Dictionary<Color, byte[]> washedPalettes = WashedPalettes.GetOrCreateValue(palette);
-            lock (washedPalettes)
-            {
-                if (washedPalettes.TryGetValue(wash, out byte[] washedPalette))
-                    return washedPalette;
-
-                if (washedPalettes.Count >= MaxVariants)
-                    washedPalettes.Clear();
-
-                int alpha = wash.A;
-                int inverseAlpha = 255 - alpha;
-                washedPalette = new byte[palette.Length];
-                for (int i = 0; i < paletteCount; i++)
-                {
-                    int offset = i * 4;
-                    washedPalette[offset] = (byte)((wash.B * alpha + palette[offset] * inverseAlpha) / 255);
-                    washedPalette[offset + 1] = (byte)((wash.G * alpha + palette[offset + 1] * inverseAlpha) / 255);
-                    washedPalette[offset + 2] = (byte)((wash.R * alpha + palette[offset + 2] * inverseAlpha) / 255);
-                    washedPalette[offset + 3] = palette[offset + 3];
-                }
-
-                washedPalettes[wash] = washedPalette;
-                return washedPalette;
-            }
-        }
-
-        #region Variants
-
-        private const int MaxVariants = 8;
-
-        private static readonly ConditionalWeakTable<byte[], Dictionary<Color, byte[]>> WashedPalettes = new();
-
-        private Dictionary<Color, Sixel> _variants;
-
-        #endregion
 
         #region Serialization
 
@@ -211,7 +104,6 @@ namespace Consolonia.Core.Drawing
         [ThreadStatic] private static WuColorQuantizer _quantizer;
 
         private byte[] _renderedBytes;
-        private int _dominantIndex = -1;
 
         /// <summary>
         ///     An image made for a single write, such as the one the renderer combines from neighbouring

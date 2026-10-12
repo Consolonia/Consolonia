@@ -25,9 +25,9 @@ namespace Consolonia.Core.Drawing
 
     /// <summary>
     ///     Strategy for drawing a bitmap into the pixel buffer. One renderer serves a terminal (the render
-    ///     target keeps it, the drawing contexts borrow it), chosen by the console's capabilities, and it
-    ///     owns whatever caching its image protocol needs. A protocol with work to do per frame, besides
-    ///     the cells the render target writes, is also an <see cref="IRenderTargetHook" />.
+    ///     target keeps it, the drawing contexts borrow it), chosen by the console's capabilities. A
+    ///     console with an image protocol gets cells showing a <see cref="CellImage" />, which its output
+    ///     encodes; any other gets text cells.
     /// </summary>
     internal abstract class BitmapRenderer
     {
@@ -36,22 +36,20 @@ namespace Consolonia.Core.Drawing
             ConsoleOutput = console;
         }
 
-        /// <summary>The console the pictures go to: its cell size, capabilities, and the image protocols' writes.</summary>
+        /// <summary>The console the pictures go to: its cell size and capabilities.</summary>
         protected IConsoleOutput ConsoleOutput { get; }
 
         /// <summary>
-        ///     The best renderer the console is capable of (capabilities are detected in PrepareConsole).
+        ///     The renderer for the console (capabilities are detected in PrepareConsole): cell images when
+        ///     the console can show pictures, block glyphs otherwise.
         /// </summary>
         internal static BitmapRenderer Create(IConsoleOutput console)
         {
             ConsoleCapabilities capabilities = console.Capabilities;
 
-            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
-                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(console);
-
-            if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
-                return new SixelBitmapRenderer(console);
+            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) ||
+                capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+                return new CellImageBitmapRenderer(console);
 
             return new QuadPixelBitmapRenderer(console);
         }
@@ -73,7 +71,7 @@ namespace Consolonia.Core.Drawing
         ///     The screen, not the clip. A partial redraw (a dialog opening over the picture, say) clips to
         ///     the region being redrawn, and rendering by that clip made a rendering per redraw region. The
         ///     cells outside it still showed the earlier rendering, and once the cache evicted that one, the
-        ///     kitty renderer deleted its image and those cells went blank. The screen bounds the size just
+        ///     image protocol deleted its image and those cells went blank. The screen bounds the size just
         ///     as well, and stays the same however the picture is redrawn.
         /// </remarks>
         protected static PixelRect OnScreenCellsInTarget(DrawingContextImpl context, PixelRect targetRect)

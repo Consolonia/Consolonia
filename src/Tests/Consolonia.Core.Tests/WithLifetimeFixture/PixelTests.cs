@@ -1,11 +1,10 @@
 // DUPFINDER_ignore
 
-using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia.Media;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
@@ -99,17 +98,29 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(pixel != pixel2);
         }
 
+        /// <summary>
+        ///     A Pixel is copied on every blend and every frame and compared for every dirty cell: it stays
+        ///     within one 64-byte cache line, image reference included (and the nullable terminal cache
+        ///     entry exactly fills one).
+        /// </summary>
         [Test]
-        public void SixelSymbolsCompareByImage()
+        public void PixelIsFiftySixBytes()
         {
-            // regression: a sixel cell carries no character and no pattern, so symbols which ignored the
-            // image compared equal and the pixel buffer diff kept showing the previous picture
-            Sixel sixel = CreateCellSixel(10);
-            Sixel otherSixel = CreateCellSixel(200);
+            Assert.That(Unsafe.SizeOf<Pixel>(), Is.EqualTo(56));
+            Assert.That(Unsafe.SizeOf<Pixel?>(), Is.EqualTo(64));
+        }
 
-            Pixel pixel = CreateSixelPixel(sixel);
-            Pixel samePixel = CreateSixelPixel(sixel);
-            Pixel otherPixel = CreateSixelPixel(otherSixel);
+        [Test]
+        public void ImageCellsCompareByImage()
+        {
+            // regression: an image cell carries no character and no pattern, so pixels which ignored the
+            // image compared equal and the pixel buffer diff kept showing the previous picture
+            CellImage image = CreateCellImage(10);
+            CellImage otherImage = CreateCellImage(200);
+
+            Pixel pixel = CreateImagePixel(image);
+            Pixel samePixel = CreateImagePixel(image);
+            Pixel otherPixel = CreateImagePixel(otherImage);
 
             Assert.That(pixel == samePixel);
             Assert.That(pixel.GetHashCode(), Is.EqualTo(samePixel.GetHashCode()));
@@ -117,99 +128,105 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(pixel.Equals((object)otherPixel), Is.False);
         }
 
+        /// <summary>
+        ///     The "image as cell background" model: cell = (color | picture under a paint) + foreground
+        ///     glyph. The paint accumulates through the same blend as a plain cell's color.
+        /// </summary>
         [Test]
-        public void TranslucentOverlayWashesSixelPalette()
+        public void ImageBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
         {
-            Sixel sixel = CreateCellSixel(200);
-            Pixel pixel = CreateSixelPixel(sixel);
+            CellImage image = CreateCellImage(200);
+            Pixel imagePixel = CreateImagePixel(image);
+
+            Pixel withGlyph = imagePixel.Blend(new Pixel(
+                new PixelForeground(new Symbol('▕'), Colors.Gray),
+                PixelBackground.Transparent));
+            Assert.That(withGlyph.Foreground.Symbol.Character, Is.EqualTo('▕'));
+            Assert.That(withGlyph.Background.Image, Is.SameAs(image),
+                "a glyph with transparent background lands OVER the picture, not evicting it");
+
             var backdrop = new Pixel(new PixelBackground(Color.Parse("#7F000000")));
+            Pixel dimmed = imagePixel.Blend(backdrop);
+            Assert.That(dimmed.Background.Image, Is.SameAs(image), "a translucent paint must not evict the picture");
+            Assert.That(dimmed.Background.Color, Is.EqualTo(Color.Parse("#7F000000")),
+                "the paint accumulates in the cell's color, for the output to lay over the picture");
+            Assert.That(imagePixel.Blend(backdrop), Is.EqualTo(dimmed),
+                "the same paint must yield the same cell, else every frame re-sends it");
 
-            Pixel dimmed = pixel.Blend(backdrop);
-            Sixel washed = dimmed.Foreground.Symbol.Sixel;
+            Pixel covered = imagePixel.Blend(new Pixel(new PixelBackground(Colors.White)));
+            Assert.That(covered.Background.Image, Is.Null,
+                "an opaque background owns the cell: the picture must be evicted");
 
-            Assert.That(washed, Is.Not.SameAs(sixel));
-            Assert.That(washed.Pixels, Is.SameAs(sixel.Pixels), "only the palette changes");
-            Assert.That(washed.Palette[0], Is.LessThan(sixel.Palette[0]), "black at half alpha darkens");
-            Assert.That(sixel.Palette[0], Is.EqualTo(200), "the source image is untouched");
-            Assert.That(pixel.Blend(backdrop), Is.EqualTo(dimmed),
-                "the same overlay must yield the same image, else every frame re-sends it");
+            Pixel overText = new Pixel(new PixelForeground(new Symbol('a'), Colors.Red),
+                new PixelBackground(Colors.Blue)).Blend(imagePixel);
+            Assert.That(overText, Is.EqualTo(imagePixel), "an image cell drawn over a text cell takes it whole");
+
+            Assert.That(imagePixel.Shade().Background.Image, Is.SameAs(image));
+            Assert.That(imagePixel.Brighten().Background.Image, Is.SameAs(image));
+            Assert.That(imagePixel.Invert().Background.Image, Is.SameAs(image));
         }
 
         [Test]
-        public void BlockGlyphTakesATextCellOverSixel()
+        public void ShadeAndBrightenPaintImageCells()
         {
-            // a window edge is text like any glyph; painted into the image, its color had to come
-            // from the image's palette and shifted to the nearest image color
-            Sixel sixel = CreateCellSixel(200);
-            Pixel pixel = CreateSixelPixel(sixel);
-            var edge = new Pixel(new PixelForeground(new Symbol('▁'), Color.FromRgb(0x10, 0x20, 0x30)));
+            Pixel imagePixel = CreateImagePixel(CreateCellImage(128));
 
-            Pixel withEdge = pixel.Blend(edge);
+            Color shade = imagePixel.Shade().Background.Color;
+            Assert.That(shade.A, Is.GreaterThan(0));
+            Assert.That(shade.R, Is.EqualTo(0), "a translucent black");
 
-            Assert.That(withEdge.Foreground.Symbol.Sixel, Is.Null);
-            Assert.That(withEdge.Foreground.Symbol.Character, Is.EqualTo('▁'));
+            Color brighten = imagePixel.Brighten().Background.Color;
+            Assert.That(brighten.A, Is.GreaterThan(0));
+            Assert.That(brighten.R, Is.EqualTo(0xFF), "a translucent white");
         }
 
+        /// <summary>
+        ///     Where a cell needs one color for a picture (the mouse cursor's contrast, text on a terminal
+        ///     that cannot draw it over an image), the paint composited over the picture's dominant color.
+        /// </summary>
         [Test]
-        public void TextOverSixelTakesDominantColorAsBackground()
+        public void TheEffectiveColorOfAnImageCellIsThePaintOverItsDominantColor()
         {
             // a mostly gray picture with a sliver of red: gray is the dominant color
-            byte[] palette = { 200, 200, 200, 0, 0, 0, 255, 0 };
-            byte[] pixels = new byte[8 * 16];
-            Array.Fill(pixels, (byte)1, 0, 8);
-            var sixel = new Sixel(palette, 2, pixels, 8, 16, 8, 16);
-            Pixel pixel = CreateSixelPixel(sixel);
+            byte[] bgra = new byte[8 * 16 * 4];
+            for (int i = 0; i < bgra.Length; i += 4)
+            {
+                bool red = i < 8 * 4;
+                bgra[i] = red ? (byte)0 : (byte)200;
+                bgra[i + 1] = red ? (byte)0 : (byte)200;
+                bgra[i + 2] = red ? (byte)255 : (byte)200;
+                bgra[i + 3] = 255;
+            }
 
-            Assert.That(sixel.DominantColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
+            var image = new CellImage(bgra, 8, 16);
+            Pixel pixel = CreateImagePixel(image);
+            Assert.That(image.DominantColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
+            Assert.That(pixel.Background.EffectiveColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
 
-            Pixel withText = pixel.Blend(new Pixel(new PixelForeground(new Symbol('a'), Colors.Red)));
-            Assert.That(withText.Foreground.Symbol.Character, Is.EqualTo('a'));
-            Assert.That(withText.Background.Color, Is.EqualTo(Color.FromRgb(200, 200, 200)),
-                "text without a background sits on the picture's dominant color");
-
-            // an opaque background of its own still wins
-            Pixel withOpaqueText = pixel.Blend(new Pixel(new PixelForeground(new Symbol('a'), Colors.Red),
-                new PixelBackground(Colors.Blue)));
-            Assert.That(withOpaqueText.Background.Color, Is.EqualTo(Colors.Blue));
-
-            // a translucent background is blended over the dominant color, not over transparent
-            Pixel withTranslucentText = pixel.Blend(new Pixel(new PixelForeground(new Symbol('a'), Colors.Red),
-                new PixelBackground(Color.Parse("#7F000000"))));
-            Assert.That(withTranslucentText.Background.Color.A, Is.EqualTo(0xFF));
-            Assert.That(withTranslucentText.Background.Color.R, Is.InRange(1, 199), "black at half alpha darkens");
-
-            // a washed image gives the washed dominant color
             Pixel dimmed = pixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
-            Pixel dimmedWithText = dimmed.Blend(new Pixel(new PixelForeground(new Symbol('a'), Colors.Red)));
-            Assert.That(dimmedWithText.Background.Color,
-                Is.EqualTo(dimmed.Foreground.Symbol.Sixel.DominantColor));
-            Assert.That(dimmedWithText.Background.Color.R, Is.LessThan(200));
+            Color effective = dimmed.Background.EffectiveColor;
+            Assert.That(effective.A, Is.EqualTo(0xFF));
+            Assert.That(effective.R, Is.InRange(90, 110), "black at half alpha over gray 200");
+
+            Assert.That(new PixelBackground(Colors.Blue).EffectiveColor, Is.EqualTo(Colors.Blue),
+                "a plain cell's effective color is its color");
         }
 
-        [Test]
-        public void ShadeAndBrightenWashImageCells()
+        private static CellImage CreateCellImage(byte gray)
         {
-            Pixel sixelPixel = CreateSixelPixel(CreateCellSixel(128));
-            Assert.That(sixelPixel.Shade().Foreground.Symbol.Sixel.Palette[0], Is.LessThan(128));
-            Assert.That(sixelPixel.Brighten().Foreground.Symbol.Sixel.Palette[0], Is.GreaterThan(128));
+            byte[] bgra = new byte[8 * 16 * 4];
+            for (int i = 0; i < bgra.Length; i += 4)
+            {
+                bgra[i] = bgra[i + 1] = bgra[i + 2] = gray;
+                bgra[i + 3] = 0xFF;
+            }
 
-            var tilePixel = new Pixel(new PixelForeground(Symbol.Space, Colors.Transparent),
-                new PixelBackground(Colors.Transparent, new KittyTile(0x42, 0, 0)));
-            Color shadeWash = tilePixel.Shade().Background.Color;
-            Assert.That(shadeWash.A, Is.GreaterThan(0));
-            Assert.That(shadeWash.R, Is.EqualTo(0));
+            return new CellImage(bgra, 8, 16);
         }
 
-        private static Sixel CreateCellSixel(byte gray)
+        private static Pixel CreateImagePixel(CellImage image)
         {
-            byte[] palette = { gray, gray, gray, 0 };
-            return new Sixel(palette, 1, new byte[8 * 16], 8, 16, 8, 16);
-        }
-
-        private static Pixel CreateSixelPixel(Sixel sixel)
-        {
-            return new Pixel(new PixelForeground(new Symbol(sixel), Colors.Transparent),
-                PixelBackground.Transparent);
+            return new Pixel(PixelForeground.Space, new PixelBackground(Colors.Transparent, image));
         }
 
         [Test]
@@ -309,37 +326,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(newPixel.Foreground.Symbol.Character, Is.EqualTo('a'));
             Assert.That(newPixel.Foreground.Color, Is.EqualTo(Colors.Red));
             Assert.That(newPixel.Background.Color, Is.EqualTo(Colors.Blue));
-        }
-
-        [Test]
-        public void KittyTileBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
-        {
-            // the "image as cell background" model: cell = (backgroundColor|backgroundImage) +
-            // foreground character
-            var tile = new KittyTile(0x42, 3, 5);
-            var tilePixel = new Pixel(
-                new PixelForeground(Symbol.Space, Colors.Transparent),
-                new PixelBackground(Colors.Transparent, tile));
-
-            Pixel withGlyph = tilePixel.Blend(new Pixel(
-                new PixelForeground(new Symbol('▕'), Colors.Gray),
-                PixelBackground.Transparent));
-            Assert.That(withGlyph.Foreground.Symbol.Character, Is.EqualTo('▕'));
-            Assert.That(withGlyph.Background.Tile, Is.EqualTo(tile),
-                "a glyph with transparent background must draw OVER the picture, not evict it");
-
-            Pixel shaded = tilePixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
-            Assert.That(shaded.Background.Tile, Is.EqualTo(tile),
-                "a translucent wash must not evict the picture");
-            Assert.That(shaded.Background.Color, Is.EqualTo(Color.Parse("#7F000000")),
-                "the wash accumulates in the tile cell's color, to be laid over the image");
-
-            Pixel covered = tilePixel.Blend(new Pixel(new PixelBackground(Colors.White)));
-            Assert.That(covered.Background.Tile.IsEmpty, Is.True,
-                "an opaque background owns the cell: the picture must be evicted");
-
-            Assert.That(tilePixel.Shade().Background.Tile, Is.EqualTo(tile));
-            Assert.That(tilePixel.Invert().Background.Tile, Is.EqualTo(tile));
         }
 
         [Test]

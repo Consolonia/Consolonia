@@ -3,8 +3,8 @@ using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing;
+using Consolonia.Core.Tests.WithLifetimeFixture;
 using NUnit.Framework;
-using FakeReadableBitmap = Consolonia.Core.Tests.WithLifetimeFixture.SixelBitmapRendererTests.FakeReadableBitmap;
 
 namespace Consolonia.Core.Tests
 {

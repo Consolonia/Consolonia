@@ -37,14 +37,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Pattern = 0;
         }
 
-        /// <summary>A cell of a sixel image: one cell wide, drawn from <paramref name="sixel" />.</summary>
-        public Symbol(Sixel sixel)
-            : this()
-        {
-            Width = 1;
-            _reference = sixel;
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Symbol(char ch, byte? width = null)
         {
@@ -154,12 +146,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Character == other.Character &&
                    Width == other.Width &&
                    Pattern == other.Pattern &&
-                   // the same sixel (every sixel cell looks alike otherwise: no character, no pattern, so
-                   // without this the pixel buffer diff would keep a stale image when a new one lands on
-                   // the same cells), or equal text
-                   (ReferenceEquals(_reference, other._reference) ||
-                    _reference is string text && other._reference is string otherText &&
-                    string.Equals(text, otherText, StringComparison.Ordinal));
+                   string.Equals(_reference, other._reference, StringComparison.Ordinal);
         }
 
 
@@ -169,22 +156,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         public readonly char Character;
 
-        /// <summary>
-        ///     The symbol's complex text or its sixel; a cell never has both. One field rather than two keeps
-        ///     every cell of the pixel buffer, which is copied on every blend and every frame, 8 bytes smaller.
-        /// </summary>
-        private readonly object _reference;
+        private readonly string _reference;
 
         /// <summary>
         ///     If cell has complex text (more than one char) this contains the full unicode sequence to draw this symbol.
         /// </summary>
-        public string Complex => _reference as string;
+        public string Complex => _reference;
 
         // box pattern for box merging.
         public readonly byte Pattern;
-
-        /// <summary>The sixel this cell shows, if it is a cell of a sixel image.</summary>
-        public Sixel Sixel => _reference as Sixel;
 
         [JsonIgnore] public readonly byte Width;
 #pragma warning restore CA1051 // Do not declare visible instance fields
@@ -204,11 +184,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Complex != null && Complex.Length > 1 ? Complex : new string(Character, 1);
         }
 
-        /// <summary>No character, no complex text and no sixel: blending this over a symbol leaves that symbol.</summary>
+        /// <summary>No character and no complex text: blending this over a symbol leaves that symbol.</summary>
         public bool NothingToDraw()
         {
-            return Character == char.MinValue &&
-                   (_reference == null || _reference is string { Length: 0 });
+            return Character == char.MinValue && string.IsNullOrEmpty(_reference);
         }
 
         public Symbol Blend(ref Symbol symbolAbove)
@@ -236,7 +215,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Character, Complex, Width, Pattern, Sixel);
+            return HashCode.Combine(Character, Complex, Width, Pattern);
         }
 
         public static bool operator ==(Symbol left, Symbol right)

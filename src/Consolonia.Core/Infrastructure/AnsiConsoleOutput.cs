@@ -64,6 +64,9 @@ namespace Consolonia.Core.Infrastructure
 
         private PixelBufferCoordinate _headBufferPoint;
 
+        /// <summary>Shows the image cells, for the console's image protocol; null when it has none.</summary>
+        private IConsoleImageEncoder _imageEncoder;
+
         /// <summary>Console.Out as installed over <see cref="_stream" />: anything else means it was redirected.</summary>
         private TextWriter _installedOut;
 
@@ -117,16 +120,53 @@ namespace Consolonia.Core.Infrastructure
         public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             if (pixel.Width <=
-                0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
+                0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes
                 return;
 
-            // a sixel cell is its image, not a glyph in colors
-            if (pixel.Foreground.Symbol.Sixel != null)
+            if (pixel.Background.Image != null)
             {
-                WriteSixel(position, pixel.Foreground.Symbol.Sixel);
+                if (_imageEncoder != null)
+                {
+                    _imageEncoder.WriteCell(position, in pixel);
+                    return;
+                }
+
+                // a picture the console claims to show but this output has no protocol for: block glyphs
+                WriteTextCell(position, AsQuadCell(in pixel), false);
                 return;
             }
 
+            WriteTextCell(position, in pixel, false);
+        }
+
+        /// <summary>
+        ///     An image cell as the text cell a terminal without an image protocol shows for it: a block
+        ///     glyph in the picture's colors, under the cell's paint, with the cell's own glyph kept if it
+        ///     has one.
+        /// </summary>
+        private Pixel AsQuadCell(in Pixel pixel)
+        {
+            CellImage image = pixel.Background.Image;
+            Pixel quad = QuadPixelBitmapRenderer.FromPixels(image.Bgra, image.Width, image.Height,
+                Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
+            Color paint = pixel.Background.Color;
+            var painted = new Pixel(
+                new PixelForeground(quad.Foreground.Symbol,
+                    PixelBackground.ColorOver(paint, quad.Foreground.Color)),
+                new PixelBackground(PixelBackground.ColorOver(paint, quad.Background.Color)),
+                pixel.CaretStyle);
+            return pixel.Foreground.IsNothingToDraw()
+                ? painted
+                : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
+        }
+
+        /// <summary>
+        ///     Writes a cell as a glyph in colors. With <paramref name="defaultBackground" /> the cell gets the
+        ///     terminal's default background rather than its color: for a cell over a kitty placement, which
+        ///     Konsole hides under any explicit cell background (see <see cref="KittyConsoleImageEncoder" />).
+        /// </summary>
+        internal void WriteTextCell(PixelBufferCoordinate position, in Pixel pixel, bool defaultBackground)
+        {
             //todo: performance of retrieval of the service, at least can be retrieved once
             Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
 
@@ -184,17 +224,13 @@ namespace Consolonia.Core.Infrastructure
                 _lastWeight = weight;
             }
 
-            // A cell showing a kitty image keeps the terminal's default background. Konsole draws
-            // below-text (z<0) placements under any explicit cell background, so painting the cell
-            // a color -- even black -- hides the picture there; kitty draws them above either way.
-            bool defaultBackground = !pixel.Background.Tile.IsEmpty;
             bool backgroundChanged = defaultBackground
                 ? !_lastBackgroundIsDefault
                 : pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault;
 
             if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
             {
-                // a tile cell's color is a wash, not a background the console could map
+                // an image cell's color is the paint over the picture, not a background the console could map
                 (object mappedBackground, object mappedForeground) =
                     consoleColorMode.Value.MapColors(defaultBackground ? Colors.Black : pixel.Background.Color,
                         pixel.Foreground.Color, pixel.Foreground.Weight);
@@ -307,23 +343,70 @@ namespace Consolonia.Core.Infrastructure
             AppendBytes(ascii);
         }
 
+        /// <summary>
+        ///     Writes an image's escape sequence at <paramref name="position" />, covering
+        ///     <paramref name="cellsWide" /> cells of the row.
+        /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
-        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
+        internal void WriteImageBytes(PixelBufferCoordinate position, ReadOnlySpan<byte> bytes, int cellsWide)
         {
-            // also called on its own (benchmarks), so it has the same lock and pause handling as WriteText
             WaitPauseTaskIfNecessary();
 
             // Always an explicit cursor move. After a glyph in the last column the position is modelled as
             // the start of the next row, but the terminal's cursor is still on the old row with a pending
-            // wrap that only the next printable character resolves; a sixel is not one, so without the
+            // wrap that only the next printable character resolves; an image is not one, so without the
             // move it would land a row up. Eight bytes against a payload of kilobytes.
             SetCaretPositionInternal(position);
 
-            // sixel payloads are strictly ASCII (data bytes are 0x3F..0x7E): the bytes go out as they are
-            AppendBytes(sixel.Render());
+            // image payloads are strictly ASCII (sixel data bytes are 0x3F..0x7E): the bytes go out as they are
+            AppendBytes(bytes);
 
-            var newPosition = new PixelBufferCoordinate((ushort)(position.X + sixel.CellsWidth), position.Y);
+            var newPosition = new PixelBufferCoordinate((ushort)(position.X + cellsWide), position.Y);
             SetCaretPositionInternal(newPosition);
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void BeginFrame()
+        {
+            _imageEncoder?.BeginFrame();
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void EndFrame(PixelBuffer screen)
+        {
+            _imageEncoder?.EndFrame(screen);
+        }
+
+        /// <summary>
+        ///     Forgets what the terminal is believed to show: the colors and attributes last set (another
+        ///     program may have changed them) and what the image encoder has placed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void ResetCache()
+        {
+            _lastBackground = Colors.Transparent;
+            _lastBackgroundIsDefault = false;
+            _lastForeground = Colors.Transparent;
+            _lastStyle = null;
+            _lastTextDecoration = null;
+            _lastWeight = null;
+            _imageEncoder?.Reset();
+        }
+
+        /// <summary>
+        ///     The encoder for the console's image protocol, kitty before sixel, or null when it has none
+        ///     this output can use (kitty needs the RGB color mode).
+        /// </summary>
+        private IConsoleImageEncoder CreateImageEncoder()
+        {
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
+                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
+                return new KittyConsoleImageEncoder(this);
+
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+                return new SixelConsoleImageEncoder(this);
+
+            return null;
         }
 
         /// <summary>
@@ -400,6 +483,7 @@ namespace Consolonia.Core.Infrastructure
             // override for terminals which render a protocol without answering its query, or to force fallback
             Capabilities = ApplyGraphicsProtocolOverride(Capabilities,
                 Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS"));
+            _imageEncoder = CreateImageEncoder();
 
             BlackColorTTYWorkaround();
 
@@ -637,11 +721,16 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Writes frames to <paramref name="stream" /> the way <see cref="PrepareConsole" /> writes them
-        ///     to stdout, without the terminal set-up: for measuring the output path.
+        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given: for
+        ///     measuring and testing the output path.
         /// </summary>
-        internal void RedirectOutput(Stream stream)
+        internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None)
         {
             InstallWriter(stream);
+            Capabilities = capabilities;
+            CellPixelWidth = DefaultCellPixelSize.Width;
+            CellPixelHeight = DefaultCellPixelSize.Height;
+            _imageEncoder = CreateImageEncoder();
         }
 
         /// <summary>Room for <paramref name="bytes" /> more bytes at the end of the frame.</summary>

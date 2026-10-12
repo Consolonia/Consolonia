@@ -131,11 +131,6 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        public virtual void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
-        {
-            // Sixel not supported by legacy Console API
-        }
-
         public virtual void WriteText(string str)
         {
             WaitPauseTaskIfNecessary();

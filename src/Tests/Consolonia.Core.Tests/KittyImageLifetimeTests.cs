@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using Consolonia.Core.Drawing;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     When kitty images leave the terminal: a tile image evicted from the renderer's cache is deleted
+    ///     When kitty images leave the terminal: a block image evicted from the encoder's cache is deleted
     ///     once no placement shows it, and not before.
     /// </summary>
     [TestFixture]
@@ -19,7 +19,7 @@ namespace Consolonia.Core.Tests
             var evicted = new HashSet<int> { 1, 2, 3 };
             var orphans = new List<int>();
 
-            KittyBitmapRenderer.SelectOrphans(evicted, new HashSet<int> { 2 }, orphans);
+            KittyConsoleImageEncoder.SelectOrphans(evicted, new HashSet<int> { 2 }, orphans);
 
             Assert.That(orphans, Is.EquivalentTo(new[] { 1, 3 }));
             Assert.That(evicted, Is.EquivalentTo(new[] { 2 }), "the image still shown waits");
@@ -31,10 +31,10 @@ namespace Consolonia.Core.Tests
             var evicted = new HashSet<int> { 7 };
             var orphans = new List<int>();
 
-            KittyBitmapRenderer.SelectOrphans(evicted, new HashSet<int> { 7 }, orphans);
+            KittyConsoleImageEncoder.SelectOrphans(evicted, new HashSet<int> { 7 }, orphans);
             Assert.That(orphans, Is.Empty, "deleting it now would leave a hole in a picture on screen");
 
-            KittyBitmapRenderer.SelectOrphans(evicted, new HashSet<int>(), orphans);
+            KittyConsoleImageEncoder.SelectOrphans(evicted, new HashSet<int>(), orphans);
             Assert.That(orphans, Is.EquivalentTo(new[] { 7 }));
             Assert.That(evicted, Is.Empty);
         }
@@ -59,15 +59,6 @@ namespace Consolonia.Core.Tests
             cache.EnsureBudget(1);
             cache.GetOrAdd(Key(6), 6, 1);
             Assert.That(evicted, Is.EquivalentTo(new[] { 1 }), "the budget never shrinks");
-        }
-
-        [Test]
-        public void ASixelSymbolIsSomethingToDraw()
-        {
-            var sixel = new Sixel(new byte[] { 0, 0, 0, 255 }, 1, new byte[8 * 16], 8, 16, 8, 16);
-
-            Assert.That(new Symbol(sixel).NothingToDraw(), Is.False);
-            Assert.That(Symbol.Empty.NothingToDraw(), Is.True);
         }
 
         private static ContentKey Key(int value)

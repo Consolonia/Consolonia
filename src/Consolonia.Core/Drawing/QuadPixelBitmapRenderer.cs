@@ -42,40 +42,83 @@ namespace Consolonia.Core.Drawing
             {
                 int top = cellY * 2 * rowBytes + cellX * 2 * 4;
                 int bottom = top + rowBytes;
-
-                // the quad pixel from the bitmap as a quad of 4 BgraColor values
-                Span<BgraColor> quadPixelColors =
-                [
-                    PixelAt(bgra, top),
-                    PixelAt(bgra, top + 4),
-                    PixelAt(bgra, bottom),
-                    PixelAt(bgra, bottom + 4)
-                ];
-
-                // split the 4 pixels into a foreground and a background group, and map the split to the
-                // block character that draws the foreground quadrants
-                byte pattern = GetColorsPattern(quadPixelColors, complexEmoji);
-                char quadPixelChar = GetQuadPixelCharacter(pattern);
-
-                // nothing in the foreground draws nothing; with no quadrant left for the background, the
-                // background takes all four colours. It is NOT transparent: a transparent background lets
-                // the color under the picture show through the hairlines terminals leave around a full
-                // block glyph
-                Color foreground = pattern == 0b0000
-                    ? BgraColor.Transparent.ToColor()
-                    : CombineQuadrants(quadPixelColors, pattern).ToColor();
-                var background = CombineQuadrants(quadPixelColors,
-                    pattern == 0b1111 ? (byte)0b1111 : (byte)(~pattern & 0b1111)).ToColor();
-
-                var imagePixel = new Pixel(
-                    new PixelForeground(new Symbol(quadPixelChar), foreground),
-                    new PixelBackground(background));
+                Pixel imagePixel = FromQuadrants(PixelAt(bgra, top), PixelAt(bgra, top + 4), PixelAt(bgra, bottom),
+                    PixelAt(bgra, bottom + 4), complexEmoji);
 
                 var point = new PixelPoint(intersectedRect.X + cellX, intersectedRect.Y + cellY);
                 pixelBuffer[point] = pixelBuffer[point].Blend(imagePixel);
             }
 
             context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+        }
+
+        /// <summary>
+        ///     The text cell for a cell of a picture given as its pixels (<paramref name="width" /> x
+        ///     <paramref name="height" /> BGRA): each quadrant's pixels averaged to one color, then the four
+        ///     colors as a block glyph in two colors. For a console output that has an image cell but no
+        ///     protocol to show it with.
+        /// </summary>
+        internal static Pixel FromPixels(ReadOnlySpan<byte> bgra, int width, int height, bool complexEmoji)
+        {
+            int halfWidth = Math.Max(1, width / 2);
+            int halfHeight = Math.Max(1, height / 2);
+            return FromQuadrants(
+                AverageBlock(bgra, width, 0, 0, halfWidth, halfHeight),
+                AverageBlock(bgra, width, halfWidth, 0, width - halfWidth, halfHeight),
+                AverageBlock(bgra, width, 0, halfHeight, halfWidth, height - halfHeight),
+                AverageBlock(bgra, width, halfWidth, halfHeight, width - halfWidth, height - halfHeight),
+                complexEmoji);
+        }
+
+        private static BgraColor AverageBlock(ReadOnlySpan<byte> bgra, int imageWidth, int x, int y, int width,
+            int height)
+        {
+            if (width <= 0 || height <= 0)
+                return BgraColor.Transparent;
+
+            long b = 0, g = 0, r = 0, a = 0;
+            for (int row = y; row < y + height; row++)
+            {
+                int offset = (row * imageWidth + x) * 4;
+                for (int column = 0; column < width; column++, offset += 4)
+                {
+                    b += bgra[offset];
+                    g += bgra[offset + 1];
+                    r += bgra[offset + 2];
+                    a += bgra[offset + 3];
+                }
+            }
+
+            int count = width * height;
+            return new BgraColor((byte)(b / count), (byte)(g / count), (byte)(r / count), (byte)(a / count));
+        }
+
+        /// <summary>
+        ///     The text cell for four quadrant colors (top left, top right, bottom left, bottom right): the
+        ///     pixels split into a foreground and a background group, and the split mapped to the block
+        ///     character that draws the foreground quadrants.
+        /// </summary>
+        private static Pixel FromQuadrants(BgraColor topLeft, BgraColor topRight, BgraColor bottomLeft,
+            BgraColor bottomRight, bool complexEmoji)
+        {
+            Span<BgraColor> quadPixelColors = [topLeft, topRight, bottomLeft, bottomRight];
+
+            byte pattern = GetColorsPattern(quadPixelColors, complexEmoji);
+            char quadPixelChar = GetQuadPixelCharacter(pattern);
+
+            // nothing in the foreground draws nothing; with no quadrant left for the background, the
+            // background takes all four colours. It is NOT transparent: a transparent background lets
+            // the color under the picture show through the hairlines terminals leave around a full
+            // block glyph
+            Color foreground = pattern == 0b0000
+                ? BgraColor.Transparent.ToColor()
+                : CombineQuadrants(quadPixelColors, pattern).ToColor();
+            var background = CombineQuadrants(quadPixelColors,
+                pattern == 0b1111 ? (byte)0b1111 : (byte)(~pattern & 0b1111)).ToColor();
+
+            return new Pixel(
+                new PixelForeground(new Symbol(quadPixelChar), foreground),
+                new PixelBackground(background));
         }
 
         private static BgraColor PixelAt(byte[] bgra, int offset)

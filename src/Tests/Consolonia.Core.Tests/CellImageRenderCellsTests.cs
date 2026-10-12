@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using Avalonia;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
@@ -9,11 +8,11 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     How the sixel renderer turns visible pixels into per-cell sixels: cells seen before are reused,
-    ///     and only the new ones are quantized, together.
+    ///     How the renderer turns visible pixels into cells showing cell images: cells seen before reuse
+    ///     their image, and only a cell with new pixels gets a new one.
     /// </summary>
     [TestFixture]
-    public class SixelRenderCellsTests
+    public class CellImageRenderCellsTests
     {
         private const int CellWidth = 8;
         private const int CellHeight = 16;
@@ -44,15 +43,15 @@ namespace Consolonia.Core.Tests
             }
         }
 
-        private static Sixel CellAt(PixelBuffer buffer, int x, int y)
+        private static CellImage CellAt(PixelBuffer buffer, int x, int y)
         {
-            return buffer[new PixelPoint(x, y)].Foreground.Symbol.Sixel;
+            return buffer[new PixelPoint(x, y)].Background.Image;
         }
 
         private static PixelBuffer Render(byte[] picture)
         {
             var cells = new PixelBuffer(CellsWide, CellsHigh);
-            SixelBitmapRenderer.RenderCells(picture, cells, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(picture, cells, CellWidth, CellHeight);
             return cells;
         }
 
@@ -78,11 +77,11 @@ namespace Consolonia.Core.Tests
 
         /// <summary>
         ///     A flat canvas (Paintty's blank picture) is one distinct block repeated: every cell must
-        ///     share ONE cached sixel from the first frame, or the first brush stroke, which makes every
+        ///     share ONE cached image from the first frame, or the first brush stroke, which makes every
         ///     cell hit the cache's single instance, re-sends the whole canvas as "changed".
         /// </summary>
         [Test]
-        public void IdenticalCellsShareOneSixelFromTheFirstFrame()
+        public void IdenticalCellsShareOneImageFromTheFirstFrame()
         {
             int seed = _seed += 0x100;
             byte[] canvas = new byte[CellsWide * CellWidth * CellsHigh * CellHeight * 4];
@@ -91,7 +90,7 @@ namespace Consolonia.Core.Tests
                 FillCell(canvas, cellX, cellY, (byte)seed, (byte)(seed >> 8), 0x7F);
 
             PixelBuffer first = Render(canvas);
-            Sixel shared = CellAt(first, 0, 0);
+            CellImage shared = CellAt(first, 0, 0);
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
                 Assert.That(CellAt(first, x, y), Is.SameAs(shared), $"cell {x},{y} in the first frame");
@@ -114,10 +113,10 @@ namespace Consolonia.Core.Tests
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
             var reused = new PixelBuffer(CellsWide, CellsHigh);
-            SixelBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
 
             FillCell(picture, 3, 0, 0x44, 0x55, 0x66);
-            SixelBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
             PixelBuffer fresh = Render(picture);
 
             for (int y = 0; y < CellsHigh; y++)
@@ -128,70 +127,25 @@ namespace Consolonia.Core.Tests
         [Test]
         public void PixelsThatAreNotExactlyTheCellsAreRefused()
         {
-            Assert.Throws<ArgumentException>(() => SixelBitmapRenderer.RenderCells(
+            Assert.Throws<ArgumentException>(() => CellImageBitmapRenderer.RenderCells(
                 new byte[Width * CellHeight * 4], new PixelBuffer(CellsWide, CellsHigh), CellWidth, CellHeight));
         }
 
+        /// <summary>A cell's image is its own pixels, exactly, and knows the color covering most of them.</summary>
         [Test]
-        public void NewCellsShareOnePaletteSoNeighboursCanBeJoined()
-        {
-            PixelBuffer buffer = Render(Picture(_seed += 0x100));
-
-            byte[] palette = CellAt(buffer, 0, 0).Palette;
-            for (int y = 0; y < CellsHigh; y++)
-            for (int x = 0; x < CellsWide; x++)
-                Assert.That(CellAt(buffer, x, y).Palette, Is.SameAs(palette), $"cell {x},{y}");
-        }
-
-        /// <summary>
-        ///     A cell's pixels are the quantizer's own indices for it, so a picture with few colors keeps
-        ///     them exactly: no nearest-color match against a palette made for something else.
-        /// </summary>
-        [Test]
-        public void ANewCellKeepsItsExactColor()
+        public void ACellKeepsItsExactPixels()
         {
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
-            FillCell(picture, 1, 0, 0xFE, 0xFE, 0xFE);
+            FillCell(picture, 1, 0, 0xFE, 0xFD, 0xFC);
 
             PixelBuffer buffer = Render(picture);
 
-            Sixel cell = CellAt(buffer, 1, 0);
-            Assert.That(cell.DominantColor, Is.EqualTo(Color.FromRgb(0xFE, 0xFE, 0xFE)));
-        }
-
-        /// <summary>
-        ///     A cell uses a few colors of a palette shared by a whole picture; only those are defined in
-        ///     its escape sequence.
-        /// </summary>
-        [Test]
-        public void RenderDefinesOnlyTheColorsTheImageUses()
-        {
-            byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 255, 255 };
-            byte[] pixels = new byte[CellWidth * CellHeight];
-            Array.Fill(pixels, (byte)1);
-
-            string rendered = Encoding.ASCII.GetString(
-                new Sixel(palette, 3, pixels, CellWidth, CellHeight, CellWidth, CellHeight).Render());
-
-            Assert.That(rendered, Does.Contain("#1;2;100;100;100"));
-            Assert.That(rendered, Does.Not.Contain("#0;2;"));
-            Assert.That(rendered, Does.Not.Contain("#2;2;"));
-        }
-
-        [Test]
-        public void ATransientImageRendersTheSameBytesWithoutKeepingThem()
-        {
-            byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255 };
-            byte[] pixels = new byte[CellWidth * CellHeight];
-            pixels[3] = 1;
-
-            string kept = Encoding.ASCII.GetString(
-                new Sixel(palette, 2, pixels, CellWidth, CellHeight, CellWidth, CellHeight).Render());
-            var transient = new Sixel(palette, 2, pixels, CellWidth, CellHeight, CellWidth, CellHeight)
-                { IsTransient = true };
-
-            Assert.That(Encoding.ASCII.GetString(transient.Render()), Is.EqualTo(kept));
+            CellImage cell = CellAt(buffer, 1, 0);
+            Assert.That(cell.Width, Is.EqualTo(CellWidth));
+            Assert.That(cell.Height, Is.EqualTo(CellHeight));
+            Assert.That(cell.Bgra[0], Is.EqualTo(0xFE));
+            Assert.That(cell.DominantColor, Is.EqualTo(Color.FromRgb(0xFC, 0xFD, 0xFE)));
         }
     }
 }

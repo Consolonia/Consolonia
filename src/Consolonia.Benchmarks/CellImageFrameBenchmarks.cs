@@ -9,20 +9,21 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     What the sixel renderer does for one frame of a full-screen picture: turn the visible
-    ///     pixels into per-cell sixels, reusing every cell it has made before.
+    ///     What the cell image renderer does for one frame of a full-screen picture: turn the visible
+    ///     pixels into cells showing cell images, reusing every image it has made before.
     /// </summary>
     /// <remarks>
     ///     1920x1072 pixels in 8x16 cells is 240x67 cells. The scenarios are the ones a paint program
     ///     produces: nothing changed, one cell changed (a brush stroke), and every cell new (a new
     ///     picture, or a scroll). The pixel copy and the cell buffer are reused from frame to frame, as
     ///     the renderer's CellRendering reuses them, so what is measured is the work and the garbage of
-    ///     one frame, not of setting up for it.
+    ///     one frame, not of setting up for it. Nothing reaches a terminal here: what the console output
+    ///     makes of the cells is measured by <see cref="ConsoleOutputBenchmarks" />.
     /// </remarks>
     [MemoryDiagnoser]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
         Justification = "BenchmarkDotNet owns the instance and calls the cleanup, which releases the bitmap")]
-    public class SixelFrameBenchmarks
+    public class CellImageFrameBenchmarks
     {
         internal const int CellWidth = 8;
         internal const int CellHeight = 16;
@@ -43,7 +44,7 @@ namespace Consolonia.Benchmarks
             _frame = MakePicture(0);
             _cells = new PixelBuffer(CellsWide, CellsHigh);
             _bitmap = new PinnedBitmap(MakePicture(0), Width, Height);
-            SixelBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
         }
 
         /// <summary>A photo-like picture: smooth gradients with fine noise, so cells differ.</summary>
@@ -83,7 +84,7 @@ namespace Consolonia.Benchmarks
         [Benchmark(Baseline = true)]
         public PixelBuffer FrameUnchanged()
         {
-            SixelBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 
@@ -94,7 +95,7 @@ namespace Consolonia.Benchmarks
         public PixelBuffer FrameOneCellChanged()
         {
             Stroke(_frame, ++_stroke);
-            SixelBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 
@@ -108,7 +109,7 @@ namespace Consolonia.Benchmarks
             Stroke(_bitmap.Pixels, ++_stroke);
             BitmapRenderer.GetVisiblePixels(_bitmap, null, new PixelSize(Width, Height),
                 new PixelRect(0, 0, Width, Height), BitmapInterpolationMode.None, _frame);
-            SixelBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 
@@ -121,7 +122,7 @@ namespace Consolonia.Benchmarks
         [Benchmark]
         public PixelBuffer FrameAllCellsNew()
         {
-            SixelBitmapRenderer.RenderCells(_newFrame, _cells, CellWidth, CellHeight);
+            CellImageBitmapRenderer.RenderCells(_newFrame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 

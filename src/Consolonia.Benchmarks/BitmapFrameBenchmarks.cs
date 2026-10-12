@@ -27,8 +27,8 @@ namespace Consolonia.Benchmarks
         Justification = "BenchmarkDotNet owns the instance and calls the cleanup")]
     public class BitmapFrameBenchmarks
     {
-        private const int Width = SixelFrameBenchmarks.Width;
-        private const int Height = SixelFrameBenchmarks.Height;
+        private const int Width = CellImageFrameBenchmarks.Width;
+        private const int Height = CellImageFrameBenchmarks.Height;
 
         private System.IDisposable _scope = null!;
         private ConsoloniaLifetime _lifetime = null!;
@@ -47,8 +47,8 @@ namespace Consolonia.Benchmarks
         [GlobalSetup]
         public void Setup()
         {
-            var console = new UnitTestConsole(new PixelBufferSize(SixelFrameBenchmarks.CellsWide,
-                SixelFrameBenchmarks.CellsHigh));
+            var console = new UnitTestConsole(new PixelBufferSize(CellImageFrameBenchmarks.CellsWide,
+                CellImageFrameBenchmarks.CellsHigh));
             _scope = AvaloniaLocator.EnterScope();
             _lifetime = ApplicationStartup.CreateLifetime(AppBuilder.Configure<BenchmarkApp>()
                 .UseConsole(console)
@@ -66,8 +66,8 @@ namespace Consolonia.Benchmarks
             _window = new ConsoleWindowImpl();
             _renderTarget = new RenderTarget(new IPlatformRenderSurface[] { _window });
             _context = new DrawingContextImpl(_window, null);
-            _bitmap = new PinnedBitmap(SixelFrameBenchmarks.MakePicture(0), Width, Height);
-            _destRect = new Rect(0, 0, SixelFrameBenchmarks.CellsWide, SixelFrameBenchmarks.CellsHigh);
+            _bitmap = new PinnedBitmap(CellImageFrameBenchmarks.MakePicture(0), Width, Height);
+            _destRect = new Rect(0, 0, CellImageFrameBenchmarks.CellsWide, CellImageFrameBenchmarks.CellsHigh);
 
             Frame();
         }
@@ -94,7 +94,7 @@ namespace Consolonia.Benchmarks
         [Benchmark]
         public void BrushStroke()
         {
-            SixelFrameBenchmarks.Stroke(_bitmap.Pixels, ++_stroke);
+            CellImageFrameBenchmarks.Stroke(_bitmap.Pixels, ++_stroke);
             _bitmap.Version++;
             Frame();
         }
@@ -103,7 +103,7 @@ namespace Consolonia.Benchmarks
         public void SetupNewPicture()
         {
             _newPicture?.Dispose();
-            _newPicture = new PinnedBitmap(SixelFrameBenchmarks.MakePicture(++_stroke), Width, Height);
+            _newPicture = new PinnedBitmap(CellImageFrameBenchmarks.MakePicture(++_stroke), Width, Height);
         }
 
         /// <summary>A picture never shown before over the whole screen: every cell is new and written.</summary>

@@ -61,10 +61,6 @@ namespace Consolonia.NUnit
                 PixelBuffer[position] = pixel;
         }
 
-        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
-        {
-        }
-
         public void WriteText(string str)
         {
             // ignore

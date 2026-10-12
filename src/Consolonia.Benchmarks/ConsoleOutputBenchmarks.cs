@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Media;
 using BenchmarkDotNet.Attributes;
+using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -13,11 +14,13 @@ namespace Consolonia.Benchmarks
 {
     /// <summary>
     ///     What AnsiConsoleOutput costs to get a frame out: the escape sequences built, buffered and written
-    ///     to the output stream (a null stream here, so the terminal's side is not measured).
+    ///     to the output stream (a null stream here, so the terminal's side is not measured). The image
+    ///     scenarios go through the output as the render target drives it: the changed image cells written,
+    ///     then the frame ended, which is where the sixel runs are encoded and the kitty blocks transmitted
+    ///     and placed.
     /// </summary>
     /// <remarks>
-    ///     A full screen is 240x67 cells of 8x16 pixels (1920x1072). A full-screen kitty picture is 510
-    ///     tiles of 8x4 cells, each sent as an 8 KB PNG (about 4 MB, a photo's worth).
+    ///     A full screen is 240x67 cells of 8x16 pixels (1920x1072), a photo's worth of distinct cells.
     /// </remarks>
     [MemoryDiagnoser]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
@@ -30,15 +33,17 @@ namespace Consolonia.Benchmarks
         private const int CellHeight = 16;
         private const int Width = CellsWide * CellWidth;
         private const int Height = CellsHigh * CellHeight;
-        private const int Tiles = 510;
-        private const int TileBytes = 8 * 1024;
-        private Sixel _cellSixel = null!;
-        private TextWriter _originalOut = null!;
+        private static readonly Color Dim = Color.FromArgb(0x7F, 0, 0, 0);
 
-        private AnsiConsoleOutput _output = null!;
-        private Sixel _screenSixel = null!;
+        private TextWriter _originalOut = null!;
+        private AnsiConsoleOutput _sixelOutput = null!;
+        private AnsiConsoleOutput _kittyOutput = null!;
         private Pixel[] _text = null!;
-        private byte[][] _tiles = null!;
+        private PixelBuffer _picture = null!;
+        private PixelBuffer _newPicture = null!;
+        private Pixel _strokeCell;
+        private PixelBuffer _strokeScreen = null!;
+        private int _seed;
 
         [GlobalSetup]
         public void Setup()
@@ -61,29 +66,33 @@ namespace Consolonia.Benchmarks
                     new PixelBackground(background));
             }
 
-            byte[] photo = Photo(Width, Height);
-            _screenSixel = Sixel.CreateFromBitmap(photo, Width, Height, CellWidth, CellHeight);
-            _screenSixel.Render(); // kept: what is measured is getting it out, not encoding it
-            _cellSixel = Sixel.CreateFromBitmap(Photo(CellWidth, CellHeight), CellWidth, CellHeight, CellWidth,
-                CellHeight);
-            _cellSixel.Render();
+            // a screen of picture as the renderer makes it
+            _picture = Picture(Width, Height, 0);
 
-            _tiles = new byte[Tiles][];
-            for (int t = 0; t < Tiles; t++)
-            {
-                _tiles[t] = new byte[TileBytes];
-                for (int i = 0; i < TileBytes; i++)
-                    _tiles[t][i] = (byte)(((uint)(i * 2654435761u) ^ (uint)(t * 40503)) >> 13);
-            }
+            // one cell of a picture never seen, as under a brush
+            PixelBuffer strokeCells = Picture(CellWidth, CellHeight, 1);
+            _strokeCell = strokeCells[0, 0];
+            _strokeScreen = new PixelBuffer(CellsWide, CellsHigh);
+            _strokeScreen[10, 5] = _strokeCell;
 
             _originalOut = Console.Out;
-            _output = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
-            RedirectTo(_output, stream);
+            _sixelOutput = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
+            _sixelOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsSixel);
+            _kittyOutput = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
+            _kittyOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsKittyGraphics);
+
+            // the picture shown once, then dimmed, so the per-frame scenarios start from a terminal that has it
+            WholeScreen(_sixelOutput, _picture);
+            WholeScreen(_sixelOutput, Dimmed(_picture));
+            WholeScreen(_kittyOutput, _picture);
+            WholeScreen(_kittyOutput, Dimmed(_picture));
         }
 
-        private static void RedirectTo(AnsiConsoleOutput output, Stream stream)
+        /// <summary>A picture no cell of which has been seen before, for the scenarios that send one.</summary>
+        [IterationSetup(Targets = [nameof(SixelNewPicture), nameof(KittyNewPicture)])]
+        public void SetupNewPicture()
         {
-            output.RedirectOutput(stream);
+            _newPicture = Picture(Width, Height, ++_seed + 2);
         }
 
         [GlobalCleanup]
@@ -93,15 +102,32 @@ namespace Consolonia.Benchmarks
             Console.SetOut(_originalOut);
         }
 
-        private static byte[] Photo(int width, int height)
+        /// <summary>A photo-like picture, as the renderer cuts it into cells.</summary>
+        private static PixelBuffer Picture(int width, int height, int seed)
+        {
+            var cells = new PixelBuffer((ushort)(width / CellWidth), (ushort)(height / CellHeight));
+            CellImageBitmapRenderer.RenderCells(Photo(width, height, seed), cells, CellWidth, CellHeight);
+            return cells;
+        }
+
+        private static PixelBuffer Dimmed(PixelBuffer picture)
+        {
+            var dimmed = new PixelBuffer(picture.Width, picture.Height);
+            for (ushort y = 0; y < picture.Height; y++)
+            for (ushort x = 0; x < picture.Width; x++)
+                dimmed[x, y] = picture[x, y].Blend(new Pixel(new PixelBackground(Dim)));
+            return dimmed;
+        }
+
+        private static byte[] Photo(int width, int height, int seed)
         {
             byte[] bgrx = new byte[width * height * 4];
             for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
             {
                 int offset = (y * width + x) * 4;
-                int noise = (int)((uint)((x * 73856093) ^ (y * 19349663)) >> 13) & 7;
-                bgrx[offset] = (byte)(x * 255 / width + noise);
+                int noise = (int)((uint)((x * 73856093) ^ (y * 19349663) ^ (seed * 83492791)) >> 13) & 7;
+                bgrx[offset] = (byte)((x * 255 / width + noise + seed) & 0xFF);
                 bgrx[offset + 1] = (byte)(y * 255 / height + noise);
                 bgrx[offset + 2] = (byte)((x + y) * 255 / (width + height) + noise);
                 bgrx[offset + 3] = 0xFF;
@@ -110,42 +136,74 @@ namespace Consolonia.Benchmarks
             return bgrx;
         }
 
+        /// <summary>A frame in which every cell of <paramref name="screen" /> changed.</summary>
+        private static void WholeScreen(AnsiConsoleOutput output, PixelBuffer screen)
+        {
+            output.BeginFrame();
+            for (ushort y = 0; y < CellsHigh; y++)
+            for (ushort x = 0; x < CellsWide; x++)
+                output.WritePixel(new PixelBufferCoordinate(x, y), screen[x, y]);
+            output.EndFrame(screen);
+            output.Flush();
+        }
+
+        /// <summary>A frame in which one cell changed.</summary>
+        private void OneCell(AnsiConsoleOutput output)
+        {
+            output.BeginFrame();
+            output.WritePixel(new PixelBufferCoordinate(10, 5), in _strokeCell);
+            output.EndFrame(_strokeScreen);
+            output.Flush();
+        }
+
         [Benchmark(Baseline = true)]
         public void TextFullScreen()
         {
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
-                _output.WritePixel(new PixelBufferCoordinate((ushort)x, (ushort)y), in _text[y * CellsWide + x]);
-            _output.Flush();
+                _sixelOutput.WritePixel(new PixelBufferCoordinate((ushort)x, (ushort)y), in _text[y * CellsWide + x]);
+            _sixelOutput.Flush();
         }
 
+        /// <summary>A full-screen picture never sent: a run per row, quantized and encoded.</summary>
         [Benchmark]
-        public void SixelFullScreen()
+        public void SixelNewPicture()
         {
-            _output.WriteSixel(new PixelBufferCoordinate(0, 0), _screenSixel);
-            _output.Flush();
+            WholeScreen(_sixelOutput, _newPicture);
+        }
+
+        /// <summary>The picture shown again after a modal dimmed it: every run comes from the cache.</summary>
+        [Benchmark]
+        public void SixelDialogClosed()
+        {
+            WholeScreen(_sixelOutput, _picture);
         }
 
         [Benchmark]
         public void SixelOneCell()
         {
-            _output.WriteSixel(new PixelBufferCoordinate(10, 5), _cellSixel);
-            _output.Flush();
+            OneCell(_sixelOutput);
+        }
+
+        /// <summary>A full-screen picture never sent: every block transmitted and placed.</summary>
+        [Benchmark]
+        public void KittyNewPicture()
+        {
+            WholeScreen(_kittyOutput, _newPicture);
+        }
+
+        /// <summary>Every block placed again, as after a resize; the images are in the terminal already.</summary>
+        [Benchmark]
+        public void KittyReplaced()
+        {
+            _kittyOutput.ResetCache();
+            WholeScreen(_kittyOutput, _picture);
         }
 
         [Benchmark]
-        public void KittyFullScreen()
+        public void KittyOneCell()
         {
-            for (int t = 0; t < Tiles; t++)
-                KittyGraphics.WriteTransmitSequence(_output, t + 1, 64, 64, _tiles[t], KittyImageFormat.Png);
-            _output.Flush();
-        }
-
-        [Benchmark]
-        public void KittyOneTile()
-        {
-            KittyGraphics.WriteTransmitSequence(_output, 1, 64, 64, _tiles[0], KittyImageFormat.Png);
-            _output.Flush();
+            OneCell(_kittyOutput);
         }
 
         /// <summary>
@@ -157,10 +215,12 @@ namespace Consolonia.Benchmarks
             (string Name, Action<ConsoleOutputBenchmarks> Run)[] scenarios =
             [
                 (nameof(TextFullScreen), b => b.TextFullScreen()),
-                (nameof(SixelFullScreen), b => b.SixelFullScreen()),
+                (nameof(SixelNewPicture), b => b.SixelNewPicture()),
+                (nameof(SixelDialogClosed), b => b.SixelDialogClosed()),
                 (nameof(SixelOneCell), b => b.SixelOneCell()),
-                (nameof(KittyFullScreen), b => b.KittyFullScreen()),
-                (nameof(KittyOneTile), b => b.KittyOneTile())
+                (nameof(KittyNewPicture), b => b.KittyNewPicture()),
+                (nameof(KittyReplaced), b => b.KittyReplaced()),
+                (nameof(KittyOneCell), b => b.KittyOneCell())
             ];
 
             TextWriter console = Console.Out;
@@ -169,10 +229,12 @@ namespace Consolonia.Benchmarks
                 using var captured = new MemoryStream();
                 var benchmarks = new ConsoleOutputBenchmarks();
                 benchmarks.Setup(captured);
+                benchmarks.SetupNewPicture();
+                captured.SetLength(0);
                 run(benchmarks);
                 benchmarks.Cleanup();
                 console.WriteLine(
-                    $"{name,-16} {captured.Length,10} bytes  {Convert.ToHexString(SHA256.HashData(captured.ToArray()))}");
+                    $"{name,-18} {captured.Length,10} bytes  {Convert.ToHexString(SHA256.HashData(captured.ToArray()))}");
             }
         }
     }
