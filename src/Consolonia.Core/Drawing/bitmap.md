@@ -262,9 +262,9 @@ to the output path should leave the digests unchanged:
 | SixelNewPicture | 629,322 |
 | SixelDialogClosed | 625,332 |
 | SixelOneCell | 3,033 |
-| KittyNewPicture | 3,237,858 |
+| KittyNewPicture | 3,237,839 |
 | KittyAfterReset | 3,232,625 |
-| KittyOneCell | 12,635 |
+| KittyOneCell | 7,100 |
 
 ### Results
 
@@ -279,10 +279,10 @@ the encoders in the output:
 | Screen of text | 2.0 ms | 514 KB | 86,966 |
 | Sixel, new full-screen picture (a run per row, quantised and encoded) | 101 ms | 8.2 MB | 629,322 |
 | Sixel, dialog closed (every run from the cache) | 1.5 ms | 1.3 MB | 625,332 |
-| Sixel, one cell | 1.9 µs | 6 KB | 3,033 |
-| Kitty, new full-screen picture (every block transmitted and placed) | 82 ms | 13.4 MB | 3,237,858 |
+| Sixel, one cell | 3.7 µs | 7.2 KB | 3,033 |
+| Kitty, new full-screen picture (every block transmitted and placed) | 82 ms | 13.4 MB | 3,237,839 |
 | Kitty, every block sent again after a reset | 81 ms | 6.5 MB | 3,232,625 |
-| Kitty, one cell | 42 µs | 40 B | 12,635 |
+| Kitty, one cell | 425 µs | 12.2 KB | 7,100 |
 
 **Whole frame per protocol** (`BitmapFrameBenchmarks`, default job, unit test console). The first
 three columns are the states before this model (the image renderers comparing cells themselves;

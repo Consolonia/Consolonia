@@ -27,7 +27,10 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
      the unit of retransmission. One image per picture meant a brush stroke re-sent the whole
      picture. A block is the compromise between how many images a screen is (about 500 at 240×67)
      and how much a change re-sends (one block). The size is the encoder's constant and nothing
-     outside it knows it.
+     outside it knows it. Measured once at 1×1 (one image and one placement per cell): a new
+     full-screen picture 273 ms and 6.08 MB against 82 ms and 3.24 MB at 8×4, since every cell
+     carries its own header, base64 padding and placement, and one cell 1.1 ms against 0.4 ms,
+     since every frame walks 16,080 blocks instead of 503.
 3. **One image id per block position, for the session.** `_blocks` holds, per position, the id
    allocated for it and the key last sent under it. A block whose key is unchanged costs nothing. A
    block whose key changed is **transmitted again under its id**: the protocol replaces the image
@@ -124,9 +127,9 @@ cells written, then `EndFrame`. The benchmark has no platform, so its blocks go 
 
 | Scenario | Time | Allocated | Bytes on the wire |
 |---|---|---|---|
-| New full-screen picture: every block transmitted and placed | 82 ms | 13.4 MB | 3,237,858 |
+| New full-screen picture: every block transmitted and placed | 82 ms | 13.4 MB | 3,237,839 |
 | After a reset: every block sent again (the earlier encoder placed them again: 2.0 ms, 62,718 bytes) | 81 ms | 6.5 MB | 3,232,625 |
-| One cell: one block re-sent and placed | 42 µs | 40 B | 12,635 |
+| One cell: one block re-sent and placed | 425 µs | 12.2 KB | 7,100 |
 
 A whole kitty frame on the unit test console (drawing into the pixel buffer and `RenderToDevice`,
 nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.md#benchmarks).

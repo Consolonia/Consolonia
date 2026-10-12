@@ -72,7 +72,7 @@ as the render target drives the output: the changed cells written, then `EndFram
 |---|---|---|---|
 | New full-screen picture: a run per row, quantised and encoded | 101 ms | 8.2 MB | 629,322 |
 | Dialog closed: every run from the cache | 1.5 ms | 1.3 MB | 625,332 |
-| One cell: a one-cell run | 1.9 µs | 6 KB | 3,033 |
+| One cell: a one-cell run | 3.7 µs | 7.2 KB | 3,033 |
 
 For comparison, before this model a full-screen picture was one sixel per cell with the bytes made
 at draw time: quantising the picture took about 110 ms in the renderer, and appending the 16,080

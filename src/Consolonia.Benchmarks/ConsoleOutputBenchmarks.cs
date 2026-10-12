@@ -72,7 +72,11 @@ namespace Consolonia.Benchmarks
             // one cell of a picture never seen, as under a brush
             PixelBuffer strokeCells = Picture(CellWidth, CellHeight, 1);
             _strokeCell = strokeCells[0, 0];
+            // the screen as it is after the stroke: the picture, with that one cell changed
             _strokeScreen = new PixelBuffer(CellsWide, CellsHigh);
+            for (ushort y = 0; y < CellsHigh; y++)
+            for (ushort x = 0; x < CellsWide; x++)
+                _strokeScreen[x, y] = _picture[x, y];
             _strokeScreen[10, 5] = _strokeCell;
 
             _originalOut = Console.Out;
@@ -81,11 +85,14 @@ namespace Consolonia.Benchmarks
             _kittyOutput = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
             _kittyOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsKittyGraphics);
 
-            // the picture shown once, then dimmed, so the per-frame scenarios start from a terminal that has it
-            WholeScreen(_sixelOutput, _picture);
-            WholeScreen(_sixelOutput, Dimmed(_picture));
-            WholeScreen(_kittyOutput, _picture);
-            WholeScreen(_kittyOutput, Dimmed(_picture));
+            // the picture shown, dimmed and shown again, so the per-frame scenarios start from a terminal that
+            // has it and the sixel run cache holds both
+            foreach (AnsiConsoleOutput output in new[] { _sixelOutput, _kittyOutput })
+            {
+                WholeScreen(output, _picture);
+                WholeScreen(output, Dimmed(_picture));
+                WholeScreen(output, _picture);
+            }
         }
 
         /// <summary>A picture no cell of which has been seen before, for the scenarios that send one.</summary>
@@ -147,9 +154,11 @@ namespace Consolonia.Benchmarks
             output.Flush();
         }
 
-        /// <summary>A frame in which one cell changed.</summary>
+        /// <summary>A frame in which one cell changed to pixels never seen before, as under a brush.</summary>
         private void OneCell(AnsiConsoleOutput output)
         {
+            _strokeCell = Picture(CellWidth, CellHeight, ++_seed + 100000)[0, 0];
+            _strokeScreen[10, 5] = _strokeCell;
             output.BeginFrame();
             output.WritePixel(new PixelBufferCoordinate(10, 5), in _strokeCell);
             output.EndFrame(_strokeScreen);
