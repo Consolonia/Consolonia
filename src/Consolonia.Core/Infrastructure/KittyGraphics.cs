@@ -10,9 +10,8 @@ using System.Text;
 using System.Text.Unicode;
 using System.Threading;
 using Avalonia.Media;
-using Consolonia.Core.Infrastructure;
 
-namespace Consolonia.Core.Drawing
+namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
     ///     Pixel data formats of the kitty graphics protocol (the f key of a transmit command).

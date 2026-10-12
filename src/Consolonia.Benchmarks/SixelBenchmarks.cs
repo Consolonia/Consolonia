@@ -1,6 +1,7 @@
 using System;
 using BenchmarkDotNet.Attributes;
 using Consolonia.Core.Drawing;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Benchmarks
 {

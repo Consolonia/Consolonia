@@ -10,7 +10,7 @@ using System.Threading;
 using Avalonia.Media;
 using JeremyAnsel.ColorQuant;
 
-namespace Consolonia.Core.Drawing
+namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
     ///     Represents a sixel image with palette and indexed pixel data, serialized via Render.

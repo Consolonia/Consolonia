@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
+using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
