@@ -185,9 +185,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             CellImage image = SolidImage(10, 20, 30);
-            var cells = new (int, int, Pixel)[KittyConsoleImageEncoder.DefaultBlockColumns * KittyConsoleImageEncoder.DefaultBlockRows];
+            var cells = new (int, int, Pixel)[KittyConsoleImageEncoder.BlockColumns * KittyConsoleImageEncoder.BlockRows];
             for (int i = 0; i < cells.Length; i++)
-                cells[i] = (i % KittyConsoleImageEncoder.DefaultBlockColumns, i / KittyConsoleImageEncoder.DefaultBlockColumns,
+                cells[i] = (i % KittyConsoleImageEncoder.BlockColumns, i / KittyConsoleImageEncoder.BlockColumns,
                     ImageCell(image));
 
             string frame = Frame(cells);
@@ -372,19 +372,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             // covered ones are deleted and the untouched ones are not sent at all
             Assert.That(transmitsAfterThePicture, Is.GreaterThan(0).And.LessThan(dialogs.Length * 8),
                 "dragging a dialog over a picture re-sends the blocks along its edges, not the screen");
-        }
-
-        [Test]
-        public void TheKittyBlockSizeCanBeOverridden()
-        {
-            Assert.That(KittyConsoleImageEncoder.BlockSize(null),
-                Is.EqualTo((KittyConsoleImageEncoder.DefaultBlockColumns, KittyConsoleImageEncoder.DefaultBlockRows)));
-            Assert.That(KittyConsoleImageEncoder.BlockSize("1x1"), Is.EqualTo((1, 1)));
-            Assert.That(KittyConsoleImageEncoder.BlockSize(" 16X8 "), Is.EqualTo((16, 8)));
-            Assert.That(KittyConsoleImageEncoder.BlockSize("0x4"),
-                Is.EqualTo((KittyConsoleImageEncoder.DefaultBlockColumns, KittyConsoleImageEncoder.DefaultBlockRows)));
-            Assert.That(KittyConsoleImageEncoder.BlockSize("big"),
-                Is.EqualTo((KittyConsoleImageEncoder.DefaultBlockColumns, KittyConsoleImageEncoder.DefaultBlockRows)));
         }
 
         /// <summary>Applies a frame's kitty placements and deletes to <paramref name="live" />, as a terminal would.</summary>

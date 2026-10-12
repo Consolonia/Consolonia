@@ -262,9 +262,9 @@ to the output path should leave the digests unchanged:
 | SixelNewPicture | 629,322 |
 | SixelDialogClosed | 625,332 |
 | SixelOneCell | 3,033 |
-| KittyNewPicture | 2,742,628 |
-| KittyAfterReset | 2,744,889 |
-| KittyOneCell | 12,571 |
+| KittyNewPicture | 3,237,858 |
+| KittyAfterReset | 3,232,625 |
+| KittyOneCell | 12,635 |
 
 ### Results
 
@@ -280,9 +280,9 @@ the encoders in the output:
 | Sixel, new full-screen picture (a run per row, quantised and encoded) | 101 ms | 8.2 MB | 629,322 |
 | Sixel, dialog closed (every run from the cache) | 1.5 ms | 1.3 MB | 625,332 |
 | Sixel, one cell | 1.9 µs | 6 KB | 3,033 |
-| Kitty, new full-screen picture (every block transmitted and placed) | 323 ms (zlib level 6; 97 to 148 ms at level 1) | 12.7 MB | 2,742,628 |
-| Kitty, every block sent again after a reset | 209 ms | 7.2 MB | 2,744,889 |
-| Kitty, one cell | 131 µs | 40 B | 12,571 |
+| Kitty, new full-screen picture (every block transmitted and placed) | 82 ms | 13.4 MB | 3,237,858 |
+| Kitty, every block sent again after a reset | 81 ms | 6.5 MB | 3,232,625 |
+| Kitty, one cell | 42 µs | 40 B | 12,635 |
 
 **Whole frame per protocol** (`BitmapFrameBenchmarks`, default job, unit test console). The first
 three columns are the states before this model (the image renderers comparing cells themselves;
@@ -304,7 +304,7 @@ difference between them is noise. Quantising moved out of the draw and into the 
 new sixel picture no longer costs 111 ms here: that cost is in `ConsoleOutputBenchmarks` above,
 where a new full-screen sixel picture is about 100 ms (the runs of a frame quantised together; done
 per run it was 1.6 s, Wu's quantiser having a large fixed cost per call) and a new kitty picture
-about 100 to 150 ms at zlib level 1 and about 320 ms at level 6, almost all compression and base64 of 8 MB of RGBA (the benchmark has no PNG encoder;
+about 80 ms, almost all zlib and base64 of 8 MB of RGBA (the benchmark has no PNG encoder;
 in an app the host registers one and the blocks go as PNG, about half the bytes). The bytes on the wire for a new sixel picture are 629 KB, where the
 old joined whole-picture sixel was 552 KB and the unjoined per-cell form about 16 MB.
 

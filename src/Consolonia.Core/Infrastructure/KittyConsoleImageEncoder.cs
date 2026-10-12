@@ -34,13 +34,10 @@ namespace Consolonia.Core.Infrastructure
     /// </remarks>
     internal sealed class KittyConsoleImageEncoder : IConsoleImageEncoder
     {
-        /// <summary>
-        ///     Block size in cells: small enough that a stroke touches few, large enough to be few.
-        ///     CONSOLONIA_KITTY_BLOCK=&lt;columns&gt;x&lt;rows&gt; overrides it, to try another on a terminal.
-        /// </summary>
-        internal const int DefaultBlockColumns = 8;
+        /// <summary>Block size in cells: small enough that a stroke touches few, large enough to be few.</summary>
+        internal const int BlockColumns = 8;
 
-        internal const int DefaultBlockRows = 4;
+        internal const int BlockRows = 4;
 
         /// <summary>Bytes of the description of one cell in a block's key: its image's digest and its paint.</summary>
         private const int KeyBytesPerCell = 16 + 4;
@@ -63,22 +60,6 @@ namespace Consolonia.Core.Infrastructure
         public KittyConsoleImageEncoder(AnsiConsoleOutput output)
         {
             _output = output;
-            (BlockColumns, BlockRows) = BlockSize(Environment.GetEnvironmentVariable("CONSOLONIA_KITTY_BLOCK"));
-        }
-
-        internal int BlockColumns { get; }
-
-        internal int BlockRows { get; }
-
-        /// <summary>The block size an override names, as "columns x rows", or the default.</summary>
-        internal static (int Columns, int Rows) BlockSize(string overrideValue)
-        {
-            string[] parts = overrideValue?.Trim().ToUpperInvariant().Split('X') ?? Array.Empty<string>();
-            if (parts.Length == 2 &&
-                int.TryParse(parts[0], out int columns) && int.TryParse(parts[1], out int rows) &&
-                columns > 0 && rows > 0)
-                return (columns, rows);
-            return (DefaultBlockColumns, DefaultBlockRows);
         }
 
         /// <summary>
@@ -266,13 +247,13 @@ namespace Consolonia.Core.Infrastructure
                 return;
             }
 
-            // RGBA: the blue and red bytes swap. Optimal is zlib level 6: on photographs a quarter fewer
-            // bytes than Fastest (level 1), for a few tens of milliseconds more per full-screen picture.
+            // RGBA: the blue and red bytes swap. Fastest is zlib level 1: level 6 saved a quarter of the
+            // bytes on photographs and cost more than twice the time per block, and this is the fallback.
             for (int i = 0; i < block.Length; i += 4)
                 (block[i], block[i + 2]) = (block[i + 2], block[i]);
 
             using var compressed = new MemoryStream();
-            using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, true))
+            using (var zlib = new ZLibStream(compressed, CompressionLevel.Fastest, true))
             {
                 zlib.Write(block);
             }

@@ -18,7 +18,7 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
    cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph
    over a picture is drawn by the terminal over the picture, so no dominant-colour fallback is needed.
 2. **The screen is walked in blocks.** `EndFrame(screen)` goes over the buffer in blocks of 8×4
-   cells (`DefaultBlockColumns`, `DefaultBlockRows`) aligned to the screen grid. A block with at
+   cells (`BlockColumns`, `BlockRows`) aligned to the screen grid. A block with at
    least one image cell gets a key: the XXH3 of each cell's image digest and paint, zero for a cell
    without an image. The key changes when a cell's picture changes, when its paint changes, and
    when a cell stops or starts showing a picture.
@@ -26,9 +26,8 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
      extension can, and WezTerm, Konsole and Ghostty do not implement it reliably), so the image is
      the unit of retransmission. One image per picture meant a brush stroke re-sent the whole
      picture. A block is the compromise between how many images a screen is (about 500 at 240×67)
-     and how much a change re-sends (one block). The size is the encoder's and nothing outside it
-     knows it; `CONSOLONIA_KITTY_BLOCK=<columns>x<rows>` (for instance `1x1`) overrides it, to try
-     another size on a terminal.
+     and how much a change re-sends (one block). The size is the encoder's constant and nothing
+     outside it knows it.
 3. **One image id per block position, for the session.** `_blocks` holds, per position, the id
    allocated for it and the key last sent under it. A block whose key is unchanged costs nothing. A
    block whose key changed is **transmitted again under its id**: the protocol replaces the image
@@ -51,8 +50,9 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
    again; so is the block when the dialog closes.
 6. **The pixels.** A block is sent as PNG through the platform's bitmaps when there are any (a
    bitmap loaded from the pixels and saved, which Avalonia does through Skia; every kitty terminal
-   decodes PNG, and a photograph is half the bytes), as RGBA with zlib level 6 otherwise: the
-   headless tests, the benchmarks, a platform without an image codec.
+   decodes PNG, and a photograph is half the bytes), as RGBA with zlib level 1 otherwise: the
+   headless tests, the benchmarks, a platform without an image codec. Level 6 saved a quarter of
+   the bytes on photographs and cost more than twice the time per block; this is the fallback.
 
 ## Why nothing is remembered about the terminal
 
@@ -112,8 +112,8 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
 - **Same bytes as a string.** `BuildTransmitSequence` composes the same bytes and decodes them to a
   string, for the tests (`AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs`).
 - **PNG first, RGBA with zlib otherwise.** On three Gallery photos at full HD, cut into 64×64
-  blocks, 0.29 to 0.59 MB as PNG against 0.39 to 1.00 MB as zlib level 6 and 0.61 to 1.32 MB at
-  level 1.
+  blocks, 0.29 to 0.59 MB as PNG against 0.61 to 1.32 MB as zlib level 1 (0.39 to 1.00 MB at
+  level 6, which costs more than twice the time per block and is not used).
 - **`q=2`** suppresses the terminal's replies on every command.
 
 ## Benchmarks
@@ -124,9 +124,9 @@ cells written, then `EndFrame`. The benchmark has no platform, so its blocks go 
 
 | Scenario | Time | Allocated | Bytes on the wire |
 |---|---|---|---|
-| New full-screen picture: every block transmitted and placed | 323 ms (zlib level 6; 97 to 148 ms at level 1) | 12.7 MB | 2,742,628 |
-| After a reset: every block sent again (the earlier encoder placed them again: 2.0 ms, 62,718 bytes) | 209 ms | 7.2 MB | 2,744,889 |
-| One cell: one block re-sent and placed | 131 µs | 40 B | 12,571 |
+| New full-screen picture: every block transmitted and placed | 82 ms | 13.4 MB | 3,237,858 |
+| After a reset: every block sent again (the earlier encoder placed them again: 2.0 ms, 62,718 bytes) | 81 ms | 6.5 MB | 3,232,625 |
+| One cell: one block re-sent and placed | 42 µs | 40 B | 12,635 |
 
 A whole kitty frame on the unit test console (drawing into the pixel buffer and `RenderToDevice`,
 nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.md#benchmarks).
