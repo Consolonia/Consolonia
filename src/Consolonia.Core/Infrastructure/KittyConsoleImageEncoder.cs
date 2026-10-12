@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.IO;
 using System.IO.Compression;
+using Avalonia;
 using Avalonia.Media;
+using Avalonia.Platform;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
@@ -52,6 +54,11 @@ namespace Consolonia.Core.Infrastructure
         private const int ScreensOfBlockImages = 3;
 
         private readonly AnsiConsoleOutput _output;
+
+        /// <summary>The platform's bitmaps, which encode PNG; looked up on the first transmit, null sends RGBA.</summary>
+        private IPlatformRenderInterface _renderInterface;
+
+        private bool _renderInterfaceResolved;
 
         /// <summary>
         ///     The terminal's image id for each block content transmitted. Evicted ids are not deleted at
@@ -319,8 +326,9 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Sends the block as one RGBA image, its cells' pixels side by side and a cell without an image
-        ///     transparent, zlib compressed.
+        ///     Sends the block as one image, its cells' pixels side by side and a cell without an image
+        ///     transparent: PNG through the platform's bitmaps when there are any (every kitty terminal
+        ///     decodes it, and a photograph is half the bytes), RGBA with zlib otherwise.
         /// </summary>
         private void TransmitBlock(int imageId, PixelBuffer screen, int blockX, int blockY, int columns, int rows,
             int cellPixelWidth, int cellPixelHeight)
@@ -330,8 +338,8 @@ namespace Consolonia.Core.Infrastructure
             int blockBytes = blockWidth * blockHeight * 4;
             if (_blockScratch == null || _blockScratch.Length < blockBytes)
                 _blockScratch = new byte[BlockColumns * cellPixelWidth * BlockRows * cellPixelHeight * 4];
-            Span<byte> rgba = _blockScratch.AsSpan(0, blockBytes);
-            rgba.Clear();
+            Span<byte> block = _blockScratch.AsSpan(0, blockBytes);
+            block.Clear();
 
             int blockRowBytes = blockWidth * 4;
             int cellRowBytes = cellPixelWidth * 4;
@@ -342,33 +350,68 @@ namespace Consolonia.Core.Infrastructure
                 if (image == null)
                     continue;
 
-                byte[] bgra = image.Bgra;
                 for (int y = 0; y < cellPixelHeight; y++)
-                {
-                    int source = y * cellRowBytes;
-                    int target = (row * cellPixelHeight + y) * blockRowBytes + column * cellRowBytes;
-                    for (int x = 0; x < cellPixelWidth; x++, source += 4, target += 4)
-                    {
-                        rgba[target] = bgra[source + 2];
-                        rgba[target + 1] = bgra[source + 1];
-                        rgba[target + 2] = bgra[source];
-                        rgba[target + 3] = bgra[source + 3];
-                    }
-                }
+                    image.Bgra.AsSpan(y * cellRowBytes, cellRowBytes)
+                        .CopyTo(block.Slice((row * cellPixelHeight + y) * blockRowBytes + column * cellRowBytes));
             }
 
-            // Optimal is zlib level 6: on photographs a quarter fewer bytes than Fastest (level 1), for
-            // a few tens of milliseconds more per full-screen picture. A block is sent once and the
-            // bytes go down a terminal link; PNG would halve them again, at the price of an encoder the
-            // output does not have (see kittybitmap.md).
+            byte[] png = TryEncodePng(block, blockWidth, blockHeight);
+            if (png != null)
+            {
+                KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, png,
+                    KittyImageFormat.Png);
+                return;
+            }
+
+            // RGBA: the blue and red bytes swap. Optimal is zlib level 6: on photographs a quarter fewer
+            // bytes than Fastest (level 1), for a few tens of milliseconds more per full-screen picture.
+            for (int i = 0; i < block.Length; i += 4)
+                (block[i], block[i + 2]) = (block[i + 2], block[i]);
+
             using var compressed = new MemoryStream();
             using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, true))
             {
-                zlib.Write(rgba);
+                zlib.Write(block);
             }
 
             KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, compressed.ToArray(),
                 KittyImageFormat.Rgba, true);
+        }
+
+        /// <summary>
+        ///     The PNG of <paramref name="width" /> x <paramref name="height" /> BGRA pixels through the
+        ///     platform's bitmaps (a bitmap loaded from the pixels and saved, which Avalonia does through
+        ///     Skia), or null where the platform has none or cannot encode: the headless tests, the
+        ///     benchmarks, a platform without an image codec.
+        /// </summary>
+        private unsafe byte[] TryEncodePng(ReadOnlySpan<byte> bgra, int width, int height)
+        {
+            if (!_renderInterfaceResolved)
+            {
+                _renderInterface = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
+                _renderInterfaceResolved = true;
+            }
+
+            if (_renderInterface == null)
+                return null;
+
+            try
+            {
+                fixed (byte* pixels = bgra)
+                {
+                    using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
+                        (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
+                    using var stream = new MemoryStream();
+                    bitmap.Save(stream);
+                    // a platform with no image codec saves nothing rather than throwing
+                    return stream.Length > 0 ? stream.ToArray() : null;
+                }
+            }
+            catch (Exception exception) when (exception is NotSupportedException or NotImplementedException
+                                                  or ConsoloniaNotSupportedException)
+            {
+                return null;
+            }
         }
 
         /// <summary>

@@ -28,8 +28,9 @@ frame, from the whole screen:
      another size on a terminal.
 3. **Each distinct block is transmitted once.** `_blockImages`, a `ContentCache<int>`, maps the
    digests to the terminal's image id. A block already in the terminal is not sent again; blocks
-   that look alike, such as a blank canvas, share one image. A new block is sent as RGBA with zlib
-   (`TransmitBlock`): its cells' pixels side by side, a cell without an image transparent.
+   that look alike, such as a blank canvas, share one image. A new block is sent as PNG through the
+   platform's bitmaps when there are any, as RGBA with zlib otherwise (`TransmitBlock`): its cells'
+   pixels side by side, a cell without an image transparent.
    - **A block's image is good for any subset of its cells**, since a placement only ever covers
      image cells. The encoder keeps, per block position, the image last used there and what each
      of its cells showed (`_blocksAtPositions`), and reuses that image while every cell now showing
@@ -127,10 +128,15 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
   `MaxTransmitLength`.
 - **Same bytes as a string.** `BuildTransmitSequence` composes the same bytes and decodes them to a
   string. It serves the wash images and the tests (`AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs`).
-- **RGBA with zlib.** Blocks are sent as raw RGBA, zlib compressed at level 6 (`CompressionLevel.Optimal`): on photographs a quarter fewer bytes than level 1 for a few tens of milliseconds more per new picture. The earlier
-  renderer sent PNG through Avalonia/Skia, which needs a render interface the output does not have;
-  the bytes per picture are in the benchmarks below. The PNG form of the sequence remains for a
-  caller that has one.
+- **PNG first, RGBA with zlib otherwise.** Every kitty terminal decodes PNG (`f=100` is mandatory in
+  the protocol), and a photograph is about half the bytes as PNG that it is as zlib RGBA: on three
+  Gallery photos at full HD, cut into 64×64 blocks, 0.29 to 0.59 MB as PNG against 0.39 to 1.00 MB
+  as zlib level 6 and 0.61 to 1.32 MB at level 1. The encoder asks the locator for the platform's
+  `IPlatformRenderInterface` and encodes through it: a bitmap loaded from the pixels and saved, which
+  Avalonia does through Skia. Where there is none or it cannot encode (the headless tests, the
+  benchmarks, a platform without an image codec) the block goes as RGBA, zlib level 6
+  (`CompressionLevel.Optimal`): on photographs a quarter fewer bytes than level 1 for a few tens of
+  milliseconds more per new picture.
 - **`q=2`** suppresses the terminal's replies on every command.
 
 ## Benchmarks

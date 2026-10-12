@@ -303,8 +303,8 @@ difference between them is noise. Quantising moved out of the draw and into the 
 new sixel picture no longer costs 111 ms here: that cost is in `ConsoleOutputBenchmarks` above,
 where a new full-screen sixel picture is about 100 ms (the runs of a frame quantised together; done
 per run it was 1.6 s, Wu's quantiser having a large fixed cost per call) and a new kitty picture
-about 100 to 150 ms, almost all zlib and base64 of 8 MB of RGBA, which the PNG path used to do in
-Skia outside this measurement. The bytes on the wire for a new sixel picture are 629 KB, where the
+about 100 to 150 ms, almost all zlib and base64 of 8 MB of RGBA (the benchmark has no PNG encoder;
+in an app the host registers one and the blocks go as PNG, about half the bytes). The bytes on the wire for a new sixel picture are 629 KB, where the
 old joined whole-picture sixel was 552 KB and the unjoined per-cell form about 16 MB.
 
 **Renderer per frame** (`CellImageFrameBenchmarks`, ShortRun), with the earlier sixel renderer's
