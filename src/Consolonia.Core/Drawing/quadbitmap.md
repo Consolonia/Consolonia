@@ -28,7 +28,22 @@ the rest of the UI like any other glyph.
 4. **Blend into the buffer.** Each cell is `Blend`ed over what the pixel buffer already holds, and
    the whole intersected rectangle is marked dirty.
 
-## How it differs from the image renderers
+The per-cell transform (four quadrant colours to a glyph and two colours) is also `FromPixels`, which
+takes a whole cell of pixels and averages each quadrant. `AnsiConsoleOutput` uses it when a console
+claims an image protocol the output cannot use (kitty without the RGB colour mode): the image cells
+it gets are written as block glyphs in the picture's colours under the cell's paint.
+
+## Why it is a renderer and not an encoder
+
+The sixel and kitty encoders exist because the terminal shows something a text cell cannot
+describe. A quad cell *is* a text cell: a glyph and two colours. Making it at draw time means every
+`IConsoleOutput` (the unit test console the snapshot tests compare, the legacy .NET console, the
+dummy) shows the picture without knowing about images, the render target compares it by value so a
+pixel change that does not alter the quad is not re-sent, and nothing is retained per cell. The
+pixel buffer holds image cells only when the console can show images; one line in
+`BitmapRenderer.Create` says so.
+
+## How it differs from the image renderer
 
 - **No caching.** Nothing is kept between frames: no `CellRendering`, no content cache. Every draw
   scales and classifies the intersected cells again. Each cell is a glyph and two colours, and the
@@ -40,8 +55,8 @@ the rest of the UI like any other glyph.
 - **The whole intersected rectangle is marked dirty**, not just the cells that changed. The text
   pass's cache comparison then drops the unchanged ones.
 - **Real colours in the cell.** Text drawn over a quad picture blends with the cell's colours
-  through the normal `Pixel.Blend` rules. It doesn't need the sixel dominant-colour treatment
-  (see [sixelbitmap.md](sixelbitmap.md)).
+  through the normal `Pixel.Blend` rules. It doesn't need the dominant-colour treatment the sixel
+  encoder gives a glyph over a picture (see [sixelbitmap.md](sixelbitmap.md)).
 - **Colour depth follows the console's colour mode.** The two colours are mapped to the terminal's
   colours like any other text colour, so the renderer also works in 16-colour modes, where kitty is
   never chosen.

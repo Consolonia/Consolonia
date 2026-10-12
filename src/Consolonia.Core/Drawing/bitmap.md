@@ -1,8 +1,9 @@
 # Bitmaps: how Consolonia draws pictures in a terminal
 
-Architecture notes for the bitmap pipeline shared by the three renderers: kitty, sixel and quad
-pixels. Each renderer has its own notes: [kittybitmap.md](kittybitmap.md),
-[sixelbitmap.md](sixelbitmap.md) and [quadbitmap.md](quadbitmap.md).
+Architecture notes for the bitmap pipeline. A picture becomes cells of the pixel buffer like any
+other drawing; which image protocol shows them, and how, is the console output's business. Each
+protocol has its own notes: [kittybitmap.md](kittybitmap.md), [sixelbitmap.md](sixelbitmap.md) and
+[quadbitmap.md](quadbitmap.md).
 
 ## The pipeline at a glance
 
@@ -10,40 +11,75 @@ pixels. Each renderer has its own notes: [kittybitmap.md](kittybitmap.md),
 Avalonia Image / DrawingContext.DrawImage
   └─ DrawingContextImpl.DrawBitmap                     (DrawingContextImpl.Bitmaps.cs)
        └─ BitmapRenderer.Draw                          (one renderer per terminal, owned by RenderTarget)
-            ├─ KittyBitmapRenderer   ─┐
-            ├─ SixelBitmapRenderer   ─┤ CellBitmapRenderer<TRendering>: one CellRendering per picture and size
-            └─ QuadPixelBitmapRenderer  (no rendering kept: blends quad glyphs straight into the buffer)
+            ├─ CellImageBitmapRenderer   CellBitmapRenderer<CellRendering>: one CellRendering per picture and size,
+            │                            each cell a CellImage (its pixels) in the cell's BACKGROUND
+            └─ QuadPixelBitmapRenderer   no image protocol: a block glyph in two colours per cell
                  │
                  ▼
-            PixelBuffer cells (a sixel in the foreground, or a KittyTile in the background)
+            PixelBuffer cells: PixelBackground(paint, CellImage) + a free foreground
                  │  dirty regions: only cells whose Pixel changed
                  ▼
-            RenderTarget.RenderToDevice                (RenderTarget.cs)
-              every changed cell           → WritePixel (a sixel cell as its sixel, a tile cell blank)
-              IRenderTargetHook.EndFrame   → KittyBitmapRenderer: tiles → placements, washes, orphan deletes
+            RenderTarget.RenderToDevice                (RenderTarget.cs: a cell is a cell)
+              BeginFrame ─ every changed cell → WritePixel ─ EndFrame(screen)
                  │
                  ▼
-            AnsiConsoleOutput frame buffer (UTF-8 bytes) → one write to stdout per frame
+            AnsiConsoleOutput                          (the only place that knows sixel from kitty)
+              text cells → SGR runs; image cells → IConsoleImageEncoder
+                 ├─ SixelConsoleImageEncoder: changed cells gathered, one sixel per run at EndFrame
+                 └─ KittyConsoleImageEncoder: cells on the default background, blocks → images and placements at EndFrame
+                 │
+                 ▼
+            frame buffer (UTF-8 bytes) → one write to stdout per frame
 ```
 
 Pictures are drawn into the same `PixelBuffer` as text. This means layering, occlusion, dirty
-tracking and diffing work for pictures as they do for text. Only the last step knows about image
-protocols: `AnsiConsoleOutput` turns an image cell into its escape sequence, and the kitty renderer
-places its images once per frame through `IRenderTargetHook`. `RenderTarget` itself names neither.
+tracking and diffing work for pictures as they do for text. The pixel model knows one thing about
+pictures: a cell's background can be a `CellImage` under a paint colour. Everything that knows the
+word sixel or kitty is in `Consolonia.Core.Infrastructure`, behind `AnsiConsoleOutput`.
+
+## The pixel model
+
+`PixelBufferImplementation/`
+
+- **`CellImage`.** The pixels of one cell of a picture: a cell-sized BGRA copy, its `ContentKey`
+  (XXH3-128 of the bytes) and a lazily computed `DominantColor`. Compared by reference. The renderer
+  keeps one instance per distinct content, so two cells showing the same pixels share one instance
+  and compare equal, and a cell whose pixels did not change keeps its instance and is not written
+  again. It is a copy because the cell's identity has to be its content: a picture is edited in
+  place and scaled to the cells it is drawn at, so nothing else holds these pixels unchanged.
+- **`PixelBackground`** is a `Color` and an optional `Image`. For an image cell the colour is the
+  **paint** laid over the picture: transparent for none. Translucent overlays (a modal's backdrop, a
+  shade) accumulate into it through the same `Blend` as a plain cell's colour. The output applies
+  the paint to the picture when the cell is written. `EffectiveColor` is what the cell looks: the
+  colour, or for an image cell the paint over the picture's dominant colour, for the few places that
+  need one colour (the mouse cursor's contrast, a glyph a protocol cannot draw over an image, the
+  fallback with no protocol, `Invert`).
+- **`Pixel.Blend`** has one rule for pictures: an image cell above takes the cell whole (its own
+  colours are transparent and would otherwise read as nothing drawn). Everything else is the general
+  rule: an opaque background evicts the image through the opaque fast path, a translucent one merges
+  into the paint and keeps the image, a glyph lands in the foreground with the image below it. What
+  a glyph over an image looks like on a terminal whose protocol cannot draw text over a picture is
+  decided at the output, not here. `Shade` and `Brighten` lay a 25 % black or white paint over an
+  image cell, since shifting a transparent colour by a step would leave it as it is.
+- **Size.** A `Pixel` is 56 bytes, within one cache line, and the nullable terminal cache entry is
+  exactly 64. `PixelForeground` stores its three optional attributes (`FontWeight?`, `FontStyle?`,
+  `TextDecorationLocation?`) packed in 6 bytes rather than three nullable enums of 8 each; the
+  properties are unchanged. `PixelTests.PixelIsFiftySixBytes` keeps it so.
 
 ## Choosing a renderer
 
-`BitmapRenderer.Create` picks the best renderer the terminal supports. The render target makes one
-per terminal, and the drawing contexts (replaced on every resize) borrow it:
+`BitmapRenderer.Create` picks the renderer for the console. The render target makes one per terminal,
+and the drawing contexts (replaced on every resize) borrow it:
 
-1. **Kitty** when the console reports `SupportsKittyGraphics` and the colour mode is RGB.
-2. **Sixel** when it reports `SupportsSixel`.
-3. **Quad pixels** otherwise. Each cell shows 2×2 pixels as a block glyph with a foreground and a
-   background colour. See [quadbitmap.md](quadbitmap.md).
+1. **Cell images** when the console reports `SupportsKittyGraphics` or `SupportsSixel`.
+2. **Quad pixels** otherwise. Each cell shows 2×2 pixels as a block glyph with a foreground and a
+   background colour. See [quadbitmap.md](quadbitmap.md). Its output is a text cell, which every
+   console can show and the snapshot tests can compare, so it stays a renderer rather than an
+   encoder.
 
-`AnsiConsoleOutput.PrepareConsole` detects these capabilities:
+`AnsiConsoleOutput.PrepareConsole` detects the capabilities and chooses its encoder:
 
-- Kitty: a kitty query (`a=q`).
+- Kitty: a kitty query (`a=q`). The encoder also needs the RGB colour mode.
 - Sixel: the DA1 reply.
 - Synchronized output: a DEC 2026 mode request.
 
@@ -75,14 +111,13 @@ A Device Attributes request follows the queries as a fence.
 
 ## One rendering per picture and size
 
-`CellBitmapRenderer<TRendering>` (`BitmapRenderer.cs`) is the shared base of the kitty and sixel
-renderers.
+`CellBitmapRenderer<TRendering>` (`BitmapRenderer.cs`) is the base of `CellImageBitmapRenderer`.
 
 - **Key.** `RenderingKey(TargetSize, InterpolationMode)`. The picture's version and the visible part
   are deliberately not part of the key.
-- **Storage.** Renderings live in a `ConditionalWeakTable<IBitmapImpl, …>` per renderer type, so they
-  die with the bitmap. A bitmap keeps at most four renderings (`MaxRenderingsPerBitmap`), one per
-  zoom level. The least recently drawn is dropped first (`FindOrAdd`).
+- **Storage.** Renderings live in a `ConditionalWeakTable<IBitmapImpl, …>`, so they die with the
+  bitmap. A bitmap keeps at most four renderings (`MaxRenderingsPerBitmap`), one per zoom level. The
+  least recently drawn is dropped first (`FindOrAdd`).
 - **Refill in place.** A `CellRendering` holds `Pixels` (BGRA of exactly the visible cells), `Cells`
   (a `PixelBuffer` of one cell per visible cell), `Version` and `VisibleCells`. When the version or
   the visible part changes, the rendering is refilled in place. Its buffers are replaced only when
@@ -90,8 +125,6 @@ renderers.
 - **Shows nothing until complete.** `Prepare` marks the rendering as showing nothing until `Complete`.
   A render that throws leaves a rendering that is made again, not one claiming to show the previous
   version.
-- **Reuse check.** `IsReusable` lets a renderer refuse a rendering that would otherwise be reused.
-  Kitty uses it to redo a rendering when one of its tile images has been evicted.
 - **Copied like any drawing.** `CopyRenderedBitmap` blends each rendered cell into the pixel buffer
   (`Pixel.Blend` lets an image cell take the cell) and marks the whole drawn rectangle dirty. The
   render target then skips every dirty cell that matches what it last wrote, so a redraw that
@@ -102,8 +135,8 @@ pixels per cell each way and blends a glyph per cell straight into the buffer.
 
 ## Content-addressed caches
 
-Both image protocols cache what they made from pixels by **what the pixels show**, not by where
-they came from (`ContentCache.cs`):
+Everything made from pixels is cached by **what the pixels show**, not by where they came from
+(`ContentCache.cs`):
 
 - **`ContentKey`.** An XXH3-128 hash of a block's BGRA bytes plus its size. 128 bits never collide
   in practice, and nothing needs keeping to compare against. Hashing every visible cell is the main
@@ -112,29 +145,53 @@ they came from (`ContentCache.cs`):
   already held, so every cell showing the same block shares one instance and compares equal. An
   eviction callback lets kitty delete the image from the terminal later.
 
-A blank canvas is one block repeated. With content keys it is one sixel or one kitty image, not one
-per cell, and the first edit changes only the cells it touched.
+Three caches use them: the renderer's `CellImage`s (three screens of pixels; eviction only ends
+deduplication, a cell on screen holds its image by reference), the sixel encoder's rendered runs
+(16 MB of bytes) and the kitty encoder's block images (three screens; the terminal holds the pixels).
+
+A blank canvas is one block repeated. With content keys it is one `CellImage`, one sixel run per
+row and one kitty image, not one per cell, and the first edit changes only the cells it touched.
 
 ## Writing a frame
 
 `RenderTarget.RenderToDevice` turns the dirty cells into output. It knows nothing about image
 protocols: a cell is a cell.
 
-1. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
-   pixels) goes through `IConsoleOutput.WritePixel`. `AnsiConsoleOutput` writes a sixel cell as its
-   sixel and a kitty tile cell as a blank cell with the default background. The cell under the mouse
-   cursor is text for that frame (`Pixel.AsText`): a sixel cell becomes a space on the picture's
-   dominant colour, a tile cell takes its wash over black.
-2. **Hooks** (`IRenderTargetHook`): `BeginFrame` before the cells, `EndFrame` after them, and
-   `ResetCache` when the render target forgets what the terminal shows. A renderer with work to do
-   per frame is registered when the render target creates it. Only kitty has such work: its
-   pictures are placements, terminal objects below the text rather than cell contents, so `EndFrame`
-   coalesces the tile cells into placements and reconciles them with the live ones. See
-   [kittybitmap.md](kittybitmap.md).
-3. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
+1. **`BeginFrame`.** The console is told a frame starts.
+2. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
+   pixels) goes through `IConsoleOutput.WritePixel`. The cell under the mouse cursor gets the cursor
+   glyph in its foreground; its contrast colour comes from `PixelBackground.EffectiveColor`, so over
+   a picture it is computed against the paint over the dominant colour.
+3. **`EndFrame(screen)`.** Every changed cell has been written; the console gets the whole buffer,
+   which is what the terminal should now show.
+4. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
    synchronized update covers all of it.
 
-### The byte frame (`AnsiConsoleOutput`)
+`BeginFrame`, `EndFrame` and `ResetCache` are default-implemented members of `IConsoleOutput`
+(`ConsoleBase` forwards them), so an output with no per-frame work ignores them. `AnsiConsoleOutput`
+forwards them to its image encoder.
+
+### The output decides what an image cell is (`AnsiConsoleOutput`)
+
+`WritePixel` writes a plain cell as a glyph in colours (`WriteTextCell`: SGR state diffed against
+the last cell, consecutive cells with no cursor move between them). An image cell goes to the
+console's `IConsoleImageEncoder`:
+
+| | `WriteCell` (per changed cell) | `EndFrame` (once per frame) |
+|---|---|---|
+| **Sixel** | A cell with a glyph is written as text on `EffectiveColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
+| **Kitty** | Written as text on the terminal's default background (Konsole hides below-text placements under any explicit cell background), glyph or blank. | The screen is walked in 8×4-cell blocks. A block with image cells is keyed by its cells' image digests, transmitted once per distinct content (RGBA, zlib), and placed at its position; placements and washes are diffed against the live ones. |
+| **None** (the console claims a protocol the output cannot use) | The cell as a block glyph in the picture's colours under its paint (`QuadPixelBitmapRenderer.FromPixels`), its own glyph kept. | Nothing. |
+
+Why the per-cell call is needed: the dirty rectangles say which cells were redrawn, but only the
+render target's compare knows which cells *changed*, and it says so by calling `WritePixel`. The
+sixel encoder learns its changed cells from that call; kitty reconciles placements against the
+whole screen, dirty or not, because a placement still shown by unchanged cells must stay live.
+
+`ResetCache` forgets what the output believes the terminal shows: the last colours and attributes
+set (another program may have changed them) and the encoder's placements.
+
+### The byte frame
 
 The frame is built as the bytes the terminal receives:
 
@@ -147,14 +204,16 @@ The frame is built as the bytes the terminal receives:
   lone high surrogate as U+FFFD before any image bytes.
 - **Image payloads.** These are ASCII, so they go in as they are. `IConsoleOutput.WriteBytes` is a
   default interface method that falls back to `WriteText`, so other outputs keep working.
-  `AnsiConsoleOutput` overrides it. `WriteSixel` appends `Sixel.Render()`. Kitty transmits are
-  composed as bytes (`KittyGraphics.WriteTransmitSequence`).
+  `AnsiConsoleOutput` overrides it. `WriteImageBytes` appends a sixel run after an explicit cursor
+  move and moves the cursor past it. Kitty transmits are composed as bytes
+  (`KittyGraphics.WriteTransmitSequence`).
 - **Flush.** `Flush` fills in the begin marker and appends the end marker when the terminal supports
   synchronized output. It flushes `Console.Out`, so text written there directly goes first, then
   writes the frame to stdout in **one** `Stream.Write`.
 - **Redirected output.** `PrepareConsole` installs the writer over the stdout stream. If
   `Console.Out` was replaced since then (a test, or a host capturing output), the frame is decoded
-  and written to that writer instead.
+  and written to that writer instead. `RedirectOutput(stream, capabilities)` sets the same up
+  without a terminal, with the encoder for the capabilities given, for tests and benchmarks.
 
 Before this change, the frame was a `StringBuilder`. Image payloads were widened to UTF-16 and
 encoded back to UTF-8 by the `StreamWriter`. A full-screen kitty picture cost about 22 MB of
@@ -163,7 +222,7 @@ garbage per frame, with gen-1 collections.
 ### Lifecycle: resize, resume, exit
 
 - **Resize.** A size change calls `RenderTarget.ResetCache`: the written-pixel cache is rebuilt and
-  every hook's `ResetCache` runs. Kitty then places every picture again from the cells and deletes
+  the console's `ResetCache` runs. Kitty then places every picture again from the cells and deletes
   the old placements at the end of the frame.
 - **Resume after a suspend.** `ConsoleWindowImpl.TerminalContentsLost` is raised when another
   program had the terminal (`ConsoloniaLifetime.DisconnectFromConsoleAsync`). It calls the same
@@ -177,92 +236,89 @@ garbage per frame, with gen-1 collections.
 `src/Consolonia.Benchmarks`, BenchmarkDotNet with `[MemoryDiagnoser]`:
 
 ```
-dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*SixelFrame*" --job short
-dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*ConsoleOutput*" -i
+dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*CellImageFrame*" --job short
+dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*ConsoleOutput*"
+dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*BitmapFrame*"
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --digest
 ```
 
 | Class | What it measures |
 |---|---|
-| `SixelFrameBenchmarks` | The sixel renderer's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. |
-| `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console, for sixel and kitty: redrawn unchanged, one pixel painted, a new picture. What Consolonia does per frame, not the terminal. |
+| `CellImageFrameBenchmarks` | The renderer's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. Nothing reaches a terminal. |
+| `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (changed cells written, then `EndFrame`): a screen of text; for sixel a new full-screen picture, the picture shown again after a dialog dimmed it (the run cache), one cell; for kitty a new full-screen picture, every block placed again after a reset, one cell. The terminal's side is not measured. |
+| `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console, for the sixel and kitty capabilities: redrawn unchanged, one pixel painted, a new picture. The unit test console keeps no output, so this is drawing and diffing; the encoders are measured by `ConsoleOutputBenchmarks`. |
 | `SixelBenchmarks` | Quantising (flat cell, photo cell, full image) and serialising sixels. |
-| `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream: a screen of text, full-screen and one-cell sixels, a full-screen kitty transmit (510 tiles of 8 KB) and one tile. The terminal's side is not measured. |
 
 `--digest` prints the SHA-256 of the bytes each `ConsoleOutputBenchmarks` scenario writes. A change
 to the output path should leave the digests unchanged:
 
 | Scenario | Bytes |
 |---|---|
-| TextFullScreen | 86,965 |
-| SixelFullScreen | 552,336 |
-| SixelOneCell | 3,036 |
-| KittyFullScreen | 5,595,102 |
-| KittyOneTile | 10,969 |
+| TextFullScreen | 86,966 |
+| SixelNewPicture | 629,322 |
+| SixelDialogClosed | 625,332 |
+| SixelOneCell | 3,033 |
+| KittyNewPicture | 3,254,735 |
+| KittyReplaced | 62,718 |
+| KittyOneCell | 16,282 |
 
-### Results on the way here
+### Results
 
-The tables below were measured on the developer machine, from 2026-10-09 to 2026-10-10. Read them
-as ratios, not absolutes.
+Measured on the developer machine; read them as ratios, not absolutes. Noise is about ±5 ms on the
+whole-frame numbers between runs.
 
-**Renderer per frame, full-screen picture** (`SixelFrameBenchmarks`, ShortRun). The first column is
-the state before the optimisation work. The last column has one reused rendering per picture and
-size.
+**Output path per frame** (`ConsoleOutputBenchmarks`, default job, in-process, null stream), with
+the encoders in the output:
 
-| Frame | Original | After cell reuse | After rendering reuse |
+| Scenario | Time | Allocated | Bytes on the wire |
 |---|---|---|---|
-| Nothing changed | 17.2 ms / 1.2 MB | 4.8 ms / 1.2 MB | 3.8 ms / 536 B |
-| One cell changed (a brush stroke) | 79.6 ms / 3.3 MB | 4.9 ms / 1.1 MB | 4.2 ms / 4 KB |
-| One cell changed, from the bitmap | — | ~9.5 MB | 5.0 ms / 568 B |
-| Every cell new (new picture, scroll) | 146 ms / 8.5 MB | 52.6 ms / 14.3 MB | ~60 ms / 13.9 MB (noisy) |
+| Screen of text | 2.0 ms | 514 KB | 86,966 |
+| Sixel, new full-screen picture (a run per row, quantised and encoded) | 101 ms | 8.2 MB | 629,322 |
+| Sixel, dialog closed (every run from the cache) | 1.5 ms | 1.3 MB | 625,332 |
+| Sixel, one cell | 1.9 µs | 6 KB | 3,033 |
+| Kitty, new full-screen picture (every block transmitted and placed) | 97 to 148 ms (noisy) | 13.6 MB | 3,254,735 |
+| Kitty, every block placed again (images already in the terminal) | 2.0 ms | 135 KB | 62,718 |
+| Kitty, one cell | 83 µs | 40 B | 16,282 |
 
-Where the time went, from most to least saved:
+**Whole frame per protocol** (`BitmapFrameBenchmarks`, default job, unit test console). The first
+three columns are the states before this model (the image renderers comparing cells themselves;
+copying like every other drawing; the frame work in a render target hook, with the sixel join gone).
+The last is the image-as-background model: one renderer, the encoders in the output, nothing encoded
+on this console.
 
-- Quantising only the cells that changed.
-- An exact palette path for cells with 256 colours or fewer.
-- Defining only the palette colours a cell uses. One cell's bytes dropped from 4.1 KB to under 1 KB.
-- Not re-sending sixel cells the terminal already shows.
-- XXH3 instead of SHA-256.
-- Reusing per-frame scratch buffers.
+| Frame | Per-cell compare in the renderer | Blend + one dirty rect | Hooks | Cell images |
+|---|---|---|---|---|
+| Sixel, redrawn unchanged | 1.1 ms | 3.6 ms | 4.0 ms | 1.2 ms |
+| Sixel, brush stroke | 12.0 ms | 9.4 ms | 10.0 ms | 6.5 ms |
+| Sixel, new picture | — | — | 111 ms | 26 ms |
+| Kitty, redrawn unchanged | 1.6 ms | 5.6 ms | 5.8 ms | 1.1 ms |
+| Kitty, brush stroke | 9.0 ms | 8.7 ms | 8.3 ms | 6.5 ms |
+| Kitty, new picture | — | — | 10.9 ms | 26 ms |
 
-The every-cell-new frame allocates more than the original because of the bookkeeping that makes
-identical cells share one sixel. It happens when a picture loads or scrolls, not on edits.
+The two capabilities now share the renderer, so their columns measure the same work; the
+difference between them is noise. Quantising moved out of the draw and into the sixel encoder, so a
+new sixel picture no longer costs 111 ms here: that cost is in `ConsoleOutputBenchmarks` above,
+where a new full-screen sixel picture is about 100 ms (the runs of a frame quantised together; done
+per run it was 1.6 s, Wu's quantiser having a large fixed cost per call) and a new kitty picture
+about 100 to 150 ms, almost all zlib and base64 of 8 MB of RGBA, which the PNG path used to do in
+Skia outside this measurement. The bytes on the wire for a new sixel picture are 629 KB, where the
+old joined whole-picture sixel was 552 KB and the unjoined per-cell form about 16 MB.
 
-**Output path per frame** (`ConsoleOutputBenchmarks`, default job, in-process, null stream). Before
-and after the byte frame:
+**Renderer per frame** (`CellImageFrameBenchmarks`, ShortRun), with the earlier sixel renderer's
+numbers for comparison (it quantised the new cells; this one copies them):
 
-| Scenario | Before | After | Speed-up | Allocated before | Allocated after |
-|---|---|---|---|---|---|
-| Screen of text | 2.08 ms | 2.05 ms | same | 332 KB | 332 KB |
-| Full-screen sixel | 293 µs | 17.5 µs | 17× | 1.1 KB | 80 B |
-| One-cell sixel | 714 ns | 298 ns | 2.4× | 80 B | 80 B |
-| Full-screen kitty transmit | 5.22 ms | 1.38 ms | 3.8× | 22.6 MB (gen 0 and 1) | 32 KB (no GC) |
-| One kitty tile | 7.08 µs | 0.81 µs | 8.8× | 43 KB | 0 B |
+| Frame | Sixel renderer, after rendering reuse | Cell images |
+|---|---|---|
+| Nothing changed | 3.8 ms / 536 B | 4.6 ms / 536 B |
+| One cell changed (a brush stroke) | 4.2 ms / 4 KB | 4.3 ms / 1.2 KB |
+| One cell changed, from the bitmap | 5.0 ms / 568 B | 6.3 ms / 1.3 KB |
+| Every cell new (new picture, scroll) | ~60 ms / 13.9 MB | 28 ms / 11.3 MB |
 
-The output bytes are identical before and after in all five scenarios. The text path costs the
-same because the ASCII fast path matches the old buffered writer. A full-screen kitty transmit
-still allocates about 64 B per tile, from a source not yet identified.
-
-**Whole frame per protocol** (`BitmapFrameBenchmarks`, default job, unit test console, measured
-2026-10-11, noise about ±5 ms between runs). Three states of `RenderTarget`: the image renderers
-comparing each cell with the buffer and marking only changed runs dirty; copying like every other
-drawing (blend, one dirty rectangle); and the frame work moved into `IRenderTargetHook`, with the
-sixel join gone and kitty scanning for placements every frame.
-
-| Frame | Per-cell compare in the renderer | Blend + one dirty rect | Hooks |
-|---|---|---|---|
-| Sixel, redrawn unchanged | 1.1 ms | 3.6 ms | 4.0 ms |
-| Sixel, brush stroke | 12.0 ms | 9.4 ms | 10.0 ms |
-| Sixel, new picture | — | — | 111 ms |
-| Kitty, redrawn unchanged | 1.6 ms | 5.6 ms | 5.8 ms |
-| Kitty, brush stroke | 9.0 ms | 8.7 ms | 8.3 ms |
-| Kitty, new picture | — | — | 10.9 ms |
-
-The unchanged redraw got slower when the renderers stopped comparing cells themselves: every
-dirty cell now goes through the render target's compare with its `_cache`, as every other drawing
-does. That compare (a 72-byte `Pixel` by value, a nullable cache) is the general cost to bring down
-next. Brush strokes are unchanged. A new sixel picture is quantising, not output. The kitty
-placement scan on every frame costs nothing measurable at this screen size.
+The remaining per-frame cost of an unchanged or one-cell frame is hashing every visible cell. The
+unchanged redraw of the whole frame got slower when the renderers stopped comparing cells
+themselves: every dirty cell goes through the render target's compare with its `_cache`, as every
+other drawing does. That compare (a 56-byte `Pixel` by value, a nullable cache) is the general cost
+to bring down next.
 
 ## Tests
 
@@ -272,8 +328,10 @@ In `src/Tests/Consolonia.Core.Tests`:
 |---|---|
 | `BitmapRendererTests` | The visible pixels of a picture at its own size, measured by the framebuffer rather than the layout size. |
 | `CellRenderingTests` | Buffer reuse across versions, reallocation on a size change, showing nothing until complete, least-recently-drawn eviction. |
-| `SixelRenderCellsTests`, `SixelPaletteTests`, `WithLifetimeFixture/SixelBitmapRendererTests` | The sixel side. |
-| `KittyGraphicsTests`, `KittyImageLifetimeTests`, `WithLifetimeFixture/KittyBitmapRendererTests` | The kitty side. |
+| `CellImageRenderCellsTests`, `WithLifetimeFixture/CellImageBitmapRendererTests` | The renderer: an edited cell is the only one made again, identical cells share one image, a cell keeps its exact pixels; drawing at target size, over a picture, clipped, partially redrawn, edited, at a new version. The latter runs once per capability to show the renderer is the same. |
+| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | The encoders: sixel neighbours are one sixel and cells apart are not, a glyph over a picture is text on its colour, runs come from the cache; a kitty block is one image and one placement on the default background, a stroke replaces the block it touched, paint is a wash placement, a reset places everything again; without a protocol a picture is block glyphs. |
+| `SixelPaletteTests` | Only used colours are defined, a transient image renders the same bytes without keeping them, too-small arrays are refused, exact versus Wu quantisation, rounded percentages. |
+| `KittyGraphicsTests`, `KittyImageLifetimeTests` | The kitty sequences, ids and registry; orphaned images and the cache budget. |
 | `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again. |
 | `AnsiConsoleOutputWriteTests` | The byte frame: order of text and bytes, UTF-8, split and lone surrogates, text written to `Console.Out` first, the redirected-`Console.Out` fallback, kitty bytes matching the string builder, an empty frame. |
-| `WithLifetimeFixture/PixelTests` | Blending over sixel cells (palette wash, dominant colour, block glyphs) and kitty tile backgrounds. |
+| `WithLifetimeFixture/PixelTests` | A `Pixel` is 56 bytes. Image cells compare by image; an image background composes with a glyph, keeps the image under paint, dies by an opaque background, takes the cell when drawn over text; shade and brighten paint it; the effective colour. |
