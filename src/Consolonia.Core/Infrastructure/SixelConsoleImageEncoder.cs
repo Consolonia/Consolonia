@@ -15,9 +15,11 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     /// <remarks>
     ///     A cell with a glyph is written as text: a terminal shows either a sixel or text in a cell, never
-    ///     a glyph over a picture, so the glyph sits on the picture's dominant color instead. The rendered
-    ///     bytes of a run are cached by its content: a modal closing over a picture re-sends the runs it
-    ///     dimmed from the cache instead of quantizing the screen again.
+    ///     a glyph over a picture, so the glyph sits on the picture's dominant color instead. The runs a
+    ///     frame has not sent before are quantized together, to one palette: Wu's quantizer has a large
+    ///     fixed cost per call, and a new picture is a run per row. The rendered bytes of a run are cached
+    ///     by its content: a modal closing over a picture re-sends the runs it dimmed from the cache
+    ///     instead of quantizing the screen again.
     /// </remarks>
     internal sealed class SixelConsoleImageEncoder : IConsoleImageEncoder
     {
@@ -28,8 +30,9 @@ namespace Consolonia.Core.Infrastructure
 
         private readonly AnsiConsoleOutput _output;
         private readonly List<ImageCell> _cells = new();
+        private readonly List<Run> _runs = new();
         private readonly ContentCache<byte[]> _renderedRuns = new(RunCacheBudgetBytes);
-        private byte[] _runBgra;
+        private byte[] _frameBgra;
         private byte[] _runKey;
 
         public SixelConsoleImageEncoder(AnsiConsoleOutput output)
@@ -38,6 +41,12 @@ namespace Consolonia.Core.Infrastructure
         }
 
         private readonly record struct ImageCell(PixelBufferCoordinate Position, CellImage Image, Color Paint);
+
+        /// <summary>Cells <see cref="Start" /> to <see cref="End" /> (exclusive) of the frame's list, one sixel.</summary>
+        private record struct Run(int Start, int End, ContentKey Key, byte[] Rendered, int FrameColumn)
+        {
+            public int Cells => End - Start;
+        }
 
         public void BeginFrame()
         {
@@ -60,7 +69,14 @@ namespace Consolonia.Core.Infrastructure
 
         public void EndFrame(PixelBuffer screen)
         {
+            if (_cells.Count == 0)
+                return;
+
+            int cellWidth = _cells[0].Image.Width;
+            int cellHeight = _cells[0].Image.Height;
+
             // the render target writes cells row by row, so neighbours on a row are consecutive here
+            _runs.Clear();
             int start = 0;
             while (start < _cells.Count)
             {
@@ -70,34 +86,24 @@ namespace Consolonia.Core.Infrastructure
                        _cells[end].Position.X == _cells[end - 1].Position.X + 1)
                     end++;
 
-                WriteRun(start, end);
+                ContentKey key = RunKey(start, end, cellWidth, cellHeight);
+                _renderedRuns.TryGet(key, out byte[] rendered);
+                _runs.Add(new Run(start, end, key, rendered, 0));
                 start = end;
             }
 
+            RenderNewRuns(cellWidth, cellHeight);
+
+            foreach (Run run in _runs)
+                _output.WriteImageBytes(_cells[run.Start].Position, run.Rendered, run.Cells);
+
             _cells.Clear();
+            _runs.Clear();
         }
 
         public void Reset()
         {
             _cells.Clear();
-        }
-
-        /// <summary>Sends the cells <paramref name="start" /> to <paramref name="end" /> (exclusive) as one sixel.</summary>
-        private void WriteRun(int start, int end)
-        {
-            int cells = end - start;
-            CellImage first = _cells[start].Image;
-            int cellWidth = first.Width;
-            int cellHeight = first.Height;
-
-            ContentKey runKey = RunKey(start, end, cellWidth, cellHeight);
-            if (!_renderedRuns.TryGet(runKey, out byte[] rendered))
-            {
-                rendered = RenderRun(start, end, cellWidth, cellHeight);
-                _renderedRuns.GetOrAdd(runKey, rendered, rendered.Length);
-            }
-
-            _output.WriteImageBytes(_cells[start].Position, rendered, cells);
         }
 
         /// <summary>What a run shows: each cell's image and the paint over it.</summary>
@@ -121,40 +127,77 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     The sixel bytes of a run: the cells' pixels side by side, each cell's paint composited over
-        ///     its own, quantized to one palette and encoded.
+        ///     Renders the runs the cache did not have: their cells' pixels side by side in one image, each
+        ///     cell's paint composited over its own, quantized once to one palette, then each run's slice
+        ///     encoded and cached.
         /// </summary>
-        private byte[] RenderRun(int start, int end, int cellWidth, int cellHeight)
+        private void RenderNewRuns(int cellWidth, int cellHeight)
         {
-            int cells = end - start;
-            int runWidth = cells * cellWidth;
-            int runRowBytes = runWidth * 4;
-            int cellRowBytes = cellWidth * 4;
-            int bytes = runRowBytes * cellHeight;
-
-            // exactly the run's pixels: the quantizer reads the whole array
-            if (_runBgra == null || _runBgra.Length != bytes)
-                _runBgra = GC.AllocateUninitializedArray<byte>(bytes);
-            byte[] bgra = _runBgra;
-
-            for (int i = start; i < end; i++)
+            int newCells = 0;
+            for (int i = 0; i < _runs.Count; i++)
             {
-                ImageCell cell = _cells[i];
-                byte[] source = cell.Image.Bgra;
-                int column = i - start;
-                for (int y = 0; y < cellHeight; y++)
-                    source.AsSpan(y * cellRowBytes, cellRowBytes)
-                        .CopyTo(bgra.AsSpan(y * runRowBytes + column * cellRowBytes, cellRowBytes));
-
-                if (cell.Paint.A != 0)
-                    Paint(bgra, runRowBytes, column * cellRowBytes, cellWidth, cellHeight, cell.Paint);
+                Run run = _runs[i];
+                if (run.Rendered != null)
+                    continue;
+                _runs[i] = run with { FrameColumn = newCells };
+                newCells += run.Cells;
             }
 
-            // transient: the bytes are kept by the run cache, not by a sixel nothing holds on to
-            return Sixel.CreateFromBitmap(bgra, runWidth, cellHeight, cellWidth, cellHeight, true).Render().ToArray();
+            if (newCells == 0)
+                return;
+
+            int frameWidth = newCells * cellWidth;
+            int frameRowBytes = frameWidth * 4;
+            int cellRowBytes = cellWidth * 4;
+
+            // exactly the new pixels: the quantizer reads the whole array
+            int bytes = frameRowBytes * cellHeight;
+            if (_frameBgra == null || _frameBgra.Length != bytes)
+                _frameBgra = GC.AllocateUninitializedArray<byte>(bytes);
+            byte[] bgra = _frameBgra;
+
+            foreach (Run run in _runs)
+            {
+                if (run.Rendered != null)
+                    continue;
+
+                for (int i = run.Start; i < run.End; i++)
+                {
+                    ImageCell cell = _cells[i];
+                    byte[] source = cell.Image.Bgra;
+                    int column = run.FrameColumn + i - run.Start;
+                    for (int y = 0; y < cellHeight; y++)
+                        source.AsSpan(y * cellRowBytes, cellRowBytes)
+                            .CopyTo(bgra.AsSpan(y * frameRowBytes + column * cellRowBytes, cellRowBytes));
+
+                    if (cell.Paint.A != 0)
+                        Paint(bgra, frameRowBytes, column * cellRowBytes, cellWidth, cellHeight, cell.Paint);
+                }
+            }
+
+            Sixel.Quantize(bgra, out byte[] palette, out int paletteCount, out byte[] indexed);
+
+            for (int r = 0; r < _runs.Count; r++)
+            {
+                Run run = _runs[r];
+                if (run.Rendered != null)
+                    continue;
+
+                int runWidth = run.Cells * cellWidth;
+                byte[] runIndexed = GC.AllocateUninitializedArray<byte>(runWidth * cellHeight);
+                for (int y = 0; y < cellHeight; y++)
+                    indexed.AsSpan(y * frameWidth + run.FrameColumn * cellWidth, runWidth)
+                        .CopyTo(runIndexed.AsSpan(y * runWidth));
+
+                // transient: the bytes are kept by the run cache, not by a sixel nothing holds on to
+                byte[] rendered = new Sixel(palette, paletteCount, runIndexed, runWidth, cellHeight, cellWidth,
+                    cellHeight) { IsTransient = true }.Render().ToArray();
+                _renderedRuns.GetOrAdd(run.Key, rendered, rendered.Length);
+                _runs[r] = run with { Rendered = rendered };
+            }
         }
 
-        /// <summary>Composites <paramref name="paint" /> over the pixels of one cell of the run.</summary>
+        /// <summary>Composites <paramref name="paint" /> over the pixels of one cell of the frame image.</summary>
         private static void Paint(byte[] bgra, int rowBytes, int cellOffset, int cellWidth, int cellHeight,
             Color paint)
         {
