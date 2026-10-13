@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
@@ -547,6 +548,18 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        /// <summary>
+        ///     Hands the renderer the cursor for the current type and position, and the terminal the
+        ///     pointer shape for it.
+        /// </summary>
+        /// <remarks>
+        ///     Reached from the UI thread, through <see cref="SetCursor" />, and from whichever thread
+        ///     the console raises mouse events on. Serialised so that the shape sent to the terminal,
+        ///     the record of it in <see cref="_pointerShape" />, and the cursor handed on all come from
+        ///     one reading of the cursor type, and reach the terminal and the renderer in the same
+        ///     order.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.Synchronized)]
         private void UpdateCursor()
         {
             OnCursorChanged(
@@ -578,7 +591,8 @@ namespace Consolonia.Core.Infrastructure
             // Every mouse move comes through here; only a change is worth a write.
             if (wanted != _pointerShape)
             {
-                if (supported.Contains(wanted))
+                // The shape itself was looked up above; only "default" is still in question.
+                if (terminalDraws || supported.Contains(PointerShapes.Default))
                 {
                     Console.SetPointerShape(wanted);
                 }

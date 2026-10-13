@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using Consolonia.Core.Infrastructure;
-using Consolonia.Core.Text;
 using Unix.Terminal;
 
 namespace Consolonia.PlatformSupport
@@ -10,48 +8,26 @@ namespace Consolonia.PlatformSupport
     public partial class CursesConsole
     {
         /// <summary>
-        ///     Works out which mouse pointer shapes the terminal can draw itself (OSC 22), so the
-        ///     pointer can be the terminal's own rather than a character.
+        ///     Asks the terminal which mouse pointer shapes it can draw itself (OSC 22); see
+        ///     <see cref="ConsoleBase.TryToSupportPointerShapes(Func{string})" />. Skipped on a
+        ///     Linux virtual console, as the Kitty keyboard probe is.
         /// </summary>
-        /// <remarks>
-        ///     <para>
-        ///         Kitty's support query names every shape an Avalonia cursor maps to, split over as
-        ///         many queries as keep each short enough to be read whole, and is followed by
-        ///         XTVERSION and then a Device Attributes request as a sentinel, which every terminal
-        ///         answers. Everything up to the sentinel's answer is read.
-        ///     </para>
-        ///     <para>
-        ///         What the answers mean is decided by <see cref="PointerShapes.Detect" />, shared with
-        ///         the Windows console. A terminal that neither answers nor is recognised keeps the
-        ///         character pointer.
-        ///     </para>
-        ///     <para>Skipped on a Linux virtual console, as the Kitty keyboard probe is.</para>
-        /// </remarks>
         private void TryToSupportPointerShapes()
         {
             if (IsTtyTerminal())
                 return;
 
-            string answers;
-            try
+            TryToSupportPointerShapes(() =>
             {
-                foreach (IReadOnlyList<string> batch in PointerShapes.QueryBatches)
-                    WriteText(Esc.QueryPointerShapes(batch));
-                WriteText(Esc.QueryTerminalVersion);
-                WriteText("\u001b[c"); // sentinel: Device Attributes query
-                Flush(); // the queries must actually reach the terminal, otherwise it never responds
-
-                answers = ReadAnswersUntilDeviceAttributes();
-            }
-            finally
-            {
-                Curses.timeout(NoInputTimeout);
-            }
-
-            (IReadOnlySet<string> supported, bool usesX11Names) =
-                PointerShapes.Detect(answers, Environment.GetEnvironmentVariable);
-            SupportedPointerShapes = supported;
-            PointerShapesUseX11Names = usesX11Names;
+                try
+                {
+                    return ReadAnswersUntilDeviceAttributes();
+                }
+                finally
+                {
+                    Curses.timeout(NoInputTimeout);
+                }
+            });
         }
 
         /// <summary>
