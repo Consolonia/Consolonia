@@ -74,6 +74,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         [JsonIgnore] public PixelRect Size => new(0, 0, Width, Height);
 
+        /// <summary>The cell at (x, y), read in place rather than copied, for scans that only look.</summary>
+        internal ref readonly Pixel CellAt(int x, int y)
+        {
+            return ref _buffer[x, y];
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private (ushort x, ushort y) ToXY(int i)

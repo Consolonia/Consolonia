@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -30,8 +31,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         /// </summary>
         private static readonly TimeSpan PicsumListTimeout = TimeSpan.FromSeconds(5);
 
-        private static readonly HttpClient Client = new();
-
         public GalleryImage()
         {
             InitializeComponent();
@@ -49,11 +48,38 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             foreach (string source in sources)
             {
                 var image = new Image { Stretch = Stretch.Uniform };
-                var border = new Border { Child = image };
+                var border = new Border { Child = new Panel { Children = { image, CreateCaption() } } };
                 border.Classes.Add("thumbnail");
                 WrapPanel.Children.Add(border);
                 _ = LoadBitmapAsync(image, source);
             }
+        }
+
+        /// <summary>
+        ///     Two lines of text drawn over a thumbnail: one on an opaque background, one on none, so
+        ///     both ways of putting text over an image can be seen on every picture.
+        /// </summary>
+        private static StackPanel CreateCaption()
+        {
+            return new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Top,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "White on dark blue",
+                        Foreground = Brushes.White,
+                        Background = Brushes.DarkBlue
+                    },
+                    new TextBlock
+                    {
+                        Text = "White on transparent",
+                        Foreground = Brushes.White,
+                        Background = Brushes.Transparent
+                    }
+                }
+            };
         }
 
         /// <summary>
@@ -67,7 +93,7 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             try
             {
                 using var timeout = new CancellationTokenSource(PicsumListTimeout);
-                string json = await Client.GetStringAsync(new Uri(PicsumListUrl), timeout.Token);
+                string json = await GalleryHttp.Client.GetStringAsync(new Uri(PicsumListUrl), timeout.Token);
 
                 using JsonDocument document = JsonDocument.Parse(json);
                 foreach (JsonElement photo in document.RootElement.EnumerateArray())
@@ -116,16 +142,17 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                     return;
                 }
 
-                byte[] bytes = await Client.GetByteArrayAsync(new Uri(source));
+                byte[] bytes = await GalleryHttp.Client.GetByteArrayAsync(new Uri(source));
                 image.Source = await Task.Run(() =>
                 {
                     using var stream = new MemoryStream(bytes);
                     return new Bitmap(stream);
                 });
             }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            // ArgumentException: the reply is not an image (an error page, a truncated download)
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or ArgumentException)
             {
-                // A photo that will not load just stays blank.
+                // A photo that will not download or decode just stays blank.
             }
         }
 

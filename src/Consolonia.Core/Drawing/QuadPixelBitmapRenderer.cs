@@ -1,15 +1,12 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -19,89 +16,119 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal sealed class QuadPixelBitmapRenderer : BitmapRenderer
     {
-        public QuadPixelBitmapRenderer(DrawingContextImpl context)
-            : base(context)
+        public QuadPixelBitmapRenderer(IConsoleOutput console)
+            : base(console)
         {
         }
 
-        public override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect)
+        public override void Draw(DrawingContextImpl context, IBitmapImpl source,
+            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
+            BitmapInterpolationMode interpolationMode)
         {
-            // Resize source to be target rect * 2 so we can map to quad pixels
+            // two pixels across and two down per cell, and only the cells being drawn are scaled: a
+            // picture zoomed far past the screen is not scaled whole every frame
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
-            using IBitmapImpl resizedBitmap =
-                renderInterface.ResizeBitmap(source, targetSize, BitmapInterpolationMode.MediumQuality);
+            var visible = new PixelRect((intersectedRect.X - targetRect.X) * 2, (intersectedRect.Y - targetRect.Y) * 2,
+                intersectedRect.Width * 2, intersectedRect.Height * 2);
+            byte[] bgra = GC.AllocateUninitializedArray<byte>(visible.Width * visible.Height * 4);
+            GetVisiblePixels(source, renderInterface, targetSize, visible, interpolationMode, bgra);
+            int rowBytes = visible.Width * 4;
 
-            var readableBitmap = (IReadableBitmapImpl)resizedBitmap;
+            bool complexEmoji = ConsoleOutput.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji);
+            PixelBuffer pixelBuffer = context.PixelBuffer;
 
-            using ILockedFramebuffer frameBuffer = readableBitmap.Lock();
-
-            int stride = frameBuffer.RowBytes;
-            int bytesPerPixel = frameBuffer.Format.BitsPerPixel / 8;
-            unsafe
+            for (int cellY = 0; cellY < intersectedRect.Height; cellY++)
+            for (int cellX = 0; cellX < intersectedRect.Width; cellX++)
             {
-                ReadOnlySpan<byte> pixelBytes = MemoryMarshal.CreateReadOnlySpan(
-                    ref Unsafe.AsRef<byte>((void*)frameBuffer.Address), stride * frameBuffer.Size.Height);
+                int top = cellY * 2 * rowBytes + cellX * 2 * 4;
+                int bottom = top + rowBytes;
+                Pixel imagePixel = FromQuadrants(PixelAt(bgra, top), PixelAt(bgra, top + 4), PixelAt(bgra, bottom),
+                    PixelAt(bgra, bottom + 4), complexEmoji);
 
-                int startY = (intersectedRect.Y - targetRect.TopLeft.Y) * 2;
-                int startX = (intersectedRect.X - targetRect.TopLeft.X) * 2;
-                int endY = startY + intersectedRect.Height * 2;
-                int endX = startX + intersectedRect.Width * 2;
+                var point = new PixelPoint(intersectedRect.X + cellX, intersectedRect.Y + cellY);
+                pixelBuffer[point] = pixelBuffer[point].Blend(imagePixel);
+            }
 
-                int py = intersectedRect.Y;
+            context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+        }
 
-                for (int y = startY; y < endY; y += 2, py++)
+        /// <summary>
+        ///     The text cell for a cell of a picture given as its pixels (<paramref name="width" /> x
+        ///     <paramref name="height" /> BGRA): each quadrant's pixels averaged to one color, then the four
+        ///     colors as a block glyph in two colors. For a console output that has an image cell but no
+        ///     protocol to show it with.
+        /// </summary>
+        internal static Pixel FromPixels(ReadOnlySpan<byte> bgra, int width, int height, bool complexEmoji)
+        {
+            int halfWidth = Math.Max(1, width / 2);
+            int halfHeight = Math.Max(1, height / 2);
+            return FromQuadrants(
+                AverageBlock(bgra, width, 0, 0, halfWidth, halfHeight),
+                AverageBlock(bgra, width, halfWidth, 0, width - halfWidth, halfHeight),
+                AverageBlock(bgra, width, 0, halfHeight, halfWidth, height - halfHeight),
+                AverageBlock(bgra, width, halfWidth, halfHeight, width - halfWidth, height - halfHeight),
+                complexEmoji);
+        }
+
+        private static BgraColor AverageBlock(ReadOnlySpan<byte> bgra, int imageWidth, int x, int y, int width,
+            int height)
+        {
+            if (width <= 0 || height <= 0)
+                return BgraColor.Transparent;
+
+            long b = 0, g = 0, r = 0, a = 0;
+            for (int row = y; row < y + height; row++)
+            {
+                int offset = (row * imageWidth + x) * 4;
+                for (int column = 0; column < width; column++, offset += 4)
                 {
-                    int px = intersectedRect.X;
-                    for (int x = startX; x < endX; x += 2, px++)
-                    {
-                        var point = new PixelPoint(px, py);
-
-                        // get the quad pixel from the bitmap as a quad of 4 BgraColor values
-                        Span<BgraColor> quadPixelColors =
-                        [
-                            GetPixelColor(pixelBytes, x, y, stride, bytesPerPixel),
-                            GetPixelColor(pixelBytes, x + 1, y, stride, bytesPerPixel),
-                            GetPixelColor(pixelBytes, x, y + 1, stride, bytesPerPixel),
-                            GetPixelColor(pixelBytes, x + 1, y + 1, stride, bytesPerPixel)
-                        ];
-
-                        // map it to a single char to represent the 4 pixels
-                        char quadPixelChar = GetQuadPixelCharacter(quadPixelColors);
-
-                        // get the combined colors for the quad pixel
-                        Color foreground = GetForegroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-                        Color background = GetBackgroundColorForQuadPixel(quadPixelChar, quadPixelColors);
-
-                        var imagePixel = new Pixel(
-                            new PixelForeground(new Symbol(quadPixelChar), foreground),
-                            new PixelBackground(background));
-
-                        Context.PixelBuffer[point] = Context.PixelBuffer[point].Blend(imagePixel);
-                    }
+                    b += bgra[offset];
+                    g += bgra[offset + 1];
+                    r += bgra[offset + 2];
+                    a += bgra[offset + 3];
                 }
             }
 
-            Context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            int count = width * height;
+            return new BgraColor((byte)(b / count), (byte)(g / count), (byte)(r / count), (byte)(a / count));
         }
 
-        private static BgraColor GetPixelColor(ReadOnlySpan<byte> pixels, int x, int y, int stride,
-            int bytesPerPixel)
+        /// <summary>
+        ///     The text cell for four quadrant colors (top left, top right, bottom left, bottom right): the
+        ///     pixels split into a foreground and a background group, and the split mapped to the block
+        ///     character that draws the foreground quadrants.
+        /// </summary>
+        private static Pixel FromQuadrants(BgraColor topLeft, BgraColor topRight, BgraColor bottomLeft,
+            BgraColor bottomRight, bool complexEmoji)
         {
-            int offset = y * stride + x * bytesPerPixel;
+            Span<BgraColor> quadPixelColors = [topLeft, topRight, bottomLeft, bottomRight];
 
-            return bytesPerPixel switch
-            {
-                4 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]),
-                3 => new BgraColor(pixels[offset], pixels[offset + 1], pixels[offset + 2], 255),
-                _ => throw new NotSupportedException(
-                    $"Unsupported bitmap format with {bytesPerPixel} bytes per pixel.")
-            };
+            byte pattern = GetColorsPattern(quadPixelColors, complexEmoji);
+            char quadPixelChar = GetQuadPixelCharacter(pattern);
+
+            // nothing in the foreground draws nothing; with no quadrant left for the background, the
+            // background takes all four colours. It is NOT transparent: a transparent background lets
+            // the color under the picture show through the hairlines terminals leave around a full
+            // block glyph
+            Color foreground = pattern == 0b0000
+                ? BgraColor.Transparent.ToColor()
+                : CombineQuadrants(quadPixelColors, pattern).ToColor();
+            var background = CombineQuadrants(quadPixelColors,
+                pattern == 0b1111 ? (byte)0b1111 : (byte)(~pattern & 0b1111)).ToColor();
+
+            return new Pixel(
+                new PixelForeground(new Symbol(quadPixelChar), foreground),
+                new PixelBackground(background));
         }
 
-        private char GetQuadPixelCharacter(ReadOnlySpan<BgraColor> colors)
+        private static BgraColor PixelAt(byte[] bgra, int offset)
         {
-            char character = GetColorsPattern(colors) switch
+            return new BgraColor(bgra[offset], bgra[offset + 1], bgra[offset + 2], bgra[offset + 3]);
+        }
+
+        private static char GetQuadPixelCharacter(byte pattern)
+        {
+            char character = pattern switch
             {
                 // ReSharper disable StringLiteralTypo
                 0b0000 => ' ',
@@ -127,78 +154,19 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Combine the colors for the white part of the quad pixel character.
+        ///     Combines the colors of the quadrants in a pattern, one bit per quadrant as
+        ///     <see cref="GetColorsPattern" /> returns it. A single quadrant keeps its color as it is.
         /// </summary>
-        /// <param name="quadPixel"></param>
-        /// <param name="pixelColors">4 colors</param>
-        /// <returns>foreground color</returns>
-        /// <exception cref="NotImplementedException"></exception>
-        private static Color GetForegroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
+        private static BgraColor CombineQuadrants(ReadOnlySpan<BgraColor> colors, byte pattern)
         {
-            if (pixelColors.Length != 4)
-                throw new ArgumentException($"{nameof(pixelColors)} must have 4 elements.");
+            Span<BgraColor> selected = stackalloc BgraColor[4];
+            int count = 0;
+            for (int i = 0; i < 4; i++)
+                if ((pattern & (0b1000 >> i)) != 0)
+                    selected[count++] = colors[i];
 
-            // TODO: Some of these chars don't work in IBM Codepage
-            BgraColor bgraColor = quadPixel switch
-            {
-                ' ' => BgraColor.Transparent,
-                '▘' => pixelColors[0],
-                '▝' => pixelColors[1],
-                '▖' => pixelColors[2],
-                '▗' => pixelColors[3],
-                '▚' => CombineColors([pixelColors[0], pixelColors[3]]),
-                '▞' => CombineColors([pixelColors[1], pixelColors[2]]),
-                '▌' => CombineColors([pixelColors[0], pixelColors[2]]),
-                '▐' => CombineColors([pixelColors[1], pixelColors[3]]),
-                '▄' => CombineColors([pixelColors[2], pixelColors[3]]),
-                '▀' => CombineColors([pixelColors[0], pixelColors[1]]),
-                '▛' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
-                '▜' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
-                '▙' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
-                '▟' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
-                '█' => CombineColors(pixelColors),
-                _ => throw new NotImplementedException()
-            };
-
-            return bgraColor.ToColor();
+            return count == 1 ? selected[0] : CombineColors(selected[..count]);
         }
-
-
-        /// <summary>
-        ///     Combine the colors for the black part of the quad pixel character.
-        /// </summary>
-        /// <param name="quadPixel"></param>
-        /// <param name="pixelColors"></param>
-        /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        private static Color GetBackgroundColorForQuadPixel(char quadPixel, ReadOnlySpan<BgraColor> pixelColors)
-        {
-            // TODO: Some of these chars don't work in IBM Codepage
-            BgraColor bgraColor = quadPixel switch
-            {
-                ' ' => CombineColors(pixelColors),
-                '▘' => CombineColors([pixelColors[1], pixelColors[2], pixelColors[3]]),
-                '▝' => CombineColors([pixelColors[0], pixelColors[2], pixelColors[3]]),
-                '▖' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[3]]),
-                '▗' => CombineColors([pixelColors[0], pixelColors[1], pixelColors[2]]),
-                '▚' => CombineColors([pixelColors[1], pixelColors[2]]),
-                '▞' => CombineColors([pixelColors[0], pixelColors[3]]),
-                '▌' => CombineColors([pixelColors[1], pixelColors[3]]),
-                '▐' => CombineColors([pixelColors[0], pixelColors[2]]),
-                '▄' => CombineColors([pixelColors[0], pixelColors[1]]),
-                '▀' => CombineColors([pixelColors[2], pixelColors[3]]),
-                '▛' => pixelColors[3],
-                '▜' => pixelColors[2],
-                '▙' => pixelColors[1],
-                '▟' => pixelColors[0],
-                // NOT transparent: a transparent background let the color under the picture show
-                // through the hairlines terminals leave around a full block glyph
-                '█' => CombineColors(pixelColors),
-                _ => throw new NotImplementedException()
-            };
-            return bgraColor.ToColor();
-        }
-
 
         private static BgraColor CombineColors(ReadOnlySpan<BgraColor> colors)
         {
@@ -225,16 +193,14 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Cluster quad colors into a pattern (like: TTFF) based on relative closeness
+        ///     Cluster the 4 quad colors into two groups by relative closeness.
         /// </summary>
-        /// <param name="colors"></param>
-        /// <returns>T or F for each color as a string</returns>
-        /// <exception cref="ArgumentException"></exception>
-        private byte GetColorsPattern(ReadOnlySpan<BgraColor> colors)
+        /// <param name="colors">the 4 colors, top left, top right, bottom left, bottom right</param>
+        /// <param name="complexEmoji">whether the console draws the quadrant characters</param>
+        /// <returns>a 4-bit mask, one bit per color, set for the colors in the foreground group</returns>
+        private static byte GetColorsPattern(ReadOnlySpan<BgraColor> colors, bool complexEmoji)
         {
-            if (colors.Length != 4) throw new ArgumentException("Array must contain exactly 4 colors.");
-
-            if (!Context.ConsoleWindowImpl.Console.Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji))
+            if (!complexEmoji)
             {
                 BgraColor topRowColor = Average(colors[0], colors[1]);
                 BgraColor bottomRowColor = Average(colors[2], colors[3]);

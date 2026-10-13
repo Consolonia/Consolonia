@@ -37,13 +37,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             Pattern = 0;
         }
 
-        public Symbol(Sixel sixel, byte width)
-            : this()
-        {
-            Width = width;
-            Sixel = sixel;
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Symbol(char ch, byte? width = null)
         {
@@ -147,16 +140,23 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
+        /// <summary>The fields as they are, for <see cref="Pixel" />, which stores them flat.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Symbol(char character, string reference, byte pattern, byte width)
+        {
+            Character = character;
+            Complex = reference;
+            Pattern = pattern;
+            Width = width;
+        }
+
 
         public bool Equals(Symbol other)
         {
             return Character == other.Character &&
-                   string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
                    Width == other.Width &&
                    Pattern == other.Pattern &&
-                   // every sixel cell looks alike otherwise (no character, no pattern), so without this
-                   // the pixel buffer diff would keep a stale image when a new one lands on the same cells
-                   Sixel == other.Sixel;
+                   string.Equals(Complex, other.Complex, StringComparison.Ordinal);
         }
 
 
@@ -169,12 +169,13 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     If cell has complex text (more than one char) this contains the full unicode sequence to draw this symbol.
         /// </summary>
-        public readonly string Complex;
+        public string Complex { get; }
+
+        /// <summary>The complex text as stored, null for none; what <see cref="Pixel" /> keeps.</summary>
+        internal string Reference => Complex;
 
         // box pattern for box merging.
         public readonly byte Pattern;
-
-        public readonly Sixel Sixel;
 
         [JsonIgnore] public readonly byte Width;
 #pragma warning restore CA1051 // Do not declare visible instance fields
@@ -194,10 +195,19 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Complex != null && Complex.Length > 1 ? Complex : new string(Character, 1);
         }
 
+        /// <summary>No character and no complex text: blending this over a symbol leaves that symbol.</summary>
         public bool NothingToDraw()
         {
-            return Character == char.MinValue &&
-                   string.IsNullOrEmpty(Complex);
+            return Character == char.MinValue && string.IsNullOrEmpty(Complex);
+        }
+
+        /// <summary>
+        ///     Shows nothing in the cell: nothing to draw, or white space. A cell showing a picture under a
+        ///     blank symbol is still the picture, whatever color the symbol has.
+        /// </summary>
+        public bool IsBlank()
+        {
+            return string.IsNullOrEmpty(Complex) && (Character == char.MinValue || char.IsWhiteSpace(Character));
         }
 
         public Symbol Blend(ref Symbol symbolAbove)
@@ -225,7 +235,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Character, Complex, Width, Pattern, Sixel);
+            return HashCode.Combine(Character, Complex, Width, Pattern);
         }
 
         public static bool operator ==(Symbol left, Symbol right)

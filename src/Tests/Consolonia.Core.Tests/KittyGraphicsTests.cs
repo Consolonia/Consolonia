@@ -1,9 +1,11 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.Reflection;
 using System.Text;
 using Avalonia.Media;
-using Consolonia.Core.Drawing;
+using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
@@ -15,11 +17,32 @@ namespace Consolonia.Core.Tests
         private static readonly string St = (char)27 + @"\";
 
         [Test]
-        public void AllocatedImageIdsStayWithin24Bits()
+        public void AllocatedImageIdsArePositive()
         {
             int imageId = KittyGraphics.AllocateImageId();
             Assert.That(imageId, Is.GreaterThan(0));
-            Assert.That(imageId, Is.LessThanOrEqualTo(0xFFFFFF));
+        }
+
+        [Test]
+        public void AllocatedIdsStayPositiveAfterTheCounterOverflows()
+        {
+            FieldInfo counter = typeof(KittyGraphics).GetField("_nextImageId",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(counter, Is.Not.Null, "_nextImageId has been renamed; this test needs updating");
+            object saved = counter!.GetValue(null);
+            try
+            {
+                counter.SetValue(null, int.MaxValue - 1);
+                for (int i = 0; i < 4; i++)
+                {
+                    int imageId = KittyGraphics.AllocateImageId();
+                    Assert.That(imageId, Is.InRange(1, int.MaxValue), "an id after the counter wrapped");
+                }
+            }
+            finally
+            {
+                counter.SetValue(null, saved);
+            }
         }
 
         [Test]
@@ -27,6 +50,25 @@ namespace Consolonia.Core.Tests
         {
             Assert.That(KittyGraphics.BuildDeleteSequence(7),
                 Is.EqualTo(Apc + "a=d,d=I,q=2,i=7" + St));
+        }
+
+        /// <summary>
+        ///     Every image transmitted is in the terminal until deleted, and at exit or when the terminal's
+        ///     contents are forgotten they are all deleted by id: deleting the visible placements alone
+        ///     (d=A) would leave the ones kept for showing again.
+        /// </summary>
+        [Test]
+        public void TransmittedImagesAreDeletedTogetherUnlessDeletedOneByOne()
+        {
+            KittyGraphics.BuildDeleteTransmittedImagesSequence(); // whatever other tests left in
+            int kept = KittyGraphics.AllocateImageId();
+            int deleted = KittyGraphics.AllocateImageId();
+            KittyGraphics.BuildDeleteSequence(deleted);
+
+            Assert.That(KittyGraphics.BuildDeleteTransmittedImagesSequence(),
+                Is.EqualTo(Apc + "a=d,d=I,q=2,i=" + kept.ToString(CultureInfo.InvariantCulture) + St),
+                "the one still in the terminal");
+            Assert.That(KittyGraphics.BuildDeleteTransmittedImagesSequence(), Is.Empty, "all counted as gone");
         }
 
         [Test]
@@ -86,7 +128,7 @@ namespace Consolonia.Core.Tests
         {
             Assert.That(KittyGraphics.BuildRectPlacementSequence(5, 7, 16, 32, 64, 48),
                 Is.EqualTo("\u001b_Ga=p,q=2,C=1,z=-2,i=5,p=7,x=16,y=32,w=64,h=48\u001b\\"));
-            Assert.That(KittyGraphics.BuildDeleteRectPlacementSequence(5, 7),
+            Assert.That(KittyGraphics.BuildDeletePlacementSequence(5, 7),
                 Is.EqualTo("\u001b_Ga=d,d=i,q=2,i=5,p=7\u001b\\"));
         }
 

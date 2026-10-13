@@ -8,7 +8,6 @@ using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
 
@@ -218,14 +217,29 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
-        public virtual void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
+        public virtual void BeginFrame()
         {
-            _consoleOutput.WriteSixel(position, sixel);
+            _consoleOutput.BeginFrame();
+        }
+
+        public virtual void EndFrame(PixelBuffer screen)
+        {
+            _consoleOutput.EndFrame(screen);
+        }
+
+        public virtual void ResetCache()
+        {
+            _consoleOutput.ResetCache();
         }
 
         public virtual void WriteText(string str)
         {
             _consoleOutput.WriteText(str);
+        }
+
+        public virtual void WriteBytes(ReadOnlySpan<byte> ascii)
+        {
+            _consoleOutput.WriteBytes(ascii);
         }
 
         protected bool CheckSize()
@@ -265,7 +279,7 @@ namespace Consolonia.Core.Infrastructure
                 return (widthPx / cols, heightPx / rows);
             }
 
-            return (8, 16);
+            return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
         }
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)

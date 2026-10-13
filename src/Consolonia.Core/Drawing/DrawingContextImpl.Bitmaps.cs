@@ -1,12 +1,8 @@
-//DUPFINDER_ignore
-//todo: this file is under refactoring. Restore the duplication finder
-
 using System;
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Consolonia.Controls;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Dummy;
 
 namespace Consolonia.Core.Drawing
@@ -17,6 +13,7 @@ namespace Consolonia.Core.Drawing
     internal partial class DrawingContextImpl
     {
         private BitmapRenderer _bitmapRenderer;
+        private IPlatformRenderInterface _renderInterface;
 
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
         {
@@ -38,10 +35,11 @@ namespace Consolonia.Core.Drawing
             if (intersectedRect.IsEmpty())
                 return;
 
-            var renderInterface = AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
-
-            _bitmapRenderer ??= CreateBitmapRenderer();
-            _bitmapRenderer.Draw(source, renderInterface, targetRect, intersectedRect);
+            _renderInterface ??= AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
+            // the render target's renderer, kept for the terminal; a context without one (tests) makes its own
+            _bitmapRenderer ??= _renderTarget?.BitmapRenderer ?? BitmapRenderer.Create(ConsoleWindowImpl.Console);
+            _bitmapRenderer.Draw(this, source, _renderInterface, targetRect, intersectedRect,
+                GetBitmapInterpolationMode());
         }
 
         public void DrawBitmap(IBitmapImpl source, IBrush opacityMask, Rect opacityMaskRect, Rect destRect)
@@ -50,20 +48,16 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Picks the best bitmap renderer the terminal is capable of (capabilities are detected in PrepareConsole).
+        ///     The interpolation the innermost render options ask for (RenderOptions.BitmapInterpolationMode, so
+        ///     an Image can keep its pixels hard-edged when enlarged), or medium quality when none do.
         /// </summary>
-        private BitmapRenderer CreateBitmapRenderer()
+        private BitmapInterpolationMode GetBitmapInterpolationMode()
         {
-            ConsoleCapabilities capabilities = ConsoleWindowImpl.Console.Capabilities;
+            foreach (RenderOptions renderOptions in _renderOptions)
+                if (renderOptions.BitmapInterpolationMode != BitmapInterpolationMode.Unspecified)
+                    return renderOptions.BitmapInterpolationMode;
 
-            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) &&
-                AvaloniaLocator.Current.GetService<IConsoleColorMode>() is RgbConsoleColorMode)
-                return new KittyBitmapRenderer(this);
-
-            if (capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
-                return new SixelBitmapRenderer(this);
-
-            return new QuadPixelBitmapRenderer(this);
+            return BitmapInterpolationMode.MediumQuality;
         }
     }
 }

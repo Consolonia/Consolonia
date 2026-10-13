@@ -5,27 +5,41 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using Avalonia.Media;
 using JeremyAnsel.ColorQuant;
 
-namespace Consolonia.Core.Drawing
+namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
-    ///     Represents a sixel image with palette and indexed pixel data.
-    ///     Supports composition via BitBlt and serialization via ToBytes.
+    ///     Represents a sixel image with palette and indexed pixel data, serialized via Render.
     /// </summary>
-    public class Sixel
+    public sealed class Sixel
     {
+        /// <exception cref="ArgumentException">
+        ///     The arrays are smaller than the counts and dimensions say. Render reads them with unchecked
+        ///     offsets, so they are checked here.
+        /// </exception>
         public Sixel(byte[] palette, int paletteCount, byte[] pixels, int width, int height,
             int cellWidth, int cellHeight)
         {
+            ArgumentNullException.ThrowIfNull(palette);
+            ArgumentNullException.ThrowIfNull(pixels);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cellWidth);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(cellHeight);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(paletteCount);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(paletteCount, 256);
+            if (palette.Length < paletteCount * 4)
+                throw new ArgumentException("The palette holds fewer colors than paletteCount.", nameof(palette));
+            if (pixels.Length < width * height)
+                throw new ArgumentException("There are fewer pixels than width * height.", nameof(pixels));
+
             Palette = palette;
             PaletteCount = paletteCount;
             Pixels = pixels;
             Width = width;
             Height = height;
             CellWidth = cellWidth;
-            CellHeight = cellHeight;
         }
 
         /// <summary>BGRX palette, 4 bytes per entry.</summary>
@@ -50,21 +64,20 @@ namespace Consolonia.Core.Drawing
         /// <summary>Width of a single cell in pixels.</summary>
         public int CellWidth { get; }
 
-        /// <summary>Height of a single cell in pixels.</summary>
-        public int CellHeight { get; }
-
         /// <summary>Width of this image in cells.</summary>
         public int CellsWidth => Width / CellWidth;
 
-        /// <summary>Height of this image in cells.</summary>
-        public int CellsHeight => Height / CellHeight;
-
         /// <summary>
-        ///     Create a Sixel from raw BGRX pixel data.
-        ///     If a palette is provided it is used to quantize against, otherwise a new palette is created.
+        ///     Create a Sixel from raw BGRX pixel data, quantized to a palette of its own.
         /// </summary>
-        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height,
-            int cellWidth, int cellHeight, byte[] palette = null)
+        /// <param name="bgrx">The pixels, 4 bytes each; the fourth byte is ignored.</param>
+        /// <param name="width">Width of the image in pixels.</param>
+        /// <param name="height">Height of the image in pixels.</param>
+        /// <param name="cellWidth">Width of a cell in pixels.</param>
+        /// <param name="cellHeight">Height of a cell in pixels.</param>
+        /// <param name="transient">Whether the image is for a single write; see <see cref="IsTransient" />.</param>
+        public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, int cellWidth, int cellHeight,
+            bool transient = false)
         {
             ArgumentNullException.ThrowIfNull(bgrx);
             // Render and BuildSixelRow index Pixels with unchecked Unsafe.Add offsets derived from
@@ -72,277 +85,35 @@ namespace Consolonia.Core.Drawing
             if (width <= 0 || height <= 0 || bgrx.Length < width * height * 4)
                 throw new ArgumentException("Bitmap size does not match the given dimensions.", nameof(bgrx));
 
-            if (palette != null)
-            {
-                int paletteCount = palette.Length / 4;
-                byte[] indexed = QuantizeWithPalette(bgrx, palette);
-                return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight);
-            }
-            else
-            {
-                Quantize(bgrx, out byte[] newPalette, out int paletteCount, out byte[] indexed);
-                return new Sixel(newPalette, paletteCount, indexed, width, height, cellWidth, cellHeight);
-            }
+            // only this image's pixels: a pooled buffer can be longer, and its tail would sway the palette
+            int byteCount = width * height * 4;
+            if (bgrx.Length > byteCount)
+                bgrx = bgrx[..byteCount];
+
+            Quantize(bgrx, out byte[] palette, out int paletteCount, out byte[] indexed);
+            return new Sixel(palette, paletteCount, indexed, width, height, cellWidth, cellHeight)
+                { IsTransient = transient };
         }
 
-        /// <summary>
-        ///     Copy source image pixels into this image at pixel position (x, y).
-        ///     Clips if source extends beyond this image's bounds.
-        /// </summary>
-        public void BitBlt(Sixel source, int x, int y)
-        {
-            for (int row = 0; row < source.Height; row++)
-            {
-                int destY = y + row;
-                if (destY < 0)
-                    continue;
-                if (destY >= Height)
-                    break;
-
-                int srcOffset = row * source.Width;
-                int dstOffset = destY * Width + x;
-
-                int srcX = 0;
-                int dstX = x;
-
-                if (dstX < 0)
-                {
-                    srcX = -dstX;
-                    dstX = 0;
-                    dstOffset = destY * Width;
-                }
-
-                int copyLen = Math.Min(source.Width - srcX, Width - dstX);
-                if (copyLen <= 0)
-                    continue;
-
-                Array.Copy(source.Pixels, srcOffset + srcX, Pixels, dstOffset, copyLen);
-            }
-
-            _renderedBytes = null;
-        }
-
-        /// <summary>
-        ///     Returns this image with <paramref name="wash" /> alpha-composited over every palette
-        ///     color, which is how a translucent overlay (a modal backdrop, a shade) tints a sixel.
-        ///     Only the palette changes, so the copy shares <see cref="Pixels" /> with this image.
-        /// </summary>
-        /// <remarks>
-        ///     Variants are cached: overlays are re-blended onto the pixel buffer every frame, and
-        ///     since symbols compare sixels by reference, returning the same instance is what keeps an
-        ///     unchanged dimmed image from being re-sent to the terminal. Cells of one image also share
-        ///     the derived palette, so the renderer can still combine them.
-        /// </remarks>
-        public Sixel Wash(Color wash)
-        {
-            if (wash.A == 0)
-                return this;
-
-            return GetOrCreateVariant(char.MinValue, wash, () =>
-                new Sixel(GetWashedPalette(Palette, PaletteCount, wash), PaletteCount, Pixels, Width, Height,
-                    CellWidth, CellHeight));
-        }
-
-        /// <summary>
-        ///     Whether <paramref name="glyph" /> is a block element <see cref="DrawBlockGlyph" /> can
-        ///     paint into the image's pixels.
-        /// </summary>
-        public static bool IsBlockGlyph(char glyph)
-        {
-            return glyph is >= '▀' and <= '▐' or >= '▔' and <= '▟';
-        }
-
-        /// <summary>
-        ///     Returns this image with the block element <paramref name="glyph" /> (an eighth, half or
-        ///     quadrant block, see <see cref="IsBlockGlyph" />) painted over it in
-        ///     <paramref name="color" />. A terminal cell shows either text or a sixel, so this is how a
-        ///     window edge or a shadow drawn over a picture keeps the picture around it.
-        /// </summary>
-        public Sixel DrawBlockGlyph(char glyph, Color color)
-        {
-            if (!IsBlockGlyph(glyph) || color.A == 0)
-                return this;
-
-            return GetOrCreateVariant(glyph, color, () =>
-            {
-                (byte[] palette, int paletteCount, byte index) = GetPaletteWithColor(Palette, PaletteCount, color);
-
-                byte[] pixels = (byte[])Pixels.Clone();
-                for (int y = 0; y < Height; y++)
-                for (int x = 0; x < Width; x++)
-                    if (BlockCovers(glyph, x, y, Width, Height))
-                        pixels[y * Width + x] = index;
-
-                return new Sixel(palette, paletteCount, pixels, Width, Height, CellWidth, CellHeight);
-            });
-        }
-
-        private Sixel GetOrCreateVariant(char glyph, Color color, Func<Sixel> create)
-        {
-            lock (_variantsLock)
-            {
-                if (_variants != null && _variants.TryGetValue((glyph, color), out Sixel variant))
-                    return variant;
-
-                // an animated overlay produces a new color every frame; don't hoard them
-                if (_variants == null || _variants.Count >= MaxVariants)
-                    _variants = new Dictionary<(char, Color), Sixel>();
-
-                variant = create();
-                _variants[(glyph, color)] = variant;
-                return variant;
-            }
-        }
-
-        /// <summary>
-        ///     Whether pixel (<paramref name="x" />, <paramref name="y" />) of a
-        ///     <paramref name="width" /> x <paramref name="height" /> cell is inside block element
-        ///     <paramref name="glyph" />.
-        /// </summary>
-        private static bool BlockCovers(char glyph, int x, int y, int width, int height)
-        {
-            bool left = x * 2 < width;
-            bool top = y * 2 < height;
-
-            switch (glyph)
-            {
-                case '▀': // ▀ upper half
-                    return top;
-                case >= '▁' and <= '█': // ▁..█ lower one to eight eighths
-                    return (height - y) * 8 <= (glyph - '▀') * height;
-                case >= '▉' and <= '▏': // ▉..▏ left seven to one eighths
-                    return x * 8 < ('▐' - glyph) * width;
-                case '▐': // ▐ right half
-                    return !left;
-                case '▔': // ▔ upper one eighth
-                    return y * 8 < height;
-                case '▕': // ▕ right one eighth
-                    return (width - x) * 8 <= width;
-                default: // ▖..▟ quadrants: bit 0 upper left, 1 upper right, 2 lower left, 3 lower right
-                    int quadrants = glyph switch
-                    {
-                        '▖' => 0b0100,
-                        '▗' => 0b1000,
-                        '▘' => 0b0001,
-                        '▙' => 0b1101,
-                        '▚' => 0b1001,
-                        '▛' => 0b0111,
-                        '▜' => 0b1011,
-                        '▝' => 0b0010,
-                        '▞' => 0b0110,
-                        '▟' => 0b1110,
-                        _ => 0
-                    };
-                    int quadrant = (top ? 0 : 2) + (left ? 0 : 1);
-                    return (quadrants & (1 << quadrant)) != 0;
-            }
-        }
-
-        private static byte[] GetWashedPalette(byte[] palette, int paletteCount, Color wash)
-        {
-            Dictionary<Color, byte[]> washedPalettes = WashedPalettes.GetOrCreateValue(palette);
-            lock (washedPalettes)
-            {
-                if (washedPalettes.TryGetValue(wash, out byte[] washedPalette))
-                    return washedPalette;
-
-                if (washedPalettes.Count >= MaxVariants)
-                    washedPalettes.Clear();
-
-                int alpha = wash.A;
-                int inverseAlpha = 255 - alpha;
-                washedPalette = new byte[palette.Length];
-                for (int i = 0; i < paletteCount; i++)
-                {
-                    int offset = i * 4;
-                    washedPalette[offset] = (byte)((wash.B * alpha + palette[offset] * inverseAlpha) / 255);
-                    washedPalette[offset + 1] = (byte)((wash.G * alpha + palette[offset + 1] * inverseAlpha) / 255);
-                    washedPalette[offset + 2] = (byte)((wash.R * alpha + palette[offset + 2] * inverseAlpha) / 255);
-                    washedPalette[offset + 3] = palette[offset + 3];
-                }
-
-                washedPalettes[wash] = washedPalette;
-                return washedPalette;
-            }
-        }
-
-        /// <summary>
-        ///     Finds <paramref name="color" /> in the palette, appending it when there is room (the
-        ///     existing indices stay valid) or settling for the nearest entry in a full palette.
-        ///     Cached per palette, so every cell of an image gets the same palette back.
-        /// </summary>
-        private static (byte[] Palette, int PaletteCount, byte Index) GetPaletteWithColor(byte[] palette,
-            int paletteCount, Color color)
-        {
-            Dictionary<Color, (byte[], int, byte)> palettesWithColor = PalettesWithColor.GetOrCreateValue(palette);
-            lock (palettesWithColor)
-            {
-                if (palettesWithColor.TryGetValue(color, out (byte[], int, byte) found))
-                    return found;
-
-                if (palettesWithColor.Count >= MaxVariants)
-                    palettesWithColor.Clear();
-
-                int nearest = 0;
-                int nearestDistance = int.MaxValue;
-                for (int i = 0; i < paletteCount; i++)
-                {
-                    int db = palette[i * 4] - color.B;
-                    int dg = palette[i * 4 + 1] - color.G;
-                    int dr = palette[i * 4 + 2] - color.R;
-                    int distance = dr * dr + dg * dg + db * db;
-                    if (distance < nearestDistance)
-                    {
-                        nearest = i;
-                        nearestDistance = distance;
-                    }
-                }
-
-                if (nearestDistance == 0 || paletteCount >= 256)
-                {
-                    found = (palette, paletteCount, (byte)nearest);
-                }
-                else
-                {
-                    byte[] extended = new byte[Math.Max(palette.Length, (paletteCount + 1) * 4)];
-                    Array.Copy(palette, extended, paletteCount * 4);
-                    extended[paletteCount * 4] = color.B;
-                    extended[paletteCount * 4 + 1] = color.G;
-                    extended[paletteCount * 4 + 2] = color.R;
-                    found = (extended, paletteCount + 1, (byte)paletteCount);
-                }
-
-                palettesWithColor[color] = found;
-                return found;
-            }
-        }
-
-        #region Variants
-
-        private const int MaxVariants = 8;
-
-        private static readonly ConditionalWeakTable<byte[], Dictionary<Color, byte[]>> WashedPalettes = new();
-
-        private static readonly ConditionalWeakTable<byte[], Dictionary<Color, (byte[], int, byte)>>
-            PalettesWithColor = new();
-
-        private readonly object _variantsLock = new();
-        private Dictionary<(char Glyph, Color Color), Sixel> _variants;
-
-        #endregion
 
         #region Serialization
 
         [ThreadStatic] private static byte[] _scratchRenderBuf;
         [ThreadStatic] private static WuColorQuantizer _quantizer;
 
-        private static readonly ConditionalWeakTable<byte[], PaletteLookup> PaletteLookups = new();
-
         private byte[] _renderedBytes;
 
         /// <summary>
+        ///     An image made for a single write, such as the one the renderer combines from neighbouring
+        ///     cells each frame. <see cref="Render" /> does not keep its bytes: it returns them straight
+        ///     from a per-thread scratch buffer, valid only until the next render on the same thread.
+        /// </summary>
+        internal bool IsTransient { get; init; }
+
+        /// <summary>
         ///     Serialize this image to SIXEL escape sequence bytes.
-        ///     The returned span is cached on the instance after the first render.
+        ///     The returned span is cached on the instance after the first render, unless the image is
+        ///     <see cref="IsTransient" />.
         /// </summary>
         public ReadOnlySpan<byte> Render()
         {
@@ -355,7 +126,18 @@ namespace Consolonia.Core.Drawing
             int paletteCount = PaletteCount;
             byte[] indexed = Pixels;
 
-            int maxOutput = 64 + paletteCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
+            // Only the colors the image uses are defined. A cell uses a handful of a palette shared by a
+            // whole picture, and defining all of them made up most of the bytes sent.
+            Span<bool> used = stackalloc bool[paletteCount];
+            int usedCount = 0;
+            foreach (byte index in indexed.AsSpan(0, width * height))
+                if (!used[index])
+                {
+                    used[index] = true;
+                    usedCount++;
+                }
+
+            int maxOutput = 64 + usedCount * 20 + width * ((height + 5) / 6) * 4 + 4096;
             byte[] output = RentOrGrow(ref _scratchRenderBuf, maxOutput);
             int pos = 0;
 
@@ -377,9 +159,13 @@ namespace Consolonia.Core.Drawing
             // Palette: #idx;2;R%;G%;B%
             for (int i = 0; i < paletteCount; i++)
             {
-                int r = palette[i * 4 + 2] * 100 / 255;
-                int g = palette[i * 4 + 1] * 100 / 255;
-                int b = palette[i * 4] * 100 / 255;
+                if (!used[i])
+                    continue;
+
+                // rounded, not truncated: 254 truncated to 99%, which the terminal reads back as 252
+                int r = (palette[i * 4 + 2] * 100 + 127) / 255;
+                int g = (palette[i * 4 + 1] * 100 + 127) / 255;
+                int b = (palette[i * 4] * 100 + 127) / 255;
 
                 output[pos++] = (byte)'#';
                 pos = WriteIntBuf(output, pos, i);
@@ -406,14 +192,22 @@ namespace Consolonia.Core.Drawing
                     int bandRows = Math.Min(6, height - yStart);
 
                     colorPresent.Clear();
+                    int bandColors = 0;
                     for (int row = 0; row < bandRows; row++)
                     {
                         int rowOff = (yStart + row) * width;
                         for (int x = 0; x < width; x++)
-                            colorPresent[indexed[rowOff + x]] = true;
+                        {
+                            ref bool present = ref colorPresent[indexed[rowOff + x]];
+                            if (!present)
+                            {
+                                present = true;
+                                bandColors++;
+                            }
+                        }
                     }
 
-                    int bandWorstCase = paletteCount * (width + 20);
+                    int bandWorstCase = bandColors * (width + 20);
                     if (pos + bandWorstCase > output.Length)
                     {
                         int newLen = Math.Max(output.Length * 2, pos + bandWorstCase + 4096);
@@ -452,15 +246,13 @@ namespace Consolonia.Core.Drawing
             output[pos++] = 0x1B;
             output[pos++] = (byte)'\\';
 
+            if (IsTransient)
+                return output.AsSpan(0, pos);
+
             byte[] rendered = GC.AllocateUninitializedArray<byte>(pos);
             output.AsSpan(0, pos).CopyTo(rendered);
             _renderedBytes = rendered;
             return rendered;
-        }
-
-        public ReadOnlySpan<byte> ToBytes()
-        {
-            return Render();
         }
 
         #endregion
@@ -468,11 +260,19 @@ namespace Consolonia.Core.Drawing
         #region Quantization
 
         /// <summary>
-        ///     Quantize BGRX pixel data using Wu's variance-minimizing algorithm.
+        ///     Quantize BGRX pixel data: exactly when it has at most 256 colors, otherwise using Wu's
+        ///     variance-minimizing algorithm.
         /// </summary>
-        private static void Quantize(byte[] bgrx,
+        /// <param name="bgrx">The pixels, 4 bytes each; the fourth byte is ignored.</param>
+        /// <param name="palette">The colors, 4 bytes each, <paramref name="paletteCount" /> of them used.</param>
+        /// <param name="paletteCount">How many colors the palette holds, at most 256.</param>
+        /// <param name="indexed">One palette index per pixel, in the order of <paramref name="bgrx" />.</param>
+        internal static void Quantize(byte[] bgrx,
             out byte[] palette, out int paletteCount, out byte[] indexed)
         {
+            if (TryIndexExactly(bgrx, out palette, out paletteCount, out indexed))
+                return;
+
             WuColorQuantizer quantizer = _quantizer ??= new WuColorQuantizer();
             ColorQuantizerResult result = quantizer.Quantize(bgrx, 256);
 
@@ -482,28 +282,66 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Map BGRX pixel data to an existing palette using nearest-color matching.
+        ///     Indexes pixels with at most 256 distinct colors exactly: the palette is those colors. Gives
+        ///     up as soon as a 257th color appears.
         /// </summary>
-        private static byte[] QuantizeWithPalette(byte[] bgrx, byte[] palette)
+        /// <remarks>
+        ///     Wu's quantizer has a large fixed cost however few pixels it is given (its color histogram
+        ///     and box cutting don't shrink with the image), while the cells a brush stroke changes hold a
+        ///     handful of colors. Exact indexing is cheaper for them and loses nothing.
+        /// </remarks>
+        private static bool TryIndexExactly(byte[] bgrx,
+            out byte[] palette, out int paletteCount, out byte[] indexed)
         {
             int pixelCount = bgrx.Length / 4;
-            byte[] indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
-            ReadOnlySpan<byte> bgrxSpan = bgrx;
-            ReadOnlySpan<byte> paletteLookup = PaletteLookups.GetValue(palette, static currentPalette =>
-                new PaletteLookup(currentPalette)).Lookup;
+            var indices = new Dictionary<int, byte>(64);
+            // rented: a photo gives up at its 257th color, usually within the first rows, and the result
+            // for a whole screen would be a large-object allocation thrown away
+            byte[] result = ArrayPool<byte>.Shared.Rent(pixelCount);
+            int lastColor = -1;
+            byte lastIndex = 0;
 
             for (int i = 0, offset = 0; i < pixelCount; i++, offset += 4)
             {
-                int b = bgrxSpan[offset];
-                int g = bgrxSpan[offset + 1];
-                int r = bgrxSpan[offset + 2];
-                int lookupIndex = ((r >> PaletteLookup.ChannelShift) << (PaletteLookup.ChannelBits * 2)) |
-                                  ((g >> PaletteLookup.ChannelShift) << PaletteLookup.ChannelBits) |
-                                  (b >> PaletteLookup.ChannelShift);
-                indexed[i] = paletteLookup[lookupIndex];
+                int color = bgrx[offset] | (bgrx[offset + 1] << 8) | (bgrx[offset + 2] << 16);
+                if (color != lastColor)
+                {
+                    if (!indices.TryGetValue(color, out lastIndex))
+                    {
+                        if (indices.Count == 256)
+                        {
+                            ArrayPool<byte>.Shared.Return(result);
+                            palette = null;
+                            paletteCount = 0;
+                            indexed = null;
+                            return false;
+                        }
+
+                        lastIndex = (byte)indices.Count;
+                        indices.Add(color, lastIndex);
+                    }
+
+                    lastColor = color;
+                }
+
+                result[i] = lastIndex;
             }
 
-            return indexed;
+            paletteCount = indices.Count;
+            palette = new byte[paletteCount * 4];
+            foreach ((int color, byte index) in indices)
+            {
+                int offset = index * 4;
+                palette[offset] = (byte)color;
+                palette[offset + 1] = (byte)(color >> 8);
+                palette[offset + 2] = (byte)(color >> 16);
+                palette[offset + 3] = 0xFF;
+            }
+
+            indexed = GC.AllocateUninitializedArray<byte>(pixelCount);
+            result.AsSpan(0, pixelCount).CopyTo(indexed);
+            ArrayPool<byte>.Shared.Return(result);
+            return true;
         }
 
         #endregion
@@ -713,53 +551,16 @@ namespace Consolonia.Core.Drawing
             return pos;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        ///     A per-thread scratch buffer of at least <paramref name="minSize" />. One very large render
+        ///     does not pin its buffer for the life of the thread: it is replaced once renders are small again.
+        /// </summary>
         private static T[] RentOrGrow<T>(ref T[] buf, int minSize)
         {
-            if (buf == null || buf.Length < minSize)
+            const int keepAtMost = 4 * 1024 * 1024;
+            if (buf == null || buf.Length < minSize || buf.Length > keepAtMost && minSize <= keepAtMost / 4)
                 buf = GC.AllocateUninitializedArray<T>(Math.Max(minSize, 4096));
             return buf;
-        }
-
-        private sealed class PaletteLookup
-        {
-            public const int ChannelBits = 5;
-            public const int ChannelShift = 8 - ChannelBits;
-            private const int LookupSize = 1 << (ChannelBits * 3);
-
-            public PaletteLookup(byte[] palette)
-            {
-                Lookup = GC.AllocateUninitializedArray<byte>(LookupSize);
-
-                int paletteCount = palette.Length / 4;
-                for (int index = 0; index < Lookup.Length; index++)
-                {
-                    int r = ((index >> (ChannelBits * 2)) & ((1 << ChannelBits) - 1)) << ChannelShift;
-                    int g = ((index >> ChannelBits) & ((1 << ChannelBits) - 1)) << ChannelShift;
-                    int b = (index & ((1 << ChannelBits) - 1)) << ChannelShift;
-
-                    int bestPaletteIndex = 0;
-                    int bestDistance = int.MaxValue;
-
-                    for (int paletteIndex = 0; paletteIndex < paletteCount; paletteIndex++)
-                    {
-                        int paletteOffset = paletteIndex * 4;
-                        int db = b - palette[paletteOffset];
-                        int dg = g - palette[paletteOffset + 1];
-                        int dr = r - palette[paletteOffset + 2];
-                        int distance = dr * dr + dg * dg + db * db;
-                        if (distance < bestDistance)
-                        {
-                            bestDistance = distance;
-                            bestPaletteIndex = paletteIndex;
-                        }
-                    }
-
-                    Lookup[index] = (byte)bestPaletteIndex;
-                }
-            }
-
-            public byte[] Lookup { get; }
         }
 
         #endregion
