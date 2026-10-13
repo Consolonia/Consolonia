@@ -45,8 +45,7 @@ namespace Consolonia.Core.Drawing
                 Pixel imagePixel = FromQuadrants(PixelAt(bgra, top), PixelAt(bgra, top + 4), PixelAt(bgra, bottom),
                     PixelAt(bgra, bottom + 4), complexEmoji);
 
-                var point = new PixelPoint(intersectedRect.X + cellX, intersectedRect.Y + cellY);
-                pixelBuffer[point] = pixelBuffer[point].Blend(imagePixel);
+                pixelBuffer.Blend(intersectedRect.X + cellX, intersectedRect.Y + cellY, in imagePixel);
             }
 
             context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
