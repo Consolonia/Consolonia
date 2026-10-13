@@ -74,12 +74,17 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             return Encoding.ASCII.GetString(_stream.ToArray());
         }
 
-        /// <summary>Shows a picture of two cells and hands back what dims it: the image and a half-black paint.</summary>
-        private string ShowTwoCells(out CellImage image, out Color paint)
+        /// <summary>
+        ///     Shows a picture of two cells, then the same two cells under a half-black paint: the frames
+        ///     written for each, and the image, for showing it again.
+        /// </summary>
+        private (string Shown, string Dimmed, CellImage Image) ShowTwoCellsThenDimThem()
         {
-            image = SolidImage(10, 20, 30);
-            paint = Color.Parse("#7F000000");
-            return Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
+            CellImage image = SolidImage(10, 20, 30);
+            var paint = Color.Parse("#7F000000");
+            string shown = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
+            string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
+            return (shown, dimmed, image);
         }
 
         private static CellImage SolidImage(byte red, byte green, byte blue)
@@ -157,8 +162,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void SixelRunsSentBeforeComeFromTheCache()
         {
             Open(ConsoleCapabilities.SupportsSixel);
-            string shown = ShowTwoCells(out CellImage image, out Color paint);
-            string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
+            (string shown, string dimmed, CellImage image) = ShowTwoCellsThenDimThem();
             string shownAgain = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
 
             Assert.That(dimmed, Is.Not.EqualTo(shown), "the paint darkens the picture");
@@ -255,9 +259,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void KittyPaintOverAPictureIsSentInThePixels()
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
-            string shown = ShowTwoCells(out CellImage image, out Color paint);
-
-            string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
+            (string shown, string dimmed, CellImage image) = ShowTwoCellsThenDimThem();
 
             Assert.That(Count(dimmed, KittyTransmit), Is.EqualTo(1), "the block again, darker");
             Assert.That(dimmed, Does.Not.Contain("z=-1,"), "no wash placement: the paint is in the pixels");
