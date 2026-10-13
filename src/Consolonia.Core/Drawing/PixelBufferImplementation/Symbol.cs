@@ -140,6 +140,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
+        /// <summary>The fields as they are, for <see cref="Pixel" />, which stores them flat.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Symbol(char character, string reference, byte pattern, byte width)
+        {
+            Character = character;
+            _reference = reference;
+            Pattern = pattern;
+            Width = width;
+        }
+
 
         public bool Equals(Symbol other)
         {
@@ -162,6 +172,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         ///     If cell has complex text (more than one char) this contains the full unicode sequence to draw this symbol.
         /// </summary>
         public string Complex => _reference;
+
+        /// <summary>The complex text as stored, null for none; what <see cref="Pixel" /> keeps.</summary>
+        internal string Reference => _reference;
 
         // box pattern for box merging.
         public readonly byte Pattern;

@@ -134,11 +134,15 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
 [bitmap.md](bitmap.md#benchmarks)), driven as the render target drives the output: the changed
 cells written, then `EndFrame`. The benchmark has no platform, so its blocks go as zlib RGBA.
 
-| Scenario | Time | Allocated | Bytes on the wire |
+| Scenario | Time | Allocated (`--alloc`) | Bytes on the wire |
 |---|---|---|---|
-| New full-screen picture: every block transmitted and placed | 82 ms | 13.4 MB | 3,237,839 |
-| After a reset: every block sent again (the earlier encoder placed them again: 2.0 ms, 62,718 bytes) | 81 ms | 6.5 MB | 3,232,625 |
-| One cell: one block re-sent and placed | 425 µs | 12.2 KB | 7,100 |
+| New full-screen picture: every block transmitted and placed | 82 ms | 208 KB | 3,237,839 |
+| After a reset: every block sent again (the earlier encoder placed them again: 2.0 ms, 62,718 bytes) | 79 ms | 208 KB | 3,232,625 |
+| One cell: one block re-sent and placed | 290 µs | 1 KB | 7,100 |
+
+What a block allocates is its `ZLibStream`: the block's pixels, the encoded bytes and the escape
+sequence go through buffers the encoder and the output keep (see [bitmap.md](bitmap.md#memory)).
+Before that, a full screen allocated 5.2 MB in a `MemoryStream` and a copy of its bytes per block.
 
 A whole kitty frame on the unit test console (drawing into the pixel buffer and `RenderToDevice`,
 nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.md#benchmarks).

@@ -99,15 +99,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     A Pixel is copied on every blend and every frame and compared for every dirty cell: it stays
-        ///     within one 64-byte cache line, image reference included (and the nullable terminal cache
-        ///     entry exactly fills one).
+        ///     A Pixel is copied on every blend and every frame and compared for every dirty cell: its
+        ///     fields are stored flat so that two references, three ints, a char and five bytes take 40
+        ///     bytes, not the 56 the nested structs padded to, image reference included.
         /// </summary>
         [Test]
-        public void PixelIsFiftySixBytes()
+        public void PixelIsFortyBytes()
         {
-            Assert.That(Unsafe.SizeOf<Pixel>(), Is.EqualTo(56));
-            Assert.That(Unsafe.SizeOf<Pixel?>(), Is.EqualTo(64));
+            Assert.That(Unsafe.SizeOf<Pixel>(), Is.EqualTo(40));
         }
 
         [Test]

@@ -104,8 +104,8 @@ namespace Consolonia.Core.Drawing
         /// <param name="visible">The part of the drawn picture to copy, in pixels of <paramref name="targetSize" />.</param>
         /// <param name="interpolationMode">How the picture is scaled.</param>
         /// <param name="destination">
-        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a rendering refilled on every edit of
-        ///     a picture keeps one rather than allocating a screen of pixels each time.
+        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a renderer refilling a rendering on
+        ///     every edit of a picture keeps one rather than allocating a screen of pixels each time.
         /// </param>
         /// <exception cref="NotSupportedException">
         ///     The scaled pixels are not 32 bits each. Only BGRA and RGBA (converted) are read.
@@ -120,7 +120,7 @@ namespace Consolonia.Core.Drawing
         ///     picture would vanish rather than show its visible part.
         /// </remarks>
         internal static void GetVisiblePixels(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelSize targetSize, PixelRect visible, BitmapInterpolationMode interpolationMode, byte[] destination)
+            PixelSize targetSize, PixelRect visible, BitmapInterpolationMode interpolationMode, Span<byte> destination)
         {
             if (destination.Length != visible.Width * visible.Height * 4)
                 throw new ArgumentException("The destination is not the size of the visible pixels.",
@@ -168,7 +168,7 @@ namespace Consolonia.Core.Drawing
         }
 
         private static unsafe void CopyWindow(ILockedFramebuffer frame, int x, int y, int width, int height,
-            byte[] window)
+            Span<byte> window)
         {
             if (frame.Format.BitsPerPixel != 32)
                 throw new NotSupportedException(
@@ -240,7 +240,13 @@ namespace Consolonia.Core.Drawing
     ///     drawing the same again reuses the rendering, a new version or a scroll refills it in place, and
     ///     only the cells that changed are copied into the pixel buffer.
     /// </summary>
-    /// <typeparam name="TRendering">What a rendering holds besides its cells and pixels.</typeparam>
+    /// <remarks>
+    ///     The pixels a rendering is made from pass through one buffer the renderer keeps, never larger than
+    ///     the screen in BGRA (only visible cells are rendered), rather than a buffer per rendering: a cell
+    ///     copies the pixels it needs, so nothing reads them once the cells are made, and a picture at four
+    ///     zoom levels kept four screens of them.
+    /// </remarks>
+    /// <typeparam name="TRendering">What a rendering holds besides its cells.</typeparam>
     internal abstract class CellBitmapRenderer<TRendering> : BitmapRenderer
         where TRendering : CellRendering, new()
     {
@@ -249,6 +255,9 @@ namespace Consolonia.Core.Drawing
         ///     levels has one for each, and the least recently drawn goes once there are more than this.
         /// </summary>
         private const int MaxRenderingsPerBitmap = 4;
+
+        /// <summary>The visible pixels of the picture being rendered; see the remarks.</summary>
+        private byte[] _pixels;
 
         protected CellBitmapRenderer(IConsoleOutput console)
             : base(console)
@@ -260,11 +269,11 @@ namespace Consolonia.Core.Drawing
             Renderings { get; }
 
         /// <summary>
-        ///     Fills <see cref="CellRendering.Cells" /> of <paramref name="rendering" />, every cell, from its
-        ///     <see cref="CellRendering.Pixels" />: BGRA rows of exactly the visible cells.
+        ///     Fills <see cref="CellRendering.Cells" /> of <paramref name="rendering" />, every cell, from
+        ///     <paramref name="pixels" />: BGRA rows of exactly the visible cells, valid for this call only.
         /// </summary>
-        protected abstract void Render(DrawingContextImpl context, TRendering rendering, int cellPixelWidth,
-            int cellPixelHeight, IPlatformRenderInterface renderInterface);
+        protected abstract void Render(DrawingContextImpl context, TRendering rendering, ReadOnlySpan<byte> pixels,
+            int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface);
 
         /// <summary>Whether a rendering of the current version can still be shown, or must be made again.</summary>
         protected virtual bool IsReusable(TRendering rendering)
@@ -289,12 +298,15 @@ namespace Consolonia.Core.Drawing
             if (!rendering.Shows(bitmap.Version, visibleCells) || !IsReusable(rendering))
             {
                 // only the visible cells are rendered, so the rendering starts at the first of them
-                rendering.Prepare(visibleCells, cellPixelWidth, cellPixelHeight);
-                GetVisiblePixels(source, renderInterface, targetSize,
-                    new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
-                        visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight),
-                    interpolationMode, rendering.Pixels);
-                Render(context, rendering, cellPixelWidth, cellPixelHeight, renderInterface);
+                rendering.Prepare(visibleCells);
+                var visiblePixels = new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
+                    visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight);
+                int pixelBytes = visiblePixels.Width * visiblePixels.Height * 4;
+                if (_pixels == null || _pixels.Length < pixelBytes)
+                    _pixels = GC.AllocateUninitializedArray<byte>(pixelBytes);
+                Span<byte> pixels = _pixels.AsSpan(0, pixelBytes);
+                GetVisiblePixels(source, renderInterface, targetSize, visiblePixels, interpolationMode, pixels);
+                Render(context, rendering, pixels, cellPixelWidth, cellPixelHeight, renderInterface);
                 rendering.Complete(bitmap.Version);
             }
 
@@ -334,10 +346,9 @@ namespace Consolonia.Core.Drawing
     }
 
     /// <summary>
-    ///     The cells a picture renders to at one size, with the pixels they were made from. A renderer
-    ///     keeps one per picture and size and refills it in place for each new version or visible part,
-    ///     so an edit allocates nothing the size of the screen: the pixel copy (8 MB for a full HD
-    ///     picture) and the cell buffer (72 bytes a cell) are made once, not once per brush stroke.
+    ///     The cells a picture renders to at one size. A renderer keeps one per picture and size and
+    ///     refills it in place for each new version or visible part, so an edit allocates nothing the size
+    ///     of the screen: the cell buffer (40 bytes a cell) is made once, not once per brush stroke.
     ///     Touched only from the render thread, like everything a renderer draws with.
     /// </summary>
     internal class CellRendering
@@ -349,12 +360,6 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>The cells of the picture the rendering covers, relative to where it is drawn.</summary>
         public PixelRect VisibleCells { get; private set; }
-
-        /// <summary>
-        ///     BGRA pixels of exactly the visible cells, row by row: what the cells were made from. Exactly
-        ///     that long, as the quantizer reads the whole array.
-        /// </summary>
-        public byte[] Pixels { get; private set; }
 
         /// <summary>One cell per visible cell.</summary>
         public PixelBuffer Cells { get; private set; }
@@ -369,18 +374,15 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Makes room for a rendering of <paramref name="visibleCells" />, keeping the buffers when their
+        ///     Makes room for a rendering of <paramref name="visibleCells" />, keeping the cells when their
         ///     size is unchanged, and shows nothing until <see cref="Complete" />: a render that throws
         ///     leaves a rendering that is made again, not one claiming to show the previous version.
         /// </summary>
-        internal void Prepare(PixelRect visibleCells, int cellPixelWidth, int cellPixelHeight)
+        internal void Prepare(PixelRect visibleCells)
         {
             _complete = false;
             VisibleCells = visibleCells;
 
-            int pixelBytes = visibleCells.Width * cellPixelWidth * visibleCells.Height * cellPixelHeight * 4;
-            if (Pixels == null || Pixels.Length != pixelBytes)
-                Pixels = GC.AllocateUninitializedArray<byte>(pixelBytes);
             if (Cells == null || Cells.Width != visibleCells.Width || Cells.Height != visibleCells.Height)
                 Cells = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
         }

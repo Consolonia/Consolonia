@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Avalonia.Media;
@@ -120,7 +121,7 @@ namespace Consolonia.Core.Infrastructure
             for (int i = start; i < end; i++, offset += RunKeyBytesPerCell)
             {
                 ImageCell cell = _cells[i];
-                MemoryMarshal.Write(key[offset..], cell.Image.Key.Digest);
+                MemoryMarshal.Write(key[offset..], cell.Image.Digest);
                 BitConverter.TryWriteBytes(key[(offset + 16)..], cell.Paint.ToUInt32());
             }
 
@@ -165,10 +166,10 @@ namespace Consolonia.Core.Infrastructure
                 for (int i = run.Start; i < run.End; i++)
                 {
                     ImageCell cell = _cells[i];
-                    byte[] source = cell.Image.Bgra;
+                    ReadOnlySpan<byte> source = cell.Image.Bgra;
                     int column = run.FrameColumn + i - run.Start;
                     for (int y = 0; y < cellHeight; y++)
-                        source.AsSpan(y * cellRowBytes, cellRowBytes)
+                        source.Slice(y * cellRowBytes, cellRowBytes)
                             .CopyTo(bgra.AsSpan(y * frameRowBytes + column * cellRowBytes, cellRowBytes));
 
                     if (cell.Paint.A != 0)
@@ -184,8 +185,9 @@ namespace Consolonia.Core.Infrastructure
                 if (run.Rendered != null)
                     continue;
 
+                // the run's slice of the indexes, rented: only the rendered bytes outlive this
                 int runWidth = run.Cells * cellWidth;
-                byte[] runIndexed = GC.AllocateUninitializedArray<byte>(runWidth * cellHeight);
+                byte[] runIndexed = ArrayPool<byte>.Shared.Rent(runWidth * cellHeight);
                 for (int y = 0; y < cellHeight; y++)
                     indexed.AsSpan(y * frameWidth + run.FrameColumn * cellWidth, runWidth)
                         .CopyTo(runIndexed.AsSpan(y * runWidth));
@@ -193,6 +195,7 @@ namespace Consolonia.Core.Infrastructure
                 // transient: the bytes are kept by the run cache, not by a sixel nothing holds on to
                 byte[] rendered = new Sixel(palette, paletteCount, runIndexed, runWidth, cellHeight, cellWidth,
                     cellHeight) { IsTransient = true }.Render().ToArray();
+                ArrayPool<byte>.Shared.Return(runIndexed);
                 _renderedRuns.GetOrAdd(run.Key, rendered, rendered.Length);
                 _runs[r] = run with { Rendered = rendered };
             }

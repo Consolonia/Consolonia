@@ -23,7 +23,8 @@ namespace Consolonia.Core.Drawing
         private readonly ConsoleWindowImpl _consoleTopLevelImpl;
 
         // cache of pixels written so we can ignore them if unchanged.
-        private Pixel?[,] _cache = null!; //todo: why Pixel can be null
+        // what the terminal shows, cell by cell, Pixel.Empty where nothing was ever written
+        private Pixel[,] _cache = null!;
 
         /// <summary>Per frame, which cells are dirty: the dirty regions marked once, not searched per cell.</summary>
         private bool[]? _dirtyCells;
@@ -146,9 +147,9 @@ namespace Consolonia.Core.Drawing
             return _drawingContextImpl;
         }
 
-        private static Pixel?[,] InitializeCache(ushort width, ushort height)
+        private static Pixel[,] InitializeCache(ushort width, ushort height)
         {
-            var cache = new Pixel?[width, height];
+            var cache = new Pixel[width, height];
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)

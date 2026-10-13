@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Media;
@@ -32,6 +33,20 @@ namespace Consolonia.Core.Drawing
         /// <summary>Screens' worth of cell images kept, so pictures shown again are not cut again.</summary>
         private const int ScreensOfCellImages = 3;
 
+        /// <summary>
+        ///     New cell images share an array of this many cells (a slab), filled across renders until full,
+        ///     so a new picture is a few hundred allocations rather than one per cell and a brush stroke is
+        ///     one slot of the current slab. Small enough that a slab stays out of the large object heap,
+        ///     and that a cell outliving its slab-mates holds on to little: the cache counts each cell's own
+        ///     bytes, and a slab is freed once no cell of it is held anywhere.
+        /// </summary>
+        internal const int CellsPerSlab = 64;
+
+        /// <summary>The slab the next new cell image goes into, and how much of it is taken. Per render thread.</summary>
+        [ThreadStatic] private static byte[] _slab;
+
+        [ThreadStatic] private static int _slabUsed;
+
         private static readonly
             ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
             RenderedBitmapCache = new();
@@ -46,13 +61,14 @@ namespace Consolonia.Core.Drawing
         protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
             Renderings => RenderedBitmapCache;
 
-        protected override void Render(DrawingContextImpl context, CellRendering rendering, int cellPixelWidth,
-            int cellPixelHeight, IPlatformRenderInterface renderInterface)
+        protected override void Render(DrawingContextImpl context, CellRendering rendering,
+            ReadOnlySpan<byte> pixels, int cellPixelWidth, int cellPixelHeight,
+            IPlatformRenderInterface renderInterface)
         {
             CellImages.EnsureBudget(ScreensOfCellImages * 4L *
                                     context.PixelBuffer.Width * cellPixelWidth *
                                     context.PixelBuffer.Height * cellPixelHeight);
-            RenderCells(rendering.Pixels, rendering.Cells, cellPixelWidth, cellPixelHeight);
+            RenderCells(pixels, rendering.Cells, cellPixelWidth, cellPixelHeight);
         }
 
         /// <summary>
@@ -66,7 +82,7 @@ namespace Consolonia.Core.Drawing
         /// <exception cref="ArgumentException">
         ///     <paramref name="visibleBytes" /> is not the pixels of exactly the cells.
         /// </exception>
-        internal static void RenderCells(byte[] visibleBytes, PixelBuffer cells, int cellPixelWidth,
+        internal static void RenderCells(ReadOnlySpan<byte> visibleBytes, PixelBuffer cells, int cellPixelWidth,
             int cellPixelHeight)
         {
             int cellsWide = cells.Width;
@@ -77,7 +93,9 @@ namespace Consolonia.Core.Drawing
                 throw new ArgumentException("The pixels are not those of exactly the cells.", nameof(visibleBytes));
 
             // cut into a scratch cell first: most cells are in the cache, and only a new one gets a copy of its own
-            byte[] cellBgra = GC.AllocateUninitializedArray<byte>(cellBytes);
+            Span<byte> cellBgra = cellBytes <= 4096 ? stackalloc byte[cellBytes] : new byte[cellBytes];
+            byte[] slab = _slab;
+            int slabUsed = _slabUsed;
 
             for (int cellY = 0; cellY < cellsHigh; cellY++)
             for (int cellX = 0; cellX < cellsWide; cellX++)
@@ -85,11 +103,21 @@ namespace Consolonia.Core.Drawing
                 CopyBlock(visibleBytes, visibleWidth * 4, cellX * cellPixelWidth, cellY * cellPixelHeight,
                     cellPixelWidth, cellPixelHeight, cellBgra);
 
-                ContentKey cellKey = ContentKey.Of(cellBgra, cellPixelWidth, cellPixelHeight);
+                UInt128 digest = XxHash128.HashToUInt128(cellBgra);
+                var cellKey = new ContentKey(digest, cellPixelWidth, cellPixelHeight);
                 if (!CellImages.TryGet(cellKey, out CellImage image))
                 {
-                    var made = new CellImage((byte[])cellBgra.Clone(), cellPixelWidth, cellPixelHeight);
+                    if (slab == null || slabUsed + cellBytes > slab.Length)
+                    {
+                        slab = _slab = GC.AllocateUninitializedArray<byte>(CellsPerSlab * cellBytes);
+                        slabUsed = 0;
+                    }
+
+                    cellBgra.CopyTo(slab.AsSpan(slabUsed, cellBytes));
+                    var made = new CellImage(slab, slabUsed, cellPixelWidth, cellPixelHeight, digest);
                     image = CellImages.GetOrAdd(cellKey, made, cellBytes);
+                    if (ReferenceEquals(image, made))
+                        _slabUsed = slabUsed += cellBytes;
                 }
 
                 // the picture as the cell's BACKGROUND, the foreground left free so glyphs drawn later land

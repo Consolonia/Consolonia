@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -13,6 +12,19 @@ using Consolonia.Controls;
 // ReSharper disable NotResolvedInText
 namespace Consolonia.Core.Drawing.PixelBufferImplementation
 {
+    /// <summary>
+    ///     One cell of the pixel buffer: a <see cref="Foreground" /> (symbol, color and text attributes), a
+    ///     <see cref="Background" /> (color, and the cell of a picture when the cell shows one) and a caret.
+    /// </summary>
+    /// <remarks>
+    ///     Stored flat rather than as a foreground struct and a background struct. Each nested struct
+    ///     pads to its own alignment, and a <see cref="Symbol" /> inside a <see cref="PixelForeground" />
+    ///     inside a Pixel came to 56 bytes for 35 bytes of fields; flat, the runtime lays the two
+    ///     references, three ints, a char and five bytes out in 40. Every cell of the screen is one of
+    ///     these, copied on every blend and compared on every frame, so the buffer and the terminal
+    ///     cache are a third smaller. The <see cref="Foreground" /> and <see cref="Background" /> are
+    ///     built on read, which the JIT does in registers.
+    /// </remarks>
     [SuppressMessage("ReSharper", "NotResolvedInText",
         Justification = "Properties are accessible but are not seen by resharper", Scope = "type")]
     [SuppressMessage("ReSharper", "NotResolvedInText", MessageId = "Color")]
@@ -30,19 +42,26 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         private static readonly Color ShadePaint = Color.FromArgb(0x40, 0x00, 0x00, 0x00);
         private static readonly Color BrightenPaint = Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF);
 
+        // the fields of the foreground's symbol, the foreground, and the background, flat (see the remarks)
+        private readonly string _symbolReference;
+        private readonly CellImage _image;
+        private readonly Color _foregroundColor;
+        private readonly Color _backgroundColor;
+        private readonly FontWeight _weight;
+        private readonly char _character;
+        private readonly byte _pattern;
+        private readonly byte _width;
+        private readonly byte _style;
+        private readonly byte _textDecoration;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Pixel()
+        public Pixel() : this(PixelForeground.Default, PixelBackground.Transparent)
         {
-            Foreground = PixelForeground.Default;
-            Background = PixelBackground.Transparent;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Pixel(CaretStyle caretStyle)
+        public Pixel(CaretStyle caretStyle) : this(PixelForeground.Default, PixelBackground.Transparent, caretStyle)
         {
-            Foreground = PixelForeground.Default;
-            Background = PixelBackground.Transparent;
-            CaretStyle = caretStyle;
         }
 
         /// <summary>
@@ -79,11 +98,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Pixel(PixelForeground foreground,
-            CaretStyle caretStyle = CaretStyle.None)
+            CaretStyle caretStyle = CaretStyle.None) : this(foreground, PixelBackground.Transparent, caretStyle)
         {
-            Foreground = foreground;
-            Background = PixelBackground.Transparent;
-            CaretStyle = caretStyle;
         }
 
         /// <summary>
@@ -94,8 +110,17 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             PixelBackground background,
             CaretStyle caretStyle = CaretStyle.None)
         {
-            Foreground = foreground;
-            Background = background;
+            Symbol symbol = foreground.Symbol;
+            _character = symbol.Character;
+            _symbolReference = symbol.Reference;
+            _pattern = symbol.Pattern;
+            _width = symbol.Width;
+            _foregroundColor = foreground.Color;
+            _weight = foreground.PackedWeight;
+            _style = foreground.PackedStyle;
+            _textDecoration = foreground.PackedTextDecoration;
+            _backgroundColor = background.Color;
+            _image = background.Image;
             CaretStyle = caretStyle;
         }
 
@@ -109,19 +134,30 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public static Pixel Space => new(new PixelForeground(Symbol.Space, Colors.Transparent),
             PixelBackground.Transparent);
 
+        public PixelForeground Foreground => new(new Symbol(_character, _symbolReference, _pattern, _width),
+            _foregroundColor, _weight, _style, _textDecoration);
+
+        public PixelBackground Background => new(_backgroundColor, _image);
+
 #pragma warning disable CA1051 // Do not declare visible instance fields
-        public readonly PixelForeground Foreground;
-        public readonly PixelBackground Background;
         public readonly CaretStyle CaretStyle;
 #pragma warning restore CA1051 // Do not declare visible instance fields
 
-        [JsonIgnore] public ushort Width => Foreground.Symbol.Width;
+        [JsonIgnore] public ushort Width => _width;
 
         public bool Equals(Pixel other)
         {
-            return EqualityComparer<PixelForeground>.Default.Equals(Foreground, other.Foreground) &&
-                   EqualityComparer<PixelBackground>.Default.Equals(Background, other.Background) &&
-                   CaretStyle == other.CaretStyle;
+            return _character == other._character &&
+                   _width == other._width &&
+                   _pattern == other._pattern &&
+                   _foregroundColor == other._foregroundColor &&
+                   _backgroundColor == other._backgroundColor &&
+                   ReferenceEquals(_image, other._image) &&
+                   _weight == other._weight &&
+                   _style == other._style &&
+                   _textDecoration == other._textDecoration &&
+                   CaretStyle == other.CaretStyle &&
+                   string.Equals(_symbolReference, other._symbolReference, StringComparison.Ordinal);
         }
 
         public Pixel Shade()
@@ -140,19 +176,20 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public Pixel Invert()
         {
-            return new Pixel(new PixelForeground(Foreground.Symbol,
+            PixelForeground foreground = Foreground;
+            return new Pixel(new PixelForeground(foreground.Symbol,
                     Background.EffectiveColor, // background color becomes the new foreground color
-                    Foreground.Weight,
-                    Foreground.Style,
-                    Foreground.TextDecoration),
-                new PixelBackground(Foreground.Color, Background.Image),
+                    foreground.Weight,
+                    foreground.Style,
+                    foreground.TextDecoration),
+                new PixelBackground(_foregroundColor, _image),
                 CaretStyle);
         }
 
         /// <summary>A cell showing a picture (see <see cref="CellImage" />).</summary>
         private bool IsImage()
         {
-            return Background.Image != null;
+            return _image != null;
         }
 
         /// <summary>
@@ -172,7 +209,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             if (pixelAbove.IsImage())
                 return pixelAbove;
 
-            Color aboveBgColor = pixelAbove.Background.Color;
+            Color aboveBgColor = pixelAbove._backgroundColor;
             byte aboveBgA = aboveBgColor.A;
 
             bool isNoForegroundOnTop;
@@ -199,14 +236,19 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     newCaretStyle = pixelAbove.CaretStyle;
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop)
+                    {
                         // merge the PixelForeground color with the pixelAbove background color
-                        newForeground = new PixelForeground(Foreground.Symbol,
-                            MergeColors(Foreground.Color, aboveBgColor, true),
-                            Foreground.Weight,
-                            Foreground.Style,
-                            Foreground.TextDecoration);
+                        PixelForeground foreground = Foreground;
+                        newForeground = new PixelForeground(foreground.Symbol,
+                            MergeColors(_foregroundColor, aboveBgColor, true),
+                            foreground.Weight,
+                            foreground.Style,
+                            foreground.TextDecoration);
+                    }
                     else
+                    {
                         newForeground = pixelAbove.Foreground;
+                    }
 
                     break;
             }
@@ -216,8 +258,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             // transparent, so what accumulates here is exactly the paint to lay over the picture. A glyph
             // lands in the foreground and the picture stays below it; what that looks like on a terminal
             // whose protocol cannot draw text over an image is the console output's decision.
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
-                Background.Image);
+            var newBackground = new PixelBackground(MergeColors(_backgroundColor, aboveBgColor, false), _image);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
         }

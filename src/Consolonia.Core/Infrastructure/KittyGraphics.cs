@@ -103,11 +103,9 @@ namespace Consolonia.Core.Infrastructure
         ///     the image carries its own dimensions) or raw 32 bit RGBA (f=32), the latter optionally
         ///     zlib compressed (o=z).
         /// </summary>
-        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight, byte[] data,
-            KittyImageFormat format, bool zlibCompressed = false)
+        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight,
+            ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed = false)
         {
-            ArgumentNullException.ThrowIfNull(data);
-
             byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
             try
             {
@@ -126,10 +124,9 @@ namespace Consolonia.Core.Infrastructure
         ///     as bytes: a payload of megabytes is never turned into text and back.
         /// </summary>
         public static void WriteTransmitSequence(IConsoleOutput console, int imageId, int pixelWidth,
-            int pixelHeight, byte[] data, KittyImageFormat format, bool zlibCompressed = false)
+            int pixelHeight, ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed = false)
         {
             ArgumentNullException.ThrowIfNull(console);
-            ArgumentNullException.ThrowIfNull(data);
 
             byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
             try

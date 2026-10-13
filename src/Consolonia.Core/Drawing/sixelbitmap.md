@@ -68,11 +68,14 @@ Machine-dependent. Read them as ratios. The commands and the shared setup are in
 **Output path per frame** (`ConsoleOutputBenchmarks`, default job, in-process, null stream), driven
 as the render target drives the output: the changed cells written, then `EndFrame`.
 
-| Scenario | Time | Allocated | Bytes on the wire |
+| Scenario | Time | Allocated (`--alloc`) | Bytes on the wire |
 |---|---|---|---|
-| New full-screen picture: a run per row, quantised and encoded | 101 ms | 8.2 MB | 629,322 |
-| Dialog closed: every run from the cache | 1.5 ms | 1.3 MB | 625,332 |
-| One cell: a one-cell run | 3.7 µs | 7.2 KB | 3,033 |
+| New full-screen picture: a run per row, quantised and encoded | 50 ms | 4.0 MB | 629,322 |
+| Dialog closed: every run from the cache | 1.2 ms | 1.26 MB | 625,332 |
+| One cell: a one-cell run | 3.1 µs | 16 KB | 3,033 |
+
+A new picture's allocation is Wu's quantiser (its histogram and the indexes of the whole frame
+image) and the rendered runs, which the cache keeps; the runs' slices of the indexes are rented.
 
 For comparison, before this model a full-screen picture was one sixel per cell with the bytes made
 at draw time: quantising the picture took about 110 ms in the renderer, and appending the 16,080

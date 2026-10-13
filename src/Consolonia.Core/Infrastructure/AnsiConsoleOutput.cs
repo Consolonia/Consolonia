@@ -26,11 +26,17 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     A frame buffer grown past this (a full-screen kitty picture is megabytes) goes back to the pool
-        ///     after it is written, rather than staying the size of the largest frame ever sent.
+        ///     after it is written, rather than staying the size of the largest frame ever sent. The next
+        ///     frame that large grows straight to that size (<see cref="_largestFrameBytes" />): doubling up
+        ///     to it from the initial size was six rents, and after a Gen2 GC had trimmed the pool, 8 MB of
+        ///     fresh arrays for a 3 MB frame.
         /// </summary>
         private const int KeptFrameBytes = 1024 * 1024;
 
         private const int InitialFrameBytes = 64 * 1024;
+
+        /// <summary>The longest frame written so far: what a frame that outgrows the buffer is likely to need.</summary>
+        private int _largestFrameBytes = InitialFrameBytes;
 
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
@@ -332,6 +338,7 @@ namespace Consolonia.Core.Infrastructure
                 Console.Out.Flush();
             }
 
+            _largestFrameBytes = Math.Max(_largestFrameBytes, _frameLength);
             _frameLength = FramePrefix;
             if (_frame.Length > KeptFrameBytes)
             {
@@ -760,7 +767,10 @@ namespace Consolonia.Core.Infrastructure
             int needed = _frameLength + bytes;
             if (needed > _frame.Length)
             {
-                byte[] grown = ArrayPool<byte>.Shared.Rent(Math.Max(needed, _frame.Length * 2));
+                // to the largest frame seen when that is more than doubling: a frame that outgrows the buffer
+                // is usually another of the large kind, and one rent beats a chain of them
+                byte[] grown = ArrayPool<byte>.Shared.Rent(Math.Max(needed, Math.Max(_frame.Length * 2,
+                    _largestFrameBytes)));
                 _frame.AsSpan(0, _frameLength).CopyTo(grown);
                 ArrayPool<byte>.Shared.Return(_frame);
                 _frame = grown;

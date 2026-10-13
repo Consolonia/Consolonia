@@ -40,6 +40,17 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             _textDecoration = textDecoration == null ? None : (byte)textDecoration.Value;
         }
 
+        /// <summary>The attributes as packed, for <see cref="Pixel" />, which stores them flat.</summary>
+        internal PixelForeground(Symbol symbol, Color color, FontWeight packedWeight, byte packedStyle,
+            byte packedTextDecoration)
+        {
+            Symbol = symbol;
+            Color = color;
+            _weight = packedWeight;
+            _style = packedStyle;
+            _textDecoration = packedTextDecoration;
+        }
+
 #pragma warning disable CA1051 // Do not declare visible instance fields
         public readonly Symbol Symbol;
         public readonly Color Color;
@@ -58,6 +69,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public TextDecorationLocation? TextDecoration =>
             _textDecoration == None ? null : (TextDecorationLocation)_textDecoration;
+
+        internal FontWeight PackedWeight => _weight;
+
+        internal byte PackedStyle => _style;
+
+        internal byte PackedTextDecoration => _textDecoration;
 
         public bool Equals(PixelForeground other)
         {

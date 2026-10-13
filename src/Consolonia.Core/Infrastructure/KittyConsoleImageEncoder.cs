@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
@@ -32,6 +33,8 @@ namespace Consolonia.Core.Infrastructure
     ///     kept images by content and placed them again by id, and a terminal that had trimmed one left a
     ///     hole; the only state here is what each position was last sent, which is this encoder's own.</para>
     /// </remarks>
+    [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
+        Justification = "The MemoryStream is over a managed array and holds nothing a Dispose would free")]
     internal sealed class KittyConsoleImageEncoder : IConsoleImageEncoder
     {
         /// <summary>Block size in cells: small enough that a stroke touches few, large enough to be few.</summary>
@@ -48,6 +51,9 @@ namespace Consolonia.Core.Infrastructure
         private readonly Dictionary<(int X, int Y), BlockState> _blocks = new();
 
         private readonly List<(int X, int Y)> _blocksToForget = new();
+
+        /// <summary>The encoded bytes of the block being transmitted: PNG or zlib. One stream, emptied per block.</summary>
+        private readonly MemoryStream _encoded = new();
 
         /// <summary>The platform's bitmaps, which encode PNG; looked up on the first transmit, null sends RGBA.</summary>
         private IPlatformRenderInterface _renderInterface;
@@ -190,12 +196,12 @@ namespace Consolonia.Core.Infrastructure
             for (int row = 0; row < rows; row++)
             for (int column = 0; column < columns; column++, offset += KeyBytesPerCell)
             {
-                ref readonly PixelBackground background = ref screen.CellAt(blockX + column, blockY + row).Background;
+                PixelBackground background = screen.CellAt(blockX + column, blockY + row).Background;
                 if (background.Image == null)
                     continue;
 
                 anyImage = true;
-                MemoryMarshal.Write(description[offset..], background.Image.Key.Digest);
+                MemoryMarshal.Write(description[offset..], background.Image.Digest);
                 BitConverter.TryWriteBytes(description[(offset + 16)..], background.Color.ToUInt32());
             }
 
@@ -225,25 +231,26 @@ namespace Consolonia.Core.Infrastructure
             for (int row = 0; row < rows; row++)
             for (int column = 0; column < columns; column++)
             {
-                ref readonly PixelBackground background = ref screen.CellAt(blockX + column, blockY + row).Background;
+                PixelBackground background = screen.CellAt(blockX + column, blockY + row).Background;
                 CellImage image = background.Image;
                 if (image == null)
                     continue;
 
                 int cellOffset = row * cellPixelHeight * blockRowBytes + column * cellRowBytes;
+                ReadOnlySpan<byte> bgra = image.Bgra;
                 for (int y = 0; y < cellPixelHeight; y++)
-                    image.Bgra.AsSpan(y * cellRowBytes, cellRowBytes)
-                        .CopyTo(block.Slice(cellOffset + y * blockRowBytes));
+                    bgra.Slice(y * cellRowBytes, cellRowBytes).CopyTo(block.Slice(cellOffset + y * blockRowBytes));
 
                 if (background.Color.A != 0)
                     CellImage.Paint(block, blockRowBytes, cellOffset, cellPixelWidth, cellPixelHeight,
                         background.Color);
             }
 
-            byte[] png = TryEncodePng(block, blockWidth, blockHeight);
-            if (png != null)
+            MemoryStream encoded = _encoded;
+            encoded.SetLength(0);
+            if (TryEncodePng(block, blockWidth, blockHeight, encoded))
             {
-                KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, png,
+                KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, Encoded(),
                     KittyImageFormat.Png);
                 return;
             }
@@ -253,23 +260,29 @@ namespace Consolonia.Core.Infrastructure
             for (int i = 0; i < block.Length; i += 4)
                 (block[i], block[i + 2]) = (block[i + 2], block[i]);
 
-            using var compressed = new MemoryStream();
-            using (var zlib = new ZLibStream(compressed, CompressionLevel.Fastest, true))
+            encoded.SetLength(0);
+            using (var zlib = new ZLibStream(encoded, CompressionLevel.Fastest, true))
             {
                 zlib.Write(block);
             }
 
-            KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, compressed.ToArray(),
+            KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, Encoded(),
                 KittyImageFormat.Rgba, true);
         }
 
+        /// <summary>What <see cref="_encoded" /> holds, without copying it out.</summary>
+        private ReadOnlySpan<byte> Encoded()
+        {
+            return _encoded.GetBuffer().AsSpan(0, (int)_encoded.Length);
+        }
+
         /// <summary>
-        ///     The PNG of <paramref name="width" /> x <paramref name="height" /> BGRA pixels through the
-        ///     platform's bitmaps (a bitmap loaded from the pixels and saved, which Avalonia does through
-        ///     Skia), or null where the platform has none or cannot encode: the headless tests, the
-        ///     benchmarks, a platform without an image codec.
+        ///     Writes the PNG of <paramref name="width" /> x <paramref name="height" /> BGRA pixels to
+        ///     <paramref name="png" /> through the platform's bitmaps (a bitmap loaded from the pixels and
+        ///     saved, which Avalonia does through Skia). False, with nothing written, where the platform has
+        ///     none or cannot encode: the headless tests, the benchmarks, a platform without an image codec.
         /// </summary>
-        private unsafe byte[] TryEncodePng(ReadOnlySpan<byte> bgra, int width, int height)
+        private unsafe bool TryEncodePng(ReadOnlySpan<byte> bgra, int width, int height, MemoryStream png)
         {
             if (!_renderInterfaceResolved)
             {
@@ -278,7 +291,7 @@ namespace Consolonia.Core.Infrastructure
             }
 
             if (_renderInterface == null)
-                return null;
+                return false;
 
             try
             {
@@ -286,16 +299,16 @@ namespace Consolonia.Core.Infrastructure
                 {
                     using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
                         (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
-                    using var stream = new MemoryStream();
-                    bitmap.Save(stream);
+                    bitmap.Save(png);
                     // a platform with no image codec saves nothing rather than throwing
-                    return stream.Length > 0 ? stream.ToArray() : null;
+                    return png.Length > 0;
                 }
             }
             catch (Exception exception) when (exception is NotSupportedException or NotImplementedException
                                                   or ConsoloniaNotSupportedException)
             {
-                return null;
+                png.SetLength(0);
+                return false;
             }
         }
 

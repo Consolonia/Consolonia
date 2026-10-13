@@ -221,19 +221,8 @@ namespace Consolonia.Benchmarks
         /// </summary>
         public static void PrintDigests()
         {
-            (string Name, Action<ConsoleOutputBenchmarks> Run)[] scenarios =
-            [
-                (nameof(TextFullScreen), b => b.TextFullScreen()),
-                (nameof(SixelNewPicture), b => b.SixelNewPicture()),
-                (nameof(SixelDialogClosed), b => b.SixelDialogClosed()),
-                (nameof(SixelOneCell), b => b.SixelOneCell()),
-                (nameof(KittyNewPicture), b => b.KittyNewPicture()),
-                (nameof(KittyAfterReset), b => b.KittyAfterReset()),
-                (nameof(KittyOneCell), b => b.KittyOneCell())
-            ];
-
             TextWriter console = Console.Out;
-            foreach ((string name, Action<ConsoleOutputBenchmarks> run) in scenarios)
+            foreach ((string name, Action<ConsoleOutputBenchmarks> run) in Scenarios)
             {
                 using var captured = new MemoryStream();
                 var benchmarks = new ConsoleOutputBenchmarks();
@@ -246,5 +235,39 @@ namespace Consolonia.Benchmarks
                     $"{name,-18} {captured.Length,10} bytes  {Convert.ToHexString(SHA256.HashData(captured.ToArray()))}");
             }
         }
+
+        /// <summary>
+        ///     <c>--alloc</c>: the bytes each scenario allocates in one run, after a warm-up run, from the
+        ///     thread's allocation counter. Exact and quick where the memory diagnoser's figure for a scenario
+        ///     with a per-iteration setup folds the setup in.
+        /// </summary>
+        public static void PrintAllocations()
+        {
+            TextWriter console = Console.Out;
+            foreach ((string name, Action<ConsoleOutputBenchmarks> run) in Scenarios)
+            {
+                var benchmarks = new ConsoleOutputBenchmarks();
+                benchmarks.Setup(Stream.Null);
+                benchmarks.SetupNewPicture();
+                run(benchmarks);
+                benchmarks.SetupNewPicture();
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                run(benchmarks);
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+                benchmarks.Cleanup();
+                console.WriteLine($"{name,-18} {allocated,12:N0} bytes allocated");
+            }
+        }
+
+        private static (string Name, Action<ConsoleOutputBenchmarks> Run)[] Scenarios =>
+        [
+            (nameof(TextFullScreen), b => b.TextFullScreen()),
+            (nameof(SixelNewPicture), b => b.SixelNewPicture()),
+            (nameof(SixelDialogClosed), b => b.SixelDialogClosed()),
+            (nameof(SixelOneCell), b => b.SixelOneCell()),
+            (nameof(KittyNewPicture), b => b.KittyNewPicture()),
+            (nameof(KittyAfterReset), b => b.KittyAfterReset()),
+            (nameof(KittyOneCell), b => b.KittyOneCell())
+        ];
     }
 }

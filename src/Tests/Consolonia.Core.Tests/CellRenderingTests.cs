@@ -15,23 +15,19 @@ namespace Consolonia.Core.Tests
     public class CellRenderingTests
     {
         [Test]
-        public void TheBuffersAreKeptWhileTheirSizeIsUnchanged()
+        public void TheCellsAreKeptWhileTheirSizeIsUnchanged()
         {
             var rendering = new CellRendering();
-            rendering.Prepare(new PixelRect(0, 0, 4, 2), 8, 16);
-            byte[] pixels = rendering.Pixels;
+            rendering.Prepare(new PixelRect(0, 0, 4, 2));
             PixelBuffer cells = rendering.Cells;
-            Assert.That(pixels.Length, Is.EqualTo(4 * 8 * 2 * 16 * 4));
             Assert.That(cells.Width, Is.EqualTo(4));
             Assert.That(cells.Height, Is.EqualTo(2));
 
-            rendering.Prepare(new PixelRect(3, 1, 4, 2), 8, 16);
-            Assert.That(rendering.Pixels, Is.SameAs(pixels), "a scroll keeps the pixel buffer");
+            rendering.Prepare(new PixelRect(3, 1, 4, 2));
             Assert.That(rendering.Cells, Is.SameAs(cells), "a scroll keeps the cells");
 
-            rendering.Prepare(new PixelRect(0, 0, 5, 2), 8, 16);
-            Assert.That(rendering.Pixels, Is.Not.SameAs(pixels));
-            Assert.That(rendering.Pixels.Length, Is.EqualTo(5 * 8 * 2 * 16 * 4));
+            rendering.Prepare(new PixelRect(0, 0, 5, 2));
+            Assert.That(rendering.Cells, Is.Not.SameAs(cells));
             Assert.That(rendering.Cells.Width, Is.EqualTo(5));
         }
 
@@ -42,7 +38,7 @@ namespace Consolonia.Core.Tests
             var visible = new PixelRect(0, 0, 2, 2);
             Assert.That(rendering.Shows(1, visible), Is.False, "never rendered");
 
-            rendering.Prepare(visible, 8, 16);
+            rendering.Prepare(visible);
             Assert.That(rendering.Shows(1, visible), Is.False, "prepared but not rendered");
 
             rendering.Complete(1);
@@ -50,7 +46,7 @@ namespace Consolonia.Core.Tests
             Assert.That(rendering.Shows(2, visible), Is.False, "an edit");
             Assert.That(rendering.Shows(1, new PixelRect(1, 0, 2, 2)), Is.False, "a scroll");
 
-            rendering.Prepare(visible, 8, 16);
+            rendering.Prepare(visible);
             Assert.That(rendering.Shows(1, visible), Is.False,
                 "being rendered again: a render that throws must not leave it claiming the old version");
         }
