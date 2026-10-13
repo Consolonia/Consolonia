@@ -173,14 +173,6 @@ namespace Consolonia
         ///     True when the console is a ConPTY pseudoconsole -- Windows Terminal, VS Code, WezTerm, an
         ///     OpenSSH session -- rather than the legacy console host.
         /// </summary>
-        /// <remarks>
-        ///     Asked of the console window, not the environment. WT_SESSION is missing when Windows hands
-        ///     a console started from Start or Explorer to Windows Terminal after the process exists, and
-        ///     over SSH; and because the environment is inherited it is present in a legacy console window
-        ///     opened from a Windows Terminal tab. The console window belongs to the console this process
-        ///     is actually attached to: under ConPTY it is a hidden PseudoConsoleWindow, under the legacy
-        ///     host a ConsoleWindowClass.
-        /// </remarks>
         private static bool IsPseudoConsole()
         {
             try
