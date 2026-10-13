@@ -201,6 +201,46 @@ namespace Consolonia.Core.Infrastructure
             Flush();
         }
 
+        /// <summary>
+        ///     Works out which mouse pointer shapes the terminal can draw itself (OSC 22), so the
+        ///     pointer can be the terminal's own rather than a character.
+        /// </summary>
+        /// <param name="readAnswersUntilDeviceAttributes">
+        ///     Reads whatever the terminal sends back, up to and including its Device Attributes
+        ///     answer, or all it sent before going quiet. How input is read is the one part of the
+        ///     probe that differs between consoles.
+        /// </param>
+        /// <remarks>
+        ///     <para>
+        ///         Kitty's support query names every shape an Avalonia cursor maps to, and is followed
+        ///         by XTVERSION and then a Device Attributes request as a sentinel, which every
+        ///         terminal answers. Everything up to the sentinel's answer is read, and what it means
+        ///         is decided by <see cref="PointerShapes.Detect" />. A terminal that neither answers
+        ///         nor is recognised keeps the character pointer.
+        ///     </para>
+        ///     <para>
+        ///         The support query goes out in several parts rather than one because libtsm, and so
+        ///         kmscon, keeps only the first 127 bytes of an OSC string and silently drops the rest:
+        ///         a single query naming every shape was 186 bytes, and the names past the cut went
+        ///         unanswered and were taken as unsupported.
+        ///     </para>
+        /// </remarks>
+        protected void TryToSupportPointerShapes(Func<string> readAnswersUntilDeviceAttributes)
+        {
+            ArgumentNullException.ThrowIfNull(readAnswersUntilDeviceAttributes);
+
+            foreach (IReadOnlyList<string> batch in PointerShapes.QueryBatches)
+                WriteText(Esc.QueryPointerShapes(batch));
+            WriteText(Esc.QueryTerminalVersion);
+            WriteText("\u001b[c"); // sentinel: Device Attributes query
+            Flush(); // the queries must actually reach the terminal, otherwise it never responds
+
+            (IReadOnlySet<string> supported, bool usesX11Names) =
+                PointerShapes.Detect(readAnswersUntilDeviceAttributes(), Environment.GetEnvironmentVariable);
+            SupportedPointerShapes = supported;
+            PointerShapesUseX11Names = usesX11Names;
+        }
+
         public virtual void ShowCaret()
         {
             _consoleOutput.ShowCaret();
