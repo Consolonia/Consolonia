@@ -104,10 +104,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             {
             }
 
-            public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
-            {
-            }
-
             public void Flush()
             {
             }
