@@ -2,7 +2,6 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 // ReSharper disable UnusedMember.Global

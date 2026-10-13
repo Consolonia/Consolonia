@@ -28,25 +28,17 @@ namespace Consolonia.Core.Infrastructure
         private const long RunCacheBudgetBytes = 16L * 1024 * 1024;
 
         private const int RunKeyBytesPerCell = 16 + 4;
+        private readonly List<ImageCell> _cells = new();
 
         private readonly AnsiConsoleOutput _output;
-        private readonly List<ImageCell> _cells = new();
-        private readonly List<Run> _runs = new();
         private readonly ContentCache<byte[]> _renderedRuns = new(RunCacheBudgetBytes);
+        private readonly List<Run> _runs = new();
         private byte[] _frameBgra;
         private byte[] _runKey;
 
         public SixelConsoleImageEncoder(AnsiConsoleOutput output)
         {
             _output = output;
-        }
-
-        private readonly record struct ImageCell(PixelBufferCoordinate Position, CellImage Image, Color Paint);
-
-        /// <summary>Cells <see cref="Start" /> to <see cref="End" /> (exclusive) of the frame's list, one sixel.</summary>
-        private record struct Run(int Start, int End, ContentKey Key, byte[] Rendered, int FrameColumn)
-        {
-            public int Cells => End - Start;
         }
 
         public void BeginFrame()
@@ -201,5 +193,12 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        private readonly record struct ImageCell(PixelBufferCoordinate Position, CellImage Image, Color Paint);
+
+        /// <summary>Cells <see cref="Start" /> to <see cref="End" /> (exclusive) of the frame's list, one sixel.</summary>
+        private record struct Run(int Start, int End, ContentKey Key, byte[] Rendered, int FrameColumn)
+        {
+            public int Cells => End - Start;
+        }
     }
 }

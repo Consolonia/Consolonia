@@ -32,7 +32,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             // we use String.Empty to represent an empty symbol
             Character = char.MinValue;
-            _reference = null;
+            Complex = null;
             Width = 0;
             Pattern = 0;
         }
@@ -41,7 +41,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public Symbol(char ch, byte? width = null)
         {
             Character = ch;
-            _reference = null;
+            Complex = null;
             Width = width ?? (byte)UnicodeCalculator.GetWidth(ch);
             Pattern = 0;
             // Use EmojiVariation for actual emoji and for wide symbol glyphs such as ☰.
@@ -54,9 +54,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                 lock (GlyphCharCache)
                 {
                     if (GlyphCharCache.TryGetValue(ch, out string wideChar))
-                        _reference = wideChar;
+                        Complex = wideChar;
                     else
-                        _reference = GlyphCharCache[ch] = $"{ch}{EmojiVariation}";
+                        Complex = GlyphCharCache[ch] = $"{ch}{EmojiVariation}";
                 }
             }
         }
@@ -80,7 +80,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public Symbol(byte boxPattern)
         {
             Character = BoxPattern.GetBoxChar(boxPattern);
-            _reference = null;
+            Complex = null;
             Width = 1;
             Pattern = boxPattern;
         }
@@ -89,7 +89,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public Symbol(string glyph, byte? width = null)
         {
             Pattern = 0;
-            _reference = null;
+            Complex = null;
             Character = char.MinValue;
             ArgumentNullException.ThrowIfNull(glyph);
             if (glyph.Length == 0)
@@ -110,7 +110,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                 else if (glyph.Any(ch => ch == TextVariation || ch == EmojiVariation))
                 {
                     // it already has the variation selector so we just use it as is
-                    _reference = glyph;
+                    Complex = glyph;
                 }
                 else
                 {
@@ -120,13 +120,13 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     {
                         if (GlyphComplexCache.TryGetValue(glyph, out string complex))
                         {
-                            _reference = complex;
+                            Complex = complex;
                         }
                         else
                         {
                             // use text variation for narrow glyphs, emoji variation for wide glyphs
                             char variation = width == 1 ? TextVariation : EmojiVariation;
-                            _reference = GlyphComplexCache[glyph] = $"{glyph}{variation}";
+                            Complex = GlyphComplexCache[glyph] = $"{glyph}{variation}";
                         }
                     }
                 }
@@ -145,7 +145,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         internal Symbol(char character, string reference, byte pattern, byte width)
         {
             Character = character;
-            _reference = reference;
+            Complex = reference;
             Pattern = pattern;
             Width = width;
         }
@@ -156,7 +156,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Character == other.Character &&
                    Width == other.Width &&
                    Pattern == other.Pattern &&
-                   string.Equals(_reference, other._reference, StringComparison.Ordinal);
+                   string.Equals(Complex, other.Complex, StringComparison.Ordinal);
         }
 
 
@@ -166,15 +166,13 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         public readonly char Character;
 
-        private readonly string _reference;
-
         /// <summary>
         ///     If cell has complex text (more than one char) this contains the full unicode sequence to draw this symbol.
         /// </summary>
-        public string Complex => _reference;
+        public string Complex { get; }
 
         /// <summary>The complex text as stored, null for none; what <see cref="Pixel" /> keeps.</summary>
-        internal string Reference => _reference;
+        internal string Reference => Complex;
 
         // box pattern for box merging.
         public readonly byte Pattern;
@@ -200,7 +198,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>No character and no complex text: blending this over a symbol leaves that symbol.</summary>
         public bool NothingToDraw()
         {
-            return Character == char.MinValue && string.IsNullOrEmpty(_reference);
+            return Character == char.MinValue && string.IsNullOrEmpty(Complex);
         }
 
         /// <summary>
@@ -209,7 +207,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         public bool IsBlank()
         {
-            return string.IsNullOrEmpty(_reference) && (Character == char.MinValue || char.IsWhiteSpace(Character));
+            return string.IsNullOrEmpty(Complex) && (Character == char.MinValue || char.IsWhiteSpace(Character));
         }
 
         public Symbol Blend(ref Symbol symbolAbove)

@@ -24,9 +24,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             Symbol = Symbol.Space;
             Color = Colors.Transparent;
-            _weight = 0;
-            _style = None;
-            _textDecoration = None;
+            PackedWeight = 0;
+            PackedStyle = None;
+            PackedTextDecoration = None;
         }
 
         public PixelForeground(Symbol symbol, Color color,
@@ -35,9 +35,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             Symbol = symbol;
             Color = color;
-            _weight = weight ?? 0;
-            _style = style == null ? None : (byte)style.Value;
-            _textDecoration = textDecoration == null ? None : (byte)textDecoration.Value;
+            PackedWeight = weight ?? 0;
+            PackedStyle = style == null ? None : (byte)style.Value;
+            PackedTextDecoration = textDecoration == null ? None : (byte)textDecoration.Value;
         }
 
         /// <summary>The attributes as packed, for <see cref="Pixel" />, which stores them flat.</summary>
@@ -46,9 +46,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             Symbol = symbol;
             Color = color;
-            _weight = packedWeight;
-            _style = packedStyle;
-            _textDecoration = packedTextDecoration;
+            PackedWeight = packedWeight;
+            PackedStyle = packedStyle;
+            PackedTextDecoration = packedTextDecoration;
         }
 
 #pragma warning disable CA1051 // Do not declare visible instance fields
@@ -59,30 +59,27 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         // The three optional attributes packed into 6 bytes rather than three nullable enums of 8 each:
         // every cell of the pixel buffer carries them, and it keeps a Pixel within a cache line.
         // FontWeight has no zero (Thin is 100), so 0 is "not set"; the other two fit a byte with a sentinel.
-        private readonly FontWeight _weight;
-        private readonly byte _style;
-        private readonly byte _textDecoration;
 
-        public FontWeight? Weight => _weight == 0 ? null : _weight;
+        public FontWeight? Weight => PackedWeight == 0 ? null : PackedWeight;
 
-        public FontStyle? Style => _style == None ? null : (FontStyle)_style;
+        public FontStyle? Style => PackedStyle == None ? null : (FontStyle)PackedStyle;
 
         public TextDecorationLocation? TextDecoration =>
-            _textDecoration == None ? null : (TextDecorationLocation)_textDecoration;
+            PackedTextDecoration == None ? null : (TextDecorationLocation)PackedTextDecoration;
 
-        internal FontWeight PackedWeight => _weight;
+        internal FontWeight PackedWeight { get; }
 
-        internal byte PackedStyle => _style;
+        internal byte PackedStyle { get; }
 
-        internal byte PackedTextDecoration => _textDecoration;
+        internal byte PackedTextDecoration { get; }
 
         public bool Equals(PixelForeground other)
         {
             return Symbol.Equals(other.Symbol) &&
                    Color.Equals(other.Color) &&
-                   _weight == other._weight &&
-                   _style == other._style &&
-                   _textDecoration == other._textDecoration;
+                   PackedWeight == other.PackedWeight &&
+                   PackedStyle == other.PackedStyle &&
+                   PackedTextDecoration == other.PackedTextDecoration;
         }
 
         public PixelForeground Shade()
@@ -118,7 +115,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Symbol, Color, (int)_weight, _style, _textDecoration);
+            return HashCode.Combine(Symbol, Color, (int)PackedWeight, PackedStyle, PackedTextDecoration);
         }
 
         public static bool operator ==(PixelForeground left, PixelForeground right)

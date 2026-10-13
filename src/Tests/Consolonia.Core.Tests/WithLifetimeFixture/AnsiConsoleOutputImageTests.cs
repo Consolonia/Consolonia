@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Avalonia.Media;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -81,7 +82,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         private (string Shown, string Dimmed, CellImage Image) ShowTwoCellsThenDimThem()
         {
             CellImage image = SolidImage(10, 20, 30);
-            var paint = Color.Parse("#7F000000");
+            Color paint = Color.Parse("#7F000000");
             string shown = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
             string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
             return (shown, dimmed, image);
@@ -194,7 +195,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             CellImage image = SolidImage(10, 20, 30);
-            var cells = new (int, int, Pixel)[KittyConsoleImageEncoder.BlockColumns * KittyConsoleImageEncoder.BlockRows];
+            var cells =
+                new (int, int, Pixel)[KittyConsoleImageEncoder.BlockColumns * KittyConsoleImageEncoder.BlockRows];
             for (int i = 0; i < cells.Length; i++)
                 cells[i] = (i % KittyConsoleImageEncoder.BlockColumns, i / KittyConsoleImageEncoder.BlockColumns,
                     ImageCell(image));
@@ -300,20 +302,21 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             string covered = Frame((0, 0, text));
 
-            Assert.That(covered, Does.Contain($"a=d,d=I,q=2,i={ImageIdOfFirstTransmit(first)}"), "the block's image goes");
+            Assert.That(covered, Does.Contain($"a=d,d=I,q=2,i={ImageIdOfFirstTransmit(first)}"),
+                "the block's image goes");
             Assert.That(Count(covered, KittyTransmit), Is.Zero);
         }
 
         private static string ImageIdOfFirstTransmit(string frame)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(frame, @"\u001b_Ga=t,[^;]*?i=(\d+)");
+            Match match = Regex.Match(frame, @"\u001b_Ga=t,[^;]*?i=(\d+)");
             Assert.That(match.Success, Is.True, "no transmit in the frame");
             return match.Groups[1].Value;
         }
 
         private static string TransmitPayload(string frame)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(frame, @"\u001b_Ga=t,[^;]*;([^\u001b]*)");
+            Match match = Regex.Match(frame, @"\u001b_Ga=t,[^;]*;([^\u001b]*)");
             Assert.That(match.Success, Is.True, "no transmit in the frame");
             return match.Groups[1].Value;
         }
@@ -337,8 +340,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             for (int x = 0; x < Columns; x++)
                 picture[x, y] = SolidImage((byte)(x * 16), (byte)(y * 32), 7);
 
-            var dialog = new Pixel(new PixelForeground(new Symbol('d'), Colors.Black), new PixelBackground(Colors.White));
-            (int X, int Y, int W, int H)?[] dialogs = { null, (2, 2, 7, 5), (3, 2, 7, 5), (5, 3, 7, 5), (9, 1, 6, 6), null, (0, 0, 16, 8), null };
+            var dialog = new Pixel(new PixelForeground(new Symbol('d'), Colors.Black),
+                new PixelBackground(Colors.White));
+            (int X, int Y, int W, int H)?[] dialogs =
+                { null, (2, 2, 7, 5), (3, 2, 7, 5), (5, 3, 7, 5), (9, 1, 6, 6), null, (0, 0, 16, 8), null };
 
             int transmitsAfterThePicture = 0;
             for (int step = 0; step < dialogs.Length; step++)
@@ -380,12 +385,13 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>Applies a frame's kitty placements and deletes to <paramref name="live" />, as a terminal would.</summary>
-        private static void ApplyToTerminal(string frame, Dictionary<(int Image, int Placement), HashSet<(int X, int Y)>> live)
+        private static void ApplyToTerminal(string frame,
+            Dictionary<(int Image, int Placement), HashSet<(int X, int Y)>> live)
         {
             var cursor = (X: 0, Y: 0);
-            var tokens = System.Text.RegularExpressions.Regex.Matches(frame,
+            MatchCollection tokens = Regex.Matches(frame,
                 @"\u001b\[(\d+);(\d+)f|\u001b_G([^\u001b]*)\u001b\\");
-            foreach (System.Text.RegularExpressions.Match token in tokens)
+            foreach (Match token in tokens)
             {
                 if (token.Groups[1].Success)
                 {
@@ -394,7 +400,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 }
 
                 string command = token.Groups[3].Value;
-                var keys = command.Split(';')[0].Split(',')
+                Dictionary<string, string> keys = command.Split(';')[0].Split(',')
                     .Select(part => part.Split('='))
                     .Where(part => part.Length == 2)
                     .ToDictionary(part => part[0], part => part[1]);
@@ -408,7 +414,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     foreach ((int Image, int Placement) key in live.Keys.Where(k => k.Image == replaced).ToList())
                         live.Remove(key);
                 }
-                else if (action == "p" && keys.TryGetValue("i", out string image) && keys.TryGetValue("p", out string placement))
+                else if (action == "p" && keys.TryGetValue("i", out string image) &&
+                         keys.TryGetValue("p", out string placement))
                 {
                     int cols = keys.TryGetValue("c", out string c) ? int.Parse(c) : int.Parse(keys["w"]) / CellWidth;
                     int rows = keys.TryGetValue("r", out string r) ? int.Parse(r) : int.Parse(keys["h"]) / CellHeight;
@@ -420,7 +427,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                         continue; // a wash is not the picture
                     live[(int.Parse(image), int.Parse(placement))] = cells;
                 }
-                else if (action == "d" && keys.TryGetValue("d", out string target) && keys.TryGetValue("i", out string deleted))
+                else if (action == "d" && keys.TryGetValue("d", out string target) &&
+                         keys.TryGetValue("i", out string deleted))
                 {
                     int imageId = int.Parse(deleted);
                     if (target == "i" && keys.TryGetValue("p", out string p))

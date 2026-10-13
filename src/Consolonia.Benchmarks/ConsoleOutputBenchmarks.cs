@@ -34,16 +34,27 @@ namespace Consolonia.Benchmarks
         private const int Width = CellsWide * CellWidth;
         private const int Height = CellsHigh * CellHeight;
         private static readonly Color Dim = Color.FromArgb(0x7F, 0, 0, 0);
+        private AnsiConsoleOutput _kittyOutput = null!;
+        private PixelBuffer _newPicture = null!;
 
         private TextWriter _originalOut = null!;
-        private AnsiConsoleOutput _sixelOutput = null!;
-        private AnsiConsoleOutput _kittyOutput = null!;
-        private Pixel[] _text = null!;
         private PixelBuffer _picture = null!;
-        private PixelBuffer _newPicture = null!;
+        private int _seed;
+        private AnsiConsoleOutput _sixelOutput = null!;
         private Pixel _strokeCell;
         private PixelBuffer _strokeScreen = null!;
-        private int _seed;
+        private Pixel[] _text = null!;
+
+        private static (string Name, Action<ConsoleOutputBenchmarks> Run)[] Scenarios =>
+        [
+            (nameof(TextFullScreen), b => b.TextFullScreen()),
+            (nameof(SixelNewPicture), b => b.SixelNewPicture()),
+            (nameof(SixelDialogClosed), b => b.SixelDialogClosed()),
+            (nameof(SixelOneCell), b => b.SixelOneCell()),
+            (nameof(KittyNewPicture), b => b.KittyNewPicture()),
+            (nameof(KittyAfterReset), b => b.KittyAfterReset()),
+            (nameof(KittyOneCell), b => b.KittyOneCell())
+        ];
 
         [GlobalSetup]
         public void Setup()
@@ -258,16 +269,5 @@ namespace Consolonia.Benchmarks
                 console.WriteLine($"{name,-18} {allocated,12:N0} bytes allocated");
             }
         }
-
-        private static (string Name, Action<ConsoleOutputBenchmarks> Run)[] Scenarios =>
-        [
-            (nameof(TextFullScreen), b => b.TextFullScreen()),
-            (nameof(SixelNewPicture), b => b.SixelNewPicture()),
-            (nameof(SixelDialogClosed), b => b.SixelDialogClosed()),
-            (nameof(SixelOneCell), b => b.SixelOneCell()),
-            (nameof(KittyNewPicture), b => b.KittyNewPicture()),
-            (nameof(KittyAfterReset), b => b.KittyAfterReset()),
-            (nameof(KittyOneCell), b => b.KittyOneCell())
-        ];
     }
 }

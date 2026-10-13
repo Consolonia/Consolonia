@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 

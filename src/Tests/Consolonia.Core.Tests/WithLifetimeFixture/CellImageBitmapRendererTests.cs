@@ -1,5 +1,6 @@
 using System;
 using Avalonia;
+using Avalonia.Media;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -80,7 +81,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             for (int x = 0; x < cellsWide; x++)
             {
                 Assert.That(ImageAt(x, y), Is.Not.Null, $"cell {x},{y} should show the picture");
-                Assert.That(_buffer[(ushort)x, (ushort)y].Background.Color, Is.EqualTo(Avalonia.Media.Colors.Transparent),
+                Assert.That(_buffer[(ushort)x, (ushort)y].Background.Color, Is.EqualTo(Colors.Transparent),
                     "nothing painted over the picture yet");
             }
         }
@@ -112,7 +113,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             for (int y = 0; y < cellsHigh; y++)
             for (int x = 0; x < cellsWide; x++)
-                Assert.That(ImageAt(x, y), Is.Not.SameAs(firstImages[x, y]), $"cell {x},{y} should show the second picture");
+                Assert.That(ImageAt(x, y), Is.Not.SameAs(firstImages[x, y]),
+                    $"cell {x},{y} should show the second picture");
         }
 
         /// <summary>A flat canvas is one image, shared by every cell showing it.</summary>

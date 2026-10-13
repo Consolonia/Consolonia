@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using Avalonia.Media;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 

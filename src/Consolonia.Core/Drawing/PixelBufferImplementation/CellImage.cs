@@ -11,19 +11,22 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
     ///     console output's business; the pixel buffer only holds the reference.
     /// </summary>
     /// <remarks>
-    ///     <para>Compared by reference. The renderer that makes cell images keeps one instance per distinct
-    ///     content (see <see cref="ContentCache{T}" />), so two cells showing the same pixels share one
-    ///     instance and compare equal, and a cell whose pixels did not change keeps its instance and is
-    ///     not written again. The bytes are a copy the image owns: a picture is edited in place and
-    ///     scaled to the cells it is drawn at, so nothing else holds these pixels unchanged.</para>
-    ///     <para>The pixels may sit in an array shared with other cell images made in the same render (a
-    ///     slab), at an offset: one allocation for a handful of cells rather than an array header and a
-    ///     heap object per cell. An instance is 56 bytes: the slab reference, its offset, the size, the
-    ///     16-byte digest the renderer finds it by, and the dominant color once computed.</para>
+    ///     <para>
+    ///         Compared by reference. The renderer that makes cell images keeps one instance per distinct
+    ///         content (see <see cref="ContentCache{T}" />), so two cells showing the same pixels share one
+    ///         instance and compare equal, and a cell whose pixels did not change keeps its instance and is
+    ///         not written again. The bytes are a copy the image owns: a picture is edited in place and
+    ///         scaled to the cells it is drawn at, so nothing else holds these pixels unchanged.
+    ///     </para>
+    ///     <para>
+    ///         The pixels may sit in an array shared with other cell images made in the same render (a
+    ///         slab), at an offset: one allocation for a handful of cells rather than an array header and a
+    ///         heap object per cell. An instance is 56 bytes: the slab reference, its offset, the size, the
+    ///         16-byte digest the renderer finds it by, and the dominant color once computed.
+    ///     </para>
     /// </remarks>
     public sealed class CellImage
     {
-        private readonly UInt128 _digest;
         private readonly int _offset;
         private readonly byte[] _pixels;
 
@@ -45,7 +48,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             _pixels = bgra;
             Width = width;
             Height = height;
-            _digest = XxHash128.HashToUInt128(bgra);
+            Digest = XxHash128.HashToUInt128(bgra);
         }
 
         /// <summary>
@@ -60,7 +63,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             _offset = offset;
             Width = width;
             Height = height;
-            _digest = digest;
+            Digest = digest;
         }
 
         /// <summary>The pixels, 4 bytes each (blue, green, red, alpha), row by row.</summary>
@@ -73,10 +76,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public int Height { get; }
 
         /// <summary>What the pixels show, as a hash: how the renderer finds the instance for a block of pixels.</summary>
-        internal ContentKey Key => new(_digest, Width, Height);
+        internal ContentKey Key => new(Digest, Width, Height);
 
         /// <summary>The 128-bit hash of the pixels; what the encoders describe a cell by.</summary>
-        internal UInt128 Digest => _digest;
+        internal UInt128 Digest { get; }
 
         /// <summary>
         ///     The opaque color covering most of the cell, computed on first use. Where a cell needs a

@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 

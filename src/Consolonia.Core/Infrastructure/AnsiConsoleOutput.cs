@@ -35,9 +35,6 @@ namespace Consolonia.Core.Infrastructure
 
         private const int InitialFrameBytes = 64 * 1024;
 
-        /// <summary>The longest frame written so far: what a frame that outgrows the buffer is likely to need.</summary>
-        private int _largestFrameBytes = InitialFrameBytes;
-
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
@@ -82,6 +79,9 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>Console.Out as installed over <see cref="_stream" />: anything else means it was redirected.</summary>
         private TextWriter _installedOut;
+
+        /// <summary>The longest frame written so far: what a frame that outgrows the buffer is likely to need.</summary>
+        private int _largestFrameBytes = InitialFrameBytes;
 
         private Color _lastBackground = Colors.Transparent;
         private bool _lastBackgroundIsDefault;
@@ -152,154 +152,6 @@ namespace Consolonia.Core.Infrastructure
             WriteTextCell(position, in pixel, false);
         }
 
-        /// <summary>
-        ///     An image cell as the text cell a terminal without an image protocol shows for it: a block
-        ///     glyph in the picture's colors, under the cell's paint, with the cell's own glyph kept if it
-        ///     has one.
-        /// </summary>
-        private Pixel AsQuadCell(in Pixel pixel)
-        {
-            CellImage image = pixel.Background.Image;
-            Pixel quad = QuadPixelBitmapRenderer.FromPixels(image.Bgra, image.Width, image.Height,
-                Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
-            Color paint = pixel.Background.Color;
-            var painted = new Pixel(
-                new PixelForeground(quad.Foreground.Symbol,
-                    PixelBackground.ColorOver(paint, quad.Foreground.Color)),
-                new PixelBackground(PixelBackground.ColorOver(paint, quad.Background.Color)),
-                pixel.CaretStyle);
-            return pixel.Foreground.IsNothingToDraw() || pixel.Foreground.Symbol.IsBlank()
-                ? painted
-                : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
-        }
-
-        /// <summary>
-        ///     Writes a cell as a glyph in colors. With <paramref name="defaultBackground" /> the cell gets the
-        ///     terminal's default background rather than its color: for a cell over a kitty placement, which
-        ///     Konsole hides under any explicit cell background (see <see cref="KittyConsoleImageEncoder" />).
-        /// </summary>
-        internal void WriteTextCell(PixelBufferCoordinate position, in Pixel pixel, bool defaultBackground)
-        {
-            //todo: performance of retrieval of the service, at least can be retrieved once
-            Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
-
-            SetCaretPosition(position);
-
-            if (pixel.Foreground.TextDecoration != _lastTextDecoration)
-            {
-                // reset previous decoration
-                WriteText(_lastTextDecoration switch
-                {
-                    TextDecorationLocation.Strikethrough => Esc.NoStrikethrough,
-                    TextDecorationLocation.Underline => Esc.NoUnderline,
-                    _ => string.Empty
-                });
-
-                // Add new decoration
-                WriteText(pixel.Foreground.TextDecoration switch
-                {
-                    TextDecorationLocation.Underline => Esc.Underline,
-                    TextDecorationLocation.Strikethrough => Esc.Strikethrough,
-                    _ => string.Empty
-                });
-                _lastTextDecoration = pixel.Foreground.TextDecoration;
-            }
-
-            FontStyle style = pixel.Foreground.Style ?? FontStyle.Normal;
-            if (style != _lastStyle)
-            {
-                //reset previous style
-                WriteText(_lastStyle switch
-                {
-                    FontStyle.Italic => Esc.NoItalic,
-                    _ => string.Empty
-                });
-
-                WriteText(style switch
-                {
-                    FontStyle.Italic => Esc.Italic,
-                    _ => string.Empty
-                });
-                _lastStyle = style;
-            }
-
-            FontWeight weight = pixel.Foreground.Weight ?? FontWeight.Normal;
-            if (weight != _lastWeight)
-            {
-                WriteText(weight switch
-                {
-                    FontWeight.Bold or FontWeight.SemiBold or FontWeight.ExtraBold or FontWeight.Black =>
-                        Esc.Bold,
-                    FontWeight.Thin or FontWeight.ExtraLight or FontWeight.Light =>
-                        Esc.Dim,
-                    _ => Esc.Normal
-                });
-                _lastWeight = weight;
-            }
-
-            bool backgroundChanged = defaultBackground
-                ? !_lastBackgroundIsDefault
-                : pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault;
-
-            if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
-            {
-                // an image cell's color is the paint over the picture, not a background the console could map
-                (object mappedBackground, object mappedForeground) =
-                    consoleColorMode.Value.MapColors(defaultBackground ? Colors.Black : pixel.Background.Color,
-                        pixel.Foreground.Color, pixel.Foreground.Weight);
-                if (pixel.Foreground.Color != _lastForeground)
-                {
-                    if (weight is not FontWeight.Bold
-                        and not FontWeight.Black
-                        and not FontWeight.SemiBold
-                        and not FontWeight.ExtraBold)
-                        DarkColorInSomeTerminalsRequiresSwitchToNormalWorkAround(mappedForeground);
-
-                    WriteText(Esc.Foreground(mappedForeground));
-                    _lastForeground = pixel.Foreground.Color;
-                }
-
-                if (backgroundChanged && defaultBackground)
-                {
-                    WriteText(Esc.DefaultBackground);
-                    _lastBackgroundIsDefault = true;
-                }
-                else if (backgroundChanged)
-                {
-                    WriteText(Esc.Background(mappedBackground));
-                    _lastBackground = pixel.Background.Color;
-                    _lastBackgroundIsDefault = false;
-                }
-            }
-
-            if (pixel.Width > 1)
-            {
-                // We write out blank chars because we don't know how many cells will be rendered by the terminal
-                // then we draw the complex glyph on top of the blank chars.
-                WriteText(new string(' ', pixel.Width));
-                SetCaretPositionInternal(position);
-            }
-
-            if (pixel.Foreground.Symbol.Complex != null)
-                WriteText(pixel.Foreground.Symbol.Complex);
-            else
-                WriteChar(pixel.Foreground.Symbol.Character);
-
-            position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
-            if (pixel.Width > 1 || pixel.Foreground.Symbol.Complex != null)
-                // then we force set the next position to where we want to be because again
-                // we can't rely on the terminal to advance the caret correctly.
-            {
-                SetCaretPositionInternal(position);
-            }
-            else
-            {
-                if (position.X >= Size.Width) position = new PixelBufferCoordinate(0, (ushort)(position.Y + 1));
-
-                _headBufferPoint = position;
-            }
-        }
-
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
@@ -359,28 +211,6 @@ namespace Consolonia.Core.Infrastructure
             AppendBytes(ascii);
         }
 
-        /// <summary>
-        ///     Writes an image's escape sequence at <paramref name="position" />, covering
-        ///     <paramref name="cellsWide" /> cells of the row.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        internal void WriteImageBytes(PixelBufferCoordinate position, ReadOnlySpan<byte> bytes, int cellsWide)
-        {
-            WaitPauseTaskIfNecessary();
-
-            // Always an explicit cursor move. After a glyph in the last column the position is modelled as
-            // the start of the next row, but the terminal's cursor is still on the old row with a pending
-            // wrap that only the next printable character resolves; an image is not one, so without the
-            // move it would land a row up. Eight bytes against a payload of kilobytes.
-            SetCaretPositionInternal(position);
-
-            // image payloads are strictly ASCII (sixel data bytes are 0x3F..0x7E): the bytes go out as they are
-            AppendBytes(bytes);
-
-            var newPosition = new PixelBufferCoordinate((ushort)(position.X + cellsWide), position.Y);
-            SetCaretPositionInternal(newPosition);
-        }
-
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void BeginFrame()
         {
@@ -407,21 +237,6 @@ namespace Consolonia.Core.Infrastructure
             _lastTextDecoration = null;
             _lastWeight = null;
             _imageEncoder?.Reset();
-        }
-
-        /// <summary>
-        ///     The encoder for the image protocol the capabilities name, kitty before sixel, or null when
-        ///     they name none: the probe's answer and nothing else.
-        /// </summary>
-        private IConsoleImageEncoder CreateImageEncoder()
-        {
-            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
-                return new KittyConsoleImageEncoder(this);
-
-            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
-                return new SixelConsoleImageEncoder(this);
-
-            return null;
         }
 
         /// <summary>
@@ -585,6 +400,191 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        /// <summary>
+        ///     An image cell as the text cell a terminal without an image protocol shows for it: a block
+        ///     glyph in the picture's colors, under the cell's paint, with the cell's own glyph kept if it
+        ///     has one.
+        /// </summary>
+        private Pixel AsQuadCell(in Pixel pixel)
+        {
+            CellImage image = pixel.Background.Image;
+            Pixel quad = QuadPixelBitmapRenderer.FromPixels(image.Bgra, image.Width, image.Height,
+                Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
+            Color paint = pixel.Background.Color;
+            var painted = new Pixel(
+                new PixelForeground(quad.Foreground.Symbol,
+                    PixelBackground.ColorOver(paint, quad.Foreground.Color)),
+                new PixelBackground(PixelBackground.ColorOver(paint, quad.Background.Color)),
+                pixel.CaretStyle);
+            return pixel.Foreground.IsNothingToDraw() || pixel.Foreground.Symbol.IsBlank()
+                ? painted
+                : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
+        }
+
+        /// <summary>
+        ///     Writes a cell as a glyph in colors. With <paramref name="defaultBackground" /> the cell gets the
+        ///     terminal's default background rather than its color: for a cell over a kitty placement, which
+        ///     Konsole hides under any explicit cell background (see <see cref="KittyConsoleImageEncoder" />).
+        /// </summary>
+        internal void WriteTextCell(PixelBufferCoordinate position, in Pixel pixel, bool defaultBackground)
+        {
+            //todo: performance of retrieval of the service, at least can be retrieved once
+            Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
+
+            SetCaretPosition(position);
+
+            if (pixel.Foreground.TextDecoration != _lastTextDecoration)
+            {
+                // reset previous decoration
+                WriteText(_lastTextDecoration switch
+                {
+                    TextDecorationLocation.Strikethrough => Esc.NoStrikethrough,
+                    TextDecorationLocation.Underline => Esc.NoUnderline,
+                    _ => string.Empty
+                });
+
+                // Add new decoration
+                WriteText(pixel.Foreground.TextDecoration switch
+                {
+                    TextDecorationLocation.Underline => Esc.Underline,
+                    TextDecorationLocation.Strikethrough => Esc.Strikethrough,
+                    _ => string.Empty
+                });
+                _lastTextDecoration = pixel.Foreground.TextDecoration;
+            }
+
+            FontStyle style = pixel.Foreground.Style ?? FontStyle.Normal;
+            if (style != _lastStyle)
+            {
+                //reset previous style
+                WriteText(_lastStyle switch
+                {
+                    FontStyle.Italic => Esc.NoItalic,
+                    _ => string.Empty
+                });
+
+                WriteText(style switch
+                {
+                    FontStyle.Italic => Esc.Italic,
+                    _ => string.Empty
+                });
+                _lastStyle = style;
+            }
+
+            FontWeight weight = pixel.Foreground.Weight ?? FontWeight.Normal;
+            if (weight != _lastWeight)
+            {
+                WriteText(weight switch
+                {
+                    FontWeight.Bold or FontWeight.SemiBold or FontWeight.ExtraBold or FontWeight.Black =>
+                        Esc.Bold,
+                    FontWeight.Thin or FontWeight.ExtraLight or FontWeight.Light =>
+                        Esc.Dim,
+                    _ => Esc.Normal
+                });
+                _lastWeight = weight;
+            }
+
+            bool backgroundChanged = defaultBackground
+                ? !_lastBackgroundIsDefault
+                : pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault;
+
+            if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
+            {
+                // an image cell's color is the paint over the picture, not a background the console could map
+                (object mappedBackground, object mappedForeground) =
+                    consoleColorMode.Value.MapColors(defaultBackground ? Colors.Black : pixel.Background.Color,
+                        pixel.Foreground.Color, pixel.Foreground.Weight);
+                if (pixel.Foreground.Color != _lastForeground)
+                {
+                    if (weight is not FontWeight.Bold
+                        and not FontWeight.Black
+                        and not FontWeight.SemiBold
+                        and not FontWeight.ExtraBold)
+                        DarkColorInSomeTerminalsRequiresSwitchToNormalWorkAround(mappedForeground);
+
+                    WriteText(Esc.Foreground(mappedForeground));
+                    _lastForeground = pixel.Foreground.Color;
+                }
+
+                if (backgroundChanged && defaultBackground)
+                {
+                    WriteText(Esc.DefaultBackground);
+                    _lastBackgroundIsDefault = true;
+                }
+                else if (backgroundChanged)
+                {
+                    WriteText(Esc.Background(mappedBackground));
+                    _lastBackground = pixel.Background.Color;
+                    _lastBackgroundIsDefault = false;
+                }
+            }
+
+            if (pixel.Width > 1)
+            {
+                // We write out blank chars because we don't know how many cells will be rendered by the terminal
+                // then we draw the complex glyph on top of the blank chars.
+                WriteText(new string(' ', pixel.Width));
+                SetCaretPositionInternal(position);
+            }
+
+            if (pixel.Foreground.Symbol.Complex != null)
+                WriteText(pixel.Foreground.Symbol.Complex);
+            else
+                WriteChar(pixel.Foreground.Symbol.Character);
+
+            position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
+            if (pixel.Width > 1 || pixel.Foreground.Symbol.Complex != null)
+                // then we force set the next position to where we want to be because again
+                // we can't rely on the terminal to advance the caret correctly.
+            {
+                SetCaretPositionInternal(position);
+            }
+            else
+            {
+                if (position.X >= Size.Width) position = new PixelBufferCoordinate(0, (ushort)(position.Y + 1));
+
+                _headBufferPoint = position;
+            }
+        }
+
+        /// <summary>
+        ///     Writes an image's escape sequence at <paramref name="position" />, covering
+        ///     <paramref name="cellsWide" /> cells of the row.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        internal void WriteImageBytes(PixelBufferCoordinate position, ReadOnlySpan<byte> bytes, int cellsWide)
+        {
+            WaitPauseTaskIfNecessary();
+
+            // Always an explicit cursor move. After a glyph in the last column the position is modelled as
+            // the start of the next row, but the terminal's cursor is still on the old row with a pending
+            // wrap that only the next printable character resolves; an image is not one, so without the
+            // move it would land a row up. Eight bytes against a payload of kilobytes.
+            SetCaretPositionInternal(position);
+
+            // image payloads are strictly ASCII (sixel data bytes are 0x3F..0x7E): the bytes go out as they are
+            AppendBytes(bytes);
+
+            var newPosition = new PixelBufferCoordinate((ushort)(position.X + cellsWide), position.Y);
+            SetCaretPositionInternal(newPosition);
+        }
+
+        /// <summary>
+        ///     The encoder for the image protocol the capabilities name, kitty before sixel, or null when
+        ///     they name none: the probe's answer and nothing else.
+        /// </summary>
+        private IConsoleImageEncoder CreateImageEncoder()
+        {
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
+                return new KittyConsoleImageEncoder(this);
+
+            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+                return new SixelConsoleImageEncoder(this);
+
+            return null;
         }
 
         private static void DumpFrame(ReadOnlySpan<byte> frame)

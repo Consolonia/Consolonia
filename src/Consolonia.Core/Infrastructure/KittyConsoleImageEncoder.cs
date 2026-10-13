@@ -5,7 +5,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Avalonia;
-using Avalonia.Media;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -21,17 +20,21 @@ namespace Consolonia.Core.Infrastructure
     ///     image id and placed at its cells.
     /// </summary>
     /// <remarks>
-    ///     <para>Blocks, because kitty cannot portably change part of an image once transmitted, so the
-    ///     image is the unit of retransmission: one image per picture meant a brush stroke re-sent the
-    ///     whole picture. A block of a few cells is the compromise between how many images a screen is
-    ///     and how much a change re-sends.</para>
-    ///     <para>One image id per block position, for the life of the session. Transmitting under an id
-    ///     the terminal already holds replaces that image and every placement of it, so a block that
-    ///     changed is sent again and its old picture is gone with no delete, and the terminal never holds
-    ///     more images than the screen has blocks. Nothing is ever placed that was not transmitted in the
-    ///     same frame, so no placement can name an image the terminal has dropped. The earlier encoder
-    ///     kept images by content and placed them again by id, and a terminal that had trimmed one left a
-    ///     hole; the only state here is what each position was last sent, which is this encoder's own.</para>
+    ///     <para>
+    ///         Blocks, because kitty cannot portably change part of an image once transmitted, so the
+    ///         image is the unit of retransmission: one image per picture meant a brush stroke re-sent the
+    ///         whole picture. A block of a few cells is the compromise between how many images a screen is
+    ///         and how much a change re-sends.
+    ///     </para>
+    ///     <para>
+    ///         One image id per block position, for the life of the session. Transmitting under an id
+    ///         the terminal already holds replaces that image and every placement of it, so a block that
+    ///         changed is sent again and its old picture is gone with no delete, and the terminal never holds
+    ///         more images than the screen has blocks. Nothing is ever placed that was not transmitted in the
+    ///         same frame, so no placement can name an image the terminal has dropped. The earlier encoder
+    ///         kept images by content and placed them again by id, and a terminal that had trimmed one left a
+    ///         hole; the only state here is what each position was last sent, which is this encoder's own.
+    ///     </para>
     /// </remarks>
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
         Justification = "The MemoryStream is over a managed array and holds nothing a Dispose would free")]
@@ -45,8 +48,6 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>Bytes of the description of one cell in a block's key: its image's digest and its paint.</summary>
         private const int KeyBytesPerCell = 16 + 4;
 
-        private readonly AnsiConsoleOutput _output;
-
         /// <summary>What each block position was last sent: its image id and the key of the pixels placed.</summary>
         private readonly Dictionary<(int X, int Y), BlockState> _blocks = new();
 
@@ -55,27 +56,19 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>The encoded bytes of the block being transmitted: PNG or zlib. One stream, emptied per block.</summary>
         private readonly MemoryStream _encoded = new();
 
+        private readonly AnsiConsoleOutput _output;
+        private byte[] _blockKey;
+        private byte[] _blockScratch;
+        private bool[] _blockVisited;
+
         /// <summary>The platform's bitmaps, which encode PNG; looked up on the first transmit, null sends RGBA.</summary>
         private IPlatformRenderInterface _renderInterface;
 
         private bool _renderInterfaceResolved;
-        private bool[] _blockVisited;
-        private byte[] _blockKey;
-        private byte[] _blockScratch;
 
         public KittyConsoleImageEncoder(AnsiConsoleOutput output)
         {
             _output = output;
-        }
-
-        /// <summary>
-        ///     A block position's image id, for the session, and the key of what was last sent under it:
-        ///     default when the terminal holds nothing for it.
-        /// </summary>
-        private sealed class BlockState
-        {
-            public int ImageId;
-            public ContentKey Sent;
         }
 
         public void BeginFrame()
@@ -329,6 +322,16 @@ namespace Consolonia.Core.Infrastructure
 
             foreach ((int X, int Y) position in _blocksToForget)
                 _blocks.Remove(position);
+        }
+
+        /// <summary>
+        ///     A block position's image id, for the session, and the key of what was last sent under it:
+        ///     default when the terminal holds nothing for it.
+        /// </summary>
+        private sealed class BlockState
+        {
+            public int ImageId;
+            public ContentKey Sent;
         }
 
         /// <summary>Image cells within one block.</summary>

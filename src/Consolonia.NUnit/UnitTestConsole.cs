@@ -6,7 +6,6 @@ using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
