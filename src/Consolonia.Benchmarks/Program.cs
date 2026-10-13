@@ -20,6 +20,12 @@ namespace Consolonia.Benchmarks
                 return;
             }
 
+            if (args.Length == 1 && args[0] == "--alloc")
+            {
+                ConsoleOutputBenchmarks.PrintAllocations();
+                return;
+            }
+
             ManualConfig config = ManualConfig.Create(DefaultConfig.Instance)
                 .WithArtifactsPath(Path.Combine(Path.GetTempPath(), "Consolonia.Benchmarks"));
             IEnumerable<Summary> _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);

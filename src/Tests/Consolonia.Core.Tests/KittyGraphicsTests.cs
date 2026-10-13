@@ -2,9 +2,10 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.Reflection;
 using System.Text;
 using Avalonia.Media;
-using Consolonia.Core.Drawing;
+using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
@@ -25,8 +26,8 @@ namespace Consolonia.Core.Tests
         [Test]
         public void AllocatedIdsStayPositiveAfterTheCounterOverflows()
         {
-            System.Reflection.FieldInfo counter = typeof(KittyGraphics).GetField("_nextImageId",
-                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            FieldInfo counter = typeof(KittyGraphics).GetField("_nextImageId",
+                BindingFlags.Static | BindingFlags.NonPublic);
             Assert.That(counter, Is.Not.Null, "_nextImageId has been renamed; this test needs updating");
             object saved = counter!.GetValue(null);
             try

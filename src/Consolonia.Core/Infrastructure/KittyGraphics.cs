@@ -11,7 +11,7 @@ using System.Text.Unicode;
 using System.Threading;
 using Avalonia.Media;
 
-namespace Consolonia.Core.Drawing
+namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
     ///     Pixel data formats of the kitty graphics protocol (the f key of a transmit command).
@@ -26,10 +26,9 @@ namespace Consolonia.Core.Drawing
     }
 
     /// <summary>
-    ///     Helpers for the kitty graphics protocol (https://sw.kovidgoyal.net/kitty/graphics-protocol/).
-    ///     An image is transmitted once and shown through classic placements: each covered cell
-    ///     carries a <see cref="PixelBufferImplementation.KittyTile" /> in its background, and
-    ///     RenderTarget coalesces those into placements cropped from the image, below text.
+    ///     The byte sequences of the kitty graphics protocol (https://sw.kovidgoyal.net/kitty/graphics-protocol/):
+    ///     transmits, placements and deletes, and the ids they name. How they are used is
+    ///     <see cref="KittyConsoleImageEncoder" />'s.
     /// </summary>
     internal static class KittyGraphics
     {
@@ -57,6 +56,9 @@ namespace Consolonia.Core.Drawing
         ///     backdrop over a picture), above the image and still below text.
         /// </summary>
         public const int WashPlacementZIndex = -1;
+
+        /// <summary>Payload bytes per chunk: exactly <see cref="MaxChunkSize" /> base64 characters.</summary>
+        private const int RawChunkSize = MaxChunkSize / 4 * 3;
 
         // Kept in the range 1..int.MaxValue (0 is not a valid id; the protocol allows 32 bits). The wider
         // the range, the longer before a wrapped id lands on an image still shown: re-transmitting an id
@@ -101,11 +103,9 @@ namespace Consolonia.Core.Drawing
         ///     the image carries its own dimensions) or raw 32 bit RGBA (f=32), the latter optionally
         ///     zlib compressed (o=z).
         /// </summary>
-        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight, byte[] data,
-            KittyImageFormat format, bool zlibCompressed = false)
+        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight,
+            ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed = false)
         {
-            ArgumentNullException.ThrowIfNull(data);
-
             byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
             try
             {
@@ -123,11 +123,10 @@ namespace Consolonia.Core.Drawing
         ///     Writes the transmit sequence of <see cref="BuildTransmitSequence" /> to <paramref name="console" />
         ///     as bytes: a payload of megabytes is never turned into text and back.
         /// </summary>
-        public static void WriteTransmitSequence(Infrastructure.IConsoleOutput console, int imageId, int pixelWidth,
-            int pixelHeight, byte[] data, KittyImageFormat format, bool zlibCompressed = false)
+        public static void WriteTransmitSequence(IConsoleOutput console, int imageId, int pixelWidth,
+            int pixelHeight, ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed = false)
         {
             ArgumentNullException.ThrowIfNull(console);
-            ArgumentNullException.ThrowIfNull(data);
 
             byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
             try
@@ -141,9 +140,6 @@ namespace Consolonia.Core.Drawing
                 ArrayPool<byte>.Shared.Return(sequence);
             }
         }
-
-        /// <summary>Payload bytes per chunk: exactly <see cref="MaxChunkSize" /> base64 characters.</summary>
-        private const int RawChunkSize = MaxChunkSize / 4 * 3;
 
         private static int MaxTransmitLength(int dataLength)
         {

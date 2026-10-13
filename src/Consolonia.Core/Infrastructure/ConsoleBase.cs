@@ -9,7 +9,6 @@ using Avalonia.Input;
 using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers;
 using Consolonia.Core.Text;
@@ -240,9 +239,19 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
-        public virtual void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
+        public virtual void BeginFrame()
         {
-            _consoleOutput.WriteSixel(position, sixel);
+            _consoleOutput.BeginFrame();
+        }
+
+        public virtual void EndFrame(PixelBuffer screen)
+        {
+            _consoleOutput.EndFrame(screen);
+        }
+
+        public virtual void ResetCache()
+        {
+            _consoleOutput.ResetCache();
         }
 
         public virtual void WriteText(string str)

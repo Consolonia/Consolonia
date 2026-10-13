@@ -14,5 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
+    <!-- the frame benchmarks run a whole frame on the unit test console -->
+    <ProjectReference Include="..\Consolonia.Fonts\Consolonia.Fonts.csproj" />
+    <ProjectReference Include="..\Consolonia.NUnit\Consolonia.NUnit.csproj" />
   </ItemGroup>
 </Project>

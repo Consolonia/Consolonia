@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using Consolonia.Core.Drawing;
+using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
@@ -22,12 +22,12 @@ namespace Consolonia.Core.Tests
             byte[] palette = { 0, 0, 0, 255 };
             byte[] pixels = new byte[Width * Height];
 
-            Assert.Throws<ArgumentException>(() => new Sixel(palette, 1, new byte[Width * Height - 1],
+            Assert.Throws<ArgumentException>(() => _ = new Sixel(palette, 1, new byte[Width * Height - 1],
                 Width, Height, Width, Height));
-            Assert.Throws<ArgumentException>(() => new Sixel(palette, 2, pixels, Width, Height, Width, Height));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new Sixel(palette, 0, pixels, Width, Height, Width,
+            Assert.Throws<ArgumentException>(() => _ = new Sixel(palette, 2, pixels, Width, Height, Width, Height));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _ = new Sixel(palette, 0, pixels, Width, Height, Width,
                 Height));
-            Assert.Throws<ArgumentOutOfRangeException>(() => new Sixel(new byte[257 * 4], 257, pixels, Width,
+            Assert.Throws<ArgumentOutOfRangeException>(() => _ = new Sixel(new byte[257 * 4], 257, pixels, Width,
                 Height, Width, Height));
             Assert.That(new Sixel(palette, 1, pixels, Width, Height, Width, Height).Width, Is.EqualTo(Width));
         }
@@ -58,7 +58,7 @@ namespace Consolonia.Core.Tests
                 twoColors[i + 3] = 0xFF;
             }
 
-            Sixel exact = Sixel.CreateFromBitmap(twoColors, Width, Height, Width, Height);
+            var exact = Sixel.CreateFromBitmap(twoColors, Width, Height, Width, Height);
             Assert.That(exact.PaletteCount, Is.EqualTo(2));
             Assert.That(exact.Pixels[0], Is.Not.EqualTo(exact.Pixels[1]));
 
@@ -66,13 +66,47 @@ namespace Consolonia.Core.Tests
             for (int i = 0; i < manyColors.Length; i += 4)
             {
                 manyColors[i] = (byte)(i / 4);
-                manyColors[i + 1] = (byte)(i / 4 >> 6);
-                manyColors[i + 2] = (byte)(i / 4 >> 3);
+                manyColors[i + 1] = (byte)((i / 4) >> 6);
+                manyColors[i + 2] = (byte)((i / 4) >> 3);
                 manyColors[i + 3] = 0xFF;
             }
 
-            Sixel quantized = Sixel.CreateFromBitmap(manyColors, 64, 64, Width, Height);
+            var quantized = Sixel.CreateFromBitmap(manyColors, 64, 64, Width, Height);
             Assert.That(quantized.PaletteCount, Is.InRange(2, 256));
+        }
+
+        /// <summary>
+        ///     A cell uses a few colors of a palette shared by a whole run; only those are defined in its
+        ///     escape sequence.
+        /// </summary>
+        [Test]
+        public void RenderDefinesOnlyTheColorsTheImageUses()
+        {
+            byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 255, 255 };
+            byte[] pixels = new byte[Width * Height];
+            Array.Fill(pixels, (byte)1);
+
+            string rendered = Encoding.ASCII.GetString(
+                new Sixel(palette, 3, pixels, Width, Height, Width, Height).Render());
+
+            Assert.That(rendered, Does.Contain("#1;2;100;100;100"));
+            Assert.That(rendered, Does.Not.Contain("#0;2;"));
+            Assert.That(rendered, Does.Not.Contain("#2;2;"));
+        }
+
+        [Test]
+        public void ATransientImageRendersTheSameBytesWithoutKeepingThem()
+        {
+            byte[] palette = { 0, 0, 0, 255, 255, 255, 255, 255 };
+            byte[] pixels = new byte[Width * Height];
+            pixels[3] = 1;
+
+            string kept = Encoding.ASCII.GetString(
+                new Sixel(palette, 2, pixels, Width, Height, Width, Height).Render());
+            var transient = new Sixel(palette, 2, pixels, Width, Height, Width, Height)
+                { IsTransient = true };
+
+            Assert.That(Encoding.ASCII.GetString(transient.Render()), Is.EqualTo(kept));
         }
     }
 }

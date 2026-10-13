@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
@@ -16,10 +15,6 @@ namespace Consolonia.Core.Tests
     [NonParallelizable] // Console.Out is process-wide
     public sealed class AnsiConsoleOutputWriteTests : IDisposable
     {
-        private TextWriter _originalOut;
-        private MemoryStream _stream;
-        private AnsiConsoleOutput _output;
-
         [SetUp]
         public void Setup()
         {
@@ -35,6 +30,10 @@ namespace Consolonia.Core.Tests
             Console.SetOut(_originalOut);
             Dispose();
         }
+
+        private TextWriter _originalOut;
+        private MemoryStream _stream;
+        private AnsiConsoleOutput _output;
 
         public void Dispose()
         {

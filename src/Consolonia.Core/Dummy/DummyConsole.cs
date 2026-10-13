@@ -1,7 +1,5 @@
-using System;
 using System.Runtime.CompilerServices;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
@@ -64,10 +62,6 @@ namespace Consolonia.Core.Dummy
         }
 
         public void SetTitle(string title)
-        {
-        }
-
-        public void WriteSixel(PixelBufferCoordinate position, Sixel sixel)
         {
         }
 

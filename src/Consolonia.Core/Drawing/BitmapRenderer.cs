@@ -5,7 +5,9 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
 
 namespace Consolonia.Core.Drawing
 {
@@ -22,24 +24,44 @@ namespace Consolonia.Core.Drawing
     // ReSharper restore NotAccessedPositionalProperty.Global
 
     /// <summary>
-    ///     Strategy for drawing a bitmap into the pixel buffer. A renderer is selected once per drawing context
-    ///     based on the console capabilities and owns whatever caching its image protocol needs.
+    ///     Strategy for drawing a bitmap into the pixel buffer. One renderer serves a terminal (the render
+    ///     target keeps it, the drawing contexts borrow it), chosen by the console's capabilities. A
+    ///     console with an image protocol gets cells showing a <see cref="CellImage" />, which its output
+    ///     encodes; any other gets text cells.
     /// </summary>
     internal abstract class BitmapRenderer
     {
-        protected BitmapRenderer(DrawingContextImpl context)
+        protected BitmapRenderer(IConsoleOutput console)
         {
-            Context = context;
+            ConsoleOutput = console;
         }
 
-        protected DrawingContextImpl Context { get; }
+        /// <summary>The console the pictures go to: its cell size and capabilities.</summary>
+        protected IConsoleOutput ConsoleOutput { get; }
 
         /// <summary>
-        ///     Draws <paramref name="source" /> into the pixel buffer over <paramref name="targetRect" /> (cell
-        ///     coordinates), limited to the visible <paramref name="intersectedRect" />, and tracks dirty regions.
+        ///     The renderer for the console (capabilities are detected in PrepareConsole): cell images when
+        ///     the console can show pictures, block glyphs otherwise.
         /// </summary>
-        public abstract void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode);
+        internal static BitmapRenderer Create(IConsoleOutput console)
+        {
+            ConsoleCapabilities capabilities = console.Capabilities;
+
+            if (capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics) ||
+                capabilities.HasFlag(ConsoleCapabilities.SupportsSixel))
+                return new CellImageBitmapRenderer(console);
+
+            return new QuadPixelBitmapRenderer(console);
+        }
+
+        /// <summary>
+        ///     Draws <paramref name="source" /> into the pixel buffer of <paramref name="context" /> over
+        ///     <paramref name="targetRect" /> (cell coordinates), limited to the visible
+        ///     <paramref name="intersectedRect" />, and tracks dirty regions.
+        /// </summary>
+        public abstract void Draw(DrawingContextImpl context, IBitmapImpl source,
+            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
+            BitmapInterpolationMode interpolationMode);
 
         /// <summary>
         ///     The part of <paramref name="targetRect" /> on screen, in cells relative to the target: what a
@@ -49,12 +71,12 @@ namespace Consolonia.Core.Drawing
         ///     The screen, not the clip. A partial redraw (a dialog opening over the picture, say) clips to
         ///     the region being redrawn, and rendering by that clip made a rendering per redraw region. The
         ///     cells outside it still showed the earlier rendering, and once the cache evicted that one, the
-        ///     kitty renderer deleted its image and those cells went blank. The screen bounds the size just
+        ///     image protocol deleted its image and those cells went blank. The screen bounds the size just
         ///     as well, and stays the same however the picture is redrawn.
         /// </remarks>
-        protected PixelRect OnScreenCellsInTarget(PixelRect targetRect)
+        protected static PixelRect OnScreenCellsInTarget(DrawingContextImpl context, PixelRect targetRect)
         {
-            var screen = new PixelRect(0, 0, Context.PixelBuffer.Width, Context.PixelBuffer.Height);
+            var screen = new PixelRect(0, 0, context.PixelBuffer.Width, context.PixelBuffer.Height);
             PixelRect onScreen = screen.Intersect(targetRect);
             return new PixelRect(onScreen.X - targetRect.X, onScreen.Y - targetRect.Y,
                 onScreen.Width, onScreen.Height);
@@ -76,9 +98,14 @@ namespace Consolonia.Core.Drawing
         ///     Copies the pixels <paramref name="source" /> shows in <paramref name="visible" /> when it is drawn
         ///     at <paramref name="targetSize" /> into <paramref name="destination" />, as tightly packed BGRA rows.
         /// </summary>
+        /// <param name="source">The picture.</param>
+        /// <param name="renderInterface">Scales the picture when it is not drawn at its own size.</param>
+        /// <param name="targetSize">The size in pixels the whole picture is drawn at.</param>
+        /// <param name="visible">The part of the drawn picture to copy, in pixels of <paramref name="targetSize" />.</param>
+        /// <param name="interpolationMode">How the picture is scaled.</param>
         /// <param name="destination">
-        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a rendering refilled on every edit of
-        ///     a picture keeps one rather than allocating a screen of pixels each time.
+        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a renderer refilling a rendering on
+        ///     every edit of a picture keeps one rather than allocating a screen of pixels each time.
         /// </param>
         /// <exception cref="NotSupportedException">
         ///     The scaled pixels are not 32 bits each. Only BGRA and RGBA (converted) are read.
@@ -93,7 +120,7 @@ namespace Consolonia.Core.Drawing
         ///     picture would vanish rather than show its visible part.
         /// </remarks>
         internal static void GetVisiblePixels(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelSize targetSize, PixelRect visible, BitmapInterpolationMode interpolationMode, byte[] destination)
+            PixelSize targetSize, PixelRect visible, BitmapInterpolationMode interpolationMode, Span<byte> destination)
         {
             if (destination.Length != visible.Width * visible.Height * 4)
                 throw new ArgumentException("The destination is not the size of the visible pixels.",
@@ -141,10 +168,11 @@ namespace Consolonia.Core.Drawing
         }
 
         private static unsafe void CopyWindow(ILockedFramebuffer frame, int x, int y, int width, int height,
-            byte[] window)
+            Span<byte> window)
         {
             if (frame.Format.BitsPerPixel != 32)
-                throw new NotSupportedException($"Bitmaps with {frame.Format.BitsPerPixel} bits per pixel are not supported.");
+                throw new NotSupportedException(
+                    $"Bitmaps with {frame.Format.BitsPerPixel} bits per pixel are not supported.");
 
             ReadOnlySpan<byte> pixels = MemoryMarshal.CreateReadOnlySpan(
                 ref Unsafe.AsRef<byte>((void*)frame.Address), frame.RowBytes * frame.Size.Height);
@@ -170,53 +198,36 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Copies the visible part of a rendered per-cell bitmap into the pixel buffer,
-        ///     tracking only the cells that actually changed as dirty (in horizontal runs).
+        ///     Blends the visible part of a rendered per-cell bitmap into the pixel buffer and marks it
+        ///     dirty, as every drawing operation does. Cells that did not change are not written to the
+        ///     terminal again: the render target compares each dirty cell with what it last wrote.
         /// </summary>
-        protected void CopyRenderedBitmapTrackingDirtyRegions(PixelBuffer renderedBitmap,
-            PixelRect intersectedRect, PixelRect visibleRectInTarget)
+        /// <param name="context">The drawing context whose pixel buffer takes the cells.</param>
+        /// <param name="renderedBitmap">The rendering, one cell per cell.</param>
+        /// <param name="intersectedRect">The cells of the pixel buffer to fill.</param>
+        /// <param name="renderedOrigin">
+        ///     The cell of the rendering that goes to the top-left cell of <paramref name="intersectedRect" />.
+        /// </param>
+        protected static void CopyRenderedBitmap(DrawingContextImpl context, PixelBuffer renderedBitmap,
+            PixelRect intersectedRect, PixelPoint renderedOrigin)
         {
+            PixelBuffer pixelBuffer = context.PixelBuffer;
             for (int y = 0; y < intersectedRect.Height; y++)
+            for (int x = 0; x < intersectedRect.Width; x++)
             {
-                int dirtyRunStart = -1;
-                for (int x = 0; x < intersectedRect.Width; x++)
-                {
-                    var sourcePoint = new PixelPoint(visibleRectInTarget.X + x, visibleRectInTarget.Y + y);
-                    var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
-                    Pixel newPixel = renderedBitmap[sourcePoint];
-                    if (Context.PixelBuffer[destPoint] == newPixel)
-                    {
-                        if (dirtyRunStart >= 0)
-                        {
-                            Context.ConsoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
-                                intersectedRect.X + dirtyRunStart,
-                                intersectedRect.Y + y,
-                                x - dirtyRunStart,
-                                1));
-                            dirtyRunStart = -1;
-                        }
-
-                        continue;
-                    }
-
-                    Context.PixelBuffer[destPoint] = newPixel;
-                    if (dirtyRunStart < 0)
-                        dirtyRunStart = x;
-                }
-
-                if (dirtyRunStart >= 0)
-                    Context.ConsoleWindowImpl.DirtyRegions.AddRect(new PixelRect(
-                        intersectedRect.X + dirtyRunStart,
-                        intersectedRect.Y + y,
-                        intersectedRect.Width - dirtyRunStart,
-                        1));
+                var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
+                pixelBuffer[destPoint] = pixelBuffer[destPoint]
+                    .Blend(renderedBitmap[new PixelPoint(renderedOrigin.X + x, renderedOrigin.Y + y)]);
             }
+
+            context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
 
         /// <summary>
-        ///     Unwraps the bitmap used as identity for render caches.
+        ///     The picture itself, out of the <see cref="AspectRatioAdjustedBitmap" /> it may be wrapped in:
+        ///     the renderings are kept per picture, and a wrapper is made anew each time it is drawn.
         /// </summary>
-        protected static IBitmapImpl GetCacheBitmapImpl(IBitmapImpl bitmapImpl)
+        protected static IBitmapImpl UnwrapBitmap(IBitmapImpl bitmapImpl)
         {
             return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
                 ? adjustedBitmap.InnerBitmap
@@ -229,7 +240,13 @@ namespace Consolonia.Core.Drawing
     ///     drawing the same again reuses the rendering, a new version or a scroll refills it in place, and
     ///     only the cells that changed are copied into the pixel buffer.
     /// </summary>
-    /// <typeparam name="TRendering">What a rendering holds besides its cells and pixels.</typeparam>
+    /// <remarks>
+    ///     The pixels a rendering is made from pass through one buffer the renderer keeps, never larger than
+    ///     the screen in BGRA (only visible cells are rendered), rather than a buffer per rendering: a cell
+    ///     copies the pixels it needs, so nothing reads them once the cells are made, and a picture at four
+    ///     zoom levels kept four screens of them.
+    /// </remarks>
+    /// <typeparam name="TRendering">What a rendering holds besides its cells.</typeparam>
     internal abstract class CellBitmapRenderer<TRendering> : BitmapRenderer
         where TRendering : CellRendering, new()
     {
@@ -239,8 +256,11 @@ namespace Consolonia.Core.Drawing
         /// </summary>
         private const int MaxRenderingsPerBitmap = 4;
 
-        protected CellBitmapRenderer(DrawingContextImpl context)
-            : base(context)
+        /// <summary>The visible pixels of the picture being rendered; see the remarks.</summary>
+        private byte[] _pixels;
+
+        protected CellBitmapRenderer(IConsoleOutput console)
+            : base(console)
         {
         }
 
@@ -249,11 +269,11 @@ namespace Consolonia.Core.Drawing
             Renderings { get; }
 
         /// <summary>
-        ///     Fills <see cref="CellRendering.Cells" /> of <paramref name="rendering" />, every cell, from its
-        ///     <see cref="CellRendering.Pixels" />: BGRA rows of exactly the visible cells.
+        ///     Fills <see cref="CellRendering.Cells" /> of <paramref name="rendering" />, every cell, from
+        ///     <paramref name="pixels" />: BGRA rows of exactly the visible cells, valid for this call only.
         /// </summary>
-        protected abstract void Render(TRendering rendering, int cellPixelWidth, int cellPixelHeight,
-            IPlatformRenderInterface renderInterface);
+        protected abstract void Render(DrawingContextImpl context, TRendering rendering, ReadOnlySpan<byte> pixels,
+            int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface);
 
         /// <summary>Whether a rendering of the current version can still be shown, or must be made again.</summary>
         protected virtual bool IsReusable(TRendering rendering)
@@ -261,33 +281,37 @@ namespace Consolonia.Core.Drawing
             return true;
         }
 
-        public sealed override void Draw(IBitmapImpl source, IPlatformRenderInterface renderInterface,
-            PixelRect targetRect, PixelRect intersectedRect, BitmapInterpolationMode interpolationMode)
+        public sealed override void Draw(DrawingContextImpl context, IBitmapImpl source,
+            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
+            BitmapInterpolationMode interpolationMode)
         {
-            int cellPixelWidth = Context.ConsoleWindowImpl.Console.CellPixelWidth;
-            int cellPixelHeight = Context.ConsoleWindowImpl.Console.CellPixelHeight;
+            int cellPixelWidth = ConsoleOutput.CellPixelWidth;
+            int cellPixelHeight = ConsoleOutput.CellPixelHeight;
 
             var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
                 targetRect.Height * cellPixelHeight);
-            PixelRect visibleCells = OnScreenCellsInTarget(targetRect);
-            IBitmapImpl bitmap = GetCacheBitmapImpl(source);
+            PixelRect visibleCells = OnScreenCellsInTarget(context, targetRect);
+            IBitmapImpl bitmap = UnwrapBitmap(source);
 
             TRendering rendering = FindOrAdd(Renderings.GetOrCreateValue(bitmap),
                 new RenderingKey(targetSize, interpolationMode));
             if (!rendering.Shows(bitmap.Version, visibleCells) || !IsReusable(rendering))
             {
                 // only the visible cells are rendered, so the rendering starts at the first of them
-                rendering.Prepare(visibleCells, cellPixelWidth, cellPixelHeight);
-                GetVisiblePixels(source, renderInterface, targetSize,
-                    new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
-                        visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight),
-                    interpolationMode, rendering.Pixels);
-                Render(rendering, cellPixelWidth, cellPixelHeight, renderInterface);
+                rendering.Prepare(visibleCells);
+                var visiblePixels = new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
+                    visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight);
+                int pixelBytes = visiblePixels.Width * visiblePixels.Height * 4;
+                if (_pixels == null || _pixels.Length < pixelBytes)
+                    _pixels = GC.AllocateUninitializedArray<byte>(pixelBytes);
+                Span<byte> pixels = _pixels.AsSpan(0, pixelBytes);
+                GetVisiblePixels(source, renderInterface, targetSize, visiblePixels, interpolationMode, pixels);
+                Render(context, rendering, pixels, cellPixelWidth, cellPixelHeight, renderInterface);
                 rendering.Complete(bitmap.Version);
             }
 
-            CopyRenderedBitmapTrackingDirtyRegions(rendering.Cells, intersectedRect,
-                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect));
+            CopyRenderedBitmap(context, rendering.Cells, intersectedRect,
+                IntersectedRectInRendering(targetRect, visibleCells, intersectedRect).Position);
         }
 
         /// <summary>
@@ -322,10 +346,9 @@ namespace Consolonia.Core.Drawing
     }
 
     /// <summary>
-    ///     The cells a picture renders to at one size, with the pixels they were made from. A renderer
-    ///     keeps one per picture and size and refills it in place for each new version or visible part,
-    ///     so an edit allocates nothing the size of the screen: the pixel copy (8 MB for a full HD
-    ///     picture) and the cell buffer (72 bytes a cell) are made once, not once per brush stroke.
+    ///     The cells a picture renders to at one size. A renderer keeps one per picture and size and
+    ///     refills it in place for each new version or visible part, so an edit allocates nothing the size
+    ///     of the screen: the cell buffer (40 bytes a cell) is made once, not once per brush stroke.
     ///     Touched only from the render thread, like everything a renderer draws with.
     /// </summary>
     internal class CellRendering
@@ -337,12 +360,6 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>The cells of the picture the rendering covers, relative to where it is drawn.</summary>
         public PixelRect VisibleCells { get; private set; }
-
-        /// <summary>
-        ///     BGRA pixels of exactly the visible cells, row by row: what the cells were made from. Exactly
-        ///     that long, as the quantizer reads the whole array.
-        /// </summary>
-        public byte[] Pixels { get; private set; }
 
         /// <summary>One cell per visible cell.</summary>
         public PixelBuffer Cells { get; private set; }
@@ -357,18 +374,15 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Makes room for a rendering of <paramref name="visibleCells" />, keeping the buffers when their
+        ///     Makes room for a rendering of <paramref name="visibleCells" />, keeping the cells when their
         ///     size is unchanged, and shows nothing until <see cref="Complete" />: a render that throws
         ///     leaves a rendering that is made again, not one claiming to show the previous version.
         /// </summary>
-        internal void Prepare(PixelRect visibleCells, int cellPixelWidth, int cellPixelHeight)
+        internal void Prepare(PixelRect visibleCells)
         {
             _complete = false;
             VisibleCells = visibleCells;
 
-            int pixelBytes = visibleCells.Width * cellPixelWidth * visibleCells.Height * cellPixelHeight * 4;
-            if (Pixels == null || Pixels.Length != pixelBytes)
-                Pixels = GC.AllocateUninitializedArray<byte>(pixelBytes);
             if (Cells == null || Cells.Width != visibleCells.Width || Cells.Height != visibleCells.Height)
                 Cells = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
         }

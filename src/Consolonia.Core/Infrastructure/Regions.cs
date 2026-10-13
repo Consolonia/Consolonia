@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Avalonia;
 using Consolonia.Core.Drawing;
@@ -23,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
         ///     mask <paramref name="width" /> cells wide. The rectangles must lie within the mask (see
         ///     <see cref="Intersect" />).
         /// </summary>
-        public void MarkCells(System.Span<bool> cells, int width)
+        public void MarkCells(Span<bool> cells, int width)
         {
             for (int i = 0; i < _rectangles.Count; i++)
             {
