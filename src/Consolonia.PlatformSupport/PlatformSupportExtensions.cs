@@ -134,7 +134,6 @@ namespace Consolonia
                 {
                     case PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT:
                     {
-                        // if output is redirected, or we are in a pseudoconsole we use the win32 ANSI based console.
                         if (Console.IsOutputRedirected || IsPseudoConsole())
                             result = new RgbConsoleColorMode();
                         else
