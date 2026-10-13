@@ -236,7 +236,8 @@ namespace Consolonia.Core.Infrastructure
                         .CopyTo(block.Slice(cellOffset + y * blockRowBytes));
 
                 if (background.Color.A != 0)
-                    Paint(block, blockRowBytes, cellOffset, cellPixelWidth, cellPixelHeight, background.Color);
+                    CellImage.Paint(block, blockRowBytes, cellOffset, cellPixelWidth, cellPixelHeight,
+                        background.Color);
             }
 
             byte[] png = TryEncodePng(block, blockWidth, blockHeight);
@@ -260,27 +261,6 @@ namespace Consolonia.Core.Infrastructure
 
             KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, compressed.ToArray(),
                 KittyImageFormat.Rgba, true);
-        }
-
-        /// <summary>Composites <paramref name="paint" /> over the pixels of one cell of the block.</summary>
-        private static void Paint(Span<byte> bgra, int rowBytes, int cellOffset, int cellWidth, int cellHeight,
-            Color paint)
-        {
-            int alpha = paint.A;
-            int inverse = 255 - alpha;
-            int blue = paint.B * alpha;
-            int green = paint.G * alpha;
-            int red = paint.R * alpha;
-            for (int y = 0; y < cellHeight; y++)
-            {
-                int offset = cellOffset + y * rowBytes;
-                for (int x = 0; x < cellWidth; x++, offset += 4)
-                {
-                    bgra[offset] = (byte)((blue + bgra[offset] * inverse) / 255);
-                    bgra[offset + 1] = (byte)((green + bgra[offset + 1] * inverse) / 255);
-                    bgra[offset + 2] = (byte)((red + bgra[offset + 2] * inverse) / 255);
-                }
-            }
         }
 
         /// <summary>

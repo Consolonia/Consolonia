@@ -43,7 +43,6 @@ namespace Consolonia.Core.Infrastructure
             Width = width;
             Height = height;
             CellWidth = cellWidth;
-            CellHeight = cellHeight;
         }
 
         /// <summary>BGRX palette, 4 bytes per entry.</summary>
@@ -68,15 +67,17 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>Width of a single cell in pixels.</summary>
         public int CellWidth { get; }
 
-        /// <summary>Height of a single cell in pixels.</summary>
-        public int CellHeight { get; }
-
         /// <summary>Width of this image in cells.</summary>
         public int CellsWidth => Width / CellWidth;
 
         /// <summary>
         ///     Create a Sixel from raw BGRX pixel data, quantized to a palette of its own.
         /// </summary>
+        /// <param name="bgrx">The pixels, 4 bytes each; the fourth byte is ignored.</param>
+        /// <param name="width">Width of the image in pixels.</param>
+        /// <param name="height">Height of the image in pixels.</param>
+        /// <param name="cellWidth">Width of a cell in pixels.</param>
+        /// <param name="cellHeight">Height of a cell in pixels.</param>
         /// <param name="transient">Whether the image is for a single write; see <see cref="IsTransient" />.</param>
         public static Sixel CreateFromBitmap(byte[] bgrx, int width, int height, int cellWidth, int cellHeight,
             bool transient = false)

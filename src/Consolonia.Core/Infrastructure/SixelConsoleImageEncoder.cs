@@ -172,7 +172,7 @@ namespace Consolonia.Core.Infrastructure
                             .CopyTo(bgra.AsSpan(y * frameRowBytes + column * cellRowBytes, cellRowBytes));
 
                     if (cell.Paint.A != 0)
-                        Paint(bgra, frameRowBytes, column * cellRowBytes, cellWidth, cellHeight, cell.Paint);
+                        CellImage.Paint(bgra, frameRowBytes, column * cellRowBytes, cellWidth, cellHeight, cell.Paint);
                 }
             }
 
@@ -198,25 +198,5 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        /// <summary>Composites <paramref name="paint" /> over the pixels of one cell of the frame image.</summary>
-        private static void Paint(byte[] bgra, int rowBytes, int cellOffset, int cellWidth, int cellHeight,
-            Color paint)
-        {
-            int alpha = paint.A;
-            int inverse = 255 - alpha;
-            int blue = paint.B * alpha;
-            int green = paint.G * alpha;
-            int red = paint.R * alpha;
-            for (int y = 0; y < cellHeight; y++)
-            {
-                int offset = y * rowBytes + cellOffset;
-                for (int x = 0; x < cellWidth; x++, offset += 4)
-                {
-                    bgra[offset] = (byte)((blue + bgra[offset] * inverse) / 255);
-                    bgra[offset + 1] = (byte)((green + bgra[offset + 1] * inverse) / 255);
-                    bgra[offset + 2] = (byte)((red + bgra[offset + 2] * inverse) / 255);
-                }
-            }
-        }
     }
 }

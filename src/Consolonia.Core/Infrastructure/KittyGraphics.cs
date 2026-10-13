@@ -26,10 +26,9 @@ namespace Consolonia.Core.Infrastructure
     }
 
     /// <summary>
-    ///     Helpers for the kitty graphics protocol (https://sw.kovidgoyal.net/kitty/graphics-protocol/).
-    ///     An image is transmitted once and shown through classic placements: each covered cell
-    ///     carries a <see cref="PixelBufferImplementation.KittyTile" /> in its background, and
-    ///     RenderTarget coalesces those into placements cropped from the image, below text.
+    ///     The byte sequences of the kitty graphics protocol (https://sw.kovidgoyal.net/kitty/graphics-protocol/):
+    ///     transmits, placements and deletes, and the ids they name. How they are used is
+    ///     <see cref="KittyConsoleImageEncoder" />'s.
     /// </summary>
     internal static class KittyGraphics
     {

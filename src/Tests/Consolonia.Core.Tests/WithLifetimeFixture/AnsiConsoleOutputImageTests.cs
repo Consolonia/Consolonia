@@ -74,6 +74,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             return Encoding.ASCII.GetString(_stream.ToArray());
         }
 
+        /// <summary>Shows a picture of two cells and hands back what dims it: the image and a half-black paint.</summary>
+        private string ShowTwoCells(out CellImage image, out Color paint)
+        {
+            image = SolidImage(10, 20, 30);
+            paint = Color.Parse("#7F000000");
+            return Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
+        }
+
         private static CellImage SolidImage(byte red, byte green, byte blue)
         {
             byte[] bgra = new byte[CellWidth * CellHeight * 4];
@@ -149,10 +157,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void SixelRunsSentBeforeComeFromTheCache()
         {
             Open(ConsoleCapabilities.SupportsSixel);
-            CellImage image = SolidImage(10, 20, 30);
-            var paint = Color.Parse("#7F000000");
-
-            string shown = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
+            string shown = ShowTwoCells(out CellImage image, out Color paint);
             string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
             string shownAgain = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
 
@@ -250,9 +255,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void KittyPaintOverAPictureIsSentInThePixels()
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
-            CellImage image = SolidImage(10, 20, 30);
-            var paint = Color.Parse("#7F000000");
-            string shown = Frame((0, 0, ImageCell(image)), (1, 0, ImageCell(image)));
+            string shown = ShowTwoCells(out CellImage image, out Color paint);
 
             string dimmed = Frame((0, 0, ImageCell(image, paint)), (1, 0, ImageCell(image, paint)));
 
