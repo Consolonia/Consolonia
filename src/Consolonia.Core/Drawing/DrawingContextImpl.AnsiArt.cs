@@ -30,11 +30,8 @@ namespace Consolonia.Core.Drawing
                 if (ax >= 0 && ax < pixelBufferBitmap.Buffer.Width && ay >= 0 &&
                     ay < pixelBufferBitmap.Buffer.Height)
                 {
-                    var point = new PixelPoint(px, py);
-                    Pixel pixel = pixelBufferBitmap.Buffer[(ushort)ax, (ushort)ay];
-
                     // todo: handle opacity if necessary
-                    _pixelBuffer[point] = _pixelBuffer[point].Blend(pixel);
+                    _pixelBuffer.Blend(new PixelPoint(px, py), in pixelBufferBitmap.Buffer.CellAt(ax, ay));
                 }
             }
 

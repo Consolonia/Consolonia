@@ -215,7 +215,7 @@ namespace Consolonia.Core.Drawing
             if (position.Y < CurrentClip.Y || position.Y >= CurrentClip.Bottom) return;
 
             if (CurrentClip.ContainsExclusive(position))
-                _pixelBuffer[position] = _pixelBuffer[position].Blend(pixel);
+                _pixelBuffer.Blend(position, in pixel);
 
             if (pixel.Width == 1)
                 return;
@@ -224,11 +224,11 @@ namespace Consolonia.Core.Drawing
 
             int leftLimit = int.Max(CurrentClip.X, position.X + 1);
 
+            var tail = new Pixel(PixelForeground.Empty, pixel.Background);
             for (int x = leftLimit; x <= rightLimit; x++)
             {
                 PixelPoint positionInSequence = position.WithX(x);
-                Pixel blendedPixel = _pixelBuffer[positionInSequence]
-                    .Blend(new Pixel(PixelForeground.Empty, pixel.Background));
+                Pixel blendedPixel = _pixelBuffer[positionInSequence].Blend(in tail);
 
                 _pixelBuffer[positionInSequence] = new Pixel(PixelForeground.Empty, blendedPixel.Background);
             }
