@@ -520,26 +520,21 @@ namespace Consolonia.PlatformSupport
 
             foreach ((string, Key) fSequence in fSequences)
                 yield return new SafeLockMatcher(
-                    new StartsEndsWithMatcher<int>(_ =>
-                        {
-                            DispatchInputAsyncWait(() => { RaiseKeyPressInternal(fSequence.Item2); });
-                        }, cp => new Rune(cp),
+                    new StartsEndsWithMatcher<int>(
+                        _ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(fSequence.Item2); }); },
+                        cp => new Rune(cp),
                         fSequence.Item1, fSequence.Item1), 0, 0, 0);
 
             // escape of ESC
             yield return new SafeLockMatcher(
-                new RegexMatcher<int>(_ =>
-                {
-                    DispatchInputAsyncWait(() => { RaiseKeyPressInternal(Key.Esc); });
-                }, cp => new Rune(cp), @"^\x1B+$", 2), 0,
+                new RegexMatcher<int>(_ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(Key.Esc); }); },
+                    cp => new Rune(cp), @"^\x1B+$", 2), 0,
                 0);
 
             // SHIFT+TAB is received as ESC then TAB, both locked by key 0: https://unix.stackexchange.com/a/238412
             yield return new SafeLockMatcher(
-                new RegexMatcher<int>(_ =>
-                    {
-                        DispatchInputAsyncWait(() => { RaiseKeyPressInternal(Key.BackTab); });
-                    }, cp => new Rune(cp), @"^\x1B\t?$",
+                new RegexMatcher<int>(_ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(Key.BackTab); }); },
+                    cp => new Rune(cp), @"^\x1B\t?$",
                     2), 0, 0);
 
             // The ESC-number handling, debatable.
