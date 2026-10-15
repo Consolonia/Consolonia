@@ -74,8 +74,9 @@ namespace Consolonia.Core.Text
         // Enables CSI u encoding for keyboard events: CSI keycode ; modifiers u
         // Flags: 1 = Disambiguate escape codes
         //        2 = Report event types (press/repeat/release)
+        //        4 = Report alternate keys (shifted key, e.g. '!' for Shift+1, as CSI keycode:shifted u)
         //        8 = Report all keys as escape codes (required to get bare-modifier events, e.g. solo Alt)
-        public const string EnableKittyKeyboard = "\u001b[>11u";
+        public const string EnableKittyKeyboard = "\u001b[>15u";
         public const string DisableKittyKeyboard = "\u001b[<u";
 
         // Query current progressive enhancement flags. A terminal supporting the

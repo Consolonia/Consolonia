@@ -7,18 +7,21 @@ namespace Consolonia.Core.Helpers.InputProcessing
     /// <summary>
     ///     Matches Kitty keyboard protocol CSI u sequences and legacy CSI functional key sequences.
     ///     Formats:
-    ///     CSI u:      ESC [ keycode ; modifiers u
+    ///     CSI u:      ESC [ keycode[:shifted[:base]] ; modifiers u
     ///     CSI tilde:  ESC [ number ; modifiers ~     (Insert, Delete, PgUp, PgDn, F5-F12)
     ///     CSI letter: ESC [ 1 ; modifiers letter     (Arrows, Home, End, F1-F4)
     ///     CSI letter: ESC [ letter                    (unmodified arrows, Home, End, F1-F4)
     /// </summary>
     public partial class CsiKeyboardMatcher<T>(
-        Action<(int keyCode, int modifiers, int eventType, char terminator)> onComplete,
+        Action<(int keyCode, int modifiers, int eventType, char terminator, int shiftedKeyCode)> onComplete,
         Func<T, Rune> toRune)
-        : RegexAccumulatorMatcher<T, (int keyCode, int modifiers, int eventType, char terminator)>(onComplete, toRune,
+        : RegexAccumulatorMatcher<T, (int keyCode, int modifiers, int eventType, char terminator, int shiftedKeyCode)>(
+            onComplete, toRune,
             CsiPatternRegex())
     {
         private const string KeyCodeGroupName = "keyCode";
+        private const string ShiftedKeyCodeGroupName = "shiftedKeyCode";
+        private const string BaseKeyCodeGroupName = "baseKeyCode";
         private const string ModifiersGroupName = "modifiers";
         private const string EventTypeGroupName = "eventType";
         private const string Separator1GroupName = "sep1";
@@ -29,8 +32,11 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// </summary>
         private const string ValidCsiTerminators = "ABCDFHPQRSu~ZE";
 
-        protected override (int keyCode, int modifiers, int eventType, char terminator)? OnTerminatorMatched(
-            Match match)
+        protected override (int keyCode,
+            int modifiers,
+            int eventType,
+            char terminator,
+            int shiftedKeyCode)? OnTerminatorMatched(Match match)
         {
             Group terminatorGroup = match.Groups[TerminatorGroupName];
             int keyCode = match.Groups[KeyCodeGroupName].Success
@@ -49,7 +55,12 @@ namespace Consolonia.Core.Helpers.InputProcessing
                 ? int.Parse(match.Groups[EventTypeGroupName].Value)
                 : 1;
 
-            return (keyCode, modifiers, eventType, terminator);
+            Group shiftedGroup = match.Groups[ShiftedKeyCodeGroupName];
+            int shiftedKeyCode = shiftedGroup.Success && shiftedGroup.Length > 0
+                ? int.Parse(shiftedGroup.Value)
+                : 0;
+
+            return (keyCode, modifiers, eventType, terminator, shiftedKeyCode);
         }
 
         public override bool TryFlush()
@@ -63,6 +74,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         /// <summary>
         ///     Matches all CSI keyboard formats, both complete sequences and valid partial prefixes
         ///     accumulated so far (in which case the <c>terminator</c> group is not present):
+        ///     ESC [ number : shifted : base ; modifiers : eventtype u   (Kitty alternate keys)
         ///     ESC [ number ; modifiers : eventtype u/~
         ///     ESC [ number ; modifiers u/~
         ///     ESC [ number u/~
@@ -76,7 +88,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         ///     Valid terminator letters: A-D (arrows), F/H (End/Home), P-S (F1-F4)
         /// </summary>
         [GeneratedRegex(
-            @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?((?<{Separator1GroupName}>[;:])(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCsiTerminators}])?)?$")]
+            @$"^\x1B(\[(?<{KeyCodeGroupName}>\d+)?(:(?<{ShiftedKeyCodeGroupName}>\d*)(:(?<{BaseKeyCodeGroupName}>\d*))?)?((?<{Separator1GroupName}>;)(?<{ModifiersGroupName}>\d+)?((?<{Separator2GroupName}>[;:])(?<{EventTypeGroupName}>\d+)?)?)?(?<{TerminatorGroupName}>[{ValidCsiTerminators}])?)?$")]
         private static partial Regex CsiPatternRegex();
     }
 }
