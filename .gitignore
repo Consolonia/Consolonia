@@ -771,3 +771,5 @@ src/.vscode/launch.json
 **/Properties/launchSettings.json
 
 **/**copilot**.md
+# Claude Code per-user settings
+.claude/settings.local.json
