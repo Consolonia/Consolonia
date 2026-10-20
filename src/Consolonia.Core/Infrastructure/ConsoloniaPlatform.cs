@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.Platform;
@@ -20,9 +20,23 @@ namespace Consolonia.Core.Infrastructure
         internal static ConsoloniaPlatformSettings Settings =>
             AvaloniaLocator.Current.GetService<IPlatformSettings>() as ConsoloniaPlatformSettings;
 
+        /// <summary>
+        ///     Gets the main console window implementation.
+        /// </summary>
+        internal IWindowImpl MainWindow { get; private set; }
+
         public IWindowImpl CreateWindow()
         {
-            return new ConsoleWindowImpl();
+            if (MainWindow != null)
+            {
+                var factory = AvaloniaLocator.Current.GetService<IChildWindowImplFactory>();
+                if (factory != null)
+                    return factory.CreateChildWindow(MainWindow);
+            }
+
+            var window = new ConsoleWindowImpl();
+            MainWindow = window;
+            return window;
         }
 
         public IWindowImpl CreateEmbeddableWindow()
@@ -47,7 +61,7 @@ namespace Consolonia.Core.Infrastructure
 
         public void Initialize()
         {
-            var renderTimer = new SleepLoopRenderTimer(30);
+            var renderTimer = new UiThreadRenderTimer(120);
 
             NotSupported += InternalWorkaroundsIgnore;
             NotSupported += KeyInputIgnore;
