@@ -27,7 +27,7 @@ using static Vanara.PInvoke.Kernel32;
 namespace Consolonia.PlatformSupport
 {
     [SupportedOSPlatform("windows")]
-    public class Win32Console : ConsoleBase
+    public partial class Win32Console : ConsoleBase
     {
         private static readonly FlagTranslator<CONTROL_KEY_STATE, RawInputModifiers>
             KeyModifiersTranslator = new(
