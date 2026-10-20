@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <ConsoloniaVersion>12.0.3</ConsoloniaVersion>
+        <ConsoloniaVersion>12.1.4</ConsoloniaVersion>
         <ConsoloniaVersionLatest>$(ConsoloniaVersion).*</ConsoloniaVersionLatest>
         <!--If ran not by pipeline - defining for local run-->
         <BUILD_VERSION Condition="'$(BUILD_VERSION)' == ''">0</BUILD_VERSION>
