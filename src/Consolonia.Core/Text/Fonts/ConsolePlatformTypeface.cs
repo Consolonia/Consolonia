@@ -92,6 +92,9 @@ namespace Consolonia.Core.Text.Fonts
                         bytes[recordOffset + 11] = (byte)stringOffsetInsideStorage;
                     }
                 }
+                // The console draws every character: one format 13 (many-to-one) group maps every code point to glyph 1.
+                // Avalonia 12.1 selects text runs by this map, and an empty one sent each grapheme to font fallback as a
+                // run of its own (which, among other things, kept word trimming from finding word boundaries).
                 case /* cmap */ 1668112752u:
                     table = new ReadOnlyMemory<byte>([
                         0x00, 0x00, // version = 0
@@ -101,18 +104,21 @@ namespace Consolonia.Core.Text.Fonts
                         0x00, 0x0A, // encodingID = full Unicode
                         0x00, 0x00, 0x00, 0x0C, // subtableOffset = 12
 
-                        0x00, 0x0C, // format = 12
+                        0x00, 0x0D, // format = 13
                         0x00, 0x00, // reserved
-                        0x00, 0x00, 0x00, 0x10, // length = 16
+                        0x00, 0x00, 0x00, 0x1C, // length = 28
                         0x00, 0x00, 0x00, 0x00, // language = 0
-                        0x00, 0x00, 0x00, 0x00 // numGroups = 0
+                        0x00, 0x00, 0x00, 0x01, // numGroups = 1
+                        0x00, 0x00, 0x00, 0x00, // startCharCode = U+0000
+                        0x00, 0x10, 0xFF, 0xFF, // endCharCode = U+10FFFF
+                        0x00, 0x00, 0x00, 0x01 // glyphID = 1
                     ]);
                     return true;
 
                 case /* maxp */ 1835104368u:
                     table = new ReadOnlyMemory<byte>([
                         0x00, 0x00, 0x50, 0x00, // version = 0.5
-                        0x00, 0x01 // numGlyphs = 1
+                        0x00, 0x02 // numGlyphs = 2 (.notdef, and the one every character maps to)
                     ]);
                     return true;
 
