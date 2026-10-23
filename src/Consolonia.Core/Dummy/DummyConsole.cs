@@ -42,6 +42,10 @@ namespace Consolonia.Core.Dummy
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => DefaultCellPixelSize.Width;
+
+        public int CellPixelHeight => DefaultCellPixelSize.Height;
+
         public PixelBufferCoordinate GetCaretPosition()
         {
             return _caretPosition;
