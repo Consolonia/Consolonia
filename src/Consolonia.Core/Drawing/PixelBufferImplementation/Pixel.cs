@@ -195,13 +195,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             PixelForeground newForeground;
             CaretStyle newCaretStyle;
 
-            // An image cell takes the cell whole: its colors are in the picture, and its own colors are
-            // transparent, which would otherwise read as nothing drawn on top
-            if (pixelAbove.IsImage())
-                return pixelAbove;
-
             Color aboveBgColor = pixelAbove._backgroundColor;
-            byte aboveBgA = aboveBgColor.A;
+            // an image cell's own color is the (transparent) paint over its picture: it takes the cell
+            // whole, as an opaque overlay does
+            byte aboveBgA = pixelAbove.IsImage() ? (byte)0xFF : aboveBgColor.A;
 
             bool isNoForegroundOnTop;
 
@@ -216,10 +213,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
                     if (isNoForegroundOnTop && pixelAbove.CaretStyle == CaretStyle.None)
                         return this;
-                    if (isNoForegroundOnTop)
-                        newForeground = Foreground;
-                    else
-                        newForeground = Foreground.Blend(pixelAbove.Foreground);
+                    newForeground = isNoForegroundOnTop ? Foreground : Foreground.Blend(pixelAbove.Foreground);
                     newCaretStyle = CaretStyle.Blend(pixelAbove.CaretStyle);
                 }
                     break;
@@ -229,6 +223,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     if (isNoForegroundOnTop)
                     {
                         // merge the PixelForeground color with the pixelAbove background color
+                        // (Foreground is built from the fields on each read: build it once)
                         PixelForeground foreground = Foreground;
                         newForeground = new PixelForeground(foreground.Symbol,
                             MergeColors(_foregroundColor, aboveBgColor, true),
@@ -244,11 +239,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     break;
             }
 
-            // Background is always blended, image cell or not. The image survives a non-opaque overlay;
-            // only an opaque one evicts it, via the fast path above. An image cell's color starts out
-            // transparent, so what accumulates here is exactly the paint to lay over the picture. A glyph
-            // lands in the foreground and the picture stays below it; what that looks like on a terminal
-            // whose protocol cannot draw text over an image is the console output's decision.
+            // Background is always blended. An image survives a non-opaque overlay (only an opaque one
+            // evicts it, above), and the color accumulated here is the paint over the picture.
             var newBackground = new PixelBackground(MergeColors(_backgroundColor, aboveBgColor, false), _image);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
