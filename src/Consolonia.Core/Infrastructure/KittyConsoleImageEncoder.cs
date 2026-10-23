@@ -60,7 +60,6 @@ namespace Consolonia.Core.Infrastructure
         private readonly AnsiConsoleOutput _output;
         private byte[] _blockKey;
         private byte[] _blockScratch;
-        private bool[] _blockVisited;
 
         /// <summary>The platform's bitmaps, which encode PNG; looked up on the first transmit, null sends RGBA.</summary>
         private IPlatformRenderInterface _renderInterface;
@@ -106,7 +105,8 @@ namespace Consolonia.Core.Infrastructure
             int cellPixelWidth = _output.CellPixelWidth;
             int cellPixelHeight = _output.CellPixelHeight;
             int screenWidth = screen.Width;
-            bool[] visited = CellRectangles.Scratch(ref _blockVisited, screenWidth * screen.Height);
+            // which cells of the block being placed a placement already covers
+            Span<bool> placed = stackalloc bool[BlockColumns * BlockRows];
 
             for (int blockY = 0; blockY < screen.Height; blockY += BlockRows)
             for (int blockX = 0; blockX < screenWidth; blockX += BlockColumns)
@@ -141,16 +141,15 @@ namespace Consolonia.Core.Infrastructure
                 TransmitBlock(state.ImageId, screen, blockX, blockY, columns, rows, cellPixelWidth, cellPixelHeight);
                 state.Sent = key;
 
-                var block = new ImageCellsInBlock(screen, blockX, blockY, columns, rows);
+                placed.Clear();
                 int placementId = 0;
                 for (int y = blockY; y < blockY + rows; y++)
                 for (int x = blockX; x < blockX + columns; x++)
                 {
-                    if (visited[y * screenWidth + x] || screen.CellAt(x, y).Background.Image == null)
+                    if (placed[(y - blockY) * columns + x - blockX] || screen.CellAt(x, y).Background.Image == null)
                         continue;
 
-                    (int width, int height) = CellRectangles.GrowRectangle(block, visited, screenWidth,
-                        screen.Height, x, y, false);
+                    (int width, int height) = GrowPlacement(screen, placed, blockX, blockY, columns, rows, x, y);
                     _output.SetCaretPosition(new PixelBufferCoordinate((ushort)x, (ushort)y));
                     _output.WriteText(KittyGraphics.BuildRectPlacementSequence(state.ImageId, ++placementId,
                         (x - blockX) * cellPixelWidth, (y - blockY) * cellPixelHeight,
@@ -159,6 +158,41 @@ namespace Consolonia.Core.Infrastructure
             }
 
             ForgetBlocksOutside(screenWidth, screen.Height);
+        }
+
+        /// <summary>
+        ///     The rectangle of image cells of the block that grows from the image cell (x, y): rightward
+        ///     while cells show an image, then downward while the whole width of the next row does, never
+        ///     into a cell already <paramref name="placed" /> (one flag per cell of the block, row by row).
+        ///     Marks the cells it takes as placed.
+        /// </summary>
+        private static (int Width, int Height) GrowPlacement(PixelBuffer screen, Span<bool> placed,
+            int blockX, int blockY, int columns, int rows, int x, int y)
+        {
+            int column = x - blockX;
+            int row = y - blockY;
+
+            int width = 1;
+            while (column + width < columns && !placed[row * columns + column + width] &&
+                   screen.CellAt(x + width, y).Background.Image != null)
+                width++;
+
+            int height = 1;
+            while (row + height < rows)
+            {
+                bool joins = true;
+                for (int i = 0; i < width && joins; i++)
+                    joins = !placed[(row + height) * columns + column + i] &&
+                            screen.CellAt(x + i, y + height).Background.Image != null;
+                if (!joins)
+                    break;
+                height++;
+            }
+
+            for (int r = row; r < row + height; r++)
+                placed.Slice(r * columns + column, width).Fill(true);
+
+            return (width, height);
         }
 
         /// <summary>
@@ -333,19 +367,6 @@ namespace Consolonia.Core.Infrastructure
         {
             public int ImageId;
             public ContentKey Sent;
-        }
-
-        /// <summary>Image cells within one block.</summary>
-        private readonly struct ImageCellsInBlock(PixelBuffer screen, int blockX, int blockY, int columns, int rows)
-            : IRectangleCells
-        {
-            public bool Joins(int x, int y, int dx, int dy)
-            {
-                int cellX = x + dx;
-                int cellY = y + dy;
-                return cellX < blockX + columns && cellY < blockY + rows &&
-                       screen.CellAt(cellX, cellY).Background.Image != null;
-            }
         }
     }
 }

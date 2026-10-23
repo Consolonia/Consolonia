@@ -48,7 +48,7 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
    screen that shrank are deleted too. The terminal therefore never holds more images than the
    screen has blocks.
 4. **Placements cover image cells only, placed right after the transmit.** Within the block the
-   image cells are grown into maximal rectangles (`CellRectangles.GrowRectangle`), and each is placed
+   image cells are grown into maximal rectangles (`GrowPlacement`), and each is placed
    at its cells as a crop of the block's image (`x=`, `y=`, `w=`, `h=` in pixels; placement ids 1, 2,
    … within the image), z=-2 (below text, above background colours), `C=1` so the cursor doesn't
    move. A block the picture fills is one placement; a block with a dialog's corner in it is a few.
