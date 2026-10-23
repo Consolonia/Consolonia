@@ -26,9 +26,6 @@ namespace Consolonia.Core.Drawing
         // what the terminal shows, cell by cell, Pixel.Empty where nothing was ever written
         private Pixel[,] _cache = null!;
 
-        /// <summary>Per frame, which cells are dirty: the dirty regions marked once, not searched per cell.</summary>
-        private bool[]? _dirtyCells;
-
         private ConsoleCursor _consoleCursor;
 
         /// <summary>The renderer drawing bitmaps on this terminal; see <see cref="BitmapRenderer" />.</summary>
@@ -206,9 +203,6 @@ namespace Consolonia.Core.Drawing
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;
 
-            bool[] dirty = CellRectangles.Scratch(ref _dirtyCells, pixelBuffer.Width * pixelBuffer.Height);
-            dirtyRegions.MarkCells(dirty, pixelBuffer.Width);
-
             for (ushort y = 0; y < pixelBuffer.Height; y++)
             {
                 bool isWide = false;
@@ -225,7 +219,7 @@ namespace Consolonia.Core.Drawing
                         caretStyle = pixel.CaretStyle;
                     }
 
-                    if (!dirty[y * pixelBuffer.Width + x])
+                    if (!dirtyRegions.Contains(x, y, false))
                         continue;
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
@@ -261,7 +255,6 @@ namespace Consolonia.Core.Drawing
                     }
 
                     if (pixel.Width > 1)
-
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
                             if (pixelBuffer[(ushort)(x + i), y].Width != 0)
