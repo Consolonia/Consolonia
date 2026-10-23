@@ -706,15 +706,13 @@ namespace Consolonia.PlatformSupport
         {
             if (!_mouseEvents.TryDequeue(out Curses.MouseEvent ev))
                 throw new ConsoloniaException("Mouse event was produced but queue was empty");
-            
+
             if (Logger.TryGet(
                     LogEventLevel.Verbose,
                     LogExtensions.GetAreaName(LogCategory.Input)) is { } logger)
-            {
                 // guarded to disable flags parsing
                 logger.Log2(
                     $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
-            }
             return ev;
         }
 
