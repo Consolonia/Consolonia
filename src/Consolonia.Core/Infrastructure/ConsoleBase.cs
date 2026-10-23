@@ -71,6 +71,11 @@ namespace Consolonia.Core.Infrastructure
             await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Input);
         }
 
+        protected void DispatchInputAsyncWait(Action action)
+        {
+            DispatchInputAsync(action).Wait();
+        }
+
         #region IConsoleInput
 
         public event Action<Key, char, RawInputModifiers, bool, ulong, bool> KeyEvent;

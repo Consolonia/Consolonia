@@ -520,17 +520,21 @@ namespace Consolonia.PlatformSupport
 
             foreach ((string, Key) fSequence in fSequences)
                 yield return new SafeLockMatcher(
-                    new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
+                    new StartsEndsWithMatcher<int>(
+                        _ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(fSequence.Item2); }); },
+                        cp => new Rune(cp),
                         fSequence.Item1, fSequence.Item1), 0, 0, 0);
 
             // escape of ESC
             yield return new SafeLockMatcher(
-                new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.Esc); }, cp => new Rune(cp), @"^\x1B+$", 2), 0,
+                new RegexMatcher<int>(_ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(Key.Esc); }); },
+                    cp => new Rune(cp), @"^\x1B+$", 2), 0,
                 0);
 
             // SHIFT+TAB is received as ESC then TAB, both locked by key 0: https://unix.stackexchange.com/a/238412
             yield return new SafeLockMatcher(
-                new RegexMatcher<int>(_ => { RaiseKeyPressInternal(Key.BackTab); }, cp => new Rune(cp), @"^\x1B\t?$",
+                new RegexMatcher<int>(_ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(Key.BackTab); }); },
+                    cp => new Rune(cp), @"^\x1B\t?$",
                     2), 0, 0);
 
             // The ESC-number handling, debatable.
@@ -583,7 +587,7 @@ namespace Consolonia.PlatformSupport
                     }
                 }
 
-                RaiseKeyPressInternal(k);
+                DispatchInputAsyncWait(() => { RaiseKeyPressInternal(k); });
             }, cp => new Rune(cp), @"^\x1B[^\x1B\[]*$", 2), 0, 0);
 
             // alt mask
@@ -591,8 +595,22 @@ namespace Consolonia.PlatformSupport
             {
                 int wch = tuple.Item2[0];
                 Key k = Key.AltMask | MapCursesKey(wch);
-                RaiseKeyPressInternal(k);
+                DispatchInputAsyncWait(() => { RaiseKeyPressInternal(k); });
             }, cp => new Rune(cp), @"^\x1B[^\x00]*$", 2), 0, Curses.KEY_CODE_YES);
+
+            // mouse events
+            yield return new SafeLockMatcher(new GenericBatchMatcher<int>(wchs =>
+            {
+                var events = new Curses.MouseEvent[wchs.Length];
+                for (int i = 0; i < wchs.Length; i++)
+                    events[i] = DequeueMouseEvent();
+
+                DispatchInputAsyncWait(() =>
+                {
+                    foreach (Curses.MouseEvent ev in events)
+                        HandleMouseInput(ev);
+                });
+            }, wch => wch == Curses.KeyMouse), Curses.KEY_CODE_YES);
 
             // mouse and resize detection and some special processing
             yield return new SafeLockMatcher(new GenericMatcher<int>(wch =>
@@ -603,15 +621,7 @@ namespace Consolonia.PlatformSupport
                         _ = DispatchInputAsync(() => { CheckSize(); });
                         return;
                     case Curses.KeyMouse:
-                        if (_mouseEvents.TryDequeue(out Curses.MouseEvent ev))
-                        {
-                            _verboseLogger.Log2(
-                                $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
-                            HandleMouseInput(ev);
-                            return;
-                        }
-
-                        throw new ConsoloniaException("Mouse event was produced but queue was empty");
+                        throw new NotSupportedException("Left for safety reasons. Must not happen");
                 }
 
                 Key k = MapCursesKey(wch);
@@ -654,19 +664,22 @@ namespace Consolonia.PlatformSupport
                         break;
                 }
 
-                RaiseKeyPressInternal(k);
+                DispatchInputAsyncWait(() => { RaiseKeyPressInternal(k); });
             }), Curses.KEY_CODE_YES);
 
             // text detection
             var textInputMatcher = new SafeLockMatcher(new TextInputMatcher<int>(tuple =>
             {
-                CanBeHandledEventArgs canBeHandledEventArgs = new();
-                RaiseTextInput(tuple.Item1, (ulong)Environment.TickCount64, canBeHandledEventArgs);
-                bool processSeparateKeys = !canBeHandledEventArgs.Handled;
+                DispatchInputAsyncWait(() =>
+                {
+                    CanBeHandledEventArgs canBeHandledEventArgs = new();
+                    RaiseTextInput(tuple.Item1, (ulong)Environment.TickCount64, canBeHandledEventArgs);
+                    bool processSeparateKeys = !canBeHandledEventArgs.Handled;
 
-                if (processSeparateKeys)
-                    foreach (int key in tuple.Item2)
-                        ProcessKeyInternal(key);
+                    if (processSeparateKeys)
+                        foreach (int key in tuple.Item2)
+                            ProcessKeyInternal(key);
+                });
             }, cp => new Rune(cp), 10 /* todo: low: magic number here*/), 0);
             yield return textInputMatcher;
 
@@ -674,7 +687,7 @@ namespace Consolonia.PlatformSupport
             yield return new SafeLockMatcher(
                 new GenericMatcher<int>(i =>
                 {
-                    ProcessKeyInternal(i);
+                    DispatchInputAsyncWait(() => { ProcessKeyInternal(i); });
                     // related to 15F2A2C4-218D-4B4D-86CE-330A312EF6A6, we have to reset text input ourselves, because 
                     // common logic of InputProcessor resets only everything below
                     // todo: should we reset all other matchers actually?
@@ -687,6 +700,20 @@ namespace Consolonia.PlatformSupport
             {
                 return i != 27;
             }
+        }
+
+        private Curses.MouseEvent DequeueMouseEvent()
+        {
+            if (!_mouseEvents.TryDequeue(out Curses.MouseEvent ev))
+                throw new ConsoloniaException("Mouse event was produced but queue was empty");
+
+            if (Logger.TryGet(
+                    LogEventLevel.Verbose,
+                    LogExtensions.GetAreaName(LogCategory.Input)) is { } logger)
+                // guarded to disable flags parsing
+                logger.Log2(
+                    $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
+            return ev;
         }
 
         private void ProcessKeyInternal(int wch)
@@ -768,11 +795,9 @@ namespace Consolonia.PlatformSupport
 
             Avalonia.Input.Key convertToKey = DefaultNetConsole.ConvertToKey(consoleKey);
 
-            RaiseKeyPress(convertToKey,
-                character, modifiers, true, (ulong)Environment.TickCount64);
-            Thread.Yield();
-            RaiseKeyPress(convertToKey,
-                character, modifiers, false, (ulong)Environment.TickCount64);
+            RaiseKeyPress(convertToKey, character, modifiers, true, (ulong)Environment.TickCount64);
+            Thread.Yield(); //todo: are this yields still necessary? 
+            RaiseKeyPress(convertToKey, character, modifiers, false, (ulong)Environment.TickCount64);
             Thread.Yield();
         }
 
@@ -788,7 +813,7 @@ namespace Consolonia.PlatformSupport
             RawInputModifiers modifiers = MouseModifiersFlagTranslator.Translate(ev.ButtonState);
             RawPointerEventType rawPointerEventType = RawPointerEventTypeFlagTranslator.Translate(ev.ButtonState);
 
-            //stop monitor event type we are getting from curses
+            //stop monitor event type we are getting from curses //todo: <- what does this comment mean?
             EventClass eventClass = EventClassFlagTranslator.Translate(rawPointerEventType, true);
             if (eventClass == EventClass.ButtonDown)
                 _moveModifers = modifiers;
