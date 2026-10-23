@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using Avalonia;
 using Avalonia.Media;
+using Avalonia.Platform;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -273,6 +276,29 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
+        ///     A platform whose bitmaps cannot encode PNG (they throw, or the application answered the
+        ///     not-supported request with no bitmap) is asked once: every block after is RGBA without asking.
+        /// </summary>
+        [TestCase(true)]
+        [TestCase(false)]
+        public void KittyAsksAPlatformThatCannotEncodePngOnlyOnce(bool throws)
+        {
+            using IDisposable scope = AvaloniaLocator.EnterScope();
+            var renderInterface = DispatchProxy.Create<IPlatformRenderInterface, NoPngRenderInterface>();
+            var counter = (NoPngRenderInterface)(object)renderInterface;
+            counter.Throws = throws;
+            AvaloniaLocator.CurrentMutable.Bind<IPlatformRenderInterface>().ToConstant(renderInterface);
+
+            Open(ConsoleCapabilities.SupportsKittyGraphics);
+            string first = Frame((0, 0, ImageCell(SolidImage(10, 20, 30))));
+            string second = Frame((0, 0, ImageCell(SolidImage(40, 50, 60))));
+
+            Assert.That(counter.LoadBitmapCalls, Is.EqualTo(1));
+            Assert.That(first, Does.Contain(KittyTransmit + "f=32,"), "RGBA when PNG failed");
+            Assert.That(second, Does.Contain(KittyTransmit + "f=32,"), "and RGBA after, without asking");
+        }
+
+        /// <summary>
         ///     After a reset nothing the terminal shows is trusted: every block is sent again under its id,
         ///     which replaces whatever the terminal still had for it.
         /// </summary>
@@ -450,6 +476,25 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(frame, Does.Not.Contain("\u001b_G"));
             Assert.That(frame, Does.Not.Contain(SixelStart));
             Assert.That(frame, Does.Contain("\u001b[48;2;10;20;30m"), "the picture's color as the cell's");
+        }
+    }
+
+    /// <summary>A render interface whose LoadBitmap throws or gives no bitmap, counting the calls.</summary>
+    public class NoPngRenderInterface : DispatchProxy
+    {
+        public int LoadBitmapCalls { get; private set; }
+
+        public bool Throws { get; set; }
+
+        protected override object Invoke(MethodInfo targetMethod, object[] args)
+        {
+            if (targetMethod?.Name != nameof(IPlatformRenderInterface.LoadBitmap))
+                throw new NotImplementedException(targetMethod?.Name);
+
+            LoadBitmapCalls++;
+            if (Throws)
+                throw new NotSupportedException();
+            return null;
         }
     }
 }

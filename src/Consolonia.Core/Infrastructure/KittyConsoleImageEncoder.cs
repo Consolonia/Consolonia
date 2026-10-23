@@ -61,7 +61,11 @@ namespace Consolonia.Core.Infrastructure
         private byte[] _blockKey;
         private byte[] _blockScratch;
 
-        /// <summary>The platform's bitmaps, which encode PNG; looked up on the first transmit, null sends RGBA.</summary>
+        /// <summary>
+        ///     The platform's bitmaps, which encode PNG; null sends RGBA. Looked up on the first transmit, not
+        ///     in the constructor: the console makes its encoder while it is constructed, before the
+        ///     application binds the render interface. Null again once it has failed to encode.
+        /// </summary>
         private IPlatformRenderInterface _renderInterface;
 
         private bool _renderInterfaceResolved;
@@ -309,6 +313,7 @@ namespace Consolonia.Core.Infrastructure
         ///     <paramref name="png" /> through the platform's bitmaps (a bitmap loaded from the pixels and
         ///     saved, which Avalonia does through Skia). False, with nothing written, where the platform has
         ///     none or cannot encode: the headless tests, the benchmarks, a platform without an image codec.
+        ///     A platform that cannot is not asked again, so the failure costs one exception, not one a block.
         /// </summary>
         private unsafe bool TryEncodePng(ReadOnlySpan<byte> bgra, int width, int height, MemoryStream png)
         {
@@ -325,19 +330,24 @@ namespace Consolonia.Core.Infrastructure
             {
                 fixed (byte* pixels = bgra)
                 {
+                    // null where the application handled the not-supported request
                     using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
                         (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
-                    bitmap.Save(png, PngBitmapEncoderOptions.Default);
+                    bitmap?.Save(png, PngBitmapEncoderOptions.Default);
                     // a platform with no image codec saves nothing rather than throwing
-                    return png.Length > 0;
+                    if (png.Length > 0)
+                        return true;
                 }
             }
             catch (Exception exception) when (exception is NotSupportedException or NotImplementedException
                                                   or ConsoloniaNotSupportedException)
             {
-                png.SetLength(0);
-                return false;
+                // no bitmaps here (the headless tests): as with no codec, RGBA from now on
             }
+
+            png.SetLength(0);
+            _renderInterface = null;
+            return false;
         }
 
         /// <summary>
