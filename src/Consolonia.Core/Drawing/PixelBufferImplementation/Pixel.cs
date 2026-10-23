@@ -140,6 +140,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         [JsonIgnore] public ushort Width => _width;
 
+        /// <summary>
+        ///     The color the background looks: its color for a plain cell, and for an image cell the paint
+        ///     blended over the picture's <see cref="CellImage.DominantColor" />. For the places that need
+        ///     one color for the cell.
+        /// </summary>
+        [JsonIgnore]
+        public Color EffectiveBackgroundColor =>
+            _image == null ? _backgroundColor : MergeColors(_image.DominantColor, _backgroundColor, false);
+
         public bool Equals(Pixel other)
         {
             return _character == other._character &&
@@ -251,7 +260,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         /// <returns>source blended into target</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
+        internal static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
         {
             // Fast paths to avoid calling into the ConsoleColorMode when not needed
             byte a = source.A;

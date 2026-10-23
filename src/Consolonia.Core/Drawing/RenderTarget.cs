@@ -227,7 +227,7 @@ namespace Consolonia.Core.Drawing
                     {
                         // the color the cursor glyph sits on: for a cell showing a picture, the paint over
                         // the picture's dominant color
-                        Color cellColor = pixel.Background.EffectiveColor;
+                        Color cellColor = pixel.EffectiveBackgroundColor;
 
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
                         {

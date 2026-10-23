@@ -415,8 +415,8 @@ namespace Consolonia.Core.Infrastructure
             Color paint = pixel.Background.Color;
             var painted = new Pixel(
                 new PixelForeground(quad.Foreground.Symbol,
-                    PixelBackground.ColorOver(paint, quad.Foreground.Color)),
-                new PixelBackground(PixelBackground.ColorOver(paint, quad.Background.Color)),
+                    Pixel.MergeColors(quad.Foreground.Color, paint, true)),
+                new PixelBackground(Pixel.MergeColors(quad.Background.Color, paint, false)),
                 pixel.CaretStyle);
             return pixel.Foreground.IsNothingToDraw() || pixel.Foreground.Symbol.IsBlank()
                 ? painted

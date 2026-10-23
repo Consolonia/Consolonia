@@ -52,7 +52,7 @@ namespace Consolonia.Core.Infrastructure
             if (!pixel.Foreground.IsNothingToDraw() && !pixel.Foreground.Symbol.IsBlank())
             {
                 // text over a picture: the glyph on the color the cell looks, as a text cell
-                var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.Background.EffectiveColor),
+                var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.EffectiveBackgroundColor),
                     pixel.CaretStyle);
                 _output.WriteTextCell(position, in textCell, false);
                 return;

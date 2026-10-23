@@ -182,14 +182,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             var image = new CellImage(bgra, 8, 16);
             Pixel pixel = CreateImagePixel(image);
             Assert.That(image.DominantColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
-            Assert.That(pixel.Background.EffectiveColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
+            Assert.That(pixel.EffectiveBackgroundColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
 
             Pixel dimmed = pixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
-            Color effective = dimmed.Background.EffectiveColor;
+            Color effective = dimmed.EffectiveBackgroundColor;
             Assert.That(effective.A, Is.EqualTo(0xFF));
             Assert.That(effective.R, Is.InRange(90, 110), "black at half alpha over gray 200");
 
-            Assert.That(new PixelBackground(Colors.Blue).EffectiveColor, Is.EqualTo(Colors.Blue),
+            Assert.That(new Pixel(new PixelBackground(Colors.Blue)).EffectiveBackgroundColor, Is.EqualTo(Colors.Blue),
                 "a plain cell's effective color is its color");
         }
 

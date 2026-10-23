@@ -53,7 +53,7 @@ word sixel or kitty is in `Consolonia.Core.Infrastructure`, behind `AnsiConsoleO
 - **`PixelBackground`** is a `Color` and an optional `Image`. For an image cell the colour is the
   **paint** laid over the picture: transparent for none. Translucent overlays (a modal's backdrop, a
   shade) accumulate into it through the same `Blend` as a plain cell's colour. The output applies
-  the paint to the picture when the cell is written. `EffectiveColor` is what the cell looks: the
+  the paint to the picture when the cell is written. `Pixel.EffectiveBackgroundColor` is what the cell looks: the
   colour, or for an image cell the paint over the picture's dominant colour, for the few places that
   need one colour (the mouse cursor's contrast, a glyph a protocol cannot draw over an image, the
   fallback with no protocol, `Invert`).
@@ -170,7 +170,7 @@ protocols: a cell is a cell.
 1. **`BeginFrame`.** The console is told a frame starts.
 2. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
    pixels) goes through `IConsoleOutput.WritePixel`. The cell under the mouse cursor gets the cursor
-   glyph in its foreground; its contrast colour comes from `PixelBackground.EffectiveColor`, so over
+   glyph in its foreground; its contrast colour comes from `Pixel.EffectiveBackgroundColor`, so over
    a picture it is computed against the paint over the dominant colour.
 3. **`EndFrame(screen)`.** Every changed cell has been written; the console gets the whole buffer,
    which is what the terminal should now show.
@@ -189,7 +189,7 @@ console's `IConsoleImageEncoder`:
 
 | | `WriteCell` (per changed cell) | `EndFrame` (once per frame) |
 |---|---|---|
-| **Sixel** | A cell with a glyph is written as text on `EffectiveColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
+| **Sixel** | A cell with a glyph is written as text on `Pixel.EffectiveBackgroundColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
 | **Kitty** | Written as text on the terminal's default background (Konsole hides below-text placements under any explicit cell background), glyph or blank. | The screen is walked in 8×4-cell blocks. A block whose key (its cells' image digests and paint) changed since it was last sent is transmitted again under the block's own image id, which replaces the image and its placements in the terminal, and its image cells are placed as crops. A block with no picture left has its image deleted. |
 | **None** (a console that reports no image protocol, given an image cell anyway) | The cell as a block glyph in the picture's colours under its paint (`QuadPixelBitmapRenderer.FromPixels`), its own glyph kept. | Nothing. |
 
