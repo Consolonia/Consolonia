@@ -107,7 +107,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             Symbol symbol = foreground.Symbol;
             _character = symbol.Character;
-            _symbolReference = symbol.Reference;
+            _symbolReference = symbol.Complex;
             _pattern = symbol.Pattern;
             _width = symbol.Width;
             _foregroundColor = foreground.Color;

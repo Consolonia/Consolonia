@@ -169,10 +169,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     If cell has complex text (more than one char) this contains the full unicode sequence to draw this symbol.
         /// </summary>
-        public string Complex { get; }
-
-        /// <summary>The complex text as stored, null for none; what <see cref="Pixel" /> keeps.</summary>
-        internal string Reference => Complex;
+        public readonly string Complex;
 
         // box pattern for box merging.
         public readonly byte Pattern;
