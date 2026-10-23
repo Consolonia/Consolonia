@@ -4,12 +4,9 @@ using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.IO.Compression;
 using System.Text;
 using System.Text.Unicode;
 using System.Threading;
-using Avalonia.Media;
 
 namespace Consolonia.Core.Infrastructure
 {
@@ -51,12 +48,6 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         public const int RectPlacementZIndex = -2;
 
-        /// <summary>
-        ///     The z-index of wash placements: translucent overlays tinting a rect placement (a modal
-        ///     backdrop over a picture), above the image and still below text.
-        /// </summary>
-        public const int WashPlacementZIndex = -1;
-
         /// <summary>Payload bytes per chunk: exactly <see cref="MaxChunkSize" /> base64 characters.</summary>
         private const int RawChunkSize = MaxChunkSize / 4 * 3;
 
@@ -64,8 +55,6 @@ namespace Consolonia.Core.Infrastructure
         // the range, the longer before a wrapped id lands on an image still shown: re-transmitting an id
         // the terminal holds deletes that image and its placements.
         private static int _nextImageId;
-
-        private static int _nextPlacementId;
 
         // The images in the terminal, by id: allocated for transmission and not deleted since. Deleting
         // every visible placement (d=A) leaves the images nothing shows, and the tile cache keeps a few
@@ -99,29 +88,10 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Builds the chunked APC sequence transmitting an image (a=t): PNG encoded (f=100,
-        ///     the image carries its own dimensions) or raw 32 bit RGBA (f=32), the latter optionally
-        ///     zlib compressed (o=z).
-        /// </summary>
-        public static string BuildTransmitSequence(int imageId, int pixelWidth, int pixelHeight,
-            ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed = false)
-        {
-            byte[] sequence = ArrayPool<byte>.Shared.Rent(MaxTransmitLength(data.Length));
-            try
-            {
-                int length = ComposeTransmit(sequence, imageId, pixelWidth, pixelHeight, data, format,
-                    zlibCompressed);
-                return Encoding.ASCII.GetString(sequence, 0, length);
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(sequence);
-            }
-        }
-
-        /// <summary>
-        ///     Writes the transmit sequence of <see cref="BuildTransmitSequence" /> to <paramref name="console" />
-        ///     as bytes: a payload of megabytes is never turned into text and back.
+        ///     Writes the chunked APC sequence transmitting an image (a=t) to <paramref name="console" />:
+        ///     PNG encoded (f=100, the image carries its own dimensions) or raw 32 bit RGBA (f=32), the
+        ///     latter optionally zlib compressed (o=z). As bytes: a payload of megabytes is never turned
+        ///     into text and back.
         /// </summary>
         public static void WriteTransmitSequence(IConsoleOutput console, int imageId, int pixelWidth,
             int pixelHeight, ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed = false)
@@ -141,14 +111,16 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        private static int MaxTransmitLength(int dataLength)
+        /// <summary>The most bytes <see cref="ComposeTransmit" /> writes for a payload of <paramref name="dataLength" />.</summary>
+        internal static int MaxTransmitLength(int dataLength)
         {
             int chunks = (dataLength + RawChunkSize - 1) / RawChunkSize;
             // per chunk "ESC_G" "m=1;" "ESC\", and the first chunk's header
             return (dataLength + 2) / 3 * 4 + chunks * 16 + 96;
         }
 
-        private static int ComposeTransmit(Span<byte> destination, int imageId, int pixelWidth, int pixelHeight,
+        /// <summary>Composes the transmit sequence into <paramref name="destination" />; returns its length.</summary>
+        internal static int ComposeTransmit(Span<byte> destination, int imageId, int pixelWidth, int pixelHeight,
             ReadOnlySpan<byte> data, KittyImageFormat format, bool zlibCompressed)
         {
             int position = 0;
@@ -191,11 +163,6 @@ namespace Consolonia.Core.Infrastructure
             return position;
         }
 
-        public static int AllocatePlacementId()
-        {
-            return NextId(ref _nextPlacementId);
-        }
-
         /// <summary>
         ///     Builds the APC sequence creating a classic placement showing a source-pixel crop of
         ///     an already transmitted image at the current cursor position, below text (z=-2),
@@ -207,61 +174,6 @@ namespace Consolonia.Core.Infrastructure
         {
             return string.Create(CultureInfo.InvariantCulture,
                 $"\u001b_Ga=p,q=2,C=1,z={RectPlacementZIndex},i={imageId},p={placementId},x={sourceX},y={sourceY},w={sourceWidth},h={sourceHeight}\u001b\\");
-        }
-
-        /// <summary>
-        ///     Builds the APC sequence transmitting a solid <paramref name="wash" /> image of one pixel per
-        ///     cell, <paramref name="columns" /> x <paramref name="rows" /> (zlib compressed, so its size
-        ///     on the wire barely depends on the screen's).
-        /// </summary>
-        /// <remarks>
-        ///     A single pixel stretched with c=/r= would do on kitty, but terminals which map every cell
-        ///     to whole source pixels drop a placement whose cells get less than one; at one pixel per
-        ///     cell every cell gets exactly one.
-        /// </remarks>
-        public static string BuildTransmitWashSequence(int imageId, Color wash, int columns, int rows)
-        {
-            byte[] rgba = new byte[columns * rows * 4];
-            for (int i = 0; i < rgba.Length; i += 4)
-            {
-                rgba[i] = wash.R;
-                rgba[i + 1] = wash.G;
-                rgba[i + 2] = wash.B;
-                rgba[i + 3] = wash.A;
-            }
-
-            using var compressed = new MemoryStream();
-            // a solid color compresses to almost nothing at any level; an animated overlay sends a new
-            // one every frame, so take the fastest
-            using (var zlib = new ZLibStream(compressed, CompressionLevel.Fastest, true))
-            {
-                zlib.Write(rgba);
-            }
-
-            return BuildTransmitSequence(imageId, columns, rows, compressed.ToArray(), KittyImageFormat.Rgba, true);
-        }
-
-        /// <summary>
-        ///     Builds the APC sequence placing a wash image (see <see cref="BuildTransmitWashSequence" />)
-        ///     at the current cursor position over <paramref name="columns" /> x <paramref name="rows" />
-        ///     cells, above rect placements and below text, without moving the cursor (C=1). It crops
-        ///     the image to one pixel per covered cell, so the image must be at least that large.
-        /// </summary>
-        public static string BuildWashPlacementSequence(int imageId, int placementId, int columns, int rows)
-        {
-            return string.Create(CultureInfo.InvariantCulture,
-                $"\u001b_Ga=p,q=2,C=1,z={WashPlacementZIndex},i={imageId},p={placementId},x=0,y=0,w={columns},h={rows},c={columns},r={rows}\u001b\\");
-        }
-
-        /// <summary>
-        ///     Builds the APC sequence deleting one specific placement of an image while keeping
-        ///     the image data, so other placements of the same image survive and re-placement
-        ///     needs no retransmission.
-        /// </summary>
-        public static string BuildDeletePlacementSequence(int imageId, int placementId)
-        {
-            return string.Create(CultureInfo.InvariantCulture,
-                $"\u001b_Ga=d,d=i,q=2,i={imageId},p={placementId}\u001b\\");
         }
 
         /// <summary>
