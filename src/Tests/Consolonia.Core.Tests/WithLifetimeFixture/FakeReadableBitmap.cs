@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
 namespace Consolonia.Core.Tests.WithLifetimeFixture
@@ -53,12 +54,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
         }
 
-        public void Save(string fileName, int? quality = null)
-        {
-            throw new NotSupportedException();
-        }
-
-        public void Save(Stream stream, int? quality = null)
+        public void Save(Stream stream, BitmapEncoderOptions options)
         {
             throw new NotSupportedException();
         }

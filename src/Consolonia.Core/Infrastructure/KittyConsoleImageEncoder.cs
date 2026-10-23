@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -292,7 +293,7 @@ namespace Consolonia.Core.Infrastructure
                 {
                     using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
                         (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
-                    bitmap.Save(png);
+                    bitmap.Save(png, PngBitmapEncoderOptions.Default);
                     // a platform with no image codec saves nothing rather than throwing
                     return png.Length > 0;
                 }
