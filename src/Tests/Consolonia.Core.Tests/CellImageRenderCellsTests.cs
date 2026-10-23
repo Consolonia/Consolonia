@@ -147,5 +147,26 @@ namespace Consolonia.Core.Tests
             Assert.That(cell.Bgra[0], Is.EqualTo(0xFE));
             Assert.That(cell.DominantColor, Is.EqualTo(Color.FromRgb(0xFC, 0xFD, 0xFE)));
         }
+
+        /// <summary>
+        ///     Both constructors guard the same way: the one taking a slab checks that the cell's pixels
+        ///     lie within it, and the public one, which goes through it, that they are exactly the cell's.
+        /// </summary>
+        [Test]
+        public void CellImagesRefusePixelsThatAreNotTheCells()
+        {
+            Assert.Throws<ArgumentNullException>(() => _ = new CellImage(null, CellWidth, CellHeight));
+            Assert.Throws<ArgumentException>(() => _ = new CellImage(new byte[CellWidth * CellHeight * 4 + 4],
+                CellWidth, CellHeight));
+            Assert.Throws<ArgumentException>(() => _ = new CellImage(new byte[CellWidth * CellHeight * 4 - 4],
+                CellWidth, CellHeight));
+
+            byte[] slab = new byte[2 * CellWidth * CellHeight * 4];
+            Assert.That(new CellImage(slab, CellWidth * CellHeight * 4, CellWidth, CellHeight, 0).Bgra.Length,
+                Is.EqualTo(CellWidth * CellHeight * 4), "the last cell of a slab");
+            Assert.Throws<ArgumentException>(() =>
+                _ = new CellImage(slab, CellWidth * CellHeight * 4 + 4, CellWidth, CellHeight, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => _ = new CellImage(slab, -1, CellWidth, CellHeight, 0));
+        }
     }
 }
