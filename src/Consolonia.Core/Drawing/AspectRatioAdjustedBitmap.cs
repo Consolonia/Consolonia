@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
 namespace Consolonia.Core.Drawing
@@ -34,14 +35,9 @@ namespace Consolonia.Core.Drawing
             InnerBitmap.Dispose();
         }
 
-        public void Save(string fileName, int? quality = null)
+        public void Save(Stream stream, BitmapEncoderOptions options)
         {
-            InnerBitmap.Save(fileName, quality);
-        }
-
-        public void Save(Stream stream, int? quality = null)
-        {
-            InnerBitmap.Save(stream, quality);
+            InnerBitmap.Save(stream, options);
         }
 
         // IReadableBitmapImpl implementation

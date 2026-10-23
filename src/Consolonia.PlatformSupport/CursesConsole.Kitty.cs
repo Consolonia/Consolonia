@@ -194,9 +194,14 @@ namespace Consolonia.PlatformSupport
                 new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
         }
 
-        private void HandleCsiKeyboardEvent((int keyCode, int modifiers, int eventType, char terminator) csiEvent)
+        private void HandleCsiKeyboardEvent((int keyCode,
+            int modifiers,
+            int eventType,
+            char terminator,
+            int shiftedKeyCode) csiEvent)
         {
             int keyCode = csiEvent.keyCode;
+            int shiftedKeyCode = csiEvent.shiftedKeyCode;
             int modifierValue = csiEvent.modifiers - 1; // Protocol uses modifiers + 1
             int eventType = csiEvent.eventType;
             char terminator = csiEvent.terminator;
@@ -209,6 +214,7 @@ namespace Consolonia.PlatformSupport
             if ((modifierValue & 1) != 0) rawModifiers |= RawInputModifiers.Shift;
             if ((modifierValue & 2) != 0) rawModifiers |= RawInputModifiers.Alt;
             if ((modifierValue & 4) != 0) rawModifiers |= RawInputModifiers.Control;
+            bool isCapsLock = (modifierValue & 64) != 0;
 
             // Try to map the keycode based on terminator type
             Key key;
@@ -247,7 +253,7 @@ namespace Consolonia.PlatformSupport
                         };
                         break;
                     }
-                    case 'u' when keyCode is >= 32 and < 127:
+                    case 'u' when IsPrintableBmp(keyCode):
                     {
                         character = (char)keyCode;
                         switch (keyCode)
@@ -265,7 +271,7 @@ namespace Consolonia.PlatformSupport
                             case ' ':
                                 key = Key.Space;
                                 break;
-                            default:
+                            case >= 32 and < 127:
                                 key = (char)keyCode switch
                                 {
                                     '.' => Key.OemPeriod,
@@ -282,6 +288,22 @@ namespace Consolonia.PlatformSupport
                                     _ => Key.None
                                 };
                                 break;
+                            default:
+                                key = Key.None;
+                                break;
+                        }
+
+                        bool isShift = rawModifiers.HasFlag(RawInputModifiers.Shift);
+                        if (isShift && IsPrintableBmp(shiftedKeyCode))
+                        {
+                            // for example, '!' for Shift+1
+                            character = (char)shiftedKeyCode;
+                            if (isCapsLock)
+                                character = char.ToLowerInvariant(character);
+                        }
+                        else if (isShift ^ isCapsLock)
+                        {
+                            character = char.ToUpperInvariant(character);
                         }
 
                         break;
@@ -294,6 +316,13 @@ namespace Consolonia.PlatformSupport
             }
 
             RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+
+            return;
+
+            static bool IsPrintableBmp(int codePoint)
+            {
+                return codePoint is >= 32 and (< 0xD800 or > 0xF8FF and <= 0xFFFF);
+            }
         }
 
         private void HandleSgrMouseEvent((int button, int x, int y, bool isRelease) mouseEvent)
