@@ -403,6 +403,18 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
+        ///     A foreground (with something to draw) that shows only its cell's background on screen: a
+        ///     white-space character with no complex text and no text decoration, which would make a space
+        ///     visible. Over a picture cell, the picture is what such a cell shows.
+        /// </summary>
+        internal static bool DrawsOnlyBackground(in PixelForeground foreground)
+        {
+            Symbol symbol = foreground.Symbol;
+            return string.IsNullOrEmpty(symbol.Complex) && char.IsWhiteSpace(symbol.Character) &&
+                   foreground.TextDecoration == null;
+        }
+
+        /// <summary>
         ///     An image cell as the text cell a terminal without an image protocol shows for it: a block
         ///     glyph in the picture's colors, under the cell's paint, with the cell's own glyph kept if it
         ///     has one.
@@ -418,7 +430,9 @@ namespace Consolonia.Core.Infrastructure
                     Pixel.MergeColors(quad.Foreground.Color, paint, true)),
                 new PixelBackground(Pixel.MergeColors(quad.Background.Color, paint, false)),
                 pixel.CaretStyle);
-            return pixel.Foreground.IsNothingToDraw() || pixel.Foreground.Symbol.IsBlank()
+            // a space with no decoration draws only its background, and on a picture cell the background
+            // is the picture
+            return pixel.Foreground.IsNothingToDraw() || DrawsOnlyBackground(pixel.Foreground)
                 ? painted
                 : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
         }

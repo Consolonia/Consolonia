@@ -162,6 +162,39 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(frame, Does.Contain("\u001b[48;2;10;20;30m"), "the glyph sits on the picture's color");
         }
 
+        /// <summary>
+        ///     A space draws only its background, and on a picture cell that is the picture; an underline
+        ///     makes the space visible, so an underlined space is text, sixel or not.
+        /// </summary>
+        [TestCase(ConsoleCapabilities.SupportsSixel)]
+        [TestCase(ConsoleCapabilities.None)]
+        public void APlainSpaceOverAPictureIsThePictureAndAnUnderlinedOneIsText(ConsoleCapabilities protocol)
+        {
+            Open(protocol);
+            CellImage image = SolidImage(10, 20, 30);
+            var space = new Pixel(new PixelForeground(Symbol.Space, Colors.White),
+                new PixelBackground(Colors.Transparent, image));
+            var underlinedSpace = new Pixel(
+                new PixelForeground(Symbol.Space, Colors.White, textDecoration: TextDecorationLocation.Underline),
+                new PixelBackground(Colors.Transparent, image));
+
+            string plain = Frame((0, 0, space));
+            string underlined = Frame((0, 0, underlinedSpace));
+
+            Assert.That(plain, Does.Not.Contain(Esc.Underline));
+            Assert.That(underlined, Does.Contain(Esc.Underline), "the underline is drawn");
+            if (protocol == ConsoleCapabilities.SupportsSixel)
+            {
+                Assert.That(Count(plain, SixelStart), Is.EqualTo(1), "the plain space shows the picture");
+                Assert.That(Count(underlined, SixelStart), Is.Zero, "the underlined space is a text cell");
+            }
+            else
+            {
+                Assert.That(plain, Does.Not.Contain(" "), "the plain space shows the picture's block glyph");
+                Assert.That(underlined, Does.Contain(" "), "the underlined space is written as itself");
+            }
+        }
+
         [Test]
         public void SixelRunsSentBeforeComeFromTheCache()
         {
