@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
@@ -107,7 +108,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private static Pixel ImageCell(CellImage image, Color paint = default)
         {
-            return new Pixel(PixelForeground.Space, new PixelBackground(paint, image));
+            return new Pixel(CellImageBitmapRenderer.PictureCellForeground, new PixelBackground(paint, image));
         }
 
         private static int Count(string frame, string sequence)
@@ -163,36 +164,66 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     A space draws only its background, and on a picture cell that is the picture; an underline
-        ///     makes the space visible, so an underlined space is text, sixel or not.
+        ///     A picture cell with no symbol is the picture, and one with any symbol is text, a space as
+        ///     much as a glyph: a space drawn over a picture is a text cell, sixel or block glyphs.
         /// </summary>
         [TestCase(ConsoleCapabilities.SupportsSixel)]
         [TestCase(ConsoleCapabilities.None)]
-        public void APlainSpaceOverAPictureIsThePictureAndAnUnderlinedOneIsText(ConsoleCapabilities protocol)
+        public void APictureCellWithNoSymbolIsThePictureAndASpaceOverItIsText(ConsoleCapabilities protocol)
         {
             Open(protocol);
-            CellImage image = SolidImage(10, 20, 30);
-            var space = new Pixel(new PixelForeground(Symbol.Space, Colors.White),
-                new PixelBackground(Colors.Transparent, image));
-            var underlinedSpace = new Pixel(
-                new PixelForeground(Symbol.Space, Colors.White, textDecoration: TextDecorationLocation.Underline),
-                new PixelBackground(Colors.Transparent, image));
+            Pixel picture = ImageCell(SolidImage(10, 20, 30));
+            Pixel spaceOverPicture = picture.Blend(new Pixel(new PixelForeground(Symbol.Space, Colors.White)));
 
-            string plain = Frame((0, 0, space));
-            string underlined = Frame((0, 0, underlinedSpace));
+            string asPicture = Frame((0, 0, picture));
+            string asText = Frame((0, 0, spaceOverPicture));
 
-            Assert.That(plain, Does.Not.Contain(Esc.Underline));
-            Assert.That(underlined, Does.Contain(Esc.Underline), "the underline is drawn");
+            Assert.That(asText, Does.EndWith(" "), "the space is written");
             if (protocol == ConsoleCapabilities.SupportsSixel)
             {
-                Assert.That(Count(plain, SixelStart), Is.EqualTo(1), "the plain space shows the picture");
-                Assert.That(Count(underlined, SixelStart), Is.Zero, "the underlined space is a text cell");
+                Assert.That(Count(asPicture, SixelStart), Is.EqualTo(1), "the picture");
+                Assert.That(Count(asText, SixelStart), Is.Zero, "the space is a text cell");
             }
             else
             {
-                Assert.That(plain, Does.Not.Contain(" "), "the plain space shows the picture's block glyph");
-                Assert.That(underlined, Does.Contain(" "), "the underlined space is written as itself");
+                Assert.That(asPicture, Does.Not.Contain(" "), "the picture's block glyph, not a space");
             }
+        }
+
+        /// <summary>
+        ///     A modal's translucent backdrop blended over a picture cell, as the renderer makes it, colors
+        ///     the cell's foreground but draws no symbol on it: the cell is still the picture, dimmed.
+        /// </summary>
+        [TestCase(ConsoleCapabilities.SupportsSixel)]
+        [TestCase(ConsoleCapabilities.None)]
+        public void ABackdropBlendedOverAPictureCellLeavesThePicture(ConsoleCapabilities protocol)
+        {
+            Open(protocol);
+            Pixel dimmed = ImageCell(SolidImage(10, 20, 30))
+                .Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
+
+            string frame = Frame((0, 0, dimmed));
+
+            if (protocol == ConsoleCapabilities.SupportsSixel)
+                Assert.That(Count(frame, SixelStart), Is.EqualTo(1), "still the picture");
+            else
+                Assert.That(frame, Does.Not.Contain(" "), "still the picture's block glyph");
+        }
+
+        /// <summary>
+        ///     Under kitty the picture is a placement below the text, so a picture cell with no symbol is
+        ///     written as a space (the picture shows through it), never as a missing character, which would
+        ///     leave the terminal's cursor where it was.
+        /// </summary>
+        [Test]
+        public void KittyWritesAPictureCellWithNoSymbolAsASpace()
+        {
+            Open(ConsoleCapabilities.SupportsKittyGraphics);
+
+            string frame = Frame((0, 0, ImageCell(SolidImage(10, 20, 30))));
+
+            Assert.That(frame, Does.Contain("\u001b[49m "), "a space on the default background");
+            Assert.That(frame.IndexOf('\0', StringComparison.Ordinal), Is.EqualTo(-1), "no missing character");
         }
 
         [Test]

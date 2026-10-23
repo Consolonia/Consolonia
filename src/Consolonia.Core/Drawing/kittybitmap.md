@@ -13,7 +13,8 @@ writing cells shows nothing by itself. The encoder uses the protocol the way the
 sixel: pixels are sent when they change, and nothing is remembered about the terminal.
 
 1. **Cells are written on the default background.** `WriteCell` writes an image cell as an ordinary
-   text cell, glyph or blank, with the terminal's default background (`WriteTextCell(…, true)`).
+   text cell with the terminal's default background (`WriteTextCell(…, true)`), and a cell with no
+   symbol as a space. Text sits above the placement, so the picture shows through spaces.
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
    cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph
    over a picture is drawn by the terminal over the picture, so no dominant-colour fallback is needed.

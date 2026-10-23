@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
@@ -207,7 +208,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private static Pixel CreateImagePixel(CellImage image)
         {
-            return new Pixel(PixelForeground.Space, new PixelBackground(Colors.Transparent, image));
+            return new Pixel(CellImageBitmapRenderer.PictureCellForeground,
+                new PixelBackground(Colors.Transparent, image));
         }
 
         [Test]

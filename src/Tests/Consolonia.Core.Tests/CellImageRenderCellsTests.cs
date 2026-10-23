@@ -149,6 +149,19 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
+        ///     A picture cell draws no symbol, so the encoders show the picture until something is drawn
+        ///     over it, and is one cell wide, unlike the cells a wide glyph covers, which are never written.
+        /// </summary>
+        [Test]
+        public void PictureCellsHaveNoSymbolAndAreOneCellWide()
+        {
+            Pixel cell = Render(Picture(_seed += 0x100))[0, 0];
+
+            Assert.That(cell.Foreground.Symbol.NothingToDraw(), "no symbol, whatever color an overlay gives it");
+            Assert.That(cell.Width, Is.EqualTo(1));
+        }
+
+        /// <summary>
         ///     Both constructors guard the same way: the one taking a slab checks that the cell's pixels
         ///     lie within it, and the public one, which goes through it, that they are exactly the cell's.
         /// </summary>

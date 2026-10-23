@@ -83,10 +83,21 @@ namespace Consolonia.Core.Infrastructure
         ///     The cell is written as text on the terminal's default background, so the placement below
         ///     shows through. Konsole draws below-text (z&lt;0) placements under any explicit cell
         ///     background, so painting the cell a color, even black, hides the picture there; kitty draws
-        ///     them above either way.
+        ///     them above either way. A cell with no glyph over its picture is written as a space: the text
+        ///     sits above the placement, so the picture shows through it.
         /// </summary>
         public void WriteCell(PixelBufferCoordinate position, in Pixel pixel)
         {
+            PixelForeground foreground = pixel.Foreground;
+            if (foreground.Symbol.NothingToDraw())
+            {
+                // written, a missing glyph is no character at all, and the terminal's cursor would not move
+                var space = new Pixel(new PixelForeground(Symbol.Space, foreground.Color, foreground.PackedWeight,
+                    foreground.PackedStyle, foreground.PackedTextDecoration), pixel.Background, pixel.CaretStyle);
+                _output.WriteTextCell(position, in space, true);
+                return;
+            }
+
             _output.WriteTextCell(position, in pixel, true);
         }
 

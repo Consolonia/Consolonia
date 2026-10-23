@@ -16,10 +16,10 @@ protocol; the choice between sixel and text is made when the cell is written.
 2. **A glyph wins the cell.** An image cell with a glyph (the mouse cursor, a window edge crossing
    the picture) is written as text at once, on `Pixel.EffectiveBackgroundColor`: the paint over the
    picture's dominant colour, so the cell still looks like the picture rather than a hole in it.
-   A space with no text decoration is not a glyph (`AnsiConsoleOutput.DrawsOnlyBackground`): it draws
-   only its background, and on a picture cell the background is the picture. So a translucent overlay
-   blended over a picture cell, which leaves its space with the overlay's colour as the foreground,
-   still shows the picture, dimmed. An underlined or struck-through space is drawn, as text.
+   A picture cell with any symbol, a space included, is written as text. The renderer makes picture
+   cells with no symbol, and gaps that layout never drew keep none, so they show the picture; a
+   translucent overlay blended over a picture cell colours its foreground but draws no symbol, so the
+   cell still shows the picture, dimmed.
 3. **Runs at the frame's end.** `EndFrame` joins consecutive recorded cells on a row into runs and
    sends each run as **one sixel**: one escape sequence, one palette, one cursor move. A brush
    stroke is a one-cell run; a new picture is one run per row.

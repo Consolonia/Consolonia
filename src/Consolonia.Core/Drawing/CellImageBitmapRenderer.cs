@@ -24,6 +24,14 @@ namespace Consolonia.Core.Drawing
     internal sealed class CellImageBitmapRenderer : CellBitmapRenderer<CellRendering>
     {
         /// <summary>
+        ///     The foreground of a picture cell: no glyph, as <see cref="Symbol.Empty" /> has, but one cell
+        ///     wide. Width 0 is how the pixel buffer marks the cells a wide glyph covers, which the render
+        ///     target never writes, so a picture cell must not have it.
+        /// </summary>
+        internal static readonly PixelForeground PictureCellForeground =
+            new(new Symbol(char.MinValue, null, 0, 1), Colors.Transparent);
+
+        /// <summary>
         ///     Pixel bytes of cell images kept at least. The budget grows to <see cref="ScreensOfCellImages" />
         ///     screens on a larger screen, so a full-screen picture never evicts its own cells while it is
         ///     being made. Eviction only ends deduplication: a cell on screen holds its image by reference.
@@ -122,7 +130,7 @@ namespace Consolonia.Core.Drawing
 
                 // the picture as the cell's BACKGROUND, the foreground left free so glyphs drawn later land
                 // over it. The color starts transparent: it is the paint translucent overlays accumulate
-                cells[new PixelPoint(cellX, cellY)] = new Pixel(PixelForeground.Space,
+                cells[new PixelPoint(cellX, cellY)] = new Pixel(PictureCellForeground,
                     new PixelBackground(Colors.Transparent, image));
             }
         }

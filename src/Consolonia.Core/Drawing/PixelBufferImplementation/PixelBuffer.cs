@@ -104,7 +104,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     }
                     else if (pixel.Width > 0)
                     {
-                        stringBuilder.Append(pixel.Foreground.Symbol.GetText());
+                        // a cell with no symbol (a picture cell) prints as a space, not as a '\0'
+                        Symbol symbol = pixel.Foreground.Symbol;
+                        stringBuilder.Append(symbol.NothingToDraw() ? " " : symbol.GetText());
                         i += pixel.Width;
                     }
                     else
