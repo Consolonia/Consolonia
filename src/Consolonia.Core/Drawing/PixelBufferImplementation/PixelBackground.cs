@@ -33,7 +33,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground Shade()
         {
-            // image cells never get here: Pixel.Shade paints them instead
             return new PixelBackground(Color.Shade(), Image);
         }
 

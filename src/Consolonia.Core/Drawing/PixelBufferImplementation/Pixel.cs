@@ -37,11 +37,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        // the paint Shade and Brighten lay over image cells, roughly matching the
-        // ColorAdjustment step PixelOperations applies to plain colors
-        private static readonly Color ShadePaint = Color.FromArgb(0x40, 0x00, 0x00, 0x00);
-        private static readonly Color BrightenPaint = Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF);
-
         // the fields of the foreground's symbol, the foreground, and the background, flat (see the remarks)
         private readonly string _symbolReference;
         private readonly CellImage _image;
@@ -162,15 +157,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public Pixel Shade()
         {
-            // an image cell's colors are in the picture and its own color is the paint over it, which
-            // shifting by a step would leave as it is: lay a translucent paint over it instead
-            if (IsImage()) return Blend(new Pixel(PixelForeground.Empty, new PixelBackground(ShadePaint)));
             return new Pixel(Foreground.Shade(), Background.Shade(), CaretStyle);
         }
 
         public Pixel Brighten()
         {
-            if (IsImage()) return Blend(new Pixel(PixelForeground.Empty, new PixelBackground(BrightenPaint)));
             return new Pixel(Foreground.Brighten(), Background.Brighten(), CaretStyle);
         }
 
@@ -178,7 +169,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             PixelForeground foreground = Foreground;
             return new Pixel(new PixelForeground(foreground.Symbol,
-                    Background.EffectiveColor, // background color becomes the new foreground color
+                    _backgroundColor, // background color becomes the new foreground color
                     foreground.Weight,
                     foreground.Style,
                     foreground.TextDecoration),

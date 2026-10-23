@@ -159,24 +159,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Pixel overText = new Pixel(new PixelForeground(new Symbol('a'), Colors.Red),
                 new PixelBackground(Colors.Blue)).Blend(imagePixel);
             Assert.That(overText, Is.EqualTo(imagePixel), "an image cell drawn over a text cell takes it whole");
-
-            Assert.That(imagePixel.Shade().Background.Image, Is.SameAs(image));
-            Assert.That(imagePixel.Brighten().Background.Image, Is.SameAs(image));
-            Assert.That(imagePixel.Invert().Background.Image, Is.SameAs(image));
-        }
-
-        [Test]
-        public void ShadeAndBrightenPaintImageCells()
-        {
-            Pixel imagePixel = CreateImagePixel(CreateCellImage(128));
-
-            Color shade = imagePixel.Shade().Background.Color;
-            Assert.That(shade.A, Is.GreaterThan(0));
-            Assert.That(shade.R, Is.EqualTo(0), "a translucent black");
-
-            Color brighten = imagePixel.Brighten().Background.Color;
-            Assert.That(brighten.A, Is.GreaterThan(0));
-            Assert.That(brighten.R, Is.EqualTo(0xFF), "a translucent white");
         }
 
         /// <summary>
