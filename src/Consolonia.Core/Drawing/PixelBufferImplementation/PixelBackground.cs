@@ -21,8 +21,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     A background showing a cell of a picture. <paramref name="color" /> is the paint laid over
         ///     the picture: transparent for none, and translucent overlays blended onto the cell accumulate
-        ///     into it exactly as they do on a plain cell. The console output applies it to the image when
-        ///     the cell is written.
+        ///     into it exactly as they do on a plain cell.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground(Color color, CellImage image) : this(color)
