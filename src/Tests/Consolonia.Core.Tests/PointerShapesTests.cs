@@ -249,14 +249,36 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void ABatchWithNoReplyHasNoShapes()
+        public void RepliesThatDoNotAnswerEveryBatchAreNotTrusted()
+        {
+            // A reply carries flags, not names: with one query unanswered there is no telling whether
+            // this one answers the first batch or the second.
+            string[][] batches = [["default", "text"], ["nw-resize", "se-resize"]];
+
+            Assert.That(PointerShapes.ParseQueryReplies("\u001b]22;1,1\u001b\\\u001b[?62;22c", batches), Is.Null);
+        }
+
+        [TestCase("\u001b]22;1\u001b\\\u001b]22;1,0\u001b\\")]
+        [TestCase("\u001b]22;1,0\u001b\\\u001b]22;1,0,1\u001b\\")]
+        public void RepliesWhoseFlagsDoNotMatchTheirBatchAreNotTrusted(string answers)
         {
             string[][] batches = [["default", "text"], ["nw-resize", "se-resize"]];
 
-            IReadOnlySet<string> supported =
-                PointerShapes.ParseQueryReplies("\u001b]22;1,1\u001b\\\u001b[?62;22c", batches);
+            Assert.That(PointerShapes.ParseQueryReplies(answers, batches), Is.Null);
+        }
 
-            Assert.That(supported, Is.EquivalentTo(new[] { "default", "text" }));
+        [Test]
+        public void DetectFallsBackToXtVersionWhenAQueryGoesUnanswered()
+        {
+            // Only the last query is answered, and every shape in it is flagged.
+            IReadOnlyList<string> last = PointerShapes.QueryBatches[^1];
+            string reply = "\u001b]22;" + string.Join(",", last.Select(_ => "1")) + "\u001b\\";
+
+            (IReadOnlySet<string> supported, bool x11) =
+                PointerShapes.Detect(reply + "\u001bP>|XTerm(390)\u001b\\\u001b[?62;22c", NoEnvironment);
+
+            Assert.That(x11, Is.True, "identified by XTVERSION, not by the reply");
+            Assert.That(supported, Does.Not.Contain("copy"), "xterm has no X11 name for copy");
         }
 
         [Test]

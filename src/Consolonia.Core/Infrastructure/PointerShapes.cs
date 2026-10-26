@@ -202,16 +202,17 @@ namespace Consolonia.Core.Infrastructure
         /// </param>
         /// <param name="environment">Reads an environment variable; the fallback when nothing identifies the terminal.</param>
         /// <remarks>
-        ///     An answer to the support query is authoritative, shape by shape. Most terminals that
-        ///     draw OSC 22 pointers do not answer it, though, so without one the terminal is
-        ///     identified -- from its XTVERSION answer, or failing that its environment -- and looked
-        ///     up in <see cref="KnownSupport" />. Shared by every console that probes, so they agree.
+        ///     An answer to the support queries is authoritative, shape by shape, when there is one
+        ///     reply for each query (see <see cref="ParseQueryReplies" />). Most terminals that draw
+        ///     OSC 22 pointers do not answer it, though, so without one the terminal is identified --
+        ///     from its XTVERSION answer, or failing that its environment -- and looked up in
+        ///     <see cref="KnownSupport" />. Shared by every console that probes, so they agree.
         /// </remarks>
         public static (IReadOnlySet<string> Supported, bool UsesX11Names) Detect(string answers,
             Func<string, string> environment)
         {
-            if (QueryAnswerRegex.IsMatch(answers))
-                return (ParseQueryReplies(answers, QueryBatches), false);
+            if (ParseQueryReplies(answers, QueryBatches) is { } answered)
+                return (answered, false);
 
             return KnownSupport(ParseXtVersion(answers) ?? FromEnvironment(environment));
         }
@@ -308,16 +309,39 @@ namespace Consolonia.Core.Infrastructure
         ///     Reads the answers to several support queries, one per batch of names: the first reply
         ///     answers the first batch, and so on. Empty replies flag nothing and are passed over.
         /// </summary>
-        /// <returns>The names the terminal said it has; a batch with no reply contributes none.</returns>
+        /// <returns>
+        ///     The names the terminal said it has, or null when the replies do not pair up with the
+        ///     batches: fewer or more replies than batches, or a reply whose flags do not number its
+        ///     batch's names.
+        /// </returns>
+        /// <remarks>
+        ///     A reply carries flags, not names, so which batch it answers is known only from its
+        ///     place. If one query went unanswered, every later reply would be read against the
+        ///     wrong names, and the terminal taken to draw shapes it does not have; such an answer
+        ///     is not trusted at all.
+        /// </remarks>
         public static IReadOnlySet<string> ParseQueryReplies(string answers,
             IReadOnlyList<IReadOnlyList<string>> batches)
         {
-            var supported = new HashSet<string>(StringComparer.Ordinal);
             MatchCollection replies = QueryAnswerRegex.Matches(answers);
-            for (int i = 0; i < replies.Count && i < batches.Count; i++)
+            if (replies.Count != batches.Count)
+                return null;
+
+            var supported = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < replies.Count; i++)
+            {
+                if (FlagCount(replies[i].Value) != batches[i].Count)
+                    return null;
                 supported.UnionWith(ParseQueryReply(replies[i].Value, batches[i]));
+            }
 
             return supported;
+        }
+
+        /// <summary>How many flags a reply matched by <see cref="QueryAnswerRegex" /> carries.</summary>
+        private static int FlagCount(string reply)
+        {
+            return reply.Count(c => c == ',') + 1;
         }
     }
 
