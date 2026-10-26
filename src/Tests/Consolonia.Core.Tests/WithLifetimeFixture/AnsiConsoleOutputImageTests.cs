@@ -348,7 +348,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void KittyAsksAPlatformThatCannotEncodePngOnlyOnce(bool throws)
         {
             using IDisposable scope = AvaloniaLocator.EnterScope();
-            var renderInterface = DispatchProxy.Create<IPlatformRenderInterface, NoPngRenderInterface>();
+            IPlatformRenderInterface renderInterface =
+                DispatchProxy.Create<IPlatformRenderInterface, NoPngRenderInterface>();
             // ReSharper disable once SuspiciousTypeConversion.Global DispatchProxy.Create returns the proxy type
             var counter = (NoPngRenderInterface)renderInterface;
             counter.Throws = throws;

@@ -176,6 +176,17 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
+        ///     The terminal may no longer show what was sent (the screen was resized, and terminals differ in
+        ///     what becomes of placements then; or another program had the terminal), so every block is sent
+        ///     again next frame. The ids stay: sending under them replaces whatever the terminal still holds.
+        /// </summary>
+        public void Reset()
+        {
+            foreach (BlockState state in _blocks.Values)
+                state.Sent = default;
+        }
+
+        /// <summary>
         ///     The rectangle of image cells of the block that grows from the image cell (x, y): rightward
         ///     while cells show an image, then downward while the whole width of the next row does, never
         ///     into a cell already <paramref name="placed" /> (one flag per cell of the block, row by row).
@@ -208,17 +219,6 @@ namespace Consolonia.Core.Infrastructure
                 placed.Slice(r * columns + column, width).Fill(true);
 
             return (width, height);
-        }
-
-        /// <summary>
-        ///     The terminal may no longer show what was sent (the screen was resized, and terminals differ in
-        ///     what becomes of placements then; or another program had the terminal), so every block is sent
-        ///     again next frame. The ids stay: sending under them replaces whatever the terminal still holds.
-        /// </summary>
-        public void Reset()
-        {
-            foreach (BlockState state in _blocks.Values)
-                state.Sent = default;
         }
 
         /// <summary>
