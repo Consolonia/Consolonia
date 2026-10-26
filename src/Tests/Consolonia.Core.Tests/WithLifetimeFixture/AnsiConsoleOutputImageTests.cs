@@ -349,7 +349,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             using IDisposable scope = AvaloniaLocator.EnterScope();
             var renderInterface = DispatchProxy.Create<IPlatformRenderInterface, NoPngRenderInterface>();
-            var counter = (NoPngRenderInterface)(object)renderInterface;
+            // ReSharper disable once SuspiciousTypeConversion.Global DispatchProxy.Create returns the proxy type
+            var counter = (NoPngRenderInterface)renderInterface;
             counter.Throws = throws;
             AvaloniaLocator.CurrentMutable.Bind<IPlatformRenderInterface>().ToConstant(renderInterface);
 

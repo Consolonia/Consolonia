@@ -344,6 +344,7 @@ namespace Consolonia.Core.Infrastructure
                     // null where the application handled the not-supported request
                     using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
                         (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
+                    // ReSharper disable once ConstantConditionalAccessQualifier annotated non-null, but it can be
                     bitmap?.Save(png, PngBitmapEncoderOptions.Default);
                     // a platform with no image codec saves nothing rather than throwing
                     if (png.Length > 0)
