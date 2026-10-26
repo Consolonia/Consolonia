@@ -27,17 +27,17 @@ namespace Consolonia
                 // in design mode we can't use any console operations at all, so we use a dummy IConsole.
                 return builder.UseConsole(new DummyConsole());
 
-            IConsole console = Environment.OSVersion.Platform switch
-            {
-#pragma warning disable CA1416 // Validate platform compatibility
-                PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT =>
-                    new Win32Console(Console.IsOutputRedirected || IsPseudoConsole()
-                        ? new AnsiConsoleOutput()
-                        : new WindowsLegacyConsoleOutput()),
-#pragma warning restore CA1416 // Validate platform compatibility
-                PlatformID.Unix or PlatformID.MacOSX => new CursesConsole(),
-                _ => new DefaultNetConsole()
-            };
+            // OperatingSystem.IsWindows() rather than Environment.OSVersion: trimming and NativeAOT drop the Windows
+            // console (and its dependencies) when publishing for another OS.
+            IConsole console;
+            if (OperatingSystem.IsWindows())
+                console = new Win32Console(Console.IsOutputRedirected || IsPseudoConsole()
+                    ? new AnsiConsoleOutput()
+                    : new WindowsLegacyConsoleOutput());
+            else if (Environment.OSVersion.Platform is PlatformID.Unix or PlatformID.MacOSX)
+                console = new CursesConsole();
+            else
+                console = new DefaultNetConsole();
 
             return builder.UseConsole(console)
                 .UseAutoDetectClipboard()
@@ -129,17 +129,14 @@ namespace Consolonia
             IConsoleColorMode result;
             if (Design.IsDesignMode)
                 result = new RgbConsoleColorMode();
+            else if (OperatingSystem.IsWindows())
+                // if output is redirected, or we are a windows terminal we use the win32 ANSI based console.
+                result = Console.IsOutputRedirected || IsPseudoConsole()
+                    ? new RgbConsoleColorMode()
+                    : new EgaConsoleColorMode(true);
             else
                 switch (Environment.OSVersion.Platform)
                 {
-                    case PlatformID.Win32S or PlatformID.Win32Windows or PlatformID.Win32NT:
-                    {
-                        if (Console.IsOutputRedirected || IsPseudoConsole())
-                            result = new RgbConsoleColorMode();
-                        else
-                            result = new EgaConsoleColorMode(true);
-                    }
-                        break;
                     case PlatformID.MacOSX:
                         result = new RgbConsoleColorMode();
                         break;

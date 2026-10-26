@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
 namespace Consolonia.Core.Dummy
@@ -58,11 +59,7 @@ namespace Consolonia.Core.Dummy
 
         public int Version { get; set; }
 
-        public void Save(string fileName, int? quality = null)
-        {
-        }
-
-        public void Save(Stream stream, int? quality = null)
+        public void Save(Stream stream, BitmapEncoderOptions options)
         {
         }
 
