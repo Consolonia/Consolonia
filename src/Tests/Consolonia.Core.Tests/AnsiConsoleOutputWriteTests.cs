@@ -112,7 +112,7 @@ namespace Consolonia.Core.Tests
             _output.Flush();
 
             Assert.That(Encoding.ASCII.GetString(Written()),
-                Is.EqualTo(KittyGraphics.BuildTransmitSequence(9, 50, 40, data, KittyImageFormat.Rgba, true)));
+                Is.EqualTo(KittyGraphicsTests.TransmitSequence(9, 50, 40, data, KittyImageFormat.Rgba, true)));
         }
 
         [Test]

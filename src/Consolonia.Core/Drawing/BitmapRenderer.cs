@@ -24,10 +24,8 @@ namespace Consolonia.Core.Drawing
     // ReSharper restore NotAccessedPositionalProperty.Global
 
     /// <summary>
-    ///     Strategy for drawing a bitmap into the pixel buffer. One renderer serves a terminal (the render
-    ///     target keeps it, the drawing contexts borrow it), chosen by the console's capabilities. A
-    ///     console with an image protocol gets cells showing a <see cref="CellImage" />, which its output
-    ///     encodes; any other gets text cells.
+    ///     Strategy for drawing a bitmap into the pixel buffer, chosen by the console's capabilities: cells
+    ///     showing a <see cref="CellImage" /> for a console with an image protocol, block glyphs otherwise.
     /// </summary>
     internal abstract class BitmapRenderer
     {
@@ -199,8 +197,7 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     Blends the visible part of a rendered per-cell bitmap into the pixel buffer and marks it
-        ///     dirty, as every drawing operation does. Cells that did not change are not written to the
-        ///     terminal again: the render target compares each dirty cell with what it last wrote.
+        ///     dirty, as every drawing operation does.
         /// </summary>
         /// <param name="context">The drawing context whose pixel buffer takes the cells.</param>
         /// <param name="renderedBitmap">The rendering, one cell per cell.</param>

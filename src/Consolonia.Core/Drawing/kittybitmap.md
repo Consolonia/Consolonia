@@ -13,7 +13,8 @@ writing cells shows nothing by itself. The encoder uses the protocol the way the
 sixel: pixels are sent when they change, and nothing is remembered about the terminal.
 
 1. **Cells are written on the default background.** `WriteCell` writes an image cell as an ordinary
-   text cell, glyph or blank, with the terminal's default background (`WriteTextCell(…, true)`).
+   text cell with the terminal's default background (`WriteTextCell(…, true)`), and a cell with no
+   symbol as a space. Text sits above the placement, so the picture shows through spaces.
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
    cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph
    over a picture is drawn by the terminal over the picture, so no dominant-colour fallback is needed.
@@ -48,7 +49,7 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
    screen that shrank are deleted too. The terminal therefore never holds more images than the
    screen has blocks.
 4. **Placements cover image cells only, placed right after the transmit.** Within the block the
-   image cells are grown into maximal rectangles (`CellRectangles.GrowRectangle`), and each is placed
+   image cells are grown into maximal rectangles (`GrowPlacement`), and each is placed
    at its cells as a crop of the block's image (`x=`, `y=`, `w=`, `h=` in pixels; placement ids 1, 2,
    … within the image), z=-2 (below text, above background colours), `C=1` so the cursor doesn't
    move. A block the picture fills is one placement; a block with a dialog's corner in it is a few.
@@ -121,8 +122,6 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
   Each chunk ends `m=1` except the last, which ends `m=0`.
 - **Encoding.** Base64 is written with `Base64.EncodeToUtf8`. The buffer is sized up front by
   `MaxTransmitLength`.
-- **Same bytes as a string.** `BuildTransmitSequence` composes the same bytes and decodes them to a
-  string, for the tests (`AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs`).
 - **PNG first, RGBA with zlib otherwise.** On three Gallery photos at full HD, cut into 64×64
   blocks, 0.29 to 0.59 MB as PNG against 0.61 to 1.32 MB as zlib level 1 (0.39 to 1.00 MB at
   level 6, which costs more than twice the time per block and is not used).
@@ -151,7 +150,7 @@ nothing encoded) is `BitmapFrameBenchmarks`; the table is in [bitmap.md](bitmap.
 
 | Tests | Cover |
 |---|---|
-| `KittyGraphicsTests` | Sequence formats (single chunk, chunked reassembly, PNG without dimensions, placements, washes, deletes), ids staying positive past overflow, and the registry: transmitted images are deleted together unless deleted one by one. |
+| `KittyGraphicsTests` | Sequence formats (single chunk, chunked reassembly, PNG without dimensions, placements, deletes), ids staying positive past overflow, and the registry: transmitted images are deleted together unless deleted one by one. |
 | `WithLifetimeFixture/AnsiConsoleOutputImageTests` | A block of cells is one image and one placement, written on the default background; only the image cells of a block are placed, as crops; a stroke re-sends the block under the same id with no delete; paint is sent in the pixels and undimming sends the block again as it was; a reset sends everything again under the same ids; a block with no picture left has its image deleted; a dialog dragged across a picture leaves the live placements covering exactly the image cells after every frame, with only the blocks along its edges re-sent. |
 | `WithLifetimeFixture/CellImageBitmapRendererTests` | With the kitty capability, the same renderer tests as with sixel. |
 | `AnsiConsoleOutputWriteTests` | A transmit written as bytes is the same as the one built as a string. |

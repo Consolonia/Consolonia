@@ -54,10 +54,14 @@ word sixel or kitty is in `Consolonia.Core.Infrastructure`, behind `AnsiConsoleO
 - **`PixelBackground`** is a `Color` and an optional `Image`. For an image cell the colour is the
   **paint** laid over the picture: transparent for none. Translucent overlays (a modal's backdrop, a
   shade) accumulate into it through the same `Blend` as a plain cell's colour. The output applies
-  the paint to the picture when the cell is written. `EffectiveColor` is what the cell looks: the
+  the paint to the picture when the cell is written. `Pixel.EffectiveBackgroundColor` is what the cell looks: the
   colour, or for an image cell the paint over the picture's dominant colour, for the few places that
   need one colour (the mouse cursor's contrast, a glyph a protocol cannot draw over an image, the
   fallback with no protocol, `Invert`).
+- **A picture cell's foreground has no symbol** (`CellImageBitmapRenderer.PictureCellForeground`:
+  no glyph, like `Symbol.Empty`, but one cell wide, since width 0 marks the cells a wide glyph covers,
+  which are never written). A picture cell with any symbol, a space included, is written as text on
+  sixel and the block-glyph fallback; gaps that layout never drew keep no symbol and show the picture.
 - **`Pixel.Blend`** has one rule for pictures: an image cell above takes the cell whole (its own
   colours are transparent and would otherwise read as nothing drawn). Everything else is the general
   rule: an opaque background evicts the image through the opaque fast path, a translucent one merges
@@ -173,7 +177,7 @@ protocols: a cell is a cell.
 1. **`BeginFrame`.** The console is told a frame starts.
 2. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
    pixels) goes through `IConsoleOutput.WritePixel`. The cell under the mouse cursor gets the cursor
-   glyph in its foreground; its contrast colour comes from `PixelBackground.EffectiveColor`, so over
+   glyph in its foreground; its contrast colour comes from `Pixel.EffectiveBackgroundColor`, so over
    a picture it is computed against the paint over the dominant colour.
 3. **`EndFrame(screen)`.** Every changed cell has been written; the console gets the whole buffer,
    which is what the terminal should now show.
@@ -192,8 +196,8 @@ console's `IConsoleImageEncoder`:
 
 | | `WriteCell` (per changed cell) | `EndFrame` (once per frame) |
 |---|---|---|
-| **Sixel** | A cell with a glyph is written as text on `EffectiveColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
-| **Kitty** | Written as text on the terminal's default background (Konsole hides below-text placements under any explicit cell background), glyph or blank. | The screen is walked in 8×4-cell blocks. A block whose key (its cells' image digests and paint) changed since it was last sent is transmitted again under the block's own image id, which replaces the image and its placements in the terminal, and its image cells are placed as crops. A block with no picture left has its image deleted. |
+| **Sixel** | A cell with a glyph is written as text on `Pixel.EffectiveBackgroundColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
+| **Kitty** | Written as text on the terminal's default background (Konsole hides below-text placements under any explicit cell background); a cell with no symbol as a space, which the picture shows through. | The screen is walked in 8×4-cell blocks. A block whose key (its cells' image digests and paint) changed since it was last sent is transmitted again under the block's own image id, which replaces the image and its placements in the terminal, and its image cells are placed as crops. A block with no picture left has its image deleted. |
 | **None** (a console that reports no image protocol, given an image cell anyway) | The cell as a block glyph in the picture's colours under its paint (`QuadPixelBitmapRenderer.FromPixels`), its own glyph kept. | Nothing. |
 
 Why the per-cell call is needed: the dirty rectangles say which cells were redrawn, but only the
@@ -403,7 +407,7 @@ In `src/Tests/Consolonia.Core.Tests`:
 | `BitmapRendererTests` | The visible pixels of a picture at its own size, measured by the framebuffer rather than the layout size. |
 | `CellRenderingTests` | Cell reuse across versions, reallocation on a size change, showing nothing until complete, least-recently-drawn eviction. |
 | `CellImageRenderCellsTests`, `WithLifetimeFixture/CellImageBitmapRendererTests` | The renderer: an edited cell is the only one made again, identical cells share one image, a cell keeps its exact pixels; drawing at target size, over a picture, clipped, partially redrawn, edited, at a new version. The latter runs once per capability to show the renderer is the same. |
-| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | The encoders: sixel neighbours are one sixel and cells apart are not, a glyph over a picture is text on its colour, runs come from the cache; a kitty block is one image and one placement on the default background, a stroke replaces the block it touched, paint is a wash placement, a reset places everything again; without a protocol a picture is block glyphs. |
+| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | The encoders: sixel neighbours are one sixel and cells apart are not, a glyph over a picture is text on its colour, runs come from the cache; a kitty block is one image and one placement on the default background, a stroke replaces the block it touched, paint is composited into the block's pixels, a reset places everything again; without a protocol a picture is block glyphs. |
 | `SixelPaletteTests` | Only used colours are defined, a transient image renders the same bytes without keeping them, too-small arrays are refused, exact versus Wu quantisation, rounded percentages. |
 | `KittyGraphicsTests`, `KittyImageLifetimeTests` | The kitty sequences, ids and registry; orphaned images and the cache budget. |
 | `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again. |

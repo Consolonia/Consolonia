@@ -14,11 +14,12 @@ protocol; the choice between sixel and text is made when the cell is written.
    the terminal shows, row by row. `WriteCell` records each image cell without a glyph: its
    position, its image and its paint.
 2. **A glyph wins the cell.** An image cell with a glyph (the mouse cursor, a window edge crossing
-   the picture) is written as text at once, on `PixelBackground.EffectiveColor`: the paint over the
+   the picture) is written as text at once, on `Pixel.EffectiveBackgroundColor`: the paint over the
    picture's dominant colour, so the cell still looks like the picture rather than a hole in it.
-   A blank symbol is not a glyph (`Symbol.IsBlank`: nothing, or white space): a translucent overlay
-   blended over a picture cell leaves its space with the overlay's colour as the foreground, and
-   that cell is still the picture, dimmed.
+   A picture cell with any symbol, a space included, is written as text. The renderer makes picture
+   cells with no symbol, and gaps that layout never drew keep none, so they show the picture; a
+   translucent overlay blended over a picture cell colours its foreground but draws no symbol, so the
+   cell still shows the picture, dimmed.
 3. **Runs at the frame's end.** `EndFrame` joins consecutive recorded cells on a row into runs and
    sends each run as **one sixel**: one escape sequence, one palette, one cursor move. A brush
    stroke is a one-cell run; a new picture is one run per row.
@@ -107,7 +108,7 @@ The cell's own colour is the paint, transparent when there is none, so the text 
 with a transparent background and look like a cell-shaped hole in the picture.
 
 **Implemented:** `CellImage.DominantColor` is the colour covering most of the cell's pixels,
-computed lazily. `PixelBackground.EffectiveColor` composites the paint over it, so a dimmed
+computed lazily. `Pixel.EffectiveBackgroundColor` blends the paint over it, so a dimmed
 picture's text cells match the dimmed picture. The sixel encoder writes a glyph cell on that colour.
 The pixel buffer keeps the image under the glyph; it is the sixel encoder, not `Pixel.Blend`, that
 turns the cell into text, because it is the protocol that cannot show both.

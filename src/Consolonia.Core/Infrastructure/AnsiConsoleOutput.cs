@@ -428,10 +428,12 @@ namespace Consolonia.Core.Infrastructure
             Color paint = pixel.Background.Color;
             var painted = new Pixel(
                 new PixelForeground(quad.Foreground.Symbol,
-                    PixelBackground.ColorOver(paint, quad.Foreground.Color)),
-                new PixelBackground(PixelBackground.ColorOver(paint, quad.Background.Color)),
+                    Pixel.MergeColors(quad.Foreground.Color, paint, true)),
+                new PixelBackground(Pixel.MergeColors(quad.Background.Color, paint, false)),
                 pixel.CaretStyle);
-            return pixel.Foreground.IsNothingToDraw() || pixel.Foreground.Symbol.IsBlank()
+            // a picture cell with any symbol is written as text; one with none (nothing drawn over the
+            // picture) is the picture
+            return pixel.Foreground.IsNothingToDraw()
                 ? painted
                 : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
         }

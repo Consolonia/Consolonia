@@ -42,6 +42,14 @@ namespace Consolonia.Core.Drawing
         /// </summary>
         internal const int CellsPerSlab = 64;
 
+        /// <summary>
+        ///     The foreground of a picture cell: no glyph, as <see cref="Symbol.Empty" /> has, but one cell
+        ///     wide. Width 0 is how the pixel buffer marks the cells a wide glyph covers, which the render
+        ///     target never writes, so a picture cell must not have it.
+        /// </summary>
+        internal static readonly PixelForeground PictureCellForeground =
+            new(new Symbol(char.MinValue, null, 0, 1), Colors.Transparent);
+
         /// <summary>The slab the next new cell image goes into, and how much of it is taken. Per render thread.</summary>
         [ThreadStatic] private static byte[] _slab;
 
@@ -122,7 +130,7 @@ namespace Consolonia.Core.Drawing
 
                 // the picture as the cell's BACKGROUND, the foreground left free so glyphs drawn later land
                 // over it. The color starts transparent: it is the paint translucent overlays accumulate
-                cells[new PixelPoint(cellX, cellY)] = new Pixel(PixelForeground.Space,
+                cells[new PixelPoint(cellX, cellY)] = new Pixel(PictureCellForeground,
                     new PixelBackground(Colors.Transparent, image));
             }
         }

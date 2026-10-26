@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
@@ -159,24 +160,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Pixel overText = new Pixel(new PixelForeground(new Symbol('a'), Colors.Red),
                 new PixelBackground(Colors.Blue)).Blend(imagePixel);
             Assert.That(overText, Is.EqualTo(imagePixel), "an image cell drawn over a text cell takes it whole");
-
-            Assert.That(imagePixel.Shade().Background.Image, Is.SameAs(image));
-            Assert.That(imagePixel.Brighten().Background.Image, Is.SameAs(image));
-            Assert.That(imagePixel.Invert().Background.Image, Is.SameAs(image));
-        }
-
-        [Test]
-        public void ShadeAndBrightenPaintImageCells()
-        {
-            Pixel imagePixel = CreateImagePixel(CreateCellImage(128));
-
-            Color shade = imagePixel.Shade().Background.Color;
-            Assert.That(shade.A, Is.GreaterThan(0));
-            Assert.That(shade.R, Is.EqualTo(0), "a translucent black");
-
-            Color brighten = imagePixel.Brighten().Background.Color;
-            Assert.That(brighten.A, Is.GreaterThan(0));
-            Assert.That(brighten.R, Is.EqualTo(0xFF), "a translucent white");
         }
 
         /// <summary>
@@ -200,14 +183,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             var image = new CellImage(bgra, 8, 16);
             Pixel pixel = CreateImagePixel(image);
             Assert.That(image.DominantColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
-            Assert.That(pixel.Background.EffectiveColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
+            Assert.That(pixel.EffectiveBackgroundColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
 
             Pixel dimmed = pixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
-            Color effective = dimmed.Background.EffectiveColor;
+            Color effective = dimmed.EffectiveBackgroundColor;
             Assert.That(effective.A, Is.EqualTo(0xFF));
             Assert.That(effective.R, Is.InRange(90, 110), "black at half alpha over gray 200");
 
-            Assert.That(new PixelBackground(Colors.Blue).EffectiveColor, Is.EqualTo(Colors.Blue),
+            Assert.That(new Pixel(new PixelBackground(Colors.Blue)).EffectiveBackgroundColor, Is.EqualTo(Colors.Blue),
                 "a plain cell's effective color is its color");
         }
 
@@ -225,7 +208,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private static Pixel CreateImagePixel(CellImage image)
         {
-            return new Pixel(PixelForeground.Space, new PixelBackground(Colors.Transparent, image));
+            return new Pixel(CellImageBitmapRenderer.PictureCellForeground,
+                new PixelBackground(Colors.Transparent, image));
         }
 
         [Test]

@@ -169,10 +169,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     If cell has complex text (more than one char) this contains the full unicode sequence to draw this symbol.
         /// </summary>
-        public string Complex { get; }
-
-        /// <summary>The complex text as stored, null for none; what <see cref="Pixel" /> keeps.</summary>
-        internal string Reference => Complex;
+        public readonly string Complex;
 
         // box pattern for box merging.
         public readonly byte Pattern;
@@ -199,15 +196,6 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public bool NothingToDraw()
         {
             return Character == char.MinValue && string.IsNullOrEmpty(Complex);
-        }
-
-        /// <summary>
-        ///     Shows nothing in the cell: nothing to draw, or white space. A cell showing a picture under a
-        ///     blank symbol is still the picture, whatever color the symbol has.
-        /// </summary>
-        public bool IsBlank()
-        {
-            return string.IsNullOrEmpty(Complex) && (Character == char.MinValue || char.IsWhiteSpace(Character));
         }
 
         public Symbol Blend(ref Symbol symbolAbove)

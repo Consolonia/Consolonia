@@ -14,14 +14,15 @@ using Consolonia.NUnit;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     One whole frame of a full-screen picture: drawn into the pixel buffer, then rendered to the
-    ///     console, for the sixel and the kitty renderer.
+    ///     One whole frame of a full-screen picture: drawn into the pixel buffer as cell images, then
+    ///     rendered to the console.
     /// </summary>
     /// <remarks>
-    ///     The console is the unit test console, which keeps no output, so what is measured is the work
-    ///     Consolonia does per frame, not the terminal's. The scenarios: the picture drawn again unchanged
-    ///     (as when anything over it repaints), and a brush stroke changing one pixel of a writeable
-    ///     picture in place.
+    ///     The console is the unit test console, which keeps no output and has no image encoder, so what
+    ///     is measured is the work Consolonia does per frame before any encoding, the same for sixel and
+    ///     kitty (<see cref="ConsoleOutputBenchmarks" /> measures the encoders). The scenarios: the
+    ///     picture drawn again unchanged (as when anything over it repaints), and a brush stroke changing
+    ///     one pixel of a writeable picture in place.
     /// </remarks>
     [MemoryDiagnoser]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
@@ -41,10 +42,6 @@ namespace Consolonia.Benchmarks
         private int _stroke;
         private ConsoleWindowImpl _window = null!;
 
-        // ReSharper disable once UnusedAutoPropertyAccessor.Global BenchmarkDotNet sets it per run
-        [Params(ConsoleCapabilities.SupportsSixel, ConsoleCapabilities.SupportsKittyGraphics)]
-        public ConsoleCapabilities Protocol { get; set; }
-
         [GlobalSetup]
         public void Setup()
         {
@@ -62,7 +59,8 @@ namespace Consolonia.Benchmarks
                     UnsafeRendering = false
                 }), []);
             console.SetupLifetime(_lifetime);
-            console.Capabilities = Protocol;
+            // any image protocol: the renderer makes cell images for either
+            console.Capabilities |= ConsoleCapabilities.SupportsSixel;
 
             _window = new ConsoleWindowImpl();
             _renderTarget = new RenderTarget(new IPlatformRenderSurface[] { _window });
@@ -91,7 +89,7 @@ namespace Consolonia.Benchmarks
             Frame();
         }
 
-        /// <summary>One pixel painted, as under a brush: one cell (sixel) or one tile (kitty) is new.</summary>
+        /// <summary>One pixel painted, as under a brush: one cell image is new.</summary>
         [Benchmark]
         public void BrushStroke()
         {

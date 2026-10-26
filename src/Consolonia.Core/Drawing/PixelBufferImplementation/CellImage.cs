@@ -38,17 +38,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <param name="height">Height of the cell in pixels.</param>
         /// <exception cref="ArgumentException"><paramref name="bgra" /> is not exactly the pixels of the cell.</exception>
         public CellImage(byte[] bgra, int width, int height)
+            : this(bgra ?? throw new ArgumentNullException(nameof(bgra)), 0, width, height,
+                XxHash128.HashToUInt128(bgra))
         {
-            ArgumentNullException.ThrowIfNull(bgra);
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
             if (bgra.Length != width * height * 4)
                 throw new ArgumentException("The pixels are not exactly those of the cell.", nameof(bgra));
-
-            _pixels = bgra;
-            Width = width;
-            Height = height;
-            Digest = XxHash128.HashToUInt128(bgra);
         }
 
         /// <summary>
@@ -57,8 +51,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         ///     <paramref name="digest" />. For the renderer, which hashes a cell to look it up before it
         ///     decides to keep it, and keeps the new cells of one render in one array.
         /// </summary>
+        /// <exception cref="ArgumentException">The pixels run past the end of <paramref name="pixels" />.</exception>
         internal CellImage(byte[] pixels, int offset, int width, int height, UInt128 digest)
         {
+            ArgumentNullException.ThrowIfNull(pixels);
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+            if (pixels.Length - offset < width * height * 4)
+                throw new ArgumentException("The pixels run past the end of the array.", nameof(pixels));
+
             _pixels = pixels;
             _offset = offset;
             Width = width;
