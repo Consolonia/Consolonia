@@ -11,6 +11,8 @@ namespace Consolonia.Core.Tests
     public class MockConsoleCapabilities : IConsoleCapabilities
     {
         public ConsoleCapabilities Capabilities { get; set; }
+        public int CellPixelWidth { get; set; } = 8;
+        public int CellPixelHeight { get; set; } = 16;
     }
 
     [TestFixture]

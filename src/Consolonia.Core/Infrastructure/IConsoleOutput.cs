@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using System.Threading.Tasks;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -71,10 +73,45 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
+        ///     The render target is about to write a frame: the cells that changed since the last one.
+        /// </summary>
+        void BeginFrame()
+        {
+        }
+
+        /// <summary>
+        ///     Every changed cell of the frame has been written; <paramref name="screen" /> is what the
+        ///     terminal should now show. An output with per-frame work besides the cells (an image protocol
+        ///     placing its pictures) does it here.
+        /// </summary>
+        void EndFrame(PixelBuffer screen)
+        {
+        }
+
+        /// <summary>
+        ///     The render target no longer trusts what the terminal shows (the screen was resized, another
+        ///     program had the terminal) and will write every cell again. Whatever the output believes about
+        ///     the terminal's state is no longer true either.
+        /// </summary>
+        void ResetCache()
+        {
+        }
+
+        /// <summary>
         ///     Write raw text to the console
         /// </summary>
         /// <param name="str"></param>
         void WriteText(string str);
+
+        /// <summary>
+        ///     Write raw ASCII escape sequences given as bytes, such as image payloads, which an output that
+        ///     buffers bytes takes without converting them to text and back.
+        /// </summary>
+        /// <remarks>Like <see cref="WriteText" />, this does not move the caret position.</remarks>
+        void WriteBytes(ReadOnlySpan<byte> ascii)
+        {
+            WriteText(Encoding.ASCII.GetString(ascii));
+        }
 
         /// <summary>
         ///     Flush any buffered output

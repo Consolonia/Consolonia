@@ -146,7 +146,7 @@ namespace Consolonia.PlatformSupport
                 try
                 {
                     WriteText(Esc.QueryKittyKeyboardFlags);
-                    WriteText("\u001b[c"); // sentinel: Device Attributes query
+                    WriteText(Esc.RequestDeviceAttributes); // sentinel: every terminal answers DA1
                     Flush(); // the queries must actually reach the terminal, otherwise it never responds
 
                     Curses.timeout(100);
