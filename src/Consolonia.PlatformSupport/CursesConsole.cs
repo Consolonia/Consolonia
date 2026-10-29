@@ -457,6 +457,13 @@ namespace Consolonia.PlatformSupport
                 new PasteBlockMatcher<int>(buffer => { RaiseTextInput(buffer, (ulong)Environment.TickCount64); },
                     cp => new Rune(cp)), 0, 0, 0);
 
+            // CSI sequences (CSI u, CSI letter, CSI tilde). Registered for every terminal, not only the kitty ones:
+            // terminfo of the Linux console has no entries for modifier-combined navigation keys, so ncurses hands
+            // their raw bytes (ESC [ 1 ; mod letter) over to us untranslated. This matcher has to sit above the ones
+            // below, otherwise the generic matcher flushes those bytes as text.
+            yield return new SafeLockMatcher(
+                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
+
             foreach (IMatcher<(int, int)> matcher in TryGetKittyMatchers())
                 yield return matcher;
 

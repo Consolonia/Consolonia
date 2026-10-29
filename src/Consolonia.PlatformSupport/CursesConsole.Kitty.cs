@@ -185,10 +185,6 @@ namespace Consolonia.PlatformSupport
             if (!_isKittyKeyboardEnabled)
                 yield break;
 
-            // CSI sequences (CSI u, CSI letter, CSI tilde)
-            yield return new SafeLockMatcher(
-                new CsiKeyboardMatcher<int>(HandleCsiKeyboardEvent, cp => new Rune(cp)), 0, 0, 0);
-
             // SGR extended mouse sequences (ESC [ &lt; button ; x ; y M/m)
             yield return new SafeLockMatcher(
                 new SgrMouseMatcher<int>(HandleSgrMouseEvent, cp => new Rune(cp)), 0, 0, 0);
@@ -205,6 +201,19 @@ namespace Consolonia.PlatformSupport
             int modifierValue = csiEvent.modifiers - 1; // Protocol uses modifiers + 1
             int eventType = csiEvent.eventType;
             char terminator = csiEvent.terminator;
+
+            // xterm `modifyOtherKeys` reports CSI 27 ; modifiers ; codepoint ~ over the same codepoint space as CSI u
+            if (terminator == '~' && keyCode == 27)
+            {
+                keyCode = eventType;
+                terminator = 'u';
+            }
+
+            // Only the kitty protocol reports event types. Any other terminal sends a whole press as one sequence,
+            // so we have to complete it with a release ourselves.
+            bool reportsEventTypes = _isKittyKeyboardEnabled;
+            if (!reportsEventTypes)
+                eventType = 1;
 
             // event type 3 = release, we handle press (1) and repeat (2)
             bool isDown = eventType != 3;
@@ -315,7 +324,11 @@ namespace Consolonia.PlatformSupport
                 }
             }
 
-            RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+            ulong timeStamp = (ulong)Environment.TickCount64;
+            RaiseKeyPress(key, character, rawModifiers, isDown, timeStamp);
+
+            if (!reportsEventTypes)
+                RaiseKeyPress(key, character, rawModifiers, false, timeStamp);
 
             return;
 

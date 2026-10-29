@@ -152,6 +152,15 @@ namespace Consolonia.Core.Tests
         [TestCase("\x1b[1092:1060:97;2u", 1092, 2, 1, 'u', 1060)]
         [TestCase("\x1b[1092::97u", 1092, 1, 1, 'u', 0)]
         [TestCase("\x1b[50:64;2:2u", 50, 2, 2, 'u', 64)]
+        // what the Linux console sends for modifier-combined navigation keys, see k_cur()/k_csi() in the kernel's
+        // drivers/tty/vt/keyboard.c. Its terminfo has no entries for them, so ncurses hands the bytes over as is.
+        [TestCase("\x1b[1;2D", 1, 2, 1, 'D', 0)] // SHIFT+LEFT
+        [TestCase("\x1b[1;5D", 1, 5, 1, 'D', 0)] // CTRL+LEFT
+        [TestCase("\x1b[1;6C", 1, 6, 1, 'C', 0)] // CTRL+SHIFT+RIGHT
+        [TestCase("\x1b[1;2~", 1, 2, 1, '~', 0)] // SHIFT+HOME
+        [TestCase("\x1b[4;5~", 4, 5, 1, '~', 0)] // CTRL+END
+        [TestCase("\x1b[3;5~", 3, 5, 1, '~', 0)] // CTRL+DELETE
+        [TestCase("\x1b[27;5;13~", 27, 5, 13, '~', 0)] // xterm modifyOtherKeys CTRL+ENTER
         public void CsiKeyboardMatcherTest(string input, int expectedKey, int expectedModifiers, int expectedEventType,
             char expectedTerminator, int expectedShiftedKey)
         {
@@ -166,6 +175,55 @@ namespace Consolonia.Core.Tests
             Assert.AreEqual(expectedEventType, matched.Value.eventType);
             Assert.AreEqual(expectedTerminator, matched.Value.terminator);
             Assert.AreEqual(expectedShiftedKey, matched.Value.shiftedKeyCode);
+        }
+
+        /// <summary>
+        ///     The matchers are ordered like in <c>CursesConsole.GetMatchers</c>. While a CSI sequence is still
+        ///     incomplete, the last resort generic matcher must not emit the bytes it has collected so far.
+        /// </summary>
+        [Test]
+        public void IncompleteCsiSequenceIsNotLeakedToGenericMatcher()
+        {
+            List<string> output = [];
+
+            var processor = new InputProcessor<char>(
+            [
+                new PasteBlockMatcher<char>(str => output.Add("paste:" + str), c => new Rune(c)),
+                new CsiKeyboardMatcher<char>(_ => output.Add("csi"), c => new Rune(c)),
+                new GenericMatcher<char>(c => output.Add("char:" + c), EscapeDoesNotComeItself)
+            ]);
+
+            processor.ProcessChunk("\x1b[1;2D".ToCharArray()); // SHIFT+LEFT as the Linux console sends it
+
+            Assert.AreEqual(new List<string> { "csi" }, output);
+        }
+
+        /// <summary>
+        ///     The matchers are ordered like in <c>CursesConsole.GetMatchers</c>. A lone ESC is not a CSI
+        ///     sequence yet - it is the leading half of an Alt+key combination - so the CSI matcher must not
+        ///     claim it and make the matcher below lose it.
+        /// </summary>
+        [Test]
+        public void AltKeyCombinationIsNotClaimedByCsiMatcher()
+        {
+            List<string> output = [];
+
+            var processor = new InputProcessor<char>(
+            [
+                new PasteBlockMatcher<char>(str => output.Add("paste:" + str), c => new Rune(c)),
+                new CsiKeyboardMatcher<char>(_ => output.Add("csi"), c => new Rune(c)),
+                new RegexMatcher<char>(_ => output.Add("alt-key"), c => new Rune(c), @"^\x1B[^\x1B\[]*$", 2),
+                new GenericMatcher<char>(c => output.Add("char:" + c), EscapeDoesNotComeItself)
+            ]);
+
+            processor.ProcessChunk("\u001bb".ToCharArray()); // ALT+B, note \x1b would swallow the b as a hex digit
+
+            Assert.AreEqual(new List<string> { "alt-key" }, output);
+        }
+
+        private static bool EscapeDoesNotComeItself(char c)
+        {
+            return c != '\x1b';
         }
     }
 }

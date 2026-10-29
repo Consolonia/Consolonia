@@ -65,10 +65,13 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override bool TryFlush()
         {
-            // Always return false: CSI sequences are auto-flushed on completion,
-            // and returning true here would block lower-priority matchers (like
-            // SgrMouseMatcher) from flushing when this matcher has partial data.
-            return false;
+            // A lone ESC is still ambiguous: it may turn out to be a solo escape or the leading half of an
+            // Alt+key combination, and the matchers below have to be able to keep collecting it across input
+            // chunks. From the CSI introducer on the sequence is ours, so we pretend to have flushed it -
+            // the same lie StartsEndsWithMatcher tells - to keep the matchers below from emitting the bytes
+            // of the still incomplete sequence on their own. Other accumulator matchers (SgrMouseMatcher)
+            // do not lose their partial data to that, because their Reset keeps it.
+            return Accumulator.Length > 1 && Accumulator[1] == '[';
         }
 
         /// <summary>
