@@ -70,12 +70,6 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        /// <summary>Moves the console's cursor; tests replace it, having no console.</summary>
-        internal virtual void MoveCursor(PixelBufferCoordinate bufferPoint)
-        {
-            Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
-        }
-
         public virtual PixelBufferCoordinate GetCaretPosition()
         {
             WaitPauseTaskIfNecessary();
@@ -218,6 +212,12 @@ namespace Consolonia.Core.Infrastructure
         {
             WaitPauseTaskIfNecessary();
             Console.Clear();
+        }
+
+        /// <summary>Moves the console's cursor; tests replace it, having no console.</summary>
+        internal virtual void MoveCursor(PixelBufferCoordinate bufferPoint)
+        {
+            Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
         }
     }
 }
