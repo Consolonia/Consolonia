@@ -5,6 +5,7 @@ using Avalonia.Metadata;
 [assembly: InternalsVisibleTo("Consolonia.Core.Tests")]
 [assembly: InternalsVisibleTo("Consolonia.Benchmarks")]
 [assembly: InternalsVisibleTo("Consolonia.Designer")]
+[assembly: InternalsVisibleTo("Consolonia.NUnit")]
 [assembly: InternalsVisibleTo("Consolonia.PlatformSupport")]
 
 [assembly: CLSCompliant(false)] //todo: should we make it compliant?

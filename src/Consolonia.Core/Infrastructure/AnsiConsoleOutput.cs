@@ -4,10 +4,12 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia;
+using Avalonia.Logging;
 using Avalonia.Media;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Helpers.Logging;
 using Consolonia.Core.Text;
 
 namespace Consolonia.Core.Infrastructure
@@ -38,9 +40,9 @@ namespace Consolonia.Core.Infrastructure
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        // set CONSOLONIA_DEBUG_FLUSH to a file path to log each flushed frame's size and kitty transmit (a=t) count
-        private static readonly string DebugFlushLogPath =
-            Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FLUSH");
+        // each flushed frame's size and kitty transmit (a=t) count, logged at Verbose in the Consolonia.Output
+        // area: .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))
+        private static readonly string OutputLogArea = LogExtensions.GetAreaName(LogCategory.Output);
 
         // set CONSOLONIA_DEBUG_FRAMES to a file path to append every flushed frame's bytes to it, as sent
         private static readonly string DebugFramesPath =
@@ -161,8 +163,10 @@ namespace Consolonia.Core.Infrastructure
             WaitPauseTaskIfNecessary();
             EndText();
 
-            if (DebugFlushLogPath != null)
-                LogFlushDiagnostics(Utf8NoBom.GetString(_frame, FramePrefix, _frameLength - FramePrefix));
+            // asked for first: decoding the frame to count its transmits is not free
+            if (Logger.TryGet(LogEventLevel.Verbose, OutputLogArea) is { } flushLogger)
+                LogFlushDiagnostics(flushLogger,
+                    Utf8NoBom.GetString(_frame, FramePrefix, _frameLength - FramePrefix));
             if (DebugFramesPath != null)
                 DumpFrame(_frame.AsSpan(FramePrefix, _frameLength - FramePrefix));
 
@@ -591,18 +595,13 @@ namespace Consolonia.Core.Infrastructure
 
         private static void DumpFrame(ReadOnlySpan<byte> frame)
         {
-            try
-            {
-                using var file = new FileStream(DebugFramesPath, FileMode.Append, FileAccess.Write, FileShare.Read);
-                file.Write(frame);
-            }
-            catch (IOException)
-            {
-                // diagnostics must never take the app down
-            }
+            // a failure to write is not swallowed: a dump asked for that silently misses frames would
+            // send the investigation the wrong way
+            using var file = new FileStream(DebugFramesPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+            file.Write(frame);
         }
 
-        private static void LogFlushDiagnostics(string text)
+        private static void LogFlushDiagnostics(ParametrizedLogger logger, string text)
         {
             const string marker = "_Ga=t";
             int transmits = 0;
@@ -611,15 +610,7 @@ namespace Consolonia.Core.Infrastructure
                  found = text.IndexOf(marker, found + marker.Length, StringComparison.Ordinal))
                 transmits++;
 
-            try
-            {
-                File.AppendAllText(DebugFlushLogPath,
-                    $"{DateTime.Now:HH:mm:ss.fff} chars={text.Length} a=t count={transmits}{Environment.NewLine}");
-            }
-            catch (IOException)
-            {
-                // diagnostics must never take the app down
-            }
+            logger.Log3("Flushed {Chars} chars, {Transmits} kitty transmits (a=t)", text.Length, transmits);
         }
 
         /// <summary>

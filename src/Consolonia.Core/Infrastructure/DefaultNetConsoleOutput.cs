@@ -49,16 +49,31 @@ namespace Consolonia.Core.Infrastructure
             WaitPauseTaskIfNecessary();
             lock (this)
             {
+                // The text buffered so far goes out wherever the cursor is when it is flushed, so it goes
+                // out before the cursor moves. The render target places the caret before the frame's last
+                // Flush (one write per frame for the ANSI output); without this the frame's last run of
+                // text was written at the caret.
+                Flush();
+
                 try
                 {
-                    Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
+                    MoveCursor(bufferPoint);
                 }
                 catch (ArgumentOutOfRangeException)
                 {
                     // ignore
                     // this happens while resizing.
                 }
+
+                // the next WritePixel at this position needs no move of its own
+                _currentPosition = bufferPoint;
             }
+        }
+
+        /// <summary>Moves the console's cursor; tests replace it, having no console.</summary>
+        internal virtual void MoveCursor(PixelBufferCoordinate bufferPoint)
+        {
+            Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
         }
 
         public virtual PixelBufferCoordinate GetCaretPosition()

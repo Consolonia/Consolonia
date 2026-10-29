@@ -32,9 +32,9 @@ namespace Consolonia.NUnit
         /// <summary>Settable so a test can opt into a protocol the real terminal would have to advertise.</summary>
         public ConsoleCapabilities Capabilities { get; set; }
 
-        public int CellPixelWidth => 8;
+        public int CellPixelWidth => DefaultCellPixelSize.Width;
 
-        public int CellPixelHeight => 16;
+        public int CellPixelHeight => DefaultCellPixelSize.Height;
 
         public void SetTitle(string title)
         {

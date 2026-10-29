@@ -341,7 +341,10 @@ namespace Consolonia.Core.Infrastructure
             {
                 fixed (byte* pixels = bgra)
                 {
-                    // null where the application handled the not-supported request
+                    // Without the Skia fallback ConsoloniaPlatform answers with a DummyBitmap, which saves
+                    // nothing (below). A picture is a DummyBitmap there too and DrawBitmap skips it, so
+                    // only bitmaps made without the platform (the tests' fakes) get here with no Skia.
+                    // An application's own not-supported handler may answer null.
                     using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
                         (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
                     // ReSharper disable once ConstantConditionalAccessQualifier annotated non-null, but it can be
