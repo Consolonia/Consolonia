@@ -32,7 +32,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             if (startsWithTrue && toTest.EndsWith(endsWith, StringComparison.Ordinal))
             {
                 string output = toTest.Substring(startsWith.Length,
-                    toTest.Length - startsWith.Length - endsWith.Length);
+                    Math.Max(0, toTest.Length - startsWith.Length - endsWith.Length));
 
                 Complete(output);
                 _accumulator.Clear();
