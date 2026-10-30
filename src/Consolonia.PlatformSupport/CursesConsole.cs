@@ -603,10 +603,9 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
             ];
 
-            foreach ((string, Key) fSequence in fSequences)
-                yield return new SafeLockMatcher(
-                    new StartsEndsWithMatcher<int>(_ => { RaiseKeyPressInternal(fSequence.Item2); }, cp => new Rune(cp),
-                        fSequence.Item1, fSequence.Item1), 0, 0, 0);
+            // the table of sequences terminfo has no entry for
+            yield return new SequenceTableMatcher<(int, int), Key>(RaiseKeyPressInternal, cp => new Rune(cp.Item2),
+                fSequences);
 
             // escape of ESC
             yield return new SafeLockMatcher(
