@@ -7,15 +7,17 @@ namespace Consolonia.Core.Helpers.InputProcessing
     public class SequenceTableMatcher<TInput, TResult> : MatcherWithComplete<TInput, TResult>
     {
         private readonly StringBuilder _accumulator = new();
+        private readonly Func<TInput, bool> _canMatch;
         private readonly HashSet<string> _prefixes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, TResult> _sequences = new(StringComparer.Ordinal);
         private readonly Func<TInput, Rune> _toRune;
 
         public SequenceTableMatcher(Action<TResult> onComplete, Func<TInput, Rune> toRune,
-            IEnumerable<(string sequence, TResult result)> table)
+            IEnumerable<(string sequence, TResult result)> table, Func<TInput, bool> canMatch)
             : base(onComplete)
         {
             _toRune = toRune;
+            _canMatch = canMatch;
 
             foreach ((string sequence, TResult result) in table)
             {
@@ -31,6 +33,12 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override AppendResult Append(TInput input)
         {
+            if (!_canMatch(input))
+            {
+                _accumulator.Clear();
+                return AppendResult.NoMatch;
+            }
+
             Rune rune = _toRune(input);
             int collected = _accumulator.Length;
 
@@ -45,10 +53,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override bool TryFlush()
         {
-            /* Claim the input only once it is unambiguously on its way to a sequence from the table. A lone escape
-               is not: it may still turn out to be a solo escape or the leading half of an ALT+combination, and the
-               matchers below have to be allowed to keep collecting it - claiming it here makes InputProcessor
-               reset them, and the combination degenerates into the bare letter. */
+            // (15F2A2C4-218D-4B4D-86CE-330A312EF6A6)
             return _accumulator.Length > 1;
         }
 

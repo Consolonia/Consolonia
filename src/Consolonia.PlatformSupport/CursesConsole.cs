@@ -603,9 +603,9 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
             ];
 
-            // the table of sequences terminfo has no entry for
+            // the table of sequences terminfo has no entry for; SafeLockMatcher has issue with (15F2A2C4-218D-4B4D-86CE-330A312EF6A6), so using canMatch instead
             yield return new SequenceTableMatcher<(int, int), Key>(RaiseKeyPressInternal, cp => new Rune(cp.Item2),
-                fSequences);
+                fSequences, cp => cp.Item1 == 0);
 
             // escape of ESC
             yield return new SafeLockMatcher(
