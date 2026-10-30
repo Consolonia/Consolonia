@@ -1,7 +1,8 @@
 # Bitmaps: how Consolonia draws pictures in a terminal
 
 Architecture notes for the bitmap pipeline. A picture becomes cells of the pixel buffer like any
-other drawing; which image protocol shows them, and how, is the console output's business. Each
+other drawing; which image protocol shows them, and how, is the console output's business. The
+pipeline every frame goes through, picture or text, is in [rendering.md](rendering.md). Each
 protocol has its own notes: [kittybitmap.md](kittybitmap.md), [sixelbitmap.md](sixelbitmap.md) and
 [quadbitmap.md](quadbitmap.md).
 
@@ -75,7 +76,9 @@ word sixel or kitty is in `Consolonia.Core.Infrastructure`, behind `AnsiConsoleO
   (`FontWeight?`, `FontStyle?`, `TextDecorationLocation?`) in 6 bytes rather than three nullable
   enums of 8 each; the public surface is unchanged except that the two are no longer fields (nothing
   took them by `ref`). `PixelTests.PixelIsFortyBytes` keeps it so. The render target's cache of
-  what the terminal shows is `Pixel[,]`, initialised to `Pixel.Empty`, not `Pixel?[,]`.
+  what the terminal shows is `Pixel[,]`, initialised to `Pixel.Empty`, not `Pixel?[,]`. Cells are
+  blended in place and compared by reference, so a frame no longer copies them around; what that
+  is worth is measured in [rendering.md](rendering.md#what-a-frame-costs).
 
 ## Choosing a renderer
 
@@ -260,6 +263,7 @@ garbage per frame, with gen-1 collections.
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*CellImageFrame*" --job short
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*ConsoleOutput*"
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*BitmapFrame*"
+dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*TextFrame*"
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --digest
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --alloc
 ```
@@ -269,6 +273,7 @@ dotnet run -c Release --project src/Consolonia.Benchmarks -- --alloc
 | `CellImageFrameBenchmarks` | The renderer's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. Nothing reaches a terminal. |
 | `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (changed cells written, then `EndFrame`): a screen of text; for sixel a new full-screen picture, the picture shown again after a dialog dimmed it (the run cache), one cell; for kitty a new full-screen picture, every block sent again after a reset, one cell. The terminal's side is not measured. |
 | `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console, for the sixel and kitty capabilities: redrawn unchanged, one pixel painted, a new picture. The unit test console keeps no output, so this is drawing and diffing; the encoders are measured by `ConsoleOutputBenchmarks`. |
+| `TextFrameBenchmarks` | The same whole frame for a screen of text with no picture: redrawn unchanged, one character typed, every cell changed. The baseline for what a picture adds; the table is in [rendering.md](rendering.md#benchmark). |
 | `SixelBenchmarks` | Quantising (flat cell, photo cell, full image) and serialising sixels. |
 
 `--alloc` prints the bytes each `ConsoleOutputBenchmarks` scenario allocates in one run after a
@@ -317,14 +322,14 @@ copying like every other drawing; the frame work in a render target hook, with t
 The last is the image-as-background model: one renderer, the encoders in the output, nothing encoded
 on this console.
 
-| Frame | Per-cell compare in the renderer | Blend + one dirty rect | Hooks | Cell images | Flat `Pixel`, slabs |
-|---|---|---|---|---|---|
-| Sixel, redrawn unchanged | 1.1 ms | 3.6 ms | 4.0 ms | 1.2 ms | 0.8 ms / 264 B |
-| Sixel, brush stroke | 12.0 ms | 9.4 ms | 10.0 ms | 6.5 ms | 6.5 ms / 960 B |
-| Sixel, new picture | — | — | 111 ms | 26 ms | 15 ms |
-| Kitty, redrawn unchanged | 1.6 ms | 5.6 ms | 5.8 ms | 1.1 ms | 0.5 ms / 264 B |
-| Kitty, brush stroke | 9.0 ms | 8.7 ms | 8.3 ms | 6.5 ms | 4.5 ms / 960 B |
-| Kitty, new picture | — | — | 10.9 ms | 26 ms | 14 ms |
+| Frame | Per-cell compare in the renderer | Blend + one dirty rect | Hooks | Cell images | Flat `Pixel`, slabs | Cells in place |
+|---|---|---|---|---|---|---|
+| Sixel, redrawn unchanged | 1.1 ms | 3.6 ms | 4.0 ms | 1.2 ms | 0.8 ms / 264 B | 0.4 ms |
+| Sixel, brush stroke | 12.0 ms | 9.4 ms | 10.0 ms | 6.5 ms | 6.5 ms / 960 B | 4.2 ms |
+| Sixel, new picture | — | — | 111 ms | 26 ms | 15 ms | 16 ms |
+| Kitty, redrawn unchanged | 1.6 ms | 5.6 ms | 5.8 ms | 1.1 ms | 0.5 ms / 264 B | 0.45 ms |
+| Kitty, brush stroke | 9.0 ms | 8.7 ms | 8.3 ms | 6.5 ms | 4.5 ms / 960 B | 5.0 ms |
+| Kitty, new picture | — | — | 10.9 ms | 26 ms | 14 ms | 15 ms |
 
 The two capabilities now share the renderer, so their columns measure the same work; the
 difference between them is noise. Quantising moved out of the draw and into the sixel encoder, so a

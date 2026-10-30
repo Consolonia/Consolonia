@@ -209,18 +209,22 @@ namespace Consolonia.Core.Drawing
                 // we can not run only from MinX to MaxX because of wide characters, also we can not run MinY/MaxY because we need to detect caret
                 for (ushort x = 0; x < pixelBuffer.Width; x++)
                 {
-                    Pixel pixel = pixelBuffer[x, y];
+                    // the cell is looked at in place; only a dirty one is copied out, since it may be
+                    // rewritten below before it is compared and written
+                    ref readonly Pixel cell = ref pixelBuffer.CellAt(x, y);
 
-                    if (pixel.IsCaret())
+                    if (cell.IsCaret())
                     {
                         if (caretPosition != null)
                             throw new InvalidOperationException("Caret is already shown");
                         caretPosition = new PixelBufferCoordinate(x, y);
-                        caretStyle = pixel.CaretStyle;
+                        caretStyle = cell.CaretStyle;
                     }
 
                     if (!dirtyRegions.Contains(x, y, false))
                         continue;
+
+                    Pixel pixel = cell;
 
                     // painting mouse cursor if within the range of current pixel (possibly wide)
                     if (IsUnderMouseCursor(x, y))
@@ -257,7 +261,7 @@ namespace Consolonia.Core.Drawing
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
-                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
+                            if (pixelBuffer.CellAt(x + i, y).Width != 0)
                             {
                                 pixel = new Pixel(
                                     new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
@@ -284,13 +288,10 @@ namespace Consolonia.Core.Drawing
                     {
                         // checking cache
                         //todo: it does not consider that some of them will be replaced by space. But issue is pessimistic, just unnecessary redraws
-                        bool anyDifferent = false;
-                        for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
-                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
-                            {
-                                anyDifferent = true;
-                                break;
-                            }
+                        // both sides compared in place (the operators take the cells by reference)
+                        bool anyDifferent = pixel != _cache[x, y];
+                        for (ushort i = 1; !anyDifferent && i < pixel.Width; i++)
+                            anyDifferent = pixelBuffer.CellAt(x + i, y) != _cache[x + i, y];
 
                         if (!anyDifferent)
                             continue;
