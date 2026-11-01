@@ -506,7 +506,7 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
                 // Shift+Ctrl+Alt+KeyEnd
                 ("\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End),
-                
+
                 // SHIFT+(Up Down Left Right)
                 ("\x1B[1;2A", Key.ShiftMask | Key.CursorUp),
                 ("\x1B[1;2B", Key.ShiftMask | Key.CursorDown),

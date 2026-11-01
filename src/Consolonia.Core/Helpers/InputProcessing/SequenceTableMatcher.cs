@@ -22,9 +22,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             foreach ((string sequence, TResult result) in table)
             {
                 if (!_sequences.TryAdd(sequence, result))
-                {
                     throw new ArgumentException($"Sequence '{sequence}' already exists in the table.");
-                }
 
                 for (int length = 1; length < sequence.Length; length++)
                     _ = _prefixes.Add(sequence[..length]);
@@ -43,7 +41,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             int collected = _accumulator.Length;
 
             AppendResult result = Collect(rune);
-            
+
             if (result == AppendResult.NoMatch && collected > 0)
                 // if was a reset, then adding input once again (so we don't loose first character after reset
                 result = Collect(rune);
