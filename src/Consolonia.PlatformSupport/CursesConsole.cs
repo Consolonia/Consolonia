@@ -492,8 +492,6 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[49;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
                 ("\x1B[50;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
                 ("\x1B[51;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Shift+Alt+(F4)
-                ("\x1B[1;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(268)),
                 // Shift+Alt+(F5 - F8)
                 ("\x1B[53;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
                 ("\x1B[54;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
@@ -504,10 +502,6 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[49;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
                 ("\x1B[50;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
                 ("\x1B[51;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Shift+Ctrl+Alt+KeyNPage
-                ("\x1B[54;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageDown),
-                // Shift+Ctrl+Alt+KeyPPage
-                ("\x1B[53;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageUp),
                 // Shift+Ctrl+Alt+KeyHome
                 ("\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
                 // Shift+Ctrl+Alt+KeyEnd
@@ -577,8 +571,6 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[5;5~", Key.CtrlMask | Key.PageUp),
                 ("\x1B[6;5~", Key.CtrlMask | Key.PageDown),
                 // CTRL+SHIFT+(Home Insert Delete End PageUp PageDown)
-                // note: 1;6~ is already claimed above as Shift+Alt+(F4) and, being registered
-                // first, shadows this one
                 ("\x1B[1;6~", Key.CtrlMask | Key.ShiftMask | Key.Home),
                 ("\x1B[2;6~", Key.CtrlMask | Key.ShiftMask | Key.InsertChar),
                 ("\x1B[3;6~", Key.CtrlMask | Key.ShiftMask | Key.DeleteChar),
