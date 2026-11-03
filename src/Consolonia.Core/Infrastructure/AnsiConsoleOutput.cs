@@ -197,16 +197,6 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
-        private void CloseUpdate()
-        {
-            if (!_synchronizedUpdateOpen)
-                return;
-
-            WaitPauseTaskIfNecessary();
-            Console.Out.Write(Esc.EndSynchronizedUpdate);
-            _synchronizedUpdateOpen = false;
-        }
-
         /// <summary>
         ///     Forgets what the terminal is believed to show: the colors and attributes last set (another
         ///     program may have changed them) and what the image encoder has placed.
@@ -381,6 +371,16 @@ namespace Consolonia.Core.Infrastructure
             _headBufferPoint = new PixelBufferCoordinate(0, 0);
             WriteText(Esc.SetCursorPosition(0, 0));
             Flush();
+        }
+
+        private void CloseUpdate()
+        {
+            if (!_synchronizedUpdateOpen)
+                return;
+
+            WaitPauseTaskIfNecessary();
+            Console.Out.Write(Esc.EndSynchronizedUpdate);
+            _synchronizedUpdateOpen = false;
         }
 
         /// <summary>
