@@ -67,7 +67,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         private string Frame(params (int X, int Y, Pixel Pixel)[] changed)
         {
             _stream.SetLength(0);
-            _output.BeginFrame();
             foreach ((int x, int y, Pixel pixel) in changed)
             {
                 _screen[(ushort)x, (ushort)y] = pixel;

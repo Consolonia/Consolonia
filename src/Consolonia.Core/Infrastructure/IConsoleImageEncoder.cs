@@ -10,9 +10,6 @@ namespace Consolonia.Core.Infrastructure
     /// </summary>
     internal interface IConsoleImageEncoder
     {
-        /// <summary>The render target is about to write a frame's changed cells.</summary>
-        void BeginFrame();
-
         /// <summary>
         ///     A changed image cell. The render target writes only the cells that differ from what the
         ///     terminal shows, so these are exactly the cells of the frame whose picture has to reach it:

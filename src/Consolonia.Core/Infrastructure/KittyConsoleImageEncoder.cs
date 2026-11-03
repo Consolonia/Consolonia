@@ -75,10 +75,6 @@ namespace Consolonia.Core.Infrastructure
             _output = output;
         }
 
-        public void BeginFrame()
-        {
-        }
-
         /// <summary>
         ///     The cell is written as text on the terminal's default background, so the placement below
         ///     shows through. Konsole draws below-text (z&lt;0) placements under any explicit cell

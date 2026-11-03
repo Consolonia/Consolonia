@@ -41,11 +41,6 @@ namespace Consolonia.Core.Infrastructure
             _output = output;
         }
 
-        public void BeginFrame()
-        {
-            _cells.Clear();
-        }
-
         public void WriteCell(PixelBufferCoordinate position, in Pixel pixel)
         {
             // a picture cell with any symbol is written as text; one with none (nothing drawn over the

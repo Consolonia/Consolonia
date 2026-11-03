@@ -198,7 +198,6 @@ namespace Consolonia.Core.Drawing
             }
 #endif
             _console.HideCaret();
-            _console.BeginFrame();
 
             PixelBufferCoordinate? caretPosition = null;
             CaretStyle? caretStyle = null;

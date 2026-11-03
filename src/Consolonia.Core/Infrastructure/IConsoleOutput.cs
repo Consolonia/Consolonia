@@ -73,13 +73,6 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
-        ///     The render target is about to write a frame: the cells that changed since the last one.
-        /// </summary>
-        void BeginFrame()
-        {
-        }
-
-        /// <summary>
         ///     Every changed cell of the frame has been written; <paramref name="screen" /> is what the
         ///     terminal should now show. An output with per-frame work besides the cells (an image protocol
         ///     placing its pictures) does it here.

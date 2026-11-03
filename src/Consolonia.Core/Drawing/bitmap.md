@@ -20,7 +20,7 @@ Avalonia Image / DrawingContext.DrawImage
                  │  dirty regions: only cells whose Pixel changed
                  ▼
             RenderTarget.RenderToDevice                (RenderTarget.cs: a cell is a cell)
-              BeginFrame ─ every changed cell → WritePixel ─ EndFrame(screen)
+              every changed cell → WritePixel ─ EndFrame(screen)
                  │
                  ▼
             AnsiConsoleOutput                          (the only place that knows sixel from kitty)
@@ -171,17 +171,16 @@ row, not one per cell, and the first edit changes only the cells it touched.
 `RenderTarget.RenderToDevice` turns the dirty cells into output. It knows nothing about image
 protocols: a cell is a cell.
 
-1. **`BeginFrame`.** The console is told a frame starts.
-2. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
+1. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
    pixels) goes through `IConsoleOutput.WritePixel`. The cell under the mouse cursor gets the cursor
    glyph in its foreground; its contrast colour comes from `Pixel.EffectiveBackgroundColor`, so over
    a picture it is computed against the paint over the dominant colour.
-3. **`EndFrame(screen)`.** Every changed cell has been written; the console gets the whole buffer,
+2. **`EndFrame(screen)`.** Every changed cell has been written; the console gets the whole buffer,
    which is what the terminal should now show.
-4. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
+3. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
    synchronized update covers all of it.
 
-`BeginFrame`, `EndFrame` and `ResetCache` are default-implemented members of `IConsoleOutput`
+`EndFrame` and `ResetCache` are default-implemented members of `IConsoleOutput`
 (`ConsoleBase` forwards them), so an output with no per-frame work ignores them. `AnsiConsoleOutput`
 forwards them to its image encoder.
 

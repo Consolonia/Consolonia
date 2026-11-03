@@ -201,11 +201,6 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
-        public virtual void BeginFrame()
-        {
-            _consoleOutput.BeginFrame();
-        }
-
         public virtual void EndFrame(PixelBuffer screen)
         {
             _consoleOutput.EndFrame(screen);

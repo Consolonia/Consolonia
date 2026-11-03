@@ -157,7 +157,6 @@ namespace Consolonia.Benchmarks
         /// <summary>A frame in which every cell of <paramref name="screen" /> changed.</summary>
         private static void WholeScreen(AnsiConsoleOutput output, PixelBuffer screen)
         {
-            output.BeginFrame();
             for (ushort y = 0; y < CellsHigh; y++)
             for (ushort x = 0; x < CellsWide; x++)
                 output.WritePixel(new PixelBufferCoordinate(x, y), screen[x, y]);
@@ -170,7 +169,6 @@ namespace Consolonia.Benchmarks
         {
             _strokeCell = Picture(CellWidth, CellHeight, ++_seed + 100000)[0, 0];
             _strokeScreen[10, 5] = _strokeCell;
-            output.BeginFrame();
             output.WritePixel(new PixelBufferCoordinate(10, 5), in _strokeCell);
             output.EndFrame(_strokeScreen);
             output.Flush();

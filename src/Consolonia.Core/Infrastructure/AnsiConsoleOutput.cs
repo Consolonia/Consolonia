@@ -169,12 +169,6 @@ namespace Consolonia.Core.Infrastructure
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
-        public void BeginFrame()
-        {
-            _imageEncoder?.BeginFrame();
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
         public void EndFrame(PixelBuffer screen)
         {
             _imageEncoder?.EndFrame(screen);
