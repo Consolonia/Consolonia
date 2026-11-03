@@ -463,67 +463,142 @@ namespace Consolonia.PlatformSupport
             (string, Key)[] fSequences =
             [
                 // Ctrl+Alt+(F1 - F4)
-                (@"\x1B[1;7P", Key.CtrlMask | Key.AltMask | MapCursesKey(80 + 185)),
-                (@"\x1B[1;7Q", Key.CtrlMask | Key.AltMask | MapCursesKey(81 + 185)),
-                (@"\x1B[1;7R", Key.CtrlMask | Key.AltMask | MapCursesKey(82 + 185)),
-                (@"\x1B[1;7S", Key.CtrlMask | Key.AltMask | MapCursesKey(83 + 185)),
+                ("\x1B[1;7P", Key.CtrlMask | Key.AltMask | MapCursesKey(80 + 185)),
+                ("\x1B[1;7Q", Key.CtrlMask | Key.AltMask | MapCursesKey(81 + 185)),
+                ("\x1B[1;7R", Key.CtrlMask | Key.AltMask | MapCursesKey(82 + 185)),
+                ("\x1B[1;7S", Key.CtrlMask | Key.AltMask | MapCursesKey(83 + 185)),
                 // Ctrl+Alt+(F5 - F8)
-                (@"\x1B[53;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(53 + 216)),
-                (@"\x1B[54;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(55 + 215)),
-                (@"\x1B[55;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(56 + 215)),
-                (@"\x1B[56;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(57 + 215)),
+                ("\x1B[53;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(53 + 216)),
+                ("\x1B[54;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(55 + 215)),
+                ("\x1B[55;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(56 + 215)),
+                ("\x1B[56;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(57 + 215)),
                 // Ctrl+Alt+(F9 - F12)
-                (@"\x1B[48;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(48 + 225)),
-                (@"\x1B[49;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(49 + 225)),
-                (@"\x1B[50;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(50 + 225)),
-                (@"\x1B[51;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(51 + 225)),
+                ("\x1B[48;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(48 + 225)),
+                ("\x1B[49;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(49 + 225)),
+                ("\x1B[50;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(50 + 225)),
+                ("\x1B[51;7~", Key.CtrlMask | Key.AltMask | MapCursesKey(51 + 225)),
                 // Ctrl+Shift+Alt+(F1 - F4)
-                (@"\x1B[1;8;7P", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(80 + 185)),
-                (@"\x1B[1;8;7Q", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(81 + 185)),
-                (@"\x1B[1;8;7R", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(82 + 185)),
-                (@"\x1B[1;8;7S", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(83 + 185)),
+                ("\x1B[1;8;7P", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(80 + 185)),
+                ("\x1B[1;8;7Q", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(81 + 185)),
+                ("\x1B[1;8;7R", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(82 + 185)),
+                ("\x1B[1;8;7S", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(83 + 185)),
                 // Ctrl+Shift+Alt+(F5 - F8)
-                (@"\x1B[53;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
-                (@"\x1B[54;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
-                (@"\x1B[55;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
-                (@"\x1B[56;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
+                ("\x1B[53;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
+                ("\x1B[54;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
+                ("\x1B[55;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
+                ("\x1B[56;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
                 // Ctrl+Shift+Alt+(F9 - F12)
-                (@"\x1B[48;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
-                (@"\x1B[49;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
-                (@"\x1B[50;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
-                (@"\x1B[51;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Shift+Alt+(F4)
-                (@"\x1B[1;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(268)),
+                ("\x1B[48;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
+                ("\x1B[49;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
+                ("\x1B[50;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
+                ("\x1B[51;8;7~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
                 // Shift+Alt+(F5 - F8)
-                (@"\x1B[53;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
-                (@"\x1B[54;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
-                (@"\x1B[55;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
-                (@"\x1B[56;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
+                ("\x1B[53;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(53 + 216)),
+                ("\x1B[54;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(55 + 215)),
+                ("\x1B[55;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(56 + 215)),
+                ("\x1B[56;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(57 + 215)),
                 // Shift+Alt+(F9 - F12)
-                (@"\x1B[48;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
-                (@"\x1B[49;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
-                (@"\x1B[50;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
-                (@"\x1B[51;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
-                // Shift+Ctrl+Alt+KeyNPage
-                (@"\x1B[54;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageDown),
-                // Shift+Ctrl+Alt+KeyPPage
-                (@"\x1B[53;6~", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.PageUp),
+                ("\x1B[48;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(48 + 225)),
+                ("\x1B[49;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(49 + 225)),
+                ("\x1B[50;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(50 + 225)),
+                ("\x1B[51;6~", Key.ShiftMask | Key.AltMask | MapCursesKey(51 + 225)),
                 // Shift+Ctrl+Alt+KeyHome
-                (@"\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
+                ("\x1B[1;6H", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.Home),
                 // Shift+Ctrl+Alt+KeyEnd
-                (@"\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End),
-                // Ctrl+Enter (`modifyOtherKeys` / xterm extended keys)
-                (@"\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
+                ("\x1B[1;6F", Key.ShiftMask | Key.CtrlMask | Key.AltMask | Key.End),
 
-                // todo: should be other sequences, need research
+                // SHIFT+(Up Down Left Right)
+                ("\x1B[1;2A", Key.ShiftMask | Key.CursorUp),
+                ("\x1B[1;2B", Key.ShiftMask | Key.CursorDown),
+                ("\x1B[1;2D", Key.ShiftMask | Key.CursorLeft),
+                ("\x1B[1;2C", Key.ShiftMask | Key.CursorRight),
+                // ALT+(Up Down Left Right)
+                ("\x1B[1;3A", Key.AltMask | Key.CursorUp),
+                ("\x1B[1;3B", Key.AltMask | Key.CursorDown),
+                ("\x1B[1;3D", Key.AltMask | Key.CursorLeft),
+                ("\x1B[1;3C", Key.AltMask | Key.CursorRight),
+                // SHIFT+ALT+(Up Down Left Right)
+                ("\x1B[1;4A", Key.ShiftMask | Key.AltMask | Key.CursorUp),
+                ("\x1B[1;4B", Key.ShiftMask | Key.AltMask | Key.CursorDown),
+                ("\x1B[1;4D", Key.ShiftMask | Key.AltMask | Key.CursorLeft),
+                ("\x1B[1;4C", Key.ShiftMask | Key.AltMask | Key.CursorRight),
+                // CTRL+(Up Down Left Right)
+                ("\x1B[1;5A", Key.CtrlMask | Key.CursorUp),
+                ("\x1B[1;5B", Key.CtrlMask | Key.CursorDown),
+                ("\x1B[1;5D", Key.CtrlMask | Key.CursorLeft),
+                ("\x1B[1;5C", Key.CtrlMask | Key.CursorRight),
+                // CTRL+SHIFT+(Up Down Left Right)
+                ("\x1B[1;6A", Key.CtrlMask | Key.ShiftMask | Key.CursorUp),
+                ("\x1B[1;6B", Key.CtrlMask | Key.ShiftMask | Key.CursorDown),
+                ("\x1B[1;6D", Key.CtrlMask | Key.ShiftMask | Key.CursorLeft),
+                ("\x1B[1;6C", Key.CtrlMask | Key.ShiftMask | Key.CursorRight),
+                // CTRL+ALT+(Up Down Left Right)
+                ("\x1B[1;7A", Key.CtrlMask | Key.AltMask | Key.CursorUp),
+                ("\x1B[1;7B", Key.CtrlMask | Key.AltMask | Key.CursorDown),
+                ("\x1B[1;7D", Key.CtrlMask | Key.AltMask | Key.CursorLeft),
+                ("\x1B[1;7C", Key.CtrlMask | Key.AltMask | Key.CursorRight),
+                // CTRL+SHIFT+ALT+(Up Down Left Right)
+                ("\x1B[1;8A", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.CursorUp),
+                ("\x1B[1;8B", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.CursorDown),
+                ("\x1B[1;8D", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.CursorLeft),
+                ("\x1B[1;8C", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.CursorRight),
+                // SHIFT+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;2~", Key.ShiftMask | Key.Home),
+                ("\x1B[2;2~", Key.ShiftMask | Key.InsertChar),
+                ("\x1B[3;2~", Key.ShiftMask | Key.DeleteChar),
+                ("\x1B[4;2~", Key.ShiftMask | Key.End),
+                ("\x1B[5;2~", Key.ShiftMask | Key.PageUp),
+                ("\x1B[6;2~", Key.ShiftMask | Key.PageDown),
+                // ALT+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;3~", Key.AltMask | Key.Home),
+                ("\x1B[2;3~", Key.AltMask | Key.InsertChar),
+                ("\x1B[3;3~", Key.AltMask | Key.DeleteChar),
+                ("\x1B[4;3~", Key.AltMask | Key.End),
+                ("\x1B[5;3~", Key.AltMask | Key.PageUp),
+                ("\x1B[6;3~", Key.AltMask | Key.PageDown),
+                // SHIFT+ALT+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;4~", Key.ShiftMask | Key.AltMask | Key.Home),
+                ("\x1B[2;4~", Key.ShiftMask | Key.AltMask | Key.InsertChar),
+                ("\x1B[3;4~", Key.ShiftMask | Key.AltMask | Key.DeleteChar),
+                ("\x1B[4;4~", Key.ShiftMask | Key.AltMask | Key.End),
+                ("\x1B[5;4~", Key.ShiftMask | Key.AltMask | Key.PageUp),
+                ("\x1B[6;4~", Key.ShiftMask | Key.AltMask | Key.PageDown),
+                // CTRL+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;5~", Key.CtrlMask | Key.Home),
+                ("\x1B[2;5~", Key.CtrlMask | Key.InsertChar),
+                ("\x1B[3;5~", Key.CtrlMask | Key.DeleteChar),
+                ("\x1B[4;5~", Key.CtrlMask | Key.End),
+                ("\x1B[5;5~", Key.CtrlMask | Key.PageUp),
+                ("\x1B[6;5~", Key.CtrlMask | Key.PageDown),
+                // CTRL+SHIFT+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;6~", Key.CtrlMask | Key.ShiftMask | Key.Home),
+                ("\x1B[2;6~", Key.CtrlMask | Key.ShiftMask | Key.InsertChar),
+                ("\x1B[3;6~", Key.CtrlMask | Key.ShiftMask | Key.DeleteChar),
+                ("\x1B[4;6~", Key.CtrlMask | Key.ShiftMask | Key.End),
+                ("\x1B[5;6~", Key.CtrlMask | Key.ShiftMask | Key.PageUp),
+                ("\x1B[6;6~", Key.CtrlMask | Key.ShiftMask | Key.PageDown),
+                // CTRL+ALT+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;7~", Key.CtrlMask | Key.AltMask | Key.Home),
+                ("\x1B[2;7~", Key.CtrlMask | Key.AltMask | Key.InsertChar),
+                ("\x1B[3;7~", Key.CtrlMask | Key.AltMask | Key.DeleteChar),
+                ("\x1B[4;7~", Key.CtrlMask | Key.AltMask | Key.End),
+                ("\x1B[5;7~", Key.CtrlMask | Key.AltMask | Key.PageUp),
+                ("\x1B[6;7~", Key.CtrlMask | Key.AltMask | Key.PageDown),
+                // CTRL+SHIFT+ALT+(Home Insert Delete End PageUp PageDown)
+                ("\x1B[1;8~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.Home),
+                ("\x1B[2;8~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.InsertChar),
+                ("\x1B[3;8~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.DeleteChar),
+                ("\x1B[4;8~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.End),
+                ("\x1B[5;8~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.PageUp),
+                ("\x1B[6;8~", Key.CtrlMask | Key.ShiftMask | Key.AltMask | Key.PageDown),
+                // Ctrl+Enter (`modifyOtherKeys` / xterm extended keys)
+                ("\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
             ];
 
-            foreach ((string, Key) fSequence in fSequences)
-                yield return new SafeLockMatcher(
-                    new StartsEndsWithMatcher<int>(
-                        _ => { DispatchInputAsyncWait(() => { RaiseKeyPressInternal(fSequence.Item2); }); },
-                        cp => new Rune(cp),
-                        fSequence.Item1, fSequence.Item1), 0, 0, 0);
+            // the table of sequences terminfo has no entry for; SafeLockMatcher has issue with (15F2A2C4-218D-4B4D-86CE-330A312EF6A6), so using canMatch instead
+            yield return new SequenceTableMatcher<(int, int), Key>(
+                key => DispatchInputAsyncWait(() => { RaiseKeyPressInternal(key); }), cp => new Rune(cp.Item2),
+                fSequences, cp => cp.Item1 == 0);
 
             // escape of ESC
             yield return new SafeLockMatcher(
