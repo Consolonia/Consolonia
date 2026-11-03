@@ -38,7 +38,8 @@ namespace Consolonia.Core.Helpers.InputProcessing
             }
 
             Rune rune = _toRune(input);
-            bool isEscSymbolAndAlreadySoloEscAccumulated = rune.Value == '\x1b' && _accumulator.Length == 1 && _accumulator[0] == '\x1b';
+            bool isEscSymbolAndAlreadySoloEscAccumulated =
+                rune.Value == '\x1b' && _accumulator.Length == 1 && _accumulator[0] == '\x1b';
             int collected = _accumulator.Length;
 
             AppendResult result = Collect(rune);
@@ -57,7 +58,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         {
             // (15F2A2C4-218D-4B4D-86CE-330A312EF6A6) // todo: We should remove  this case ASAP. It was more or less simple
             // todo: to understand with less number of matchers. But as that number grow even I (owner of this scenario) have to investigate it every time. Also more and more bugs come with it. My guess at this point is that we could encapsulate this hack only within CopyPaste matcher without of spreading it onto other matchers
-            
+
             return _accumulator.Length > 1;
         }
 
