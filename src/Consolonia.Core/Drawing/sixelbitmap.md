@@ -11,7 +11,7 @@ text. The pixel buffer holds the picture as cells with a `CellImage` background,
 protocol; the choice between sixel and text is made when the cell is written.
 
 1. **Changed cells are gathered.** The render target writes only the cells that differ from what
-   the terminal shows, row by row. `WriteCell` records each image cell without a glyph: its
+   the terminal shows, row by row. `WriteImagePixel` records each image cell without a glyph: its
    position, its image and its paint.
 2. **A glyph wins the cell.** An image cell with a glyph (the mouse cursor, a window edge crossing
    the picture) is written as text at once, on `Pixel.EffectiveBackgroundColor`: the paint over the
@@ -20,7 +20,7 @@ protocol; the choice between sixel and text is made when the cell is written.
    cells with no symbol, and gaps that layout never drew keep none, so they show the picture; a
    translucent overlay blended over a picture cell colours its foreground but draws no symbol, so the
    cell still shows the picture, dimmed.
-3. **Runs at the frame's end.** `EndFrame` joins consecutive recorded cells on a row into runs and
+3. **Runs at the frame's end.** `EndUpdate` joins consecutive recorded cells on a row into runs and
    sends each run as **one sixel**: one escape sequence, one palette, one cursor move. A brush
    stroke is a one-cell run; a new picture is one run per row.
    - **The run's pixels.** `RenderRun` copies the cells' pixels side by side into one buffer. A
@@ -67,7 +67,7 @@ Machine-dependent. Read them as ratios. The commands and the shared setup are in
 [bitmap.md](bitmap.md#benchmarks). A full screen is 240×67 cells of 8×16, a 1920×1072 picture.
 
 **Output path per frame** (`ConsoleOutputBenchmarks`, default job, in-process, null stream), driven
-as the render target drives the output: the changed cells written, then `EndFrame`.
+as the render target drives the output: the changed cells written, then `EndUpdate`.
 
 | Scenario | Time | Allocated (`--alloc`) | Bytes on the wire |
 |---|---|---|---|

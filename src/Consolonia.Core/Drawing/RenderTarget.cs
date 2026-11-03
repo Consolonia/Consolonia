@@ -197,6 +197,20 @@ namespace Consolonia.Core.Drawing
                 _lastFpsUpdate = now;
             }
 #endif
+            _console.BeginUpdate();
+            try
+            {
+                RenderFrame(pixelBuffer, dirtyRegions);
+            }
+            finally
+            {
+                // closes the update even when a cell throws; otherwise the terminal holds back all that follows
+                _console.EndUpdate(pixelBuffer);
+            }
+        }
+
+        private void RenderFrame(PixelBuffer pixelBuffer, Snapshot dirtyRegions)
+        {
             _console.HideCaret();
 
             PixelBufferCoordinate? caretPosition = null;
@@ -301,8 +315,6 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            _console.EndFrame(pixelBuffer);
-
 #if FPS
             var fps = $"FPS: {_fps: 000}";
             for (ushort i = 0; i < fps.Length; i++)
@@ -320,9 +332,6 @@ namespace Consolonia.Core.Drawing
                 _console.SetCaretStyle((CaretStyle)caretStyle!);
                 _console.ShowCaret();
             }
-
-            // one write for the whole frame, caret included, so a synchronized update covers all of it
-            _console.Flush();
         }
 
         private bool IsUnderMouseCursor(int x, int y)

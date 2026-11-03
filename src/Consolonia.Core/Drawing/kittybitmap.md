@@ -12,13 +12,13 @@ at a cell position, below the text. A placement is a terminal object, not the co
 writing cells shows nothing by itself. The encoder uses the protocol the way the sixel encoder uses
 sixel: pixels are sent when they change, and nothing is remembered about the terminal.
 
-1. **Cells are written on the default background.** `WriteCell` writes an image cell as an ordinary
+1. **Cells are written on the default background.** `WriteImagePixel` writes an image cell as an ordinary
    text cell with the terminal's default background (`WriteTextCell(…, true)`), and a cell with no
    symbol as a space. Text sits above the placement, so the picture shows through spaces.
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
    cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph
    over a picture is drawn by the terminal over the picture, so no dominant-colour fallback is needed.
-2. **The screen is walked in blocks.** `EndFrame(screen)` goes over the buffer in blocks of 8×4
+2. **The screen is walked in blocks.** `EndUpdate(screen)` goes over the buffer in blocks of 8×4
    cells (`BlockColumns`, `BlockRows`) aligned to the screen grid. A block with at
    least one image cell gets a key: the XXH3 of each cell's image digest and paint, zero for a cell
    without an image. The key changes when a cell's picture changes, when its paint changes, and
@@ -131,7 +131,7 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
 
 `ConsoleOutputBenchmarks`, default job, in-process, writing to a null stream (see
 [bitmap.md](bitmap.md#benchmarks)), driven as the render target drives the output: the changed
-cells written, then `EndFrame`. The benchmark has no platform, so its blocks go as zlib RGBA.
+cells written, then `EndUpdate`. The benchmark has no platform, so its blocks go as zlib RGBA.
 
 | Scenario | Time | Allocated (`--alloc`) | Bytes on the wire |
 |---|---|---|---|

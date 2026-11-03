@@ -82,7 +82,7 @@ namespace Consolonia.Core.Infrastructure
         ///     them above either way. A cell with no glyph over its picture is written as a space: the text
         ///     sits above the placement, so the picture shows through it.
         /// </summary>
-        public void WriteCell(PixelBufferCoordinate position, in Pixel pixel)
+        public void WriteImagePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             PixelForeground foreground = pixel.Foreground;
             if (foreground.Symbol.NothingToDraw())
@@ -111,7 +111,7 @@ namespace Consolonia.Core.Infrastructure
         ///     transparent pixels: placing a whole block put the picture over a dialog's body and left only
         ///     its border glyphs.
         /// </remarks>
-        public void EndFrame(PixelBuffer screen)
+        public void EndUpdate(PixelBuffer screen)
         {
             int cellPixelWidth = _output.CellPixelWidth;
             int cellPixelHeight = _output.CellPixelHeight;

@@ -20,13 +20,13 @@ Avalonia Image / DrawingContext.DrawImage
                  │  dirty regions: only cells whose Pixel changed
                  ▼
             RenderTarget.RenderToDevice                (RenderTarget.cs: a cell is a cell)
-              every changed cell → WritePixel ─ EndFrame(screen)
+              BeginUpdate ─ every changed cell → WritePixel ─ caret ─ EndUpdate(screen)
                  │
                  ▼
             AnsiConsoleOutput                          (the only place that knows sixel from kitty)
               text cells → SGR runs; image cells → IConsoleImageEncoder
-                 ├─ SixelConsoleImageEncoder: changed cells gathered, one sixel per run at EndFrame
-                 └─ KittyConsoleImageEncoder: cells on the default background, changed blocks re-sent under their ids at EndFrame
+                 ├─ SixelConsoleImageEncoder: changed cells gathered, one sixel per run at EndUpdate
+                 └─ KittyConsoleImageEncoder: cells on the default background, changed blocks re-sent under their ids at EndUpdate
                  │
                  ▼
             frame buffer (UTF-8 bytes) → one write to stdout per frame
@@ -171,18 +171,22 @@ row, not one per cell, and the first edit changes only the cells it touched.
 `RenderTarget.RenderToDevice` turns the dirty cells into output. It knows nothing about image
 protocols: a cell is a cell.
 
-1. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
+1. **`BeginUpdate`.** The console is told a frame starts. `AnsiConsoleOutput` opens a DEC 2026
+   synchronized update here when the terminal has them.
+2. **Cells.** Every dirty cell that differs from what the terminal shows (the `_cache` of written
    pixels) goes through `IConsoleOutput.WritePixel`. The cell under the mouse cursor gets the cursor
    glyph in its foreground; its contrast colour comes from `Pixel.EffectiveBackgroundColor`, so over
    a picture it is computed against the paint over the dominant colour.
-2. **`EndFrame(screen)`.** Every changed cell has been written; the console gets the whole buffer,
-   which is what the terminal should now show.
-3. **Caret, then `Flush`.** The whole frame, caret included, goes out in one write. A DEC 2026
-   synchronized update covers all of it.
+3. **Caret.** The caret, hidden at the start of the frame, is placed and shown.
+4. **`EndUpdate(screen)`.** Every changed cell has been written; the console gets the whole buffer,
+   which is what the terminal should now show. `AnsiConsoleOutput` has its image encoder place its
+   pictures, moves the cursor back to the caret, closes the synchronized update and flushes: the whole
+   frame, caret included, goes out in one write. `RenderTarget` calls it in a `finally`, and
+   `AnsiConsoleOutput` closes the update in one, so an exception never leaves an update open.
 
-`EndFrame` and `ResetCache` are default-implemented members of `IConsoleOutput`
-(`ConsoleBase` forwards them), so an output with no per-frame work ignores them. `AnsiConsoleOutput`
-forwards them to its image encoder.
+`BeginUpdate`, `EndUpdate` and `ResetCache` are default-implemented members of `IConsoleOutput`
+(`ConsoleBase` forwards them); the default `EndUpdate` flushes. `AnsiConsoleOutput` passes
+`BeginUpdate`, `EndUpdate` and `ResetCache` on to its image encoder (`ResetCache` as `Reset`).
 
 ### The output decides what an image cell is (`AnsiConsoleOutput`)
 
@@ -190,7 +194,7 @@ forwards them to its image encoder.
 the last cell, consecutive cells with no cursor move between them). An image cell goes to the
 console's `IConsoleImageEncoder`:
 
-| | `WriteCell` (per changed cell) | `EndFrame` (once per frame) |
+| | `WriteImagePixel` (per changed cell) | `EndUpdate` (once per frame) |
 |---|---|---|
 | **Sixel** | A cell with a glyph is written as text on `Pixel.EffectiveBackgroundColor`: a terminal shows a sixel or text in a cell, never both. A cell without one is recorded. | The recorded cells, in row order, form runs of neighbours; each run is one sixel: pixels side by side, the paint composited in, one palette, encoded. Rendered runs are cached by content. |
 | **Kitty** | Written as text on the terminal's default background (Konsole hides below-text placements under any explicit cell background); a cell with no symbol as a space, which the picture shows through. | The screen is walked in 8×4-cell blocks. A block whose key (its cells' image digests and paint) changed since it was last sent is transmitted again under the block's own image id, which replaces the image and its placements in the terminal, and its image cells are placed as crops. A block with no picture left has its image deleted. |
@@ -208,7 +212,7 @@ set (another program may have changed them) and the encoder's placements.
 ### Writing the frame
 
 Everything goes through `Console.Out`, the writer `PrepareConsole` installs over stdout (64 KB
-buffer, flushed by `Flush` only):
+buffer, flushed by `EndUpdate` and `Flush` only):
 
 - **Text.** `WriteText` and `WriteChar` write to `Console.Out`; the writer encodes UTF-8, surrogate
   pairs split across writes included.
@@ -218,10 +222,9 @@ buffer, flushed by `Flush` only):
   never becomes a string. `WriteImageBytes` writes a sixel run after an explicit cursor move and moves
   the cursor past it. Kitty transmits are composed as bytes (`KittyGraphics.WriteTransmitSequence`).
   Text and payloads share the one writer, so they reach the terminal in the order written.
-- **Synchronized output.** When the terminal supports DEC 2026, the first write of a frame writes the
-  begin marker and `Flush` writes the end marker. The writer may send parts of a large frame before
-  `Flush`; the terminal applies none of it until the end marker. A frame an exception abandoned stays
-  open and is closed by the next `Flush`, `RestoreConsole`'s included.
+- **Synchronized output.** When the terminal supports DEC 2026, `BeginUpdate` writes the begin marker
+  and `EndUpdate` writes the end marker. The writer may send parts of a large frame before then; the
+  terminal applies none of it until the end marker. `RestoreConsole` closes an update left open.
 - **Diagnostics.** Each flushed frame's text and image payload sizes go to Avalonia's logger at
   `Verbose` in the `Consolonia.Output` area
   (`.LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))`).
@@ -259,7 +262,7 @@ dotnet run -c Release --project src/Consolonia.Benchmarks -- --alloc
 | Class | What it measures |
 |---|---|
 | `CellImageFrameBenchmarks` | The renderer's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. Nothing reaches a terminal. |
-| `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (changed cells written, then `EndFrame`): a screen of text; for sixel a new full-screen picture, the picture shown again after a dialog dimmed it (the run cache), one cell; for kitty a new full-screen picture, every block sent again after a reset, one cell. The terminal's side is not measured. |
+| `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (changed cells written, then `EndUpdate`): a screen of text; for sixel a new full-screen picture, the picture shown again after a dialog dimmed it (the run cache), one cell; for kitty a new full-screen picture, every block sent again after a reset, one cell. The terminal's side is not measured. |
 | `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console, for the sixel and kitty capabilities: redrawn unchanged, one pixel painted, a new picture. The unit test console keeps no output, so this is drawing and diffing; the encoders are measured by `ConsoleOutputBenchmarks`. |
 | `SixelBenchmarks` | Quantising (flat cell, photo cell, full image) and serialising sixels. |
 

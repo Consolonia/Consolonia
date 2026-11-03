@@ -41,7 +41,7 @@ namespace Consolonia.Core.Infrastructure
             _output = output;
         }
 
-        public void WriteCell(PixelBufferCoordinate position, in Pixel pixel)
+        public void WriteImagePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             // a picture cell with any symbol is written as text; one with none (nothing drawn over the
             // picture, whatever color an overlay blended into it) is the picture
@@ -57,7 +57,13 @@ namespace Consolonia.Core.Infrastructure
             _cells.Add(new ImageCell(position, pixel.Background.Image, pixel.Background.Color));
         }
 
-        public void EndFrame(PixelBuffer screen)
+        public void BeginUpdate()
+        {
+            _cells.Clear();
+            _runs.Clear();
+        }
+
+        public void EndUpdate(PixelBuffer screen)
         {
             if (_cells.Count == 0)
                 return;
@@ -86,9 +92,6 @@ namespace Consolonia.Core.Infrastructure
 
             foreach (Run run in _runs)
                 _output.WriteImageBytes(_cells[run.Start].Position, run.Rendered, run.Cells);
-
-            _cells.Clear();
-            _runs.Clear();
         }
 
         public void Reset()

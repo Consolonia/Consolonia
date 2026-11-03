@@ -43,7 +43,7 @@ namespace Consolonia.Benchmarks
         private AnsiConsoleOutput _sixelOutput = null!;
         private Pixel _strokeCell;
         private PixelBuffer _strokeScreen = null!;
-        private Pixel[] _text = null!;
+        private PixelBuffer _text = null!;
 
         private static (string Name, Action<ConsoleOutputBenchmarks> Run)[] Scenarios =>
         [
@@ -67,13 +67,14 @@ namespace Consolonia.Benchmarks
             AvaloniaLocator.CurrentMutable.Bind<IConsoleColorMode>().ToConstant(new RgbConsoleColorMode());
 
             // a screen of text in runs of eight cells per color, as a UI draws it
-            _text = new Pixel[CellsWide * CellsHigh];
-            for (int i = 0; i < _text.Length; i++)
+            _text = new PixelBuffer(CellsWide, CellsHigh);
+            for (int i = 0; i < CellsWide * CellsHigh; i++)
             {
                 int run = i / 8;
                 Color foreground = Color.FromRgb((byte)(run * 37), (byte)(run * 11), 200);
                 Color background = Color.FromRgb(20, (byte)(run * 5), (byte)(run * 3));
-                _text[i] = new Pixel(new PixelForeground(new Symbol((char)('A' + i % 26)), foreground),
+                _text[(ushort)(i % CellsWide), (ushort)(i / CellsWide)] = new Pixel(
+                    new PixelForeground(new Symbol((char)('A' + i % 26)), foreground),
                     new PixelBackground(background));
             }
 
@@ -157,11 +158,11 @@ namespace Consolonia.Benchmarks
         /// <summary>A frame in which every cell of <paramref name="screen" /> changed.</summary>
         private static void WholeScreen(AnsiConsoleOutput output, PixelBuffer screen)
         {
+            output.BeginUpdate();
             for (ushort y = 0; y < CellsHigh; y++)
             for (ushort x = 0; x < CellsWide; x++)
                 output.WritePixel(new PixelBufferCoordinate(x, y), screen[x, y]);
-            output.EndFrame(screen);
-            output.Flush();
+            output.EndUpdate(screen);
         }
 
         /// <summary>A frame in which one cell changed to pixels never seen before, as under a brush.</summary>
@@ -169,18 +170,15 @@ namespace Consolonia.Benchmarks
         {
             _strokeCell = Picture(CellWidth, CellHeight, ++_seed + 100000)[0, 0];
             _strokeScreen[10, 5] = _strokeCell;
+            output.BeginUpdate();
             output.WritePixel(new PixelBufferCoordinate(10, 5), in _strokeCell);
-            output.EndFrame(_strokeScreen);
-            output.Flush();
+            output.EndUpdate(_strokeScreen);
         }
 
         [Benchmark(Baseline = true)]
         public void TextFullScreen()
         {
-            for (int y = 0; y < CellsHigh; y++)
-            for (int x = 0; x < CellsWide; x++)
-                _sixelOutput.WritePixel(new PixelBufferCoordinate((ushort)x, (ushort)y), in _text[y * CellsWide + x]);
-            _sixelOutput.Flush();
+            WholeScreen(_sixelOutput, _text);
         }
 
         /// <summary>A full-screen picture never sent: a run per row, quantized and encoded.</summary>

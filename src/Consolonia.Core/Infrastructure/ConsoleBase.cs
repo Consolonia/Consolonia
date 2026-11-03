@@ -201,9 +201,14 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
-        public virtual void EndFrame(PixelBuffer screen)
+        public virtual void BeginUpdate()
         {
-            _consoleOutput.EndFrame(screen);
+            _consoleOutput.BeginUpdate();
+        }
+
+        public virtual void EndUpdate(PixelBuffer screen)
+        {
+            _consoleOutput.EndUpdate(screen);
         }
 
         public virtual void ResetCache()

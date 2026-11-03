@@ -11,17 +11,26 @@ namespace Consolonia.Core.Infrastructure
     internal interface IConsoleImageEncoder
     {
         /// <summary>
+        ///     A frame starts, inside the output's <see cref="IConsoleOutput.BeginUpdate" />. An encoder that
+        ///     gathers the frame's cells starts with none, whatever an earlier frame that threw left behind.
+        /// </summary>
+        void BeginUpdate()
+        {
+        }
+
+        /// <summary>
         ///     A changed image cell. The render target writes only the cells that differ from what the
         ///     terminal shows, so these are exactly the cells of the frame whose picture has to reach it:
-        ///     written now, or gathered for <see cref="EndFrame" />.
+        ///     written now, or gathered for <see cref="EndUpdate" />.
         /// </summary>
-        void WriteCell(PixelBufferCoordinate position, in Pixel pixel);
+        void WriteImagePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
         ///     Every changed cell has been written; <paramref name="screen" /> is what the terminal should
-        ///     now show, image cells or not. The protocol's per-frame work goes here.
+        ///     now show, image cells or not. The protocol's per-frame work goes here, inside the output's
+        ///     <see cref="IConsoleOutput.EndUpdate" />, before the update is closed.
         /// </summary>
-        void EndFrame(PixelBuffer screen);
+        void EndUpdate(PixelBuffer screen);
 
         /// <summary>
         ///     The render target no longer trusts what the terminal shows and will write every cell again:

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
 using NUnit.Framework;
@@ -31,6 +32,8 @@ namespace Consolonia.Core.Tests
             Console.SetOut(_originalOut);
             Dispose();
         }
+
+        private static readonly PixelBuffer Screen = new(1, 1);
 
         private TextWriter _originalOut;
         private MemoryStream _stream;
@@ -103,21 +106,25 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void AFrameIsOneSynchronizedUpdateWhenTheTerminalHasThem()
+        public void BeginUpdateToEndUpdateIsOneSynchronizedUpdateWhenTheTerminalHasThem()
         {
             _output.RedirectOutput(_stream, ConsoleCapabilities.SupportsSynchronizedOutput);
 
+            _output.BeginUpdate();
             _output.WriteText("a");
             _output.WriteBytes("\u001b_Gb\u001b\\"u8);
             _output.WriteText("c");
+            _output.EndUpdate(Screen);
             _output.Flush();
-            _output.Flush();
+            _output.BeginUpdate();
             _output.WriteText("d");
+            _output.EndUpdate(Screen);
+            _output.WriteText("e");
             _output.Flush();
 
             Assert.That(Encoding.UTF8.GetString(Written()), Is.EqualTo(
                 Esc.BeginSynchronizedUpdate + "a\u001b_Gb\u001b\\c" + Esc.EndSynchronizedUpdate +
-                Esc.BeginSynchronizedUpdate + "d" + Esc.EndSynchronizedUpdate));
+                Esc.BeginSynchronizedUpdate + "d" + Esc.EndSynchronizedUpdate + "e"));
         }
 
         [Test]

@@ -67,14 +67,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         private string Frame(params (int X, int Y, Pixel Pixel)[] changed)
         {
             _stream.SetLength(0);
+            _output.BeginUpdate();
             foreach ((int x, int y, Pixel pixel) in changed)
             {
                 _screen[(ushort)x, (ushort)y] = pixel;
                 _output.WritePixel(new PixelBufferCoordinate((ushort)x, (ushort)y), in pixel);
             }
 
-            _output.EndFrame(_screen);
-            _output.Flush();
+            _output.EndUpdate(_screen);
             return Encoding.ASCII.GetString(_stream.ToArray());
         }
 

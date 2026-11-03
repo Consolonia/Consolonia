@@ -42,9 +42,6 @@ namespace Consolonia.Core.Infrastructure
         private int _frameImageChars;
         private int _frameImages;
 
-        /// <summary>Whether anything has been written since the last flush.</summary>
-        private bool _frameStarted;
-
         private PixelBufferCoordinate _headBufferPoint;
 
         /// <summary>
@@ -110,7 +107,7 @@ namespace Consolonia.Core.Infrastructure
             {
                 if (_imageEncoder != null)
                 {
-                    _imageEncoder.WriteCell(position, in pixel);
+                    _imageEncoder.WriteImagePixel(position, in pixel);
                     return;
                 }
 
@@ -125,21 +122,13 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
-            if (!_frameStarted)
-                return;
-
             WaitPauseTaskIfNecessary();
-
-            if (_synchronizedUpdateOpen)
-                Console.Out.Write(Esc.EndSynchronizedUpdate);
             Console.Out.Flush();
 
             if (Logger.TryGet(LogEventLevel.Verbose, OutputLogArea) is { } flushLogger)
                 flushLogger.Log3("Flushed {Chars} chars and {Images} image payloads of {ImageChars} chars",
                     _frameChars, _frameImages, _frameImageChars);
 
-            _frameStarted = false;
-            _synchronizedUpdateOpen = false;
             _frameChars = 0;
             _frameImages = 0;
             _frameImageChars = 0;
@@ -154,7 +143,6 @@ namespace Consolonia.Core.Infrastructure
         public void WriteBytes(ReadOnlySpan<byte> ascii)
         {
             WaitPauseTaskIfNecessary();
-            StartFrame();
 
             Span<char> chunk = stackalloc char[ImageChunkChars];
             _frameImages++;
@@ -168,10 +156,55 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        /// <summary>
+        ///     Opens a DEC 2026 synchronized update when the terminal has them: it shows everything up to
+        ///     the end marker <see cref="EndUpdate" /> writes at once, though the writer may send parts of a
+        ///     large frame before then. The image encoder starts its frame.
+        /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
-        public void EndFrame(PixelBuffer screen)
+        public void BeginUpdate()
         {
-            _imageEncoder?.EndFrame(screen);
+            if (!_synchronizedUpdateOpen && Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
+            {
+                WaitPauseTaskIfNecessary();
+                Console.Out.Write(Esc.BeginSynchronizedUpdate);
+                _synchronizedUpdateOpen = true;
+            }
+
+            _imageEncoder?.BeginUpdate();
+        }
+
+        /// <summary>
+        ///     The image encoder places its pictures, the cursor goes back to where the frame left it (the
+        ///     caret), and the update is closed and sent, whatever the encoder throws.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void EndUpdate(PixelBuffer screen)
+        {
+            try
+            {
+                if (_imageEncoder != null)
+                {
+                    PixelBufferCoordinate caret = _headBufferPoint;
+                    _imageEncoder.EndUpdate(screen);
+                    SetCaretPosition(caret);
+                }
+            }
+            finally
+            {
+                CloseUpdate();
+                Flush();
+            }
+        }
+
+        private void CloseUpdate()
+        {
+            if (!_synchronizedUpdateOpen)
+                return;
+
+            WaitPauseTaskIfNecessary();
+            Console.Out.Write(Esc.EndSynchronizedUpdate);
+            _synchronizedUpdateOpen = false;
         }
 
         /// <summary>
@@ -202,7 +235,6 @@ namespace Consolonia.Core.Infrastructure
             if (string.IsNullOrEmpty(str))
                 return;
 
-            StartFrame();
             _frameChars += str.Length;
             Console.Out.Write(str);
         }
@@ -278,7 +310,9 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
-            // what follows joins any frame an interruption left open, so the Flush below closes its update.
+            // an update an interruption left open would hold back everything that follows
+            CloseUpdate();
+
             // Free the terminal-side storage of every kitty image sent: the ones kept for showing again as
             // well as the ones placed, which deleting the visible placements alone would leave behind
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
@@ -678,24 +712,6 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Opens a frame at its first write: with synchronized output (DEC 2026) the terminal applies
-        ///     everything up to the end marker <see cref="Flush" /> writes at once, though the writer may
-        ///     send parts of a large frame before then.
-        /// </summary>
-        private void StartFrame()
-        {
-            if (_frameStarted)
-                return;
-
-            _frameStarted = true;
-            if (!Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
-                return;
-
-            Console.Out.Write(Esc.BeginSynchronizedUpdate);
-            _synchronizedUpdateOpen = true;
-        }
-
-        /// <summary>
         ///     Write char to the console
         /// </summary>
         /// <param name="ch"></param>
@@ -704,7 +720,6 @@ namespace Consolonia.Core.Infrastructure
             if (ch == 0)
                 return;
 
-            StartFrame();
             _frameChars++;
             Console.Out.Write(ch);
         }

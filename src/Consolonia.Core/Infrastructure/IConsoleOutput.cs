@@ -73,12 +73,22 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
-        ///     Every changed cell of the frame has been written; <paramref name="screen" /> is what the
-        ///     terminal should now show. An output with per-frame work besides the cells (an image protocol
-        ///     placing its pictures) does it here.
+        ///     A frame starts: what is written until <see cref="EndUpdate" /> is one frame. An output that
+        ///     can have the terminal show a frame all at once (a DEC 2026 synchronized update) opens it here.
         /// </summary>
-        void EndFrame(PixelBuffer screen)
+        void BeginUpdate()
         {
+        }
+
+        /// <summary>
+        ///     The frame <see cref="BeginUpdate" /> started is written, caret included; <paramref name="screen" />
+        ///     is what the terminal should now show. An output with per-frame work besides the cells (an image
+        ///     protocol placing its pictures) does it here, leaving the cursor where the caret was put, then
+        ///     closes the update and flushes.
+        /// </summary>
+        void EndUpdate(PixelBuffer screen)
+        {
+            Flush();
         }
 
         /// <summary>
