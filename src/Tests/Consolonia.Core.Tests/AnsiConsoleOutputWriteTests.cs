@@ -1,15 +1,16 @@
 using System;
 using System.IO;
 using System.Text;
+using Consolonia.Controls;
 using Consolonia.Core.Infrastructure;
+using Consolonia.Core.Text;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     How AnsiConsoleOutput gets a frame out: text and image bytes in the order written, as the UTF-8
-    ///     the terminal receives, in one write to the output stream, or as text to Console.Out when that
-    ///     was redirected.
+    ///     How AnsiConsoleOutput gets a frame out: text and image bytes through Console.Out in the order
+    ///     written, as the UTF-8 the terminal receives, in a synchronized update when the terminal has one.
     /// </summary>
     [TestFixture]
     [NonParallelizable] // Console.Out is process-wide
@@ -88,20 +89,6 @@ namespace Consolonia.Core.Tests
         }
 
         [Test]
-        public void AConsoleOutRedirectedAfterwardsGetsTheFrameAsText()
-        {
-            var redirected = new StringWriter();
-            Console.SetOut(redirected);
-
-            _output.WriteText("é");
-            _output.WriteBytes("\u001b_G\u001b\\"u8);
-            _output.Flush();
-
-            Assert.That(redirected.ToString(), Is.EqualTo("é\u001b_G\u001b\\"));
-            Assert.That(Written(), Is.Empty);
-        }
-
-        [Test]
         public void AKittyTransmitIsWrittenAsTheSameBytesItIsBuiltAs()
         {
             byte[] data = new byte[10000]; // three chunks, the last one short
@@ -113,6 +100,37 @@ namespace Consolonia.Core.Tests
 
             Assert.That(Encoding.ASCII.GetString(Written()),
                 Is.EqualTo(KittyGraphicsTests.TransmitSequence(9, 50, 40, data, KittyImageFormat.Rgba, true)));
+        }
+
+        [Test]
+        public void AFrameIsOneSynchronizedUpdateWhenTheTerminalHasThem()
+        {
+            _output.RedirectOutput(_stream, ConsoleCapabilities.SupportsSynchronizedOutput);
+
+            _output.WriteText("a");
+            _output.WriteBytes("\u001b_Gb\u001b\\"u8);
+            _output.WriteText("c");
+            _output.Flush();
+            _output.Flush();
+            _output.WriteText("d");
+            _output.Flush();
+
+            Assert.That(Encoding.UTF8.GetString(Written()), Is.EqualTo(
+                Esc.BeginSynchronizedUpdate + "a\u001b_Gb\u001b\\c" + Esc.EndSynchronizedUpdate +
+                Esc.BeginSynchronizedUpdate + "d" + Esc.EndSynchronizedUpdate));
+        }
+
+        [Test]
+        public void AnImagePayloadLongerThanAChunkIsWrittenWhole()
+        {
+            byte[] payload = new byte[10000];
+            for (int i = 0; i < payload.Length; i++)
+                payload[i] = (byte)('?' + i % 64);
+
+            _output.WriteBytes(payload);
+            _output.Flush();
+
+            Assert.That(Written(), Is.EqualTo(payload));
         }
 
         [Test]

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -26,50 +25,25 @@ namespace Consolonia.Core.Infrastructure
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
 
-        /// <summary>
-        ///     A frame buffer grown past this (a full-screen kitty picture is megabytes) goes back to the pool
-        ///     after it is written, rather than staying the size of the largest frame ever sent. The next
-        ///     frame that large grows straight to that size (<see cref="_largestFrameBytes" />): doubling up
-        ///     to it from the initial size was six rents, and after a Gen2 GC had trimmed the pool, 8 MB of
-        ///     fresh arrays for a 3 MB frame.
-        /// </summary>
-        private const int KeptFrameBytes = 1024 * 1024;
-
-        private const int InitialFrameBytes = 64 * 1024;
+        /// <summary>Characters of an image payload widened per write to Console.Out.</summary>
+        private const int ImageChunkChars = 4096;
 
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        // each flushed frame's size and kitty transmit (a=t) count, logged at Verbose in the Consolonia.Output
-        // area: .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))
+        // each flushed frame's size, logged at Verbose in the Consolonia.Output area:
+        // .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))
         private static readonly string OutputLogArea = LogExtensions.GetAreaName(LogCategory.Output);
-
-        // set CONSOLONIA_DEBUG_FRAMES to a file path to append every flushed frame's bytes to it, as sent
-        private static readonly string DebugFramesPath =
-            Environment.GetEnvironmentVariable("CONSOLONIA_DEBUG_FRAMES");
 
         private static readonly UTF8Encoding Utf8NoBom = new(false);
 
-        private static readonly byte[] BeginSynchronizedUpdate = Encoding.ASCII.GetBytes(Esc.BeginSynchronizedUpdate);
+        // what the frame being written holds, for the flush log
+        private int _frameChars;
+        private int _frameImageChars;
+        private int _frameImages;
 
-        private static readonly byte[] EndSynchronizedUpdate = Encoding.ASCII.GetBytes(Esc.EndSynchronizedUpdate);
-
-        /// <summary>Room left at the start of the frame for <see cref="BeginSynchronizedUpdate" />.</summary>
-        private static readonly int FramePrefix = BeginSynchronizedUpdate.Length;
-
-        private readonly Encoder _encoder = Utf8NoBom.GetEncoder();
-
-        /// <summary>Whether the encoder holds a high surrogate waiting for the low one in the next text.</summary>
-        private bool _encoderPending;
-
-        /// <summary>
-        ///     The frame being built, as the UTF-8 bytes the terminal receives, after
-        ///     <see cref="FramePrefix" /> bytes of room. Image payloads are ASCII and go in as they are;
-        ///     only text is encoded.
-        /// </summary>
-        private byte[] _frame = ArrayPool<byte>.Shared.Rent(InitialFrameBytes);
-
-        private int _frameLength = FramePrefix;
+        /// <summary>Whether anything has been written since the last flush.</summary>
+        private bool _frameStarted;
 
         private PixelBufferCoordinate _headBufferPoint;
 
@@ -78,12 +52,6 @@ namespace Consolonia.Core.Infrastructure
         ///     it answered none. See <see cref="PrepareConsole" />.
         /// </summary>
         private IConsoleImageEncoder _imageEncoder;
-
-        /// <summary>Console.Out as installed over <see cref="_stream" />: anything else means it was redirected.</summary>
-        private TextWriter _installedOut;
-
-        /// <summary>The longest frame written so far: what a frame that outgrows the buffer is likely to need.</summary>
-        private int _largestFrameBytes = InitialFrameBytes;
 
         private Color _lastBackground = Colors.Transparent;
         private bool _lastBackgroundIsDefault;
@@ -95,8 +63,8 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
         private TextWriter _originalOut;
 
-        /// <summary>The stream frames are written to as bytes, while Console.Out is still the writer over it.</summary>
-        private Stream _stream;
+        /// <summary>Whether the frame being written opened a synchronized update, which Flush closes.</summary>
+        private bool _synchronizedUpdateOpen;
 
         internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
 
@@ -157,62 +125,47 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void Flush()
         {
-            if (_frameLength == FramePrefix)
+            if (!_frameStarted)
                 return;
 
             WaitPauseTaskIfNecessary();
-            EndText();
 
-            // asked for first: decoding the frame to count its transmits is not free
+            if (_synchronizedUpdateOpen)
+                Console.Out.Write(Esc.EndSynchronizedUpdate);
+            Console.Out.Flush();
+
             if (Logger.TryGet(LogEventLevel.Verbose, OutputLogArea) is { } flushLogger)
-                LogFlushDiagnostics(flushLogger,
-                    Utf8NoBom.GetString(_frame, FramePrefix, _frameLength - FramePrefix));
-            if (DebugFramesPath != null)
-                DumpFrame(_frame.AsSpan(FramePrefix, _frameLength - FramePrefix));
+                flushLogger.Log3("Flushed {Chars} chars and {Images} image payloads of {ImageChars} chars",
+                    _frameChars, _frameImages, _frameImageChars);
 
-            // synchronized update (DEC 2026) makes the terminal apply the batch atomically; wrapping here
-            // rather than in the render loop keeps begin/end paired even if a frame is abandoned
-            int start = FramePrefix;
-            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
-            {
-                BeginSynchronizedUpdate.CopyTo(_frame, 0);
-                start = 0;
-                AppendBytes(EndSynchronizedUpdate);
-            }
-
-            if (_stream != null && ReferenceEquals(Console.Out, _installedOut))
-            {
-                // one write of the whole frame, after whatever was written straight to Console.Out
-                Console.Out.Flush();
-                _stream.Write(_frame, start, _frameLength - start);
-                _stream.Flush();
-            }
-            else
-            {
-                // Console.Out was redirected after PrepareConsole (a test, a host capturing output): honour it
-                Console.Out.Write(Utf8NoBom.GetString(_frame, start, _frameLength - start));
-                Console.Out.Flush();
-            }
-
-            _largestFrameBytes = Math.Max(_largestFrameBytes, _frameLength);
-            _frameLength = FramePrefix;
-            if (_frame.Length > KeptFrameBytes)
-            {
-                ArrayPool<byte>.Shared.Return(_frame);
-                _frame = ArrayPool<byte>.Shared.Rent(InitialFrameBytes);
-            }
+            _frameStarted = false;
+            _synchronizedUpdateOpen = false;
+            _frameChars = 0;
+            _frameImages = 0;
+            _frameImageChars = 0;
         }
 
         /// <summary>
-        ///     Writes ASCII escape sequences given as bytes, image payloads above all, without converting
-        ///     them to text and back.
+        ///     Writes ASCII escape sequences given as bytes, image payloads above all, without building a
+        ///     string of them.
         /// </summary>
         /// <remarks>This does not move the caret position, so should only be used for escape commands</remarks>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void WriteBytes(ReadOnlySpan<byte> ascii)
         {
             WaitPauseTaskIfNecessary();
-            AppendBytes(ascii);
+            StartFrame();
+
+            Span<char> chunk = stackalloc char[ImageChunkChars];
+            _frameImages++;
+            _frameImageChars += ascii.Length;
+            while (!ascii.IsEmpty)
+            {
+                int length = Math.Min(chunk.Length, ascii.Length);
+                Encoding.ASCII.GetChars(ascii[..length], chunk);
+                Console.Out.Write(chunk[..length]);
+                ascii = ascii[length..];
+            }
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -252,7 +205,12 @@ namespace Consolonia.Core.Infrastructure
         public void WriteText(string str)
         {
             WaitPauseTaskIfNecessary();
-            AppendText(str);
+            if (string.IsNullOrEmpty(str))
+                return;
+
+            StartFrame();
+            _frameChars += str.Length;
+            Console.Out.Write(str);
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -268,10 +226,8 @@ namespace Consolonia.Core.Infrastructure
             // pseudoconsole. Measured against a live ConPTY with full-screen frames: ~14 frames a
             // second through the default writer, ~100 through this one flushed once per frame.
             //
-            // Installed via SetOut rather than written to directly, so anything that redirects
-            // Console.Out afterwards -- a test, a host capturing output -- is honoured exactly as
-            // before. Done after the encoding change above, because setting OutputEncoding
-            // recreates Console.Out and would discard this writer.
+            // Done after the encoding change above, because setting OutputEncoding recreates
+            // Console.Out and would discard this writer.
             _originalOut = Console.Out;
             InstallWriter(Console.OpenStandardOutput());
 
@@ -328,12 +284,8 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
-            // close any update left open by an interrupted frame, else the terminal withholds output until it
-            // times out. Written straight out: buffered, Flush would wrap it in an update of its own.
-            if (Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
-                Console.Out.Write(Esc.EndSynchronizedUpdate);
-
-            // free the terminal-side storage of every kitty image sent: the ones kept for showing again as
+            // what follows joins any frame an interruption left open, so the Flush below closes its update.
+            // Free the terminal-side storage of every kitty image sent: the ones kept for showing again as
             // well as the ones placed, which deleting the visible placements alone would leave behind
             if (Capabilities.HasFlag(ConsoleCapabilities.SupportsKittyGraphics))
             {
@@ -352,9 +304,6 @@ namespace Consolonia.Core.Infrastructure
                 Console.SetOut(_originalOut);
                 _originalOut = null;
             }
-
-            _stream = null;
-            _installedOut = null;
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -571,8 +520,8 @@ namespace Consolonia.Core.Infrastructure
             // move it would land a row up. Eight bytes against a payload of kilobytes.
             SetCaretPositionInternal(position);
 
-            // image payloads are strictly ASCII (sixel data bytes are 0x3F..0x7E): the bytes go out as they are
-            AppendBytes(bytes);
+            // image payloads are strictly ASCII (sixel data bytes are 0x3F..0x7E)
+            WriteBytes(bytes);
 
             var newPosition = new PixelBufferCoordinate((ushort)(position.X + cellsWide), position.Y);
             SetCaretPositionInternal(newPosition);
@@ -591,26 +540,6 @@ namespace Consolonia.Core.Infrastructure
                 return new SixelConsoleImageEncoder(this);
 
             return null;
-        }
-
-        private static void DumpFrame(ReadOnlySpan<byte> frame)
-        {
-            // a failure to write is not swallowed: a dump asked for that silently misses frames would
-            // send the investigation the wrong way
-            using var file = new FileStream(DebugFramesPath, FileMode.Append, FileAccess.Write, FileShare.Read);
-            file.Write(frame);
-        }
-
-        private static void LogFlushDiagnostics(ParametrizedLogger logger, string text)
-        {
-            const string marker = "_Ga=t";
-            int transmits = 0;
-            for (int found = text.IndexOf(marker, StringComparison.Ordinal);
-                 found >= 0;
-                 found = text.IndexOf(marker, found + marker.Length, StringComparison.Ordinal))
-                transmits++;
-
-            logger.Log3("Flushed {Chars} chars, {Transmits} kitty transmits (a=t)", text.Length, transmits);
         }
 
         /// <summary>
@@ -725,19 +654,13 @@ namespace Consolonia.Core.Infrastructure
             //todo: low: we can not simply test the presence of this bug (if it even exists), thus come back to this later
         }
 
-        /// <summary>
-        ///     The large-buffered, manually flushed writer over <paramref name="stream" /> (see PrepareConsole),
-        ///     and the stream itself for frames, which go to it as bytes in one write each.
-        /// </summary>
-        private void InstallWriter(Stream stream)
+        /// <summary>The large-buffered, manually flushed writer over <paramref name="stream" /> (see PrepareConsole).</summary>
+        private static void InstallWriter(Stream stream)
         {
             Console.SetOut(new StreamWriter(stream, Utf8NoBom, 65536, true)
             {
                 AutoFlush = false
             });
-            _stream = stream;
-            // as Console holds it (wrapped for thread safety), to tell a later redirection apart
-            _installedOut = Console.Out;
         }
 
         /// <summary>
@@ -754,65 +677,28 @@ namespace Consolonia.Core.Infrastructure
             _imageEncoder = CreateImageEncoder();
         }
 
-        /// <summary>Room for <paramref name="bytes" /> more bytes at the end of the frame.</summary>
-        private Span<byte> FrameSpace(int bytes)
-        {
-            int needed = _frameLength + bytes;
-            if (needed > _frame.Length)
-            {
-                // to the largest frame seen when that is more than doubling: a frame that outgrows the buffer
-                // is usually another of the large kind, and one rent beats a chain of them
-                byte[] grown = ArrayPool<byte>.Shared.Rent(Math.Max(needed, Math.Max(_frame.Length * 2,
-                    _largestFrameBytes)));
-                _frame.AsSpan(0, _frameLength).CopyTo(grown);
-                ArrayPool<byte>.Shared.Return(_frame);
-                _frame = grown;
-            }
-
-            return _frame.AsSpan(_frameLength);
-        }
-
-        /// <summary>Appends <paramref name="text" /> as UTF-8; escape sequences, which are most of it, are ASCII.</summary>
-        private void AppendText(ReadOnlySpan<char> text)
-        {
-            if (text.IsEmpty)
-                return;
-
-            Span<byte> space = FrameSpace(Utf8NoBom.GetMaxByteCount(text.Length));
-            int ascii = 0;
-            if (!_encoderPending && Ascii.FromUtf16(text, space, out ascii) == OperationStatus.Done)
-            {
-                _frameLength += ascii;
-                return;
-            }
-
-            // from the first non-ASCII character on (or all of it, to pair a surrogate held from before)
-            _frameLength += ascii + _encoder.GetBytes(text[ascii..], space[ascii..], false);
-            _encoderPending = char.IsHighSurrogate(text[^1]);
-        }
-
-        /// <summary>Appends ASCII bytes as they are.</summary>
-        private void AppendBytes(ReadOnlySpan<byte> bytes)
-        {
-            EndText();
-            bytes.CopyTo(FrameSpace(bytes.Length));
-            _frameLength += bytes.Length;
-        }
-
-        /// <summary>Writes out a high surrogate the encoder still holds, which no low one followed.</summary>
-        private void EndText()
-        {
-            if (!_encoderPending)
-                return;
-            _frameLength += _encoder.GetBytes(ReadOnlySpan<char>.Empty, FrameSpace(Utf8NoBom.GetMaxByteCount(0)),
-                true);
-            _encoderPending = false;
-        }
-
         private void SetCaretPositionInternal(PixelBufferCoordinate bufferPoint)
         {
             WriteText(Esc.SetCursorPosition(bufferPoint.X, bufferPoint.Y));
             _headBufferPoint = bufferPoint;
+        }
+
+        /// <summary>
+        ///     Opens a frame at its first write: with synchronized output (DEC 2026) the terminal applies
+        ///     everything up to the end marker <see cref="Flush" /> writes at once, though the writer may
+        ///     send parts of a large frame before then.
+        /// </summary>
+        private void StartFrame()
+        {
+            if (_frameStarted)
+                return;
+
+            _frameStarted = true;
+            if (!Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
+                return;
+
+            Console.Out.Write(Esc.BeginSynchronizedUpdate);
+            _synchronizedUpdateOpen = true;
         }
 
         /// <summary>
@@ -824,14 +710,9 @@ namespace Consolonia.Core.Infrastructure
             if (ch == 0)
                 return;
 
-            if (ch < 0x80 && !_encoderPending)
-            {
-                FrameSpace(1)[0] = (byte)ch;
-                _frameLength++;
-                return;
-            }
-
-            AppendText(new ReadOnlySpan<char>(in ch));
+            StartFrame();
+            _frameChars++;
+            Console.Out.Write(ch);
         }
     }
 }

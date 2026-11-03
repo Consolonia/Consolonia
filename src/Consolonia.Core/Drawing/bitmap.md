@@ -206,39 +206,32 @@ stops or starts showing a picture.
 `ResetCache` forgets what the output believes the terminal shows: the last colours and attributes
 set (another program may have changed them) and the encoder's placements.
 
-### The byte frame
+### Writing the frame
 
-The frame is built as the bytes the terminal receives:
+Everything goes through `Console.Out`, the writer `PrepareConsole` installs over stdout (64 KB
+buffer, flushed by `Flush` only):
 
-- **Buffer.** `_frame` is a pooled `byte[]` with 8 bytes reserved in front for the DEC 2026 begin
-  marker. Starting at 64 KB, it grows by doubling. A buffer grown past 1 MB (a full-screen kitty
-  picture is megabytes) goes back to the pool after the write.
-- **Text.** Text is encoded as UTF-8 on the way in. `Ascii.FromUtf16` takes ASCII, which is almost
-  everything, in one vectorised pass, and `WriteChar` stores ASCII directly. A stateful `Encoder`
-  handles the rest. It keeps a surrogate pair split across two writes together. `EndText` writes a
-  lone high surrogate as U+FFFD before any image bytes.
-- **Image payloads.** These are ASCII, so they go in as they are. `IConsoleOutput.WriteBytes` is a
-  default interface method that falls back to `WriteText`, so other outputs keep working.
-  `AnsiConsoleOutput` overrides it. `WriteImageBytes` appends a sixel run after an explicit cursor
-  move and moves the cursor past it. Kitty transmits are composed as bytes
-  (`KittyGraphics.WriteTransmitSequence`).
-- **Flush.** `Flush` fills in the begin marker and appends the end marker when the terminal supports
-  synchronized output. It flushes `Console.Out`, so text written there directly goes first, then
-  writes the frame to stdout in **one** `Stream.Write`.
-- **Diagnostics.** Each flushed frame's size and kitty transmit count goes to Avalonia's logger at
+- **Text.** `WriteText` and `WriteChar` write to `Console.Out`; the writer encodes UTF-8, surrogate
+  pairs split across writes included.
+- **Image payloads.** These are ASCII. `IConsoleOutput.WriteBytes` is a default interface method
+  that falls back to `WriteText`, so other outputs keep working. `AnsiConsoleOutput` overrides it to
+  widen the bytes to `Console.Out` in 4096-character chunks on the stack, so a payload of megabytes
+  never becomes a string. `WriteImageBytes` writes a sixel run after an explicit cursor move and moves
+  the cursor past it. Kitty transmits are composed as bytes (`KittyGraphics.WriteTransmitSequence`).
+  Text and payloads share the one writer, so they reach the terminal in the order written.
+- **Synchronized output.** When the terminal supports DEC 2026, the first write of a frame writes the
+  begin marker and `Flush` writes the end marker. The writer may send parts of a large frame before
+  `Flush`; the terminal applies none of it until the end marker. A frame an exception abandoned stays
+  open and is closed by the next `Flush`, `RestoreConsole`'s included.
+- **Diagnostics.** Each flushed frame's text and image payload sizes go to Avalonia's logger at
   `Verbose` in the `Consolonia.Output` area
   (`.LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))`).
-  `CONSOLONIA_DEBUG_FRAMES=<file>` appends every frame's bytes as sent, to read back what a
-  terminal was given. A dump that cannot be written fails the flush rather than silently missing
-  frames.
-- **Redirected output.** `PrepareConsole` installs the writer over the stdout stream. If
-  `Console.Out` was replaced since then (a test, or a host capturing output), the frame is decoded
-  and written to that writer instead. `RedirectOutput(stream, capabilities)` sets the same up
-  without a terminal, with the encoder for the capabilities given, for tests and benchmarks.
+- **Tests and benchmarks.** `RedirectOutput(stream, capabilities)` installs the same writer over a
+  stream, without a terminal, with the encoder for the capabilities given. Replacing `Console.Out`
+  otherwise while the app runs is not supported.
 
-Before this change, the frame was a `StringBuilder`. Image payloads were widened to UTF-16 and
-encoded back to UTF-8 by the `StreamWriter`. A full-screen kitty picture cost about 22 MB of
-garbage per frame, with gen-1 collections.
+Built as strings, the payloads of a full-screen kitty picture cost about 22 MB of garbage per frame,
+with gen-1 collections; hence the chunks.
 
 ### Lifecycle: resize, resume, exit
 
@@ -367,7 +360,7 @@ What the image model costs in memory, and the choices made to keep it down. A fu
 | Cell image cache | terminal | 24 MB min, 3 screens | pixels of distinct cells kept, LRU |
 | Renderer scratch | terminal | one screen of BGRA | the visible pixels of the picture being rendered, 8 MB at full HD, grown never shrunk |
 | Kitty encoder | terminal | one block of BGRA + its encoding | both reused; ~50 KB |
-| Byte frame | terminal | the frame being written | pooled; a frame over 1 MB goes back to the pool after it is flushed, and the next large one is rented at the largest size seen (see below) |
+| Output writer | terminal | 64 KB | the `StreamWriter` behind `Console.Out`; image payloads pass through an 8 KB (4096-character) stack chunk |
 | Sixel encoder | terminal | run cache 16 MB, frame image of new runs | the frame image is the new cells' BGRA, replaced when its size changes |
 | Text-only app | | 0 | none of the above but the two 40-byte-per-cell buffers |
 
@@ -384,14 +377,9 @@ What the image model costs in memory, and the choices made to keep it down. A fu
   longest run wins.
 - **Kitty transmits without copies.** One `MemoryStream` takes the PNG or the zlib of a block and
   its buffer is passed as a span to the sequence writer, which base64-encodes it into a pooled array
-  and writes that to the frame.
+  and writes that to the output.
 - **Sixel runs.** A run's slice of the quantised indexes is rented from the array pool; only the
   rendered bytes are kept, by the run cache.
-- **The byte frame grows in one step.** A full-screen kitty frame is 3 MB; after it is flushed the
-  buffer goes back to the pool and a 64 KB one is rented, so a text-only app does not keep it. The
-  next large frame used to double its way back up (six rents), and after a Gen2 GC had trimmed the
-  pool that was 8 MB of fresh arrays per frame, found with `--alloc`. `FrameSpace` now grows to the
-  largest frame seen when that is more than doubling: one rent, and one 3 MB allocation after a trim.
 - **Spans at the seams.** `CellImage.Bgra`, the visible pixels into `RenderCells` and out of
   `GetVisiblePixels`, and the kitty payload are `ReadOnlySpan<byte>`/`Span<byte>`: callers pass
   slices of pooled or reused arrays, and nothing is sized to the array it happens to be in.
@@ -409,5 +397,5 @@ In `src/Tests/Consolonia.Core.Tests`:
 | `SixelPaletteTests` | Only used colours are defined, a transient image renders the same bytes without keeping them, too-small arrays are refused, exact versus Wu quantisation, rounded percentages. |
 | `KittyGraphicsTests`, `KittyImageLifetimeTests` | The kitty sequences, ids and registry; orphaned images and the cache budget. |
 | `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again. |
-| `AnsiConsoleOutputWriteTests` | The byte frame: order of text and bytes, UTF-8, split and lone surrogates, text written to `Console.Out` first, the redirected-`Console.Out` fallback, kitty bytes matching the string builder, an empty frame. |
+| `AnsiConsoleOutputWriteTests` | Writing the frame: order of text and bytes, UTF-8, split and lone surrogates, text written to `Console.Out` first, kitty bytes matching the string builder, a payload longer than a chunk, one synchronized update per frame, an empty frame. |
 | `WithLifetimeFixture/PixelTests` | A `Pixel` is 40 bytes. Image cells compare by image; an image background composes with a glyph, keeps the image under paint, dies by an opaque background, takes the cell when drawn over text; shade and brighten paint it; the effective colour. |

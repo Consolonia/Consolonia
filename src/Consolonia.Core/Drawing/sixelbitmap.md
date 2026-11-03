@@ -35,8 +35,8 @@ protocol; the choice between sixel and text is made when the cell is written.
      quantised once; closing it re-sends the un-dimmed runs from the cache, which were made when the
      picture first appeared. The sixel itself is transient (`IsTransient`): the cache holds the
      bytes, not the `Sixel`.
-4. **Writing a run.** `AnsiConsoleOutput.WriteImageBytes` moves the cursor explicitly, appends the
-   bytes straight into the byte frame, and moves the cursor past the run. The explicit move matters:
+4. **Writing a run.** `AnsiConsoleOutput.WriteImageBytes` moves the cursor explicitly, writes the
+   bytes to the output, and moves the cursor past the run. The explicit move matters:
    after a glyph in the last column the terminal's cursor still sits on the old row with a pending
    wrap, and a sixel would otherwise land a row up.
 5. **The terminal does the rest.** Writing a character into a cell replaces the sixel pixels in
@@ -57,9 +57,9 @@ the image.
 - Bands are built six rows at a time per colour. `BuildSixelRow` uses `Vector256` when available,
   then the rows are run-length encoded.
 - The bytes are cached on the instance after the first render, unless the image is transient.
-- The payload is strict ASCII (data bytes 0x3F..0x7E). `WriteImageBytes` therefore appends
-  `Render()`'s span straight into the byte frame, with no conversion to text (see
-  [bitmap.md](bitmap.md#the-byte-frame)).
+- The payload is strict ASCII (data bytes 0x3F..0x7E). `WriteImageBytes` therefore writes
+  `Render()`'s span to the output without building a string of it (see
+  [bitmap.md](bitmap.md#writing-the-frame)).
 
 ## Benchmarks
 
@@ -137,4 +137,4 @@ screen.
 | `SixelPaletteTests` | Only used colours are defined. A transient image renders the same bytes without keeping them. Too-small arrays are refused. Exact versus Wu quantisation. Rounded percentages. |
 | `CellImageRenderCellsTests`, `WithLifetimeFixture/CellImageBitmapRendererTests` | The renderer, which is the same for every image protocol (see [bitmap.md](bitmap.md#tests)). |
 | `WithLifetimeFixture/PixelTests` | Image cells compare by image; the effective colour of a painted image cell. |
-| `AnsiConsoleOutputWriteTests` | The byte frame the sixels are written into. |
+| `AnsiConsoleOutputWriteTests` | The output the sixels are written to. |
