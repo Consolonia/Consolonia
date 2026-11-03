@@ -46,7 +46,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
             if (result == AppendResult.NoMatch && collected > 0
                                                &&
-                                               isEscSymbolAndAlreadySoloEscAccumulated // 15F2A2C4-218D-4B4D-86CE-330A312EF6A6 avoiding ESC after ESC: https://github.com/Consolonia/Consolonia/pull/708#discussion_r4459046211 - checking that not escape again
+                                               !isEscSymbolAndAlreadySoloEscAccumulated // 15F2A2C4-218D-4B4D-86CE-330A312EF6A6 avoiding ESC after ESC: https://github.com/Consolonia/Consolonia/pull/708#discussion_r4459046211 - checking that not escape again
                )
                 // if was a reset, then adding input once again (so we don't loose first character after reset
                 result = Collect(rune);
