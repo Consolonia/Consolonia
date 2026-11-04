@@ -16,7 +16,8 @@ namespace Consolonia.Core.Tests
             "Avalonia's routed-event dispatcher exception behavior has changed. " +
             "The TargetInvocationException catch in CursesConsole is probably legacy code and needs to be reconsidered.";
 
-        [Test, RequiresThread]
+        [Test]
+        [RequiresThread]
         public void PostedRoutedEventStillThrowsMarkedTargetInvocationException()
         {
             Dispatcher dispatcher = CreateDispatcher();
