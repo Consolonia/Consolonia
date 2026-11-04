@@ -73,7 +73,7 @@ namespace Consolonia.Core.Infrastructure
 
         protected void DispatchInputAsyncWait(Action action)
         {
-            DispatchInputAsync(action).Wait();
+            DispatchInputAsync(action).GetAwaiter().GetResult();
         }
 
         #region IConsoleInput
