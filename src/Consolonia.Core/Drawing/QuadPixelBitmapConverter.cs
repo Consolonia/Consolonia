@@ -11,7 +11,7 @@ using Consolonia.Core.Infrastructure;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     Renders a bitmap by approximating each cell with a colored quad-pixel block character.
+    ///     Converts a bitmap by approximating each cell with a colored quad-pixel block character.
     ///     This is the fallback for terminals without graphics protocol support.
     /// </summary>
     internal sealed class QuadPixelBitmapConverter : BitmapConverter

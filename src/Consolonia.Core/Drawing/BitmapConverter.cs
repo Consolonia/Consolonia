@@ -12,8 +12,8 @@ using Consolonia.Core.Infrastructure;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     What a rendering of a bitmap is for: the size it is drawn at and how it was scaled. The picture's
-    ///     version and the part of it on screen are not part of the key: a rendering is refilled in place
+    ///     What a conversion of a bitmap is for: the size it is drawn at and how it was scaled. The picture's
+    ///     version and the part of it on screen are not part of the key: a conversion is refilled in place
     ///     when they change (see <see cref="CellRendering" />).
     /// </summary>
     // The properties are only read through the generated Equals/GetHashCode: together they are a cache key.
@@ -60,12 +60,12 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     The part of <paramref name="targetRect" /> on screen, in cells relative to the target: what a
-        ///     rendering covers.
+        ///     conversion covers.
         /// </summary>
         /// <remarks>
         ///     The screen, not the clip. A partial redraw (a dialog opening over the picture, say) clips to
-        ///     the region being redrawn, and rendering by that clip made a rendering per redraw region. The
-        ///     cells outside it still showed the earlier rendering, and once the cache evicted that one, the
+        ///     the region being redrawn, and converting by that clip made a conversion per redraw region. The
+        ///     cells outside it still showed the earlier conversion, and once the cache evicted that one, the
         ///     image protocol deleted its image and those cells went blank. The screen bounds the size just
         ///     as well, and stays the same however the picture is redrawn.
         /// </remarks>
@@ -78,7 +78,7 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Where <paramref name="intersectedRect" /> falls in a rendering of <paramref name="renderedCells" />
+        ///     Where <paramref name="intersectedRect" /> falls in a conversion of <paramref name="renderedCells" />
         ///     (cells relative to <paramref name="targetRect" />).
         /// </summary>
         protected static PixelRect IntersectedRectInRendering(PixelRect targetRect, PixelRect renderedCells,
@@ -99,7 +99,7 @@ namespace Consolonia.Core.Drawing
         /// <param name="visible">The part of the drawn picture to copy, in pixels of <paramref name="targetSize" />.</param>
         /// <param name="interpolationMode">How the picture is scaled.</param>
         /// <param name="destination">
-        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a converter refilling a rendering on
+        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a converter refilling a conversion on
         ///     every edit of a picture keeps one rather than allocating a screen of pixels each time.
         /// </param>
         /// <exception cref="NotSupportedException">
@@ -193,14 +193,14 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Blends the visible part of a rendered per-cell bitmap into the pixel buffer and marks it
+        ///     Blends the visible part of a converted per-cell bitmap into the pixel buffer and marks it
         ///     dirty, as every drawing operation does.
         /// </summary>
         /// <param name="context">The drawing context whose pixel buffer takes the cells.</param>
-        /// <param name="renderedBitmap">The rendering, one cell per cell.</param>
+        /// <param name="renderedBitmap">The conversion, one cell per cell.</param>
         /// <param name="intersectedRect">The cells of the pixel buffer to fill.</param>
         /// <param name="renderedOrigin">
-        ///     The cell of the rendering that goes to the top-left cell of <paramref name="intersectedRect" />.
+        ///     The cell of the conversion that goes to the top-left cell of <paramref name="intersectedRect" />.
         /// </param>
         protected static void CopyRenderedBitmap(DrawingContextImpl context, PixelBuffer renderedBitmap,
             PixelRect intersectedRect, PixelPoint renderedOrigin)
@@ -219,7 +219,7 @@ namespace Consolonia.Core.Drawing
 
         /// <summary>
         ///     The picture itself, out of the <see cref="AspectRatioAdjustedBitmap" /> it may be wrapped in:
-        ///     the renderings are kept per picture, and a wrapper is made anew each time it is drawn.
+        ///     the conversions are kept per picture, and a wrapper is made anew each time it is drawn.
         /// </summary>
         protected static IBitmapImpl UnwrapBitmap(IBitmapImpl bitmapImpl)
         {
@@ -231,26 +231,26 @@ namespace Consolonia.Core.Drawing
 
     /// <summary>
     ///     A converter that turns the on-screen part of a picture into cells, once per picture and size:
-    ///     drawing the same again reuses the rendering, a new version or a scroll refills it in place, and
+    ///     drawing the same again reuses the conversion, a new version or a scroll refills it in place, and
     ///     only the cells that changed are copied into the pixel buffer.
     /// </summary>
     /// <remarks>
-    ///     The pixels a rendering is made from pass through one buffer the converter keeps, never larger than
-    ///     the screen in BGRA (only visible cells are rendered), rather than a buffer per rendering: a cell
+    ///     The pixels a conversion is made from pass through one buffer the converter keeps, never larger than
+    ///     the screen in BGRA (only visible cells are converted), rather than a buffer per conversion: a cell
     ///     copies the pixels it needs, so nothing reads them once the cells are made, and a picture at four
     ///     zoom levels kept four screens of them.
     /// </remarks>
-    /// <typeparam name="TRendering">What a rendering holds besides its cells.</typeparam>
+    /// <typeparam name="TRendering">What a conversion holds besides its cells.</typeparam>
     internal abstract class CellBitmapConverter<TRendering> : BitmapConverter
         where TRendering : CellRendering, new()
     {
         /// <summary>
-        ///     Renderings kept per bitmap, one per size it is drawn at: a picture shown at several zoom
+        ///     Conversions kept per bitmap, one per size it is drawn at: a picture shown at several zoom
         ///     levels has one for each, and the least recently drawn goes once there are more than this.
         /// </summary>
         private const int MaxRenderingsPerBitmap = 4;
 
-        /// <summary>The visible pixels of the picture being rendered; see the remarks.</summary>
+        /// <summary>The visible pixels of the picture being converted; see the remarks.</summary>
         private byte[] _pixels;
 
         protected CellBitmapConverter(IConsoleOutput console)
@@ -258,7 +258,7 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        /// <summary>The renderings of each picture, kept for as long as the picture is.</summary>
+        /// <summary>The conversions of each picture, kept for as long as the picture is.</summary>
         protected abstract ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, TRendering>>>
             Renderings { get; }
 
@@ -269,7 +269,7 @@ namespace Consolonia.Core.Drawing
         protected abstract void Render(DrawingContextImpl context, TRendering rendering, ReadOnlySpan<byte> pixels,
             int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface);
 
-        /// <summary>Whether a rendering of the current version can still be shown, or must be made again.</summary>
+        /// <summary>Whether a conversion of the current version can still be shown, or must be made again.</summary>
         protected virtual bool IsReusable(TRendering rendering)
         {
             return true;
@@ -291,7 +291,7 @@ namespace Consolonia.Core.Drawing
                 new RenderingKey(targetSize, interpolationMode));
             if (!rendering.Shows(bitmap.Version, visibleCells) || !IsReusable(rendering))
             {
-                // only the visible cells are rendered, so the rendering starts at the first of them
+                // only the visible cells are converted, so the conversion starts at the first of them
                 rendering.Prepare(visibleCells);
                 var visiblePixels = new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
                     visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight);
@@ -309,7 +309,7 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     The rendering for <paramref name="key" />, made when there is none, and now the most recently
+        ///     The conversion for <paramref name="key" />, made when there is none, and now the most recently
         ///     drawn (last in the list). The least recently drawn goes once there are too many.
         /// </summary>
         internal static TRendering FindOrAdd(List<KeyValuePair<RenderingKey, TRendering>> renderings,
@@ -340,7 +340,7 @@ namespace Consolonia.Core.Drawing
     }
 
     /// <summary>
-    ///     The cells a picture renders to at one size. A converter keeps one per picture and size and
+    ///     The cells a picture converts to at one size. A converter keeps one per picture and size and
     ///     refills it in place for each new version or visible part, so an edit allocates nothing the size
     ///     of the screen: the cell buffer (40 bytes a cell) is made once, not once per brush stroke.
     ///     Touched only from the render thread, like everything a converter draws with.
@@ -352,7 +352,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>The version of the picture the cells show, once <see cref="Shows" /> can be true.</summary>
         public int Version { get; private set; }
 
-        /// <summary>The cells of the picture the rendering covers, relative to where it is drawn.</summary>
+        /// <summary>The cells of the picture the conversion covers, relative to where it is drawn.</summary>
         public PixelRect VisibleCells { get; private set; }
 
         /// <summary>One cell per visible cell.</summary>
@@ -368,9 +368,9 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Makes room for a rendering of <paramref name="visibleCells" />, keeping the cells when their
-        ///     size is unchanged, and shows nothing until <see cref="Complete" />: a render that throws
-        ///     leaves a rendering that is made again, not one claiming to show the previous version.
+        ///     Makes room for a conversion of <paramref name="visibleCells" />, keeping the cells when their
+        ///     size is unchanged, and shows nothing until <see cref="Complete" />: a conversion that throws
+        ///     leaves a conversion that is made again, not one claiming to show the previous version.
         /// </summary>
         internal void Prepare(PixelRect visibleCells)
         {

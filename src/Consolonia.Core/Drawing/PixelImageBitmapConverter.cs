@@ -11,7 +11,7 @@ using Consolonia.Core.Infrastructure;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     Renders a bitmap as cells whose background is a <see cref="PixelImage" />: the pixels of that cell
+    ///     Converts a bitmap as cells whose background is a <see cref="PixelImage" />: the pixels of that cell
     ///     of the picture. For any console with an image protocol; which protocol, and what is sent for a
     ///     cell, is the console output's business.
     /// </summary>
@@ -34,7 +34,7 @@ namespace Consolonia.Core.Drawing
         private const int ScreensOfPixelImages = 3;
 
         /// <summary>
-        ///     New pixel images share an array of this many cells (a slab), filled across renders until full,
+        ///     New pixel images share an array of this many cells (a slab), filled across conversions until full,
         ///     so a new picture is a few hundred allocations rather than one per cell and a brush stroke is
         ///     one slot of the current slab. Small enough that a slab stays out of the large object heap,
         ///     and that a cell outliving its slab-mates holds on to little: the cache counts each cell's own
