@@ -45,6 +45,16 @@ protocol; the choice between sixel and text is made when the cell is written.
    column the terminal's cursor still sits on the old row with a pending wrap, and a sixel would
    otherwise land a row up. Where a sixel leaves the cursor depends on the terminal, so after
    `WriteBytes` the output treats the cursor as unknown and moves it before anything else.
+   **The last row.** A terminal counts a sixel's height in bands of 6 pixels, so a cell's sixel
+   reaches up to 5 pixels into the row below (Windows Terminal answers the cell size query with
+   10x20: a 20-pixel sixel is 24). Unset pixels are transparent (DCS `0;1q`), so the row below
+   keeps what it shows; by default a terminal fills them with the background, out to that row's
+   bottom. On the last row the overhang would scroll the whole screen up a line, under everything
+   the output and the render target remember (stale pictures through a dialog, holes where pictures
+   should be). So the last row's sixels are drawn with scroll margins of the rows above
+   (DECSTBM `ESC[1;{rows-1}r`, put back with `ESC[r`): with the cursor below them there is nothing
+   to scroll, and the overhang is cut off at the bottom of the screen. Rounding the sixel down to
+   whole bands instead left a strip in every cell that a space could only fill with a flat colour.
 5. **The terminal does the rest.** Writing a character into a cell replaces the sixel pixels in
    that cell. Neighbouring cells are not sent again because they did not change, so the rest of the
    picture stays on screen.
@@ -57,7 +67,7 @@ the image.
 
 `Sixel.Render` serialises one image:
 
-- DCS `q`, the colour definitions, the sixel bands, ST.
+- DCS `0;1q` (unset pixels transparent), the colour definitions, the sixel bands, ST.
 - **Only the colours the image uses are defined.** A run uses what its cells use, and defining all
   256 used to make up most of the bytes of a one-cell sixel.
 - Bands are built six rows at a time per colour. `BuildSixelRow` uses `Vector256` when available,

@@ -123,7 +123,7 @@ namespace Consolonia.Imaging.Tests
             return count;
         }
 
-        private const string SixelStart = "\u001bPq";
+        private const string SixelStart = "\u001bP0;1q";
         private const string KittyTransmit = "\u001b_Ga=t,";
         private const string KittyPlace = "\u001b_Ga=p,";
 
@@ -140,6 +140,29 @@ namespace Consolonia.Imaging.Tests
                 "placed at the run's first cell");
             Assert.That(frame, Does.EndWith(Esc.SetCursorPosition(0, 0)),
                 "where a sixel leaves the cursor is not known, so it is moved back to the caret");
+        }
+
+        /// <summary>
+        ///     A sixel reaches up to 5 pixels below its cell (whole bands of 6), which on the last row would
+        ///     scroll the screen. The last row's sixels are drawn with scroll margins of the rows above, so
+        ///     there is nothing to scroll; the margins are put back after. Other rows need none.
+        /// </summary>
+        [Test]
+        public void SixelOnTheLastRowIsDrawnBelowTheScrollMargins()
+        {
+            Open(ConsoleCapabilities.SupportsSixel);
+            PixelImage image = SolidImage(10, 20, 30);
+
+            string frame = Frame((0, 1, ImageCell(image)), (0, Rows - 1, ImageCell(image)),
+                (1, Rows - 1, ImageCell(image)));
+
+            string margins = $"\u001b[1;{Rows - 1}r";
+            Assert.That(Count(frame, margins), Is.EqualTo(1), "set once for the last row's sixels");
+            Assert.That(frame.IndexOf(margins, StringComparison.Ordinal),
+                Is.GreaterThan(frame.IndexOf(SixelStart, StringComparison.Ordinal)), "not for the row above");
+            Assert.That(frame, Does.Contain(margins + Esc.SetCursorPosition(0, Rows - 1) + SixelStart));
+            Assert.That(frame.IndexOf("\u001b[r", StringComparison.Ordinal),
+                Is.GreaterThan(frame.LastIndexOf(SixelStart, StringComparison.Ordinal)), "put back after");
         }
 
         [Test]
