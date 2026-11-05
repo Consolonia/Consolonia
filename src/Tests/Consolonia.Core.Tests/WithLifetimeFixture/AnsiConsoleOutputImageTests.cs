@@ -15,7 +15,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     /// <summary>
     ///     What AnsiConsoleOutput does with the cells of the pixel buffer that show a picture: with an
-    ///     encoder from the registered <see cref="IConsoleImageEncoderFactory" />, the output writes the text
+    ///     encoder from the <see cref="IConsoleImageEncoderFactory" /> it is given, the output writes the text
     ///     over the pictures and the encoder renders them at the end of the frame's update; without one, a
     ///     picture is block glyphs.
     /// </summary>
@@ -28,7 +28,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             _originalOut = Console.Out;
             _factory = new RecordingEncoderFactory();
-            AvaloniaLocator.CurrentMutable.Bind<IConsoleImageEncoderFactory>().ToConstant(_factory);
         }
 
         [TearDown]
@@ -62,6 +61,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _stream = new MemoryStream();
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(Columns, Rows) };
             _output.RedirectOutput(_stream, capabilities);
+            _output.SetImageEncoderFactory(_factory);
             _screen = new PixelBuffer(Columns, Rows);
         }
 

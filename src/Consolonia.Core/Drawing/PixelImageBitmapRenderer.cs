@@ -59,7 +59,7 @@ namespace Consolonia.Core.Drawing
             ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
             RenderedBitmapCache = new();
 
-        private static readonly ContentCache<PixelImage> PixelImages = new(MinPixelImageBudgetBytes);
+        private static readonly PixelImageCache PixelImages = new(MinPixelImageBudgetBytes);
 
         public PixelImageBitmapRenderer(IConsoleOutput console)
             : base(console)
@@ -112,8 +112,7 @@ namespace Consolonia.Core.Drawing
                     cellPixelWidth, cellPixelHeight, cellBgra);
 
                 UInt128 digest = XxHash128.HashToUInt128(cellBgra);
-                var cellKey = new ContentKey(digest, cellPixelWidth, cellPixelHeight);
-                if (!PixelImages.TryGet(cellKey, out PixelImage image))
+                if (!PixelImages.TryGet(digest, cellPixelWidth, cellPixelHeight, out PixelImage image))
                 {
                     if (slab == null || slabUsed + cellBytes > slab.Length)
                     {
@@ -123,7 +122,7 @@ namespace Consolonia.Core.Drawing
 
                     cellBgra.CopyTo(slab.AsSpan(slabUsed, cellBytes));
                     var made = new PixelImage(slab, slabUsed, cellPixelWidth, cellPixelHeight, digest);
-                    image = PixelImages.GetOrAdd(cellKey, made, cellBytes);
+                    image = PixelImages.GetOrAdd(made);
                     if (ReferenceEquals(image, made))
                         _slabUsed = slabUsed += cellBytes;
                 }

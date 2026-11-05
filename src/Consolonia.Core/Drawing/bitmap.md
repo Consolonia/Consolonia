@@ -2,8 +2,8 @@
 
 Architecture notes for the bitmap pipeline. A picture becomes cells of the pixel buffer like any
 other drawing; which image protocol shows them, and how, is the console output's business. Image
-protocols (sixel, kitty graphics) are not implemented in core: an encoder library registers an
-`IConsoleImageEncoderFactory`, and without one pictures are block glyphs
+protocols (sixel, kitty graphics) are not implemented in core: an encoder library gives the console
+an `IConsoleImageEncoderFactory`, and without one pictures are block glyphs
 ([quadbitmap.md](quadbitmap.md)).
 
 ## The pipeline at a glance
@@ -94,10 +94,14 @@ and the drawing contexts (replaced on every resize) borrow it:
 A Device Attributes request follows the queries as a fence. The cell size in pixels is asked for
 too. `CONSOLONIA_GRAPHICS=kitty|sixel|quad` overrides detection (`ApplyGraphicsProtocolOverride`).
 
-Then `InstallImageEncoder` asks the `IConsoleImageEncoderFactory` registered with Avalonia's locator
-for an encoder (`CreateEncoder(IConsoleOutput)`). The factory reads the capabilities and picks
-the protocol (its choice when the terminal has several) or returns null. With an encoder the output
-sets `SupportsPixelImages`; without one it clears it.
+An encoder library hands the console its `IConsoleImageEncoderFactory` through
+`IConsoleOutput.SetImageEncoderFactory`, once the application is set up (from the builder's
+`AfterPlatformServicesSetup`, so it does not matter where in the chain it is enabled: consoles probe
+the terminal in their constructors, before the builder binds anything). `ConsoleBase` forwards it
+and takes the output's `SupportsPixelImages` again. The output asks the factory for an encoder
+(`CreateEncoder(IConsoleOutput)`) then, and again whenever the console is prepared. The factory
+reads the capabilities and picks the protocol (its choice when the terminal has several) or returns
+null. With an encoder the output sets `SupportsPixelImages`; without one it clears it.
 
 ## Getting the visible pixels
 
@@ -147,21 +151,21 @@ sets `SupportsPixelImages`; without one it clears it.
 The quad-pixel renderer has no rendering to keep. It scales just the intersected cells at two
 pixels per cell each way and blends a glyph per cell straight into the buffer.
 
-## Content-addressed caches
+## Pixel images by content
 
-Everything made from pixels is cached by **what the pixels show**, not by where they came from
-(`ContentCache.cs`):
+The renderer finds a cell's `PixelImage` by **what the pixels show**, not by where they came from
+(`PixelImageCache`, internal):
 
-- **`ContentKey`.** An XXH3-128 hash of a block's BGRA bytes plus its size. 128 bits never collide
-  in practice, and nothing needs keeping to compare against. Hashing every visible cell is the main
-  cost of a changed frame. XXH3 replaced SHA-256 and made it about 10× cheaper.
-- **`ContentCache<T>`.** A least-recently-used cache with a cost budget. `GetOrAdd` returns the value
-  already held, so every cell showing the same block shares one instance and compares equal.
+- **The digest.** An XXH3-128 hash of the cell's BGRA bytes, kept as `PixelImage.Digest`, with the
+  size. 128 bits never collide in practice, and nothing needs keeping to compare against. Hashing
+  every visible cell is the main cost of a changed frame. XXH3 replaced SHA-256 and made it about
+  10× cheaper.
+- **The cache.** Least recently used first out, beyond three screens of pixel bytes; eviction only
+  ends the sharing, a cell on screen holds its image by reference. `GetOrAdd` returns the image
+  already held, so every cell showing the same pixels shares one instance and compares equal.
 
-The renderer keeps its `PixelImage`s in one (three screens of pixels; eviction only ends
-deduplication, a cell on screen holds its image by reference). `ContentKey`, `ContentCache<T>`,
-`PixelImage.Digest`, `PixelImage.Key` and `PixelImage.Paint` are public, so an encoder can key and
-cache its own work the same way.
+`PixelImage.Digest` and `PixelImage.Paint` are public, so an encoder can describe a cell's picture
+and composite its paint; what an encoder caches is its own.
 
 A blank canvas is one block repeated. With content keys it is one `PixelImage`, not one per cell,
 and the first edit changes only the cells it touched.

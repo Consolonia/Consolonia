@@ -52,10 +52,13 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Draws the pictures of the image cells, for the image protocol the console answered the probe
-        ///     with, as the registered <see cref="IConsoleImageEncoderFactory" /> makes it; null when there is
-        ///     no factory or it made none. See <see cref="PrepareConsole" />.
+        ///     with, as <see cref="_imageEncoderFactory" /> makes it; null when there is no factory or it made
+        ///     none.
         /// </summary>
         private IConsoleImageEncoder _imageEncoder;
+
+        /// <summary>The image library's factory, from <see cref="SetImageEncoderFactory" />; null without one.</summary>
+        private IConsoleImageEncoderFactory _imageEncoderFactory;
 
         private Color _lastBackground = Colors.Transparent;
         private bool _lastBackgroundIsDefault;
@@ -584,13 +587,24 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Asks the registered <see cref="IConsoleImageEncoderFactory" /> for the encoder of the image
-        ///     protocol the capabilities name. With one, the console shows pixel images
-        ///     (<see cref="ConsoleCapabilities.SupportsPixelImages" />); without, pictures are block glyphs.
+        ///     Takes the image library's factory and asks it for the encoder of the image protocol the
+        ///     capabilities name, now if the console is prepared and again whenever it is.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        {
+            _imageEncoderFactory = factory;
+            InstallImageEncoder();
+        }
+
+        /// <summary>
+        ///     Asks the factory for the encoder of the image protocol the capabilities name. With one, the
+        ///     console shows pixel images (<see cref="ConsoleCapabilities.SupportsPixelImages" />); without,
+        ///     pictures are block glyphs.
         /// </summary>
         private void InstallImageEncoder()
         {
-            _imageEncoder = AvaloniaLocator.Current.GetService<IConsoleImageEncoderFactory>()?.CreateEncoder(this);
+            _imageEncoder = _imageEncoderFactory?.CreateEncoder(this);
             if (_imageEncoder != null)
                 Capabilities |= ConsoleCapabilities.SupportsPixelImages;
             else

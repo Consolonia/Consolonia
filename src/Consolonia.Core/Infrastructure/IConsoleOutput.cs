@@ -101,6 +101,17 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
+        ///     Gives the output the factory of an image library (<c>UseConsoloniaImaging</c>), once the
+        ///     application is set up: an output that speaks image protocols asks it for the encoder of the
+        ///     protocol its terminal has, and shows pixel images
+        ///     (<see cref="Consolonia.Controls.ConsoleCapabilities.SupportsPixelImages" />) when it gets one.
+        ///     Other outputs ignore it.
+        /// </summary>
+        void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        {
+        }
+
+        /// <summary>
         ///     Write raw text to the console
         /// </summary>
         /// <param name="str"></param>

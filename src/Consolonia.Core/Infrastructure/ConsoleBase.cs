@@ -216,6 +216,15 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ResetCache();
         }
 
+        public virtual void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        {
+            _consoleOutput.SetImageEncoderFactory(factory);
+            // the output's capabilities were taken when the console was prepared; whether it shows pixel
+            // images is decided now
+            Capabilities = (Capabilities & ~ConsoleCapabilities.SupportsPixelImages) |
+                           (_consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages);
+        }
+
         public virtual void WriteText(string str)
         {
             _consoleOutput.WriteText(str);
