@@ -27,9 +27,9 @@ namespace Consolonia.Core.Drawing
     ///     Strategy for drawing a bitmap into the pixel buffer, chosen by the console's capabilities: cells
     ///     showing a <see cref="PixelImage" /> for a console with an image protocol, block glyphs otherwise.
     /// </summary>
-    internal abstract class BitmapRenderer
+    internal abstract class BitmapConverter
     {
-        protected BitmapRenderer(IConsoleOutput console)
+        protected BitmapConverter(IConsoleOutput console)
         {
             ConsoleOutput = console;
         }
@@ -38,15 +38,15 @@ namespace Consolonia.Core.Drawing
         protected IConsoleOutput ConsoleOutput { get; }
 
         /// <summary>
-        ///     The renderer for the console (capabilities are detected in PrepareConsole): pixel images when
+        ///     The converter for the console (capabilities are detected in PrepareConsole): pixel images when
         ///     the console can show pictures, block glyphs otherwise.
         /// </summary>
-        internal static BitmapRenderer Create(IConsoleOutput console)
+        internal static BitmapConverter Create(IConsoleOutput console)
         {
             if (console.Capabilities.HasFlag(ConsoleCapabilities.SupportsPixelImages))
-                return new PixelImageBitmapRenderer(console);
+                return new PixelImageBitmapConverter(console);
 
-            return new QuadPixelBitmapRenderer(console);
+            return new QuadPixelBitmapConverter(console);
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace Consolonia.Core.Drawing
         /// <param name="visible">The part of the drawn picture to copy, in pixels of <paramref name="targetSize" />.</param>
         /// <param name="interpolationMode">How the picture is scaled.</param>
         /// <param name="destination">
-        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a renderer refilling a rendering on
+        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a converter refilling a rendering on
         ///     every edit of a picture keeps one rather than allocating a screen of pixels each time.
         /// </param>
         /// <exception cref="NotSupportedException">
@@ -230,18 +230,18 @@ namespace Consolonia.Core.Drawing
     }
 
     /// <summary>
-    ///     A renderer that turns the on-screen part of a picture into cells, once per picture and size:
+    ///     A converter that turns the on-screen part of a picture into cells, once per picture and size:
     ///     drawing the same again reuses the rendering, a new version or a scroll refills it in place, and
     ///     only the cells that changed are copied into the pixel buffer.
     /// </summary>
     /// <remarks>
-    ///     The pixels a rendering is made from pass through one buffer the renderer keeps, never larger than
+    ///     The pixels a rendering is made from pass through one buffer the converter keeps, never larger than
     ///     the screen in BGRA (only visible cells are rendered), rather than a buffer per rendering: a cell
     ///     copies the pixels it needs, so nothing reads them once the cells are made, and a picture at four
     ///     zoom levels kept four screens of them.
     /// </remarks>
     /// <typeparam name="TRendering">What a rendering holds besides its cells.</typeparam>
-    internal abstract class CellBitmapRenderer<TRendering> : BitmapRenderer
+    internal abstract class CellBitmapConverter<TRendering> : BitmapConverter
         where TRendering : CellRendering, new()
     {
         /// <summary>
@@ -253,7 +253,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>The visible pixels of the picture being rendered; see the remarks.</summary>
         private byte[] _pixels;
 
-        protected CellBitmapRenderer(IConsoleOutput console)
+        protected CellBitmapConverter(IConsoleOutput console)
             : base(console)
         {
         }
@@ -340,10 +340,10 @@ namespace Consolonia.Core.Drawing
     }
 
     /// <summary>
-    ///     The cells a picture renders to at one size. A renderer keeps one per picture and size and
+    ///     The cells a picture renders to at one size. A converter keeps one per picture and size and
     ///     refills it in place for each new version or visible part, so an edit allocates nothing the size
     ///     of the screen: the cell buffer (40 bytes a cell) is made once, not once per brush stroke.
-    ///     Touched only from the render thread, like everything a renderer draws with.
+    ///     Touched only from the render thread, like everything a converter draws with.
     /// </summary>
     internal class CellRendering
     {

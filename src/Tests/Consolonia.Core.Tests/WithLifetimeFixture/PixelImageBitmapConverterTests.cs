@@ -12,10 +12,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     /// <summary>
     ///     How a picture becomes cells showing <see cref="PixelImage" />s, on a console that shows pixel
-    ///     images: the renderer is the same whichever protocol the console's encoder speaks.
+    ///     images: the converter is the same whichever protocol the console's encoder speaks.
     /// </summary>
     [TestFixture]
-    public sealed class PixelImageBitmapRendererTests : IDisposable
+    public sealed class PixelImageBitmapConverterTests : IDisposable
     {
         [SetUp]
         public void Setup()
@@ -60,7 +60,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Regression test: a bitmap already at the target size skips the resize, and the renderer used to
+        ///     Regression test: a bitmap already at the target size skips the resize, and the converter used to
         ///     read from the null resize result and throw. Four cells across at 8x16 per cell is exactly 32x32.
         /// </summary>
         [Test]

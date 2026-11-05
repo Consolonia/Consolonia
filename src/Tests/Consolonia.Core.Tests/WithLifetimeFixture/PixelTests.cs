@@ -196,7 +196,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private static Pixel CreateImagePixel(PixelImage image)
         {
-            return new Pixel(PixelImageBitmapRenderer.PictureCellForeground,
+            return new Pixel(PixelImageBitmapConverter.PictureCellForeground,
                 new PixelBackground(Colors.Transparent, image));
         }
 

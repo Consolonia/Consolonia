@@ -207,7 +207,7 @@ namespace Consolonia.Core.Infrastructure
                 if (_imageEncoder != null)
                 {
                     PixelBufferCoordinate caret = _headBufferPoint;
-                    _imageEncoder.RenderImages(screen);
+                    _imageEncoder.WriteImages(screen);
                     SetCaretPosition(caret);
                 }
             }
@@ -408,7 +408,7 @@ namespace Consolonia.Core.Infrastructure
         private Pixel AsQuadCell(in Pixel pixel)
         {
             PixelImage image = pixel.Background.Image;
-            Pixel quad = QuadPixelBitmapRenderer.FromPixels(image.Bgra, image.Width, image.Height,
+            Pixel quad = QuadPixelBitmapConverter.FromPixels(image.Bgra, image.Width, image.Height,
                 Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
             Color paint = pixel.Background.Color;
             var painted = new Pixel(

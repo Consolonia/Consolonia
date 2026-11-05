@@ -108,7 +108,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         private static Pixel ImageCell(PixelImage image, Color paint = default)
         {
-            return new Pixel(PixelImageBitmapRenderer.PictureCellForeground, new PixelBackground(paint, image));
+            return new Pixel(PixelImageBitmapConverter.PictureCellForeground, new PixelBackground(paint, image));
         }
 
         private static Pixel TextCell(char character)
@@ -150,7 +150,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             string frame = Frame((0, 0, ImageCell(SolidImage(10, 20, 30))), (1, 0, TextCell('x')),
                 (2, 0, ImageCell(SolidImage(40, 50, 60))));
 
-            Assert.That(_factory.Encoder.Calls, Is.EqualTo(new[] { "RenderImages" }));
+            Assert.That(_factory.Encoder.Calls, Is.EqualTo(new[] { "WriteImages" }));
             Assert.That(_factory.Encoder.Screen, Is.SameAs(_screen));
             Assert.That(frame, Does.Contain("x"), "the text cell is written as text");
         }
@@ -308,7 +308,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     A modal's translucent backdrop blended over a picture cell, as the renderer makes it, colors
+        ///     A modal's translucent backdrop blended over a picture cell, as the converter makes it, colors
         ///     the cell's foreground but draws no symbol on it: the cell is still the picture, dimmed.
         /// </summary>
         [Test]
@@ -366,9 +366,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
             public bool SupportsTextOverlay { get; set; }
 
-            public void RenderImages(PixelBuffer screen)
+            public void WriteImages(PixelBuffer screen)
             {
-                Calls.Add(nameof(RenderImages));
+                Calls.Add(nameof(WriteImages));
                 Screen = screen;
                 if (Throws)
                     throw new InvalidOperationException("the encoder failed");

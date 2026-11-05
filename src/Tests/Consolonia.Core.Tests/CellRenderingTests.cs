@@ -55,20 +55,20 @@ namespace Consolonia.Core.Tests
         public void OneRenderingPerSizeTheLeastRecentlyDrawnGoingBeyondFour()
         {
             var renderings = new List<KeyValuePair<RenderingKey, CellRendering>>();
-            CellRendering first = CellBitmapRenderer<CellRendering>.FindOrAdd(renderings, Key(1));
-            Assert.That(CellBitmapRenderer<CellRendering>.FindOrAdd(renderings, Key(1)), Is.SameAs(first),
+            CellRendering first = CellBitmapConverter<CellRendering>.FindOrAdd(renderings, Key(1));
+            Assert.That(CellBitmapConverter<CellRendering>.FindOrAdd(renderings, Key(1)), Is.SameAs(first),
                 "the same size is the same rendering, whatever the version");
 
             for (int size = 2; size <= 4; size++)
-                CellBitmapRenderer<CellRendering>.FindOrAdd(renderings, Key(size));
+                CellBitmapConverter<CellRendering>.FindOrAdd(renderings, Key(size));
             Assert.That(renderings.Count, Is.EqualTo(4));
 
-            CellBitmapRenderer<CellRendering>.FindOrAdd(renderings, Key(1)); // drawn again: the most recent now
-            CellBitmapRenderer<CellRendering>.FindOrAdd(renderings, Key(5));
+            CellBitmapConverter<CellRendering>.FindOrAdd(renderings, Key(1)); // drawn again: the most recent now
+            CellBitmapConverter<CellRendering>.FindOrAdd(renderings, Key(5));
             Assert.That(renderings.Count, Is.EqualTo(4));
             Assert.That(renderings.ConvertAll(r => r.Key.TargetSize.Width / 8), Is.EqualTo(new[] { 3, 4, 1, 5 }),
                 "size 2, the least recently drawn, is gone");
-            Assert.That(CellBitmapRenderer<CellRendering>.FindOrAdd(renderings, Key(1)), Is.SameAs(first));
+            Assert.That(CellBitmapConverter<CellRendering>.FindOrAdd(renderings, Key(1)), Is.SameAs(first));
         }
 
         private static RenderingKey Key(int size)

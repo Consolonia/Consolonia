@@ -12,7 +12,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Compared by reference. The renderer that makes pixel images keeps one instance per distinct
+    ///         Compared by reference. The converter that makes pixel images keeps one instance per distinct
     ///         content (see <see cref="PixelImageCache" />), so two cells showing the same pixels share one
     ///         instance and compare equal, and a cell whose pixels did not change keeps its instance and is
     ///         not written again. The bytes are a copy the image owns: a picture is edited in place and
@@ -22,7 +22,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
     ///         The pixels may sit in an array shared with other pixel images made in the same render (a
     ///         slab), at an offset: one allocation for a handful of cells rather than an array header and a
     ///         heap object per cell. An instance is 56 bytes: the slab reference, its offset, the size, the
-    ///         16-byte digest the renderer finds it by, and the dominant color once computed.
+    ///         16-byte digest the converter finds it by, and the dominant color once computed.
     ///     </para>
     /// </remarks>
     public sealed class PixelImage
@@ -48,7 +48,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     A pixel image whose pixels are the <paramref name="width" /> x <paramref name="height" /> x 4
         ///     bytes of <paramref name="pixels" /> from <paramref name="offset" />, already hashed to
-        ///     <paramref name="digest" />. For the renderer, which hashes a cell to look it up before it
+        ///     <paramref name="digest" />. For the converter, which hashes a cell to look it up before it
         ///     decides to keep it, and keeps the new cells of one render in one array.
         /// </summary>
         /// <exception cref="ArgumentException">The pixels run past the end of <paramref name="pixels" />.</exception>
@@ -78,7 +78,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public int Height { get; }
 
         /// <summary>
-        ///     The 128-bit XXH3 hash of the pixels: what the renderer finds the instance by, and what an
+        ///     The 128-bit XXH3 hash of the pixels: what the converter finds the instance by, and what an
         ///     encoder describes a cell's picture by.
         /// </summary>
         public UInt128 Digest { get; }

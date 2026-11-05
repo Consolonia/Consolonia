@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests
 {
     [TestFixture]
-    public class BitmapRendererTests
+    public class BitmapConverterTests
     {
         /// <summary>
         ///     The visible part of a picture drawn at its own size is exactly its pixels under that part. Also
@@ -26,7 +26,7 @@ namespace Consolonia.Core.Tests
             var visible = new PixelRect(3, 2, 4, 5);
 
             byte[] pixels = new byte[visible.Width * visible.Height * 4];
-            BitmapRenderer.GetVisiblePixels(source, null, size, visible, BitmapInterpolationMode.None, pixels);
+            BitmapConverter.GetVisiblePixels(source, null, size, visible, BitmapInterpolationMode.None, pixels);
 
             byte[] expected = new byte[visible.Width * visible.Height * 4];
             using (ILockedFramebuffer frame = bitmap.Lock())

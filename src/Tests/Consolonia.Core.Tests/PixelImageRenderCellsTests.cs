@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     How the renderer turns visible pixels into cells showing pixel images: cells seen before reuse
+    ///     How the converter turns visible pixels into cells showing pixel images: cells seen before reuse
     ///     their image, and only a cell with new pixels gets a new one.
     /// </summary>
     [TestFixture]
@@ -51,7 +51,7 @@ namespace Consolonia.Core.Tests
         private static PixelBuffer Render(byte[] picture)
         {
             var cells = new PixelBuffer(CellsWide, CellsHigh);
-            PixelImageBitmapRenderer.RenderCells(picture, cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(picture, cells, CellWidth, CellHeight);
             return cells;
         }
 
@@ -104,7 +104,7 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
-        ///     The renderer refills one cell buffer per picture on every edit rather than making a new one:
+        ///     The converter refills one cell buffer per picture on every edit rather than making a new one:
         ///     rendering into the buffer that holds the previous frame gives exactly the cells a fresh one gets.
         /// </summary>
         [Test]
@@ -113,10 +113,10 @@ namespace Consolonia.Core.Tests
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
             var reused = new PixelBuffer(CellsWide, CellsHigh);
-            PixelImageBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(picture, reused, CellWidth, CellHeight);
 
             FillCell(picture, 3, 0, 0x44, 0x55, 0x66);
-            PixelImageBitmapRenderer.RenderCells(picture, reused, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(picture, reused, CellWidth, CellHeight);
             PixelBuffer fresh = Render(picture);
 
             for (int y = 0; y < CellsHigh; y++)
@@ -127,7 +127,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void PixelsThatAreNotExactlyTheCellsAreRefused()
         {
-            Assert.Throws<ArgumentException>(() => PixelImageBitmapRenderer.RenderCells(
+            Assert.Throws<ArgumentException>(() => PixelImageBitmapConverter.RenderCells(
                 new byte[Width * CellHeight * 4], new PixelBuffer(CellsWide, CellsHigh), CellWidth, CellHeight));
         }
 

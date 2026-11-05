@@ -21,7 +21,7 @@ namespace Consolonia.Core.Drawing
     ///     same image, is not dirty, and is not written again: a change to the picture rewrites only the
     ///     cells it touched, and a flat canvas is one image shared by every cell.
     /// </remarks>
-    internal sealed class PixelImageBitmapRenderer : CellBitmapRenderer<CellRendering>
+    internal sealed class PixelImageBitmapConverter : CellBitmapConverter<CellRendering>
     {
         /// <summary>
         ///     Pixel bytes of pixel images kept at least. The budget grows to <see cref="ScreensOfPixelImages" />
@@ -61,7 +61,7 @@ namespace Consolonia.Core.Drawing
 
         private static readonly PixelImageCache PixelImages = new(MinPixelImageBudgetBytes);
 
-        public PixelImageBitmapRenderer(IConsoleOutput console)
+        public PixelImageBitmapConverter(IConsoleOutput console)
             : base(console)
         {
         }

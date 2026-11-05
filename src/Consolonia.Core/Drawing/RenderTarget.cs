@@ -28,8 +28,8 @@ namespace Consolonia.Core.Drawing
 
         private ConsoleCursor _consoleCursor;
 
-        /// <summary>The renderer drawing bitmaps on this terminal; see <see cref="BitmapRenderer" />.</summary>
-        private BitmapRenderer? _bitmapRenderer;
+        /// <summary>The converter drawing bitmaps on this terminal; see <see cref="BitmapConverter" />.</summary>
+        private BitmapConverter? _bitmapRenderer;
 
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
@@ -101,11 +101,11 @@ namespace Consolonia.Core.Drawing
         public PixelSize PixelSize { get; } = new(1, 1);
 
         /// <summary>
-        ///     The renderer drawing bitmaps on this terminal, made on first use so that the console's
+        ///     The converter drawing bitmaps on this terminal, made on first use so that the console's
         ///     capabilities are known. The drawing contexts borrow it: a resize replaces them, and the
         ///     renderings it keeps outlive them.
         /// </summary>
-        internal BitmapRenderer BitmapRenderer => _bitmapRenderer ??= BitmapRenderer.Create(_console);
+        internal BitmapConverter BitmapConverter => _bitmapRenderer ??= BitmapConverter.Create(_console);
 
         internal void RenderToDevice()
         {

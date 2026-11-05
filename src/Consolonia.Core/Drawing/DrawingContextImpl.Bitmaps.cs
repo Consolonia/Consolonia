@@ -12,7 +12,7 @@ namespace Consolonia.Core.Drawing
     /// </summary>
     internal partial class DrawingContextImpl
     {
-        private BitmapRenderer _bitmapRenderer;
+        private BitmapConverter _bitmapRenderer;
         private IPlatformRenderInterface _renderInterface;
 
         public void DrawBitmap(IBitmapImpl source, double opacity, Rect sourceRect, Rect destRect)
@@ -36,8 +36,8 @@ namespace Consolonia.Core.Drawing
                 return;
 
             _renderInterface ??= AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
-            // the render target's renderer, kept for the terminal; a context without one (tests) makes its own
-            _bitmapRenderer ??= _renderTarget?.BitmapRenderer ?? BitmapRenderer.Create(ConsoleWindowImpl.Console);
+            // the render target's converter, kept for the terminal; a context without one (tests) makes its own
+            _bitmapRenderer ??= _renderTarget?.BitmapConverter ?? BitmapConverter.Create(ConsoleWindowImpl.Console);
             _bitmapRenderer.Draw(this, source, _renderInterface, targetRect, intersectedRect,
                 GetBitmapInterpolationMode());
         }

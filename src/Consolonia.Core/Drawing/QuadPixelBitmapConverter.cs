@@ -14,9 +14,9 @@ namespace Consolonia.Core.Drawing
     ///     Renders a bitmap by approximating each cell with a colored quad-pixel block character.
     ///     This is the fallback for terminals without graphics protocol support.
     /// </summary>
-    internal sealed class QuadPixelBitmapRenderer : BitmapRenderer
+    internal sealed class QuadPixelBitmapConverter : BitmapConverter
     {
-        public QuadPixelBitmapRenderer(IConsoleOutput console)
+        public QuadPixelBitmapConverter(IConsoleOutput console)
             : base(console)
         {
         }

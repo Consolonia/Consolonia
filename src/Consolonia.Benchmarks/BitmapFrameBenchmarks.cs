@@ -59,7 +59,7 @@ namespace Consolonia.Benchmarks
                     UnsafeRendering = false
                 }), []);
             console.SetupLifetime(_lifetime);
-            // a console with an image encoder: the renderer makes pixel images whatever its protocol
+            // a console with an image encoder: the converter makes pixel images whatever its protocol
             console.Capabilities |= ConsoleCapabilities.SupportsPixelImages;
 
             _window = new ConsoleWindowImpl();

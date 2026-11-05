@@ -8,14 +8,14 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     What the pixel image renderer does for one frame of a full-screen picture: turn the visible
+    ///     What the pixel image converter does for one frame of a full-screen picture: turn the visible
     ///     pixels into cells showing pixel images, reusing every image it has made before.
     /// </summary>
     /// <remarks>
     ///     1920x1072 pixels in 8x16 cells is 240x67 cells. The scenarios are the ones a paint program
     ///     produces: nothing changed, one cell changed (a brush stroke), and every cell new (a new
     ///     picture, or a scroll). The pixel copy and the cell buffer are reused from frame to frame, as
-    ///     the renderer's CellRendering reuses them, so what is measured is the work and the garbage of
+    ///     the converter's CellRendering reuses them, so what is measured is the work and the garbage of
     ///     one frame, not of setting up for it. Nothing reaches a terminal here: what the console output
     ///     makes of the cells is measured by <see cref="ConsoleOutputBenchmarks" />.
     /// </remarks>
@@ -43,7 +43,7 @@ namespace Consolonia.Benchmarks
             _frame = MakePicture(0);
             _cells = new PixelBuffer(CellsWide, CellsHigh);
             _bitmap = new PinnedBitmap(MakePicture(0), Width, Height);
-            PixelImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(_frame, _cells, CellWidth, CellHeight);
         }
 
         /// <summary>A photo-like picture: smooth gradients with fine noise, so cells differ.</summary>
@@ -83,7 +83,7 @@ namespace Consolonia.Benchmarks
         [Benchmark(Baseline = true)]
         public PixelBuffer FrameUnchanged()
         {
-            PixelImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(_frame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 
@@ -94,21 +94,21 @@ namespace Consolonia.Benchmarks
         public PixelBuffer FrameOneCellChanged()
         {
             Stroke(_frame, ++_stroke);
-            PixelImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(_frame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 
         /// <summary>
         ///     The brush stroke from the bitmap: the visible pixels copied out of it into the rendering's
-        ///     pixel buffer, then rendered. Everything the renderer does per edit short of the terminal.
+        ///     pixel buffer, then rendered. Everything the converter does per edit short of the terminal.
         /// </summary>
         [Benchmark]
         public PixelBuffer FrameOneCellChangedFromBitmap()
         {
             Stroke(_bitmap.Pixels, ++_stroke);
-            BitmapRenderer.GetVisiblePixels(_bitmap, null, new PixelSize(Width, Height),
+            BitmapConverter.GetVisiblePixels(_bitmap, null, new PixelSize(Width, Height),
                 new PixelRect(0, 0, Width, Height), BitmapInterpolationMode.None, _frame);
-            PixelImageBitmapRenderer.RenderCells(_frame, _cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(_frame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 
@@ -121,7 +121,7 @@ namespace Consolonia.Benchmarks
         [Benchmark]
         public PixelBuffer FrameAllCellsNew()
         {
-            PixelImageBitmapRenderer.RenderCells(_newFrame, _cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(_newFrame, _cells, CellWidth, CellHeight);
             return _cells;
         }
 

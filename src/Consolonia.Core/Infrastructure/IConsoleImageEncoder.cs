@@ -27,12 +27,12 @@ namespace Consolonia.Core.Infrastructure
         ///     <see cref="IConsoleOutput.EndUpdate" />, before the update is closed; the output puts the
         ///     cursor back afterwards.
         /// </summary>
-        void RenderImages(PixelBuffer screen);
+        void WriteImages(PixelBuffer screen);
 
         /// <summary>
         ///     The terminal no longer shows what the encoder sent (the screen was resized, another program
         ///     had the terminal, the console was restored): forget it, so the next
-        ///     <see cref="RenderImages" /> sends every picture again. Writes nothing.
+        ///     <see cref="WriteImages" /> sends every picture again. Writes nothing.
         /// </summary>
         void Reset();
 

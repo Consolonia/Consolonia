@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
 {
-    /// <summary>The cache the pixel image renderer finds the image for a cell's pixels in.</summary>
+    /// <summary>The cache the pixel image converter finds the image for a cell's pixels in.</summary>
     [TestFixture]
     public class PixelImageCacheTests
     {

@@ -7,7 +7,7 @@ using Avalonia.Platform;
 
 namespace Consolonia.Benchmarks
 {
-    /// <summary>A bitmap over pinned BGRA pixels, read the way the renderer reads a real one.</summary>
+    /// <summary>A bitmap over pinned BGRA pixels, read the way the converter reads a real one.</summary>
     internal sealed class PinnedBitmap : IReadableBitmapImpl
     {
         public PinnedBitmap(byte[] bgra, int width, int height)
