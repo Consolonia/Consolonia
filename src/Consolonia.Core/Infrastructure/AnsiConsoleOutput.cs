@@ -3,9 +3,12 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Avalonia;
+using Avalonia.Logging;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Helpers.Logging;
 using Consolonia.Core.Text;
 
 namespace Consolonia.Core.Infrastructure
@@ -22,13 +25,40 @@ namespace Consolonia.Core.Infrastructure
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
 
+        /// <summary>Characters of an image payload widened per write to Console.Out.</summary>
+        private const int ImageChunkChars = 4096;
+
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        private readonly StringBuilder _outputBuffer = new();
+        // each flushed frame's size, logged at Verbose in the Consolonia.Output area:
+        // .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))
+        private static readonly string OutputLogArea = LogExtensions.GetAreaName(LogCategory.Output);
+
+        private static readonly UTF8Encoding Utf8NoBom = new(false);
+
+        // what the frame being written holds, for the flush log
+        private int _frameChars;
+        private int _frameImageChars;
+        private int _frameImages;
+
+        /// <summary>
+        ///     Where the terminal's cursor is not known, after a payload written with <see cref="WriteBytes" />:
+        ///     the next write moves it, wherever <see cref="_headBufferPoint" /> says it is.
+        /// </summary>
+        private bool _caretUnknown;
 
         private PixelBufferCoordinate _headBufferPoint;
+
+        /// <summary>
+        ///     Draws the pictures of the image cells, for the image protocol the console answered the probe
+        ///     with, as the registered <see cref="IConsoleImageEncoderFactory" /> makes it; null when there is
+        ///     no factory or it made none. See <see cref="PrepareConsole" />.
+        /// </summary>
+        private IConsoleImageEncoder _imageEncoder;
+
         private Color _lastBackground = Colors.Transparent;
+        private bool _lastBackgroundIsDefault;
         private Color _lastForeground = Colors.Transparent;
         private FontStyle? _lastStyle;
         private TextDecorationLocation? _lastTextDecoration;
@@ -37,9 +67,28 @@ namespace Consolonia.Core.Infrastructure
         /// <summary>What Console.Out was before <see cref="PrepareConsole" /> replaced it.</summary>
         private TextWriter _originalOut;
 
+        /// <summary>
+        ///     A glyph was written in the last column. <see cref="_headBufferPoint" /> is the start of the next
+        ///     row, which is where the next character goes, but the terminal's cursor is still on the old row
+        ///     with a pending wrap that only a printed character resolves: anything else placed at the cursor
+        ///     (an image, the caret) needs an explicit move.
+        /// </summary>
+        private bool _pendingWrap;
+
+        /// <summary>Whether the frame being written opened a synchronized update, which Flush closes.</summary>
+        private bool _synchronizedUpdateOpen;
+
+        internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
+
+        internal Func<string, char, int, string> RequestAnsiResponseHandler { get; set; }
+
         public ConsoleCapabilities Capabilities { get; protected set; }
 
         public PixelBufferSize Size { get; set; }
+
+        public int CellPixelWidth { get; private set; }
+
+        public int CellPixelHeight { get; private set; }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetTitle(string title)
@@ -51,7 +100,7 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetCaretPosition(PixelBufferCoordinate bufferPoint)
         {
-            if (bufferPoint.Equals(GetCaretPosition())) return;
+            if (!_caretUnknown && !_pendingWrap && bufferPoint.Equals(_headBufferPoint)) return;
 
             SetCaretPositionInternal(bufferPoint);
         }
@@ -66,13 +115,357 @@ namespace Consolonia.Core.Infrastructure
         public void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
         {
             if (pixel.Width <=
-                0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes 
+                0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes
                 return;
 
+            if (pixel.Background.Image != null)
+            {
+                if (_imageEncoder != null)
+                {
+                    // the text over the picture; the picture is the encoder's, at EndUpdate
+                    WriteTextOverPicture(position, in pixel);
+                    return;
+                }
+
+                // a picture on a console the probe found no image protocol for: block glyphs
+                WriteTextCell(position, AsQuadCell(in pixel), false);
+                return;
+            }
+
+            WriteTextCell(position, in pixel, false);
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void Flush()
+        {
+            WaitPauseTaskIfNecessary();
+            Console.Out.Flush();
+
+            if (Logger.TryGet(LogEventLevel.Verbose, OutputLogArea) is { } flushLogger)
+                flushLogger.Log3("Flushed {Chars} chars and {Images} image payloads of {ImageChars} chars",
+                    _frameChars, _frameImages, _frameImageChars);
+
+            _frameChars = 0;
+            _frameImages = 0;
+            _frameImageChars = 0;
+        }
+
+        /// <summary>
+        ///     Writes ASCII escape sequences given as bytes, image payloads above all, without building a
+        ///     string of them.
+        /// </summary>
+        /// <remarks>
+        ///     Where the cursor is afterwards is the payload's business, so it is not known: the next write
+        ///     moves it.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void WriteBytes(ReadOnlySpan<byte> ascii)
+        {
+            WaitPauseTaskIfNecessary();
+
+            _caretUnknown = true;
+            Span<char> chunk = stackalloc char[ImageChunkChars];
+            _frameImages++;
+            _frameImageChars += ascii.Length;
+            while (!ascii.IsEmpty)
+            {
+                int length = Math.Min(chunk.Length, ascii.Length);
+                Encoding.ASCII.GetChars(ascii[..length], chunk);
+                Console.Out.Write(chunk[..length]);
+                ascii = ascii[length..];
+            }
+        }
+
+        /// <summary>
+        ///     Opens a DEC 2026 synchronized update when the terminal has them: it shows everything up to
+        ///     the end marker <see cref="EndUpdate" /> writes at once, though the writer may send parts of a
+        ///     large frame before then.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void BeginUpdate()
+        {
+            if (!_synchronizedUpdateOpen && Capabilities.HasFlag(ConsoleCapabilities.SupportsSynchronizedOutput))
+            {
+                WaitPauseTaskIfNecessary();
+                Console.Out.Write(Esc.BeginSynchronizedUpdate);
+                _synchronizedUpdateOpen = true;
+            }
+        }
+
+        /// <summary>
+        ///     The image encoder makes its pictures match the screen, the cursor goes back to where the frame
+        ///     left it (the caret), and the update is closed and sent, whatever the encoder throws.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void EndUpdate(PixelBuffer screen)
+        {
+            try
+            {
+                if (_imageEncoder != null)
+                {
+                    PixelBufferCoordinate caret = _headBufferPoint;
+                    _imageEncoder.RenderImages(screen);
+                    SetCaretPosition(caret);
+                }
+            }
+            finally
+            {
+                CloseUpdate();
+                Flush();
+            }
+        }
+
+        private void CloseUpdate()
+        {
+            if (!_synchronizedUpdateOpen)
+                return;
+
+            WaitPauseTaskIfNecessary();
+            Console.Out.Write(Esc.EndSynchronizedUpdate);
+            _synchronizedUpdateOpen = false;
+        }
+
+        /// <summary>
+        ///     Forgets what the terminal is believed to show: the colors and attributes last set (another
+        ///     program may have changed them) and what the image encoder has placed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void ResetCache()
+        {
+            _lastBackground = Colors.Transparent;
+            _lastBackgroundIsDefault = false;
+            _lastForeground = Colors.Transparent;
+            _lastStyle = null;
+            _lastTextDecoration = null;
+            _lastWeight = null;
+            _imageEncoder?.Reset();
+        }
+
+        /// <summary>
+        ///     Write raw text to the console
+        /// </summary>
+        /// <remarks>This does not move the caret position, so should only be used for escape commands</remarks>
+        /// <param name="str"></param>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void WriteText(string str)
+        {
+            WaitPauseTaskIfNecessary();
+            if (string.IsNullOrEmpty(str))
+                return;
+
+            _frameChars += str.Length;
+            Console.Out.Write(str);
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void PrepareConsole()
+        {
+#pragma warning disable CA1303 // Do not pass literals as localized parameters
+            Console.OutputEncoding = Encoding.UTF8;
+
+            // Replace Console.Out with a large-buffered, manually flushed writer. The default one
+            // carries a 256-character buffer with AutoFlush enabled, so every frame this class so
+            // carefully batches into _outputBuffer left the process as hundreds of syscall-sized
+            // fragments -- on Windows, each one separately parsed and re-serialized by the
+            // pseudoconsole. Measured against a live ConPTY with full-screen frames: ~14 frames a
+            // second through the default writer, ~100 through this one flushed once per frame.
+            //
+            // Done after the encoding change above, because setting OutputEncoding recreates
+            // Console.Out and would discard this writer.
+            _originalOut = Console.Out;
+            InstallWriter(Console.OpenStandardOutput());
+
+            // enable alternate screen so original console screen is not affected by the app
+            Console.Write(Esc.EnableAlternateBuffer);
+            Console.Out.Flush();
+
+            Size = new PixelBufferSize((ushort)Console.WindowWidth, (ushort)Console.WindowHeight);
+
+            // Detect complex emoji support by writing a complex emoji and checking cursor position.
+            // If the cursor moves 2 positions, it indicates proper rendering of composite surrogate pairs.
+            (int left, _) = Console.GetCursorPosition();
+            Console.Write(TestEmoji);
+            // the writer buffers, so flush the emoji before asking where the cursor is
+            Console.Out.Flush();
+            (int left2, _) = Console.GetCursorPosition();
+            if (left2 - left == 2)
+                Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
+
+            // 8x16 pixels is the fallback when the terminal does not report its cell size
+            (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ??
+                                     (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
+            CellPixelHeight = cellH;
+            CellPixelWidth = cellW;
+
+            // three queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
+            // DECRQM mode 2026 (reply "CSI?2026;<state>$y") and DA1 (reply "ESC[?62;4;22c", feature 4 = sixel).
+            // DA1 is answered by every terminal and is the only reply containing 'c', so it fences the read.
+            string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
+                Esc.QueryKittyGraphics + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
+                'c', 1000) ?? string.Empty;
+            if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsSynchronizedOutput;
+            if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsSixel;
+
+            // some terminals answer the kitty query asynchronously, after DA1: give it one more short read
+            if (!ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
+                graphicsProbeResponse += RequestAnsiResponseHandler?.Invoke(string.Empty, '\\', 250) ?? string.Empty;
+            if (ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
+                Capabilities |= ConsoleCapabilities.SupportsKittyGraphics;
+
+            // override for terminals which render a protocol without answering its query, or to force fallback
+            Capabilities = ApplyGraphicsProtocolOverride(Capabilities,
+                Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS"));
+            InstallImageEncoder();
+
+            BlackColorTTYWorkaround();
+
+            ClearScreen();
+#pragma warning restore CA1303 // Do not pass literals as localized parameters
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void RestoreConsole()
+        {
+            // an update an interruption left open would hold back everything that follows
+            CloseUpdate();
+
+            // what the terminal holds for the encoder (stored images) is freed while it is still ours, and
+            // nothing it sent is on screen any more
+            _imageEncoder?.RestoreConsole();
+            _imageEncoder?.Reset();
+
+            WriteText(Esc.DisableAlternateBuffer);
+            WriteText(Esc.Reset);
+            WriteText(Esc.ShowCursor);
+            Flush();
+
+            // The console gets its own writer back, flushed; ours held nothing between flushes.
+            if (_originalOut != null)
+            {
+                Console.SetOut(_originalOut);
+                _originalOut = null;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void SetCaretStyle(CaretStyle caretStyle)
+        {
+            switch (caretStyle)
+            {
+                case CaretStyle.BlinkingBlock:
+                    WriteText(Esc.BlinkingBlockCursor);
+                    break;
+                case CaretStyle.SteadyBlock:
+                    WriteText(Esc.SteadyBlockCursor);
+                    break;
+                case CaretStyle.BlinkingUnderline:
+                    WriteText(Esc.BlinkingUnderlineCursor);
+                    break;
+                case CaretStyle.SteadyUnderline:
+                    WriteText(Esc.SteadyUnderlineCursor);
+                    break;
+                case CaretStyle.BlinkingBar:
+                    WriteText(Esc.BlinkingBarCursor);
+                    break;
+                case CaretStyle.SteadyBar:
+                    WriteText(Esc.SteadyBarCursor);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(caretStyle), caretStyle, null);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void HideCaret()
+        {
+            WriteText(Esc.HideCursor);
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void ShowCaret()
+        {
+            WriteText(Esc.ShowCursor);
+        }
+
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void ClearScreen()
+        {
+            WriteText(Esc.ClearScreen);
+            SetCaretPositionInternal(new PixelBufferCoordinate(0, 0));
+            Flush();
+        }
+
+        /// <summary>
+        ///     An image cell as the text cell a terminal without an image protocol shows for it: a block
+        ///     glyph in the picture's colors, under the cell's paint, with the cell's own glyph kept if it
+        ///     has one.
+        /// </summary>
+        private Pixel AsQuadCell(in Pixel pixel)
+        {
+            PixelImage image = pixel.Background.Image;
+            Pixel quad = QuadPixelBitmapRenderer.FromPixels(image.Bgra, image.Width, image.Height,
+                Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
+            Color paint = pixel.Background.Color;
+            var painted = new Pixel(
+                new PixelForeground(quad.Foreground.Symbol,
+                    Pixel.MergeColors(quad.Foreground.Color, paint, true)),
+                new PixelBackground(Pixel.MergeColors(quad.Background.Color, paint, false)),
+                pixel.CaretStyle);
+            // a picture cell with any symbol is written as text; one with none (nothing drawn over the
+            // picture) is the picture
+            return pixel.Foreground.IsNothingToDraw()
+                ? painted
+                : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
+        }
+
+        /// <summary>
+        ///     The text of an image cell, with an encoder to draw its picture. Where the protocol draws the
+        ///     picture below the text, the cell is its glyph, or a space, on the terminal's default background,
+        ///     which every terminal shows the picture through (some hide it under any explicit background, even
+        ///     black). Where the picture replaces the cells it covers, a glyph over it is a text cell on the
+        ///     color the cell looks, and a cell with none is left to the picture.
+        /// </summary>
+        private void WriteTextOverPicture(PixelBufferCoordinate position, in Pixel pixel)
+        {
+            // a picture cell with any symbol is text; one with none (nothing drawn over the picture,
+            // whatever color an overlay blended into it) is the picture
+            bool nothingDrawn = pixel.Foreground.IsNothingToDraw();
+
+            if (_imageEncoder.SupportsTextOverlay)
+            {
+                PixelForeground foreground = pixel.Foreground;
+                // written, a missing glyph is no character at all, and the terminal's cursor would not move
+                Pixel cell = nothingDrawn
+                    ? new Pixel(new PixelForeground(Symbol.Space, foreground.Color, foreground.Weight,
+                        foreground.Style, foreground.TextDecoration), pixel.Background, pixel.CaretStyle)
+                    : pixel;
+                WriteTextCell(position, in cell, true);
+                return;
+            }
+
+            if (nothingDrawn)
+                return;
+
+            var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.EffectiveBackgroundColor),
+                pixel.CaretStyle);
+            WriteTextCell(position, in textCell, false);
+        }
+
+        /// <summary>
+        ///     Writes a cell as a glyph in colors. With <paramref name="defaultBackground" /> the cell gets the
+        ///     terminal's default background rather than its color: for a cell over a picture an image
+        ///     protocol draws below the text, which some terminals hide under any explicit cell background.
+        /// </summary>
+        private void WriteTextCell(PixelBufferCoordinate position, in Pixel pixel, bool defaultBackground)
+        {
             //todo: performance of retrieval of the service, at least can be retrieved once
             Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
 
-            SetCaretPosition(position);
+            // a pending wrap is no reason to move: the character resolves it, onto the next row
+            if (_caretUnknown || !position.Equals(_headBufferPoint))
+                SetCaretPositionInternal(position);
 
             if (pixel.Foreground.TextDecoration != _lastTextDecoration)
             {
@@ -126,11 +519,16 @@ namespace Consolonia.Core.Infrastructure
                 _lastWeight = weight;
             }
 
-            if (pixel.Foreground.Color != _lastForeground || pixel.Background.Color != _lastBackground)
+            bool backgroundChanged = defaultBackground
+                ? !_lastBackgroundIsDefault
+                : pixel.Background.Color != _lastBackground || _lastBackgroundIsDefault;
+
+            if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
             {
+                // an image cell's color is the paint over the picture, not a background the console could map
                 (object mappedBackground, object mappedForeground) =
-                    consoleColorMode.Value.MapColors(pixel.Background.Color, pixel.Foreground.Color,
-                        pixel.Foreground.Weight);
+                    consoleColorMode.Value.MapColors(defaultBackground ? Colors.Black : pixel.Background.Color,
+                        pixel.Foreground.Color, pixel.Foreground.Weight);
                 if (pixel.Foreground.Color != _lastForeground)
                 {
                     if (weight is not FontWeight.Bold
@@ -143,10 +541,16 @@ namespace Consolonia.Core.Infrastructure
                     _lastForeground = pixel.Foreground.Color;
                 }
 
-                if (pixel.Background.Color != _lastBackground)
+                if (backgroundChanged && defaultBackground)
+                {
+                    WriteText(Esc.DefaultBackground);
+                    _lastBackgroundIsDefault = true;
+                }
+                else if (backgroundChanged)
                 {
                     WriteText(Esc.Background(mappedBackground));
                     _lastBackground = pixel.Background.Color;
+                    _lastBackgroundIsDefault = false;
                 }
             }
 
@@ -172,152 +576,103 @@ namespace Consolonia.Core.Infrastructure
             }
             else
             {
-                if (position.X >= Size.Width) position = new PixelBufferCoordinate(0, (ushort)(position.Y + 1));
+                _pendingWrap = position.X >= Size.Width;
+                if (_pendingWrap) position = new PixelBufferCoordinate(0, (ushort)(position.Y + 1));
 
                 _headBufferPoint = position;
             }
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void Flush()
+        /// <summary>
+        ///     Asks the registered <see cref="IConsoleImageEncoderFactory" /> for the encoder of the image
+        ///     protocol the capabilities name. With one, the console shows pixel images
+        ///     (<see cref="ConsoleCapabilities.SupportsPixelImages" />); without, pictures are block glyphs.
+        /// </summary>
+        private void InstallImageEncoder()
         {
-            if (_outputBuffer.Length > 0)
-            {
-                WaitPauseTaskIfNecessary();
-
-                // Straight from the builder -- no ToString copy of the whole frame -- and one
-                // explicit flush, which with the writer PrepareConsole installed is what turns a
-                // frame into a handful of large writes instead of hundreds of small ones.
-                Console.Out.Write(_outputBuffer);
-                Console.Out.Flush();
-                _outputBuffer.Clear();
-            }
+            _imageEncoder = AvaloniaLocator.Current.GetService<IConsoleImageEncoderFactory>()?.CreateEncoder(this);
+            if (_imageEncoder != null)
+                Capabilities |= ConsoleCapabilities.SupportsPixelImages;
+            else
+                Capabilities &= ~ConsoleCapabilities.SupportsPixelImages;
         }
 
         /// <summary>
-        ///     Write raw text to the console
+        ///     Parses a Primary Device Attributes (DA1) response such as "ESC[?62;4;22c".
+        ///     Feature parameter 4 (following the device class) indicates sixel graphics support.
         /// </summary>
-        /// <remarks>This does not move the caret position, so should only be used for escape commands</remarks>
-        /// <param name="str"></param>
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void WriteText(string str)
+        internal static bool DeviceAttributesIndicateSixelSupport(string deviceAttributesResponse)
         {
-            WaitPauseTaskIfNecessary();
-            _outputBuffer.Append(str);
+            if (string.IsNullOrEmpty(deviceAttributesResponse))
+                return false;
+
+            // the probe's other replies (DECRPM "ESC[?2026;2$y", kitty's APC) come first, so find the
+            // DA1 reply by its final 'c' and take the parameters from its own "[?"
+            int end = deviceAttributesResponse.LastIndexOf('c');
+            int start = end > 0 ? deviceAttributesResponse.LastIndexOf("[?", end, StringComparison.Ordinal) : -1;
+            if (start < 0)
+                return false;
+
+            string[] parameters = deviceAttributesResponse[(start + 2)..end].Split(';');
+
+            // the first parameter is the device class, the rest are supported features
+            for (int i = 1; i < parameters.Length; i++)
+                if (parameters[i] == "4")
+                    return true;
+
+            return false;
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void PrepareConsole()
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.QueryKittyGraphics" /> contains the
+        ///     "APC _Gi=31;OK ST" reply a kitty-graphics-capable terminal sends.
+        /// </summary>
+        internal static bool ResponseIndicatesKittyGraphicsSupport(string response)
         {
-#pragma warning disable CA1303 // Do not pass literals as localized parameters
-            Console.OutputEncoding = Encoding.UTF8;
+            return response != null && response.Contains("_Gi=31;OK", StringComparison.Ordinal);
+        }
 
-            // Replace Console.Out with a large-buffered, manually flushed writer. The default one
-            // carries a 256-character buffer with AutoFlush enabled, so every frame this class so
-            // carefully batches into _outputBuffer left the process as hundreds of syscall-sized
-            // fragments -- on Windows, each one separately parsed and re-serialized by the
-            // pseudoconsole. Measured against a live ConPTY with full-screen frames: ~14 frames a
-            // second through the default writer, ~100 through this one flushed once per frame.
-            //
-            // Installed via SetOut rather than written to directly, so anything that redirects
-            // Console.Out afterwards -- a test, a host capturing output -- is honoured exactly as
-            // before. Done after the encoding change above, because setting OutputEncoding
-            // recreates Console.Out and would discard this writer.
-            _originalOut = Console.Out;
-            Console.SetOut(new StreamWriter(
-                Console.OpenStandardOutput(), new UTF8Encoding(false), 65536, true)
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.RequestSynchronizedOutputMode" /> reports
+        ///     DEC private mode 2026 as available. DECRPM states 1 (set), 2 (reset) and 3 (permanently
+        ///     set) mean the terminal applies synchronized updates; 0 (unrecognized) and 4 (permanently
+        ///     reset) mean it does not.
+        /// </summary>
+        internal static bool ResponseIndicatesSynchronizedOutputSupport(string response)
+        {
+            if (string.IsNullOrEmpty(response))
+                return false;
+
+            const string prefix = "[?2026;";
+            int start = response.IndexOf(prefix, StringComparison.Ordinal);
+            if (start < 0)
+                return false;
+
+            int stateStart = start + prefix.Length;
+            int end = response.IndexOf("$y", stateStart, StringComparison.Ordinal);
+            if (end < 0)
+                return false;
+
+            return response[stateStart..end] is "1" or "2" or "3";
+        }
+
+        /// <summary>
+        ///     Applies the CONSOLONIA_GRAPHICS environment variable override to the detected capabilities:
+        ///     "kitty" forces kitty graphics on, "sixel" forces sixel (and kitty off), "quad" disables
+        ///     both graphics protocols. Any other value leaves detection untouched.
+        /// </summary>
+        internal static ConsoleCapabilities ApplyGraphicsProtocolOverride(ConsoleCapabilities capabilities,
+            string overrideValue)
+        {
+            return overrideValue?.Trim().ToUpperInvariant() switch
             {
-                AutoFlush = false
-            });
-
-            // enable alternate screen so original console screen is not affected by the app
-            Console.Write(Esc.EnableAlternateBuffer);
-            Console.Out.Flush();
-
-            Size = new PixelBufferSize((ushort)Console.WindowWidth, (ushort)Console.WindowHeight);
-
-            // Detect complex emoji support by writing a complex emoji and checking cursor position.
-            // If the cursor moves 2 positions, it indicates proper rendering of composite surrogate pairs.
-            (int left, _) = Console.GetCursorPosition();
-            Console.Write(TestEmoji);
-            // The writer no longer flushes on its own, and the position read below asks the
-            // console -- which cannot have moved the cursor for text it has not received.
-            Console.Out.Flush();
-            (int left2, _) = Console.GetCursorPosition();
-            if (left2 - left == 2)
-                Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
-
-            BlackColorTTYWorkaround();
-
-            ClearScreen();
-#pragma warning restore CA1303 // Do not pass literals as localized parameters
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void RestoreConsole()
-        {
-            WriteText(Esc.DisableAlternateBuffer);
-            WriteText(Esc.Reset);
-            WriteText(Esc.ShowCursor);
-            Flush();
-
-            // The console gets its own writer back, flushed; ours held nothing between flushes.
-            if (_originalOut != null)
-            {
-                Console.SetOut(_originalOut);
-                _originalOut = null;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void SetCaretStyle(CaretStyle caretStyle)
-        {
-            switch (caretStyle)
-            {
-                case CaretStyle.BlinkingBlock:
-                    WriteText(Esc.BlinkingBlockCursor);
-                    break;
-                case CaretStyle.SteadyBlock:
-                    WriteText(Esc.SteadyBlockCursor);
-                    break;
-                case CaretStyle.BlinkingUnderline:
-                    WriteText(Esc.BlinkingUnderlineCursor);
-                    break;
-                case CaretStyle.SteadyUnderline:
-                    WriteText(Esc.SteadyUnderlineCursor);
-                    break;
-                case CaretStyle.BlinkingBar:
-                    WriteText(Esc.BlinkingBarCursor);
-                    break;
-                case CaretStyle.SteadyBar:
-                    WriteText(Esc.SteadyBarCursor);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(caretStyle), caretStyle, null);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void HideCaret()
-        {
-            WriteText(Esc.HideCursor);
-            Flush();
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void ShowCaret()
-        {
-            WriteText(Esc.ShowCursor);
-            Flush();
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void ClearScreen()
-        {
-            WriteText(Esc.ClearScreen);
-            _headBufferPoint = new PixelBufferCoordinate(0, 0);
-            WriteText(Esc.SetCursorPosition(0, 0));
-            Flush();
+                "KITTY" => capabilities | ConsoleCapabilities.SupportsKittyGraphics,
+                "SIXEL" => (capabilities & ~ConsoleCapabilities.SupportsKittyGraphics) |
+                           ConsoleCapabilities.SupportsSixel,
+                "QUAD" => capabilities &
+                          ~(ConsoleCapabilities.SupportsKittyGraphics | ConsoleCapabilities.SupportsSixel),
+                _ => capabilities
+            };
         }
 
         /// <summary>
@@ -354,10 +709,35 @@ namespace Consolonia.Core.Infrastructure
             //todo: low: we can not simply test the presence of this bug (if it even exists), thus come back to this later
         }
 
+        /// <summary>The large-buffered, manually flushed writer over <paramref name="stream" /> (see PrepareConsole).</summary>
+        private static void InstallWriter(Stream stream)
+        {
+            Console.SetOut(new StreamWriter(stream, Utf8NoBom, 65536, true)
+            {
+                AutoFlush = false
+            });
+        }
+
+        /// <summary>
+        ///     Writes frames to <paramref name="stream" /> the way <see cref="PrepareConsole" /> writes them
+        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given: for
+        ///     measuring and testing the output path.
+        /// </summary>
+        internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None)
+        {
+            InstallWriter(stream);
+            Capabilities = capabilities;
+            CellPixelWidth = DefaultCellPixelSize.Width;
+            CellPixelHeight = DefaultCellPixelSize.Height;
+            InstallImageEncoder();
+        }
+
         private void SetCaretPositionInternal(PixelBufferCoordinate bufferPoint)
         {
             WriteText(Esc.SetCursorPosition(bufferPoint.X, bufferPoint.Y));
             _headBufferPoint = bufferPoint;
+            _caretUnknown = false;
+            _pendingWrap = false;
         }
 
         /// <summary>
@@ -366,8 +746,11 @@ namespace Consolonia.Core.Infrastructure
         /// <param name="ch"></param>
         private void WriteChar(char ch)
         {
-            if (ch > 0)
-                _outputBuffer.Append(ch);
+            if (ch == 0)
+                return;
+
+            _frameChars++;
+            Console.Out.Write(ch);
         }
     }
 }

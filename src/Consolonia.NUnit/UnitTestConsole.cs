@@ -29,7 +29,12 @@ namespace Consolonia.NUnit
 
         public PixelBufferSize Size { get; set; }
 
-        public ConsoleCapabilities Capabilities { get; }
+        /// <summary>Settable so a test can opt into a protocol the real terminal would have to advertise.</summary>
+        public ConsoleCapabilities Capabilities { get; set; }
+
+        public int CellPixelWidth => DefaultCellPixelSize.Width;
+
+        public int CellPixelHeight => DefaultCellPixelSize.Height;
 
         public void SetTitle(string title)
         {
