@@ -27,7 +27,7 @@ using static Vanara.PInvoke.Kernel32;
 namespace Consolonia.PlatformSupport
 {
     [SupportedOSPlatform("windows")]
-    public class Win32Console : ConsoleBase
+    public partial class Win32Console : ConsoleBase
     {
         private static readonly FlagTranslator<CONTROL_KEY_STATE, RawInputModifiers>
             KeyModifiersTranslator = new(
@@ -89,6 +89,8 @@ namespace Consolonia.PlatformSupport
                             ConsoleCapabilities.SupportsAltSolo;
             if (GetConsoleWindow() != IntPtr.Zero)
                 Capabilities |= ConsoleCapabilities.SupportsMouseCursor;
+
+            TryToSupportPixelMouse();
         }
 
         [MethodImpl(MethodImplOptions.Synchronized)]
@@ -129,7 +131,7 @@ namespace Consolonia.PlatformSupport
                 while (!Disposed /*inject ThreadAbortException*/)
                 {
                     await WaitPauseTaskIfNecessaryAsync();
-                    INPUT_RECORD[] inputRecords = _windowsConsole.ReadConsoleInput();
+                    INPUT_RECORD[] inputRecords = ReadInputRecords();
                     var clipboard = AvaloniaLocator.Current.GetService<IClipboard>();
                     if (clipboard != null &&
                         inputRecords.Where(evt => evt.EventType == EVENT_TYPE.KEY_EVENT).Skip(1).Any())
@@ -231,7 +233,7 @@ namespace Consolonia.PlatformSupport
                     }
                 });
 
-                inputRecords = _windowsConsole.ReadConsoleInput();
+                inputRecords = ReadInputRecords();
             }
         }
 
@@ -263,7 +265,10 @@ namespace Consolonia.PlatformSupport
 
         private void HandleMouseInput(MOUSE_EVENT_RECORD mouseEvent)
         {
-            var point = new Point(mouseEvent.dwMousePosition.X, mouseEvent.dwMousePosition.Y);
+            // decoded SGR-Pixels reports carry zero-based pixels, the console's own records cells
+            Point point = _vtInputDecoder != null
+                ? PixelToCell(mouseEvent.dwMousePosition.X + 1, mouseEvent.dwMousePosition.Y + 1)
+                : new Point(mouseEvent.dwMousePosition.X, mouseEvent.dwMousePosition.Y);
             RawInputModifiers inputModifiers =
                 KeyModifiersTranslator.Translate(mouseEvent.dwControlKeyState) |
                 MouseModifiersTranslator.Translate(mouseEvent.dwButtonState);
