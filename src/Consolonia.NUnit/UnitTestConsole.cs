@@ -60,6 +60,14 @@ namespace Consolonia.NUnit
                 PixelBuffer[position] = pixel;
         }
 
+        /// <summary>The screen the last frame ended with, as the render target hands it over.</summary>
+        public PixelBuffer LastFrameScreen { get; private set; }
+
+        public void EndUpdate(PixelBuffer screen)
+        {
+            LastFrameScreen = screen;
+        }
+
         public void WriteText(string str)
         {
             // ignore

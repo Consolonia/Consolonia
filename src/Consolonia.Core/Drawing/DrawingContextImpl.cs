@@ -42,7 +42,7 @@ namespace Consolonia.Core.Drawing
 
         void IDisposable.Dispose()
         {
-            _renderTarget.RenderToDevice();
+            _renderTarget.EndDrawing();
         }
 
         public void Clear(Color color)

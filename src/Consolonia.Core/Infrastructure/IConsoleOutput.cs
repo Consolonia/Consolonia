@@ -82,7 +82,9 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     The frame <see cref="BeginUpdate" /> started is written, caret included; <paramref name="screen" />
-        ///     is what the terminal should now show. An output with per-frame work besides the cells (an image
+        ///     is what the terminal should now show: every cell as it was last written, not the pixel buffer
+        ///     drawn into (the cell under the mouse cursor, for one, is written as the cursor). An output
+        ///     with per-frame work besides the cells (an image
         ///     protocol placing its pictures) does it here, leaving the cursor where the caret was put, then
         ///     closes the update and flushes.
         /// </summary>

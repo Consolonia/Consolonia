@@ -172,6 +172,14 @@ and the first edit changes only the cells it touched.
 
 ## Writing a frame
 
+**One frame at a time, from a finished drawing.** Each window has a `RenderLock`, held for a drawing
+context's whole life (from `CreateDrawingContext` until `Dispose` has written the frame), for every
+frame written (`RenderToDevice`, and the mouse cursor's frames from their timer thread), and while the
+pixel buffer is replaced on a resize. Without it, a cursor frame went out while Avalonia was half way
+through drawing: the page under a resizing dialog drawn, the backdrop and the dialog not yet. Its own
+cells were put right by the next frame, but an image encoder, given the pixel buffer, sent the
+undimmed pictures it saw there, and the next frame skipped every cell that ended up as before.
+
 `RenderTarget.RenderToDevice` turns the dirty cells into output. It knows nothing about image
 protocols: a cell is a cell.
 
@@ -182,8 +190,11 @@ protocols: a cell is a cell.
    glyph in its foreground; its contrast colour comes from `Pixel.EffectiveBackgroundColor`, so over
    a picture it is computed against the paint over the dominant colour.
 3. **Caret.** The caret, hidden at the start of the frame, is placed and shown.
-4. **`EndUpdate(screen)`.** Every changed cell has been written; the console gets the whole buffer,
-   which is what the terminal should now show. `AnsiConsoleOutput` has its image encoder write its
+4. **`EndUpdate(screen)`.** Every changed cell has been written; the console gets the `_cache`, every
+   cell as it was last written, which is what the terminal should now show. Not the pixel buffer: a
+   cell is written only when it is dirty, so the buffer shows the terminal only while every drawing
+   marks the cells it changes, and the cell under the mouse cursor is written as the cursor's glyph,
+   so an encoder sends the picture there again when the cursor moves off. `AnsiConsoleOutput` has its image encoder write its
    pictures, moves the cursor back to the caret, closes the synchronized update and flushes: the whole
    frame, caret included, goes out in one write. `RenderTarget` calls it in a `finally`, and
    `AnsiConsoleOutput` closes the update in one, so an exception never leaves an update open.
@@ -350,6 +361,6 @@ In `src/Tests/Consolonia.Core.Tests`:
 | `CellConversionTests` | Cell reuse across versions, reallocation on a size change, showing nothing until complete, least-recently-drawn eviction. |
 | `PixelImageConvertCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` | The converter: an edited cell is the only one made again, identical cells share one image, a cell keeps its exact pixels; drawing at target size, over a picture, clipped, partially redrawn, edited, at a new version, on a console with `SupportsPixelImages`. |
 | `WithLifetimeFixture/AnsiConsoleOutputImageTests` | With a recording encoder: the factory is asked with the output and its capabilities; `SupportsPixelImages` is set with an encoder and cleared without; the encoder writes once a frame with the screen; the text over a picture with and without `SupportsTextOverlay` (default background, or the picture's colour; a space, or nothing); after `WriteBytes`, and after the last column, `SetCaretPosition` moves the cursor; the encoder's output is inside the synchronized update; the cursor goes back to the caret after the encoder moves it; an encoder that throws still leaves the update closed; `Reset` and `RestoreConsole` are forwarded, and `Reset` follows `RestoreConsole`. Without an encoder a picture is block glyphs: a picture cell with no symbol is a block glyph, a space over it is text, a backdrop leaves the picture. |
-| `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again. |
+| `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again; a frame ends with the screen as written, not the pixel buffer; a frame from another thread waits for the drawing under way. |
 | `AnsiConsoleOutputWriteTests` | Writing the frame: order of text and bytes, UTF-8, split and lone surrogates, text written to `Console.Out` first, a payload longer than a chunk, one synchronized update per frame, an empty frame. |
 | `WithLifetimeFixture/PixelTests` | Image cells compare by image; an image background composes with a glyph, keeps the image under paint, dies by an opaque background, takes the cell when drawn over text; shade and brighten paint it; the effective colour. |

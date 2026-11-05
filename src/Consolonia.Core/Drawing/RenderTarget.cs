@@ -23,8 +23,10 @@ namespace Consolonia.Core.Drawing
         private readonly ConsoleWindowImpl _consoleTopLevelImpl;
 
         // cache of pixels written so we can ignore them if unchanged.
-        // what the terminal shows, cell by cell, Pixel.Empty where nothing was ever written
-        private Pixel[,] _cache = null!;
+        // what the terminal shows, cell by cell, Pixel.Empty where nothing was ever written. It is what the
+        // console is told the screen is at the end of a frame, not the pixel buffer: only dirty cells are
+        // written, and the cell under the mouse cursor is written as the cursor
+        private PixelBuffer _cache = null!;
 
         private ConsoleCursor _consoleCursor;
 
@@ -53,6 +55,9 @@ namespace Consolonia.Core.Drawing
             InitializeCacheInternal();
             _cursorTimer = new Timer(_ =>
                 {
+                    // after any drawing under way: written from a buffer half drawn, a frame carries the
+                    // half-drawn cells, and an image encoder the pictures in them
+                    lock (_consoleTopLevelImpl.RenderLock)
                     lock (this)
                     {
                         if (_cursorTimer == null)
@@ -109,12 +114,16 @@ namespace Consolonia.Core.Drawing
 
         internal void RenderToDevice()
         {
-            try
+            // re-entered from EndDrawing, which holds it already
+            lock (_consoleTopLevelImpl.RenderLock)
             {
-                RenderToDevice(_consoleTopLevelImpl.DirtyRegions);
-            }
-            catch (InvalidDrawingContextException)
-            {
+                try
+                {
+                    RenderToDevice(_consoleTopLevelImpl.DirtyRegions);
+                }
+                catch (InvalidDrawingContextException)
+                {
+                }
             }
         }
 
@@ -138,15 +147,42 @@ namespace Consolonia.Core.Drawing
                 PreviousFrameIsRetained = true // otherwise full redrawing happens
             };
 
-            if (_drawingContextImpl is null || _drawingContextImpl.PixelBuffer != _consoleTopLevelImpl.PixelBuffer)
-                _drawingContextImpl = new DrawingContextImpl(_consoleTopLevelImpl, this);
+            // held until the context is disposed and the frame written (EndDrawing)
+            Monitor.Enter(_consoleTopLevelImpl.RenderLock);
+            try
+            {
+                if (_drawingContextImpl is null ||
+                    _drawingContextImpl.PixelBuffer != _consoleTopLevelImpl.PixelBuffer)
+                    _drawingContextImpl = new DrawingContextImpl(_consoleTopLevelImpl, this);
 
-            return _drawingContextImpl;
+                return _drawingContextImpl;
+            }
+            catch
+            {
+                Monitor.Exit(_consoleTopLevelImpl.RenderLock);
+                throw;
+            }
         }
 
-        private static Pixel[,] InitializeCache(ushort width, ushort height)
+        /// <summary>
+        ///     The drawing context <see cref="CreateDrawingContext" /> handed out is done with: the frame is
+        ///     written, and the window's render lock, held since, is released.
+        /// </summary>
+        internal void EndDrawing()
         {
-            var cache = new Pixel[width, height];
+            try
+            {
+                RenderToDevice();
+            }
+            finally
+            {
+                Monitor.Exit(_consoleTopLevelImpl.RenderLock);
+            }
+        }
+
+        private static PixelBuffer InitializeCache(ushort width, ushort height)
+        {
+            var cache = new PixelBuffer(width, height);
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
@@ -172,6 +208,7 @@ namespace Consolonia.Core.Drawing
             _consoleTopLevelImpl.DirtyRegions.AddRect(new PixelRect(0, 0, pixelBuffer.Width, pixelBuffer.Height));
         }
 
+        /// <summary>Writes a frame. Callers hold the window's render lock, so the buffer is not half drawn.</summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice(Snapshot.Regions regions)
         {
@@ -181,7 +218,7 @@ namespace Consolonia.Core.Drawing
             if (dirtyRegions.IsEmpty) return;
 
             // a new cache means everything is redrawn
-            if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
+            if (pixelBuffer.Width != _cache.Width || pixelBuffer.Height != _cache.Height)
                 ResetCache();
 
 #if FPS
@@ -205,7 +242,7 @@ namespace Consolonia.Core.Drawing
             finally
             {
                 // closes the update even when a cell throws; otherwise the terminal holds back all that follows
-                _console.EndUpdate(pixelBuffer);
+                _console.EndUpdate(_cache);
             }
         }
 
@@ -299,7 +336,7 @@ namespace Consolonia.Core.Drawing
                         //todo: it does not consider that some of them will be replaced by space. But issue is pessimistic, just unnecessary redraws
                         bool anyDifferent = false;
                         for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
-                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
+                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[(ushort)(x + i), y])
                             {
                                 anyDifferent = true;
                                 break;
