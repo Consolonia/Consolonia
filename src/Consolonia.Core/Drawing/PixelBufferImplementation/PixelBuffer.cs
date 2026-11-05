@@ -80,6 +80,25 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return ref _buffer[x, y];
         }
 
+        /// <summary>
+        ///     Blends <paramref name="above" /> into the cell at (x, y) where it is. The drawing context does
+        ///     this for every cell it touches; through the indexers that was a 40-byte copy out, one into the
+        ///     blend and one back.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Blend(int x, int y, in Pixel above)
+        {
+            ref Pixel cell = ref _buffer[x, y];
+            cell = cell.Blend(in above);
+        }
+
+        /// <inheritdoc cref="Blend(int, int, in Pixel)" />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Blend(PixelPoint point, in Pixel above)
+        {
+            Blend(point.X, point.Y, in above);
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private (ushort x, ushort y) ToXY(int i)
