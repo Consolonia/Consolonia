@@ -143,7 +143,7 @@ namespace Consolonia.Benchmarks
         private static PixelBuffer Picture(int width, int height, int seed)
         {
             var cells = new PixelBuffer((ushort)(width / CellWidth), (ushort)(height / CellHeight));
-            PixelImageBitmapConverter.RenderCells(Photo(width, height, seed), cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.ConvertCells(Photo(width, height, seed), cells, CellWidth, CellHeight);
             return cells;
         }
 

@@ -146,6 +146,6 @@ screen.
 |---|---|
 | `Consolonia.Imaging.Tests/ImageEncoderTests` (`Sixel*`) | Neighbours on a row are one sixel at the run's first cell, with the cursor put back after; cells apart are separate sixels; a glyph over a picture is text on the picture's colour and no sixel, a space too; a backdrop leaves the picture; a cell is sent again only when what it shows changed, and everything after a reset; a dimmed run is different bytes and the un-dimmed run comes back from the cache byte for byte. |
 | `Consolonia.Imaging.Tests/SixelPaletteTests` | Only used colours are defined. A transient image renders the same bytes without keeping them. Too-small arrays are refused. Exact versus Wu quantisation. Rounded percentages. |
-| `PixelImageRenderCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` (core) | The converter, which is the same for every image protocol (see [bitmap.md](../Consolonia.Core/Drawing/bitmap.md#tests)). |
+| `PixelImageConvertCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` (core) | The converter, which is the same for every image protocol (see [bitmap.md](../Consolonia.Core/Drawing/bitmap.md#tests)). |
 | `WithLifetimeFixture/PixelTests` (core) | Image cells compare by image; the effective colour of a painted image cell. |
 | `AnsiConsoleOutputWriteTests`, `WithLifetimeFixture/AnsiConsoleOutputImageTests` (core) | The output the sixels are written to, and the text it writes over pictures. |
