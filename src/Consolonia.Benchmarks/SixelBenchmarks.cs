@@ -88,7 +88,7 @@ namespace Consolonia.Benchmarks
         }
 
         /// <summary>
-        ///     Serializes one cell, as the renderer sends a cell on its own. A new instance shares the
+        ///     Serializes one cell, as the encoder sends a cell on its own. A new instance shares the
         ///     arrays, so the encoding is measured rather than a cached result.
         /// </summary>
         [Benchmark]

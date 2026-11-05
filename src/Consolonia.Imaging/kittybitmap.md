@@ -19,7 +19,7 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
    cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph
    over a picture is drawn by the terminal over the picture, so no dominant-colour fallback is needed.
-2. **The screen is walked in blocks.** `RenderImages(screen)` goes over the buffer in blocks of 8×4
+2. **The screen is walked in blocks.** `WriteImages(screen)` goes over the buffer in blocks of 8×4
    cells (`BlockColumns`, `BlockRows`) aligned to the screen grid. A block with at
    least one image cell gets a key: the XXH3 of each cell's image digest and paint, zero for a cell
    without an image. The key changes when a cell's picture changes, when its paint changes, and
@@ -134,7 +134,7 @@ buffer and hands it to `IConsoleOutput.WriteBytes`. A payload of megabytes never
 
 `ImageOutputBenchmarks` (`Kitty*`), default job, in-process, writing to a null stream (see
 [bitmap.md](../Consolonia.Core/Drawing/bitmap.md#benchmarks)), driven as the render target drives the output: the changed cells
-written, then `EndUpdate`, which calls `RenderImages`. The benchmark has no platform, so its blocks go as zlib RGBA.
+written, then `EndUpdate`, which calls `WriteImages`. The benchmark has no platform, so its blocks go as zlib RGBA.
 
 | Scenario | Time | Allocated (`--alloc`) | Bytes on the wire |
 |---|---|---|---|

@@ -96,7 +96,7 @@ namespace Consolonia.Imaging
         ///     transparent pixels: placing a whole block put the picture over a dialog's body and left only
         ///     its border glyphs.
         /// </remarks>
-        public void RenderImages(PixelBuffer screen)
+        public void WriteImages(PixelBuffer screen)
         {
             int cellPixelWidth = _output.CellPixelWidth;
             int cellPixelHeight = _output.CellPixelHeight;
