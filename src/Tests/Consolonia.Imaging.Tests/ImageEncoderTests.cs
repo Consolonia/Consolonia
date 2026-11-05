@@ -110,7 +110,7 @@ namespace Consolonia.Imaging.Tests
 
         private static Pixel ImageCell(PixelImage image, Color paint = default)
         {
-            return new Pixel(PixelImageBitmapRenderer.PictureCellForeground, new PixelBackground(paint, image));
+            return new Pixel(PixelImageBitmapConverter.PictureCellForeground, new PixelBackground(paint, image));
         }
 
         private static int Count(string frame, string sequence)
@@ -222,7 +222,7 @@ namespace Consolonia.Imaging.Tests
         }
 
         /// <summary>
-        ///     A modal's translucent backdrop blended over a picture cell, as the renderer makes it, colors
+        ///     A modal's translucent backdrop blended over a picture cell, as the converter makes it, colors
         ///     the cell's foreground but draws no symbol on it: the cell is still the picture, dimmed.
         /// </summary>
         [Test]

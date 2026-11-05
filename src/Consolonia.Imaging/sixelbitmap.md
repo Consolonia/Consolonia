@@ -15,11 +15,11 @@ protocol; the choice between sixel and text is made when the cell is written.
    image cell with a glyph (the mouse cursor, a window edge crossing the picture) as text, on
    `Pixel.EffectiveBackgroundColor`: the paint over the picture's dominant colour, so the cell still
    looks like the picture rather than a hole in it. A picture cell with no glyph it leaves alone.
-   A picture cell with any symbol, a space included, is written as text. The renderer makes picture
+   A picture cell with any symbol, a space included, is written as text. The converter makes picture
    cells with no symbol, and gaps that layout never drew keep none, so they show the picture; a
    translucent overlay blended over a picture cell colours its foreground but draws no symbol, so the
    cell still shows the picture, dimmed.
-2. **Changed cells are found.** `RenderImages(screen)` walks the screen against the encoder's own
+2. **Changed cells are found.** `WriteImages(screen)` walks the screen against the encoder's own
    record of what it sent to each cell: the picture's digest and the paint over it, or nothing where
    the cell is text. A picture cell whose picture or paint differs from the record is gathered, and
    the record updated; a text cell (a glyph over a picture, a wide glyph's continuation) clears it,
@@ -33,7 +33,7 @@ protocol; the choice between sixel and text is made when the cell is written.
      modal dims a picture on a sixel terminal: the paint is baked into the run.
    - **One palette per run** (`Sixel.CreateFromBitmap`): at most 256 colours per run rather than per
      picture, so a run of few colours is indexed exactly (`TryIndexExactly`) and a photo row goes to
-     Wu's quantiser (`JeremyAnsel.ColorQuant`). The earlier renderer quantised the whole picture to
+     Wu's quantiser (`JeremyAnsel.ColorQuant`). The earlier converter quantised the whole picture to
      one palette at draw time; this is per row and at write time.
    - **Rendered runs are cached by content** (`ContentCache<byte[]>`, 16 MB): the key is the XXH3 of
      the cells' image digests and paints. A dialog opening dims the runs under it, which are
@@ -74,7 +74,7 @@ picture.
 
 **Output path per frame** (`ImageOutputBenchmarks`, `Sixel*`, default job, in-process, null stream),
 driven as the render target drives the output: the changed cells written, then `EndUpdate`, which
-calls `RenderImages`. The dialog-closed scenario shows the dimmed picture before each run.
+calls `WriteImages`. The dialog-closed scenario shows the dimmed picture before each run.
 
 | Scenario | Time | Allocated (`--alloc`) | Bytes on the wire |
 |---|---|---|---|
@@ -89,7 +89,7 @@ A new picture's allocation is Wu's quantiser (its histogram and the indexes of t
 image) and the rendered runs, which the cache keeps; the runs' slices of the indexes are rented.
 
 For comparison, before this model a full-screen picture was one sixel per cell with the bytes made
-at draw time: quantising the picture took about 110 ms in the renderer, and appending the 16,080
+at draw time: quantising the picture took about 110 ms in the converter, and appending the 16,080
 cached cell sixels about 4.5 ms in the output, for 552,336 bytes on the wire as one joined sixel or
 about 1 KB per cell unjoined.
 
@@ -146,6 +146,6 @@ screen.
 |---|---|
 | `Consolonia.Imaging.Tests/ImageEncoderTests` (`Sixel*`) | Neighbours on a row are one sixel at the run's first cell, with the cursor put back after; cells apart are separate sixels; a glyph over a picture is text on the picture's colour and no sixel, a space too; a backdrop leaves the picture; a cell is sent again only when what it shows changed, and everything after a reset; a dimmed run is different bytes and the un-dimmed run comes back from the cache byte for byte. |
 | `Consolonia.Imaging.Tests/SixelPaletteTests` | Only used colours are defined. A transient image renders the same bytes without keeping them. Too-small arrays are refused. Exact versus Wu quantisation. Rounded percentages. |
-| `PixelImageRenderCellsTests`, `WithLifetimeFixture/PixelImageBitmapRendererTests` (core) | The renderer, which is the same for every image protocol (see [bitmap.md](../Consolonia.Core/Drawing/bitmap.md#tests)). |
+| `PixelImageRenderCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` (core) | The converter, which is the same for every image protocol (see [bitmap.md](../Consolonia.Core/Drawing/bitmap.md#tests)). |
 | `WithLifetimeFixture/PixelTests` (core) | Image cells compare by image; the effective colour of a painted image cell. |
 | `AnsiConsoleOutputWriteTests`, `WithLifetimeFixture/AnsiConsoleOutputImageTests` (core) | The output the sixels are written to, and the text it writes over pictures. |

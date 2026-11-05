@@ -104,7 +104,7 @@ namespace Consolonia.Imaging
         private byte[] _renderedBytes;
 
         /// <summary>
-        ///     An image made for a single write, such as the one the renderer combines from neighbouring
+        ///     An image made for a single write, such as the one the encoder combines from neighbouring
         ///     cells each frame. <see cref="Render" /> does not keep its bytes: it returns them straight
         ///     from a per-thread scratch buffer, valid only until the next render on the same thread.
         /// </summary>

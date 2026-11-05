@@ -60,7 +60,7 @@ namespace Consolonia.Imaging
         ///     them. A cell with a glyph over its picture is the output's text; a wide glyph's continuation
         ///     cell is the glyph's.
         /// </summary>
-        public void RenderImages(PixelBuffer screen)
+        public void WriteImages(PixelBuffer screen)
         {
             int width = screen.Width;
             int height = screen.Height;

@@ -83,7 +83,7 @@ namespace Consolonia.Benchmarks
                     new PixelBackground(background));
             }
 
-            // a screen of picture as the renderer makes it
+            // a screen of picture as the converter makes it
             _picture = Picture(Width, Height, 0);
 
             // one cell of a picture never seen, as under a brush
@@ -139,11 +139,11 @@ namespace Consolonia.Benchmarks
             Console.SetOut(_originalOut);
         }
 
-        /// <summary>A photo-like picture, as the renderer cuts it into cells.</summary>
+        /// <summary>A photo-like picture, as the converter cuts it into cells.</summary>
         private static PixelBuffer Picture(int width, int height, int seed)
         {
             var cells = new PixelBuffer((ushort)(width / CellWidth), (ushort)(height / CellHeight));
-            PixelImageBitmapRenderer.RenderCells(Photo(width, height, seed), cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.RenderCells(Photo(width, height, seed), cells, CellWidth, CellHeight);
             return cells;
         }
 
