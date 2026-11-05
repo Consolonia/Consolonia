@@ -12,7 +12,7 @@ an `IConsoleImageEncoderFactory`, and without one pictures are block glyphs
 Avalonia Image / DrawingContext.DrawImage
   └─ DrawingContextImpl.DrawBitmap                     (DrawingContextImpl.Bitmaps.cs)
        └─ BitmapConverter.Draw                          (one converter per terminal, owned by RenderTarget)
-            ├─ PixelImageBitmapConverter   CellBitmapConverter<CellRendering>: one CellRendering per picture and size,
+            ├─ PixelImageBitmapConverter   CellBitmapConverter<CellConversion>: one CellConversion per picture and size,
             │                            each cell a PixelImage (its pixels) in the cell's BACKGROUND
             └─ QuadPixelBitmapConverter   no image protocol: a block glyph in two colours per cell
                  │
@@ -47,7 +47,7 @@ only as capabilities it probes for; what is sent for an image cell is the encode
   pixels share one instance and compare equal, and a cell whose pixels did not change keeps its
   instance and is not written again. It is a copy because the cell's identity has to be its content:
   a picture is edited in place and scaled to the cells it is drawn at, so nothing else holds these
-  pixels unchanged. The copy lives in a *slab* shared with the other new cells of the same render
+  pixels unchanged. The copy lives in a *slab* shared with the other new cells of the same conversion
   (64 cells, `CellsPerSlab`), at an offset: a new picture is a few hundred allocations, not one per
   cell. See [Memory](#memory).
 - **`PixelBackground`** is a `Color` and an optional `Image`. For an image cell the colour is the
@@ -115,40 +115,40 @@ null. With an encoder the output sets `SupportsPixelImages`; without one it clea
 - **No scaling at native size.** When the picture is drawn at its own size and is already BGRA, the
   visible window is a plain copy.
 - **The screen bounds the size, not the clip.** `OnScreenCellsInTarget` uses the screen, not the
-  redraw clip. Rendering by the clip made a separate rendering for each partial redraw, such as a
+  redraw clip. Converting by the clip made a separate conversion for each partial redraw, such as a
   dialog opening over the picture.
 - **Size from the framebuffer.** Sizes are measured from the locked framebuffer, not `PixelSize`.
   `AspectRatioAdjustedBitmap` reports half its height to layout.
 - **The caller owns the destination.** The destination span is passed in, so a converter refilling
-  a rendering on every brush stroke reuses one buffer. A full HD screen of BGRA is 8 MB.
+  a conversion on every brush stroke reuses one buffer. A full HD screen of BGRA is 8 MB.
 - The interpolation mode comes from the innermost `RenderOptions.BitmapInterpolationMode`, or
   `MediumQuality` when none is set. Pixel-art pictures can stay hard-edged when enlarged.
 
-## One rendering per picture and size
+## One conversion per picture and size
 
-`CellBitmapConverter<TRendering>` (`BitmapConverter.cs`) is the base of `PixelImageBitmapConverter`.
+`CellBitmapConverter<TConversion>` (`BitmapConverter.cs`) is the base of `PixelImageBitmapConverter`.
 
-- **Key.** `RenderingKey(TargetSize, InterpolationMode)`. The picture's version and the visible part
+- **Key.** `ConversionKey(TargetSize, InterpolationMode)`. The picture's version and the visible part
   are deliberately not part of the key.
-- **Storage.** Renderings live in a `ConditionalWeakTable<IBitmapImpl, …>`, so they die with the
-  bitmap. A bitmap keeps at most four renderings (`MaxRenderingsPerBitmap`), one per zoom level. The
+- **Storage.** Conversions live in a `ConditionalWeakTable<IBitmapImpl, …>`, so they die with the
+  bitmap. A bitmap keeps at most four conversions (`MaxConversionsPerBitmap`), one per zoom level. The
   least recently drawn is dropped first (`FindOrAdd`).
-- **Refill in place.** A `CellRendering` holds `Cells` (a `PixelBuffer` of one cell per visible
-  cell), `Version` and `VisibleCells`. When the version or the visible part changes, the rendering
+- **Refill in place.** A `CellConversion` holds `Cells` (a `PixelBuffer` of one cell per visible
+  cell), `Version` and `VisibleCells`. When the version or the visible part changes, the conversion
   is refilled in place; the cells are replaced only when their size changes. The pixels it is made
   from pass through one buffer the converter keeps (`CellBitmapConverter._pixels`), at most a screen
-  of BGRA, rather than a buffer per rendering: a cell copies the pixels it needs, so nothing reads
+  of BGRA, rather than a buffer per conversion: a cell copies the pixels it needs, so nothing reads
   them once the cells are made, and a picture at four zoom levels kept four screens of them (32 MB
   at full HD). An edit or a scroll therefore allocates nothing the size of the screen.
-- **Shows nothing until complete.** `Prepare` marks the rendering as showing nothing until `Complete`.
-  A render that throws leaves a rendering that is made again, not one claiming to show the previous
+- **Shows nothing until complete.** `Prepare` marks the conversion as showing nothing until `Complete`.
+  A conversion that throws leaves a conversion that is made again, not one claiming to show the previous
   version.
-- **Copied like any drawing.** `CopyRenderedBitmap` blends each rendered cell into the pixel buffer
+- **Copied like any drawing.** `CopyConvertedBitmap` blends each converted cell into the pixel buffer
   (`Pixel.Blend` lets an image cell take the cell) and marks the whole drawn rectangle dirty. The
   render target then skips every dirty cell that matches what it last wrote, so a redraw that
   changes nothing writes nothing to the terminal.
 
-The quad-pixel converter has no rendering to keep. It scales just the intersected cells at two
+The quad-pixel converter has no conversion to keep. It scales just the intersected cells at two
 pixels per cell each way and blends a glyph per cell straight into the buffer.
 
 ## Pixel images by content
@@ -183,14 +183,14 @@ protocols: a cell is a cell.
    a picture it is computed against the paint over the dominant colour.
 3. **Caret.** The caret, hidden at the start of the frame, is placed and shown.
 4. **`EndUpdate(screen)`.** Every changed cell has been written; the console gets the whole buffer,
-   which is what the terminal should now show. `AnsiConsoleOutput` has its image encoder render its
+   which is what the terminal should now show. `AnsiConsoleOutput` has its image encoder write its
    pictures, moves the cursor back to the caret, closes the synchronized update and flushes: the whole
    frame, caret included, goes out in one write. `RenderTarget` calls it in a `finally`, and
    `AnsiConsoleOutput` closes the update in one, so an exception never leaves an update open.
 
 `BeginUpdate`, `EndUpdate` and `ResetCache` are default-implemented members of `IConsoleOutput`
 (`ConsoleBase` forwards them); the default `EndUpdate` flushes. `AnsiConsoleOutput` has its image
-encoder render its pictures in `EndUpdate`, and passes `ResetCache` (as `Reset`) and `RestoreConsole`
+encoder write its pictures in `EndUpdate`, and passes `ResetCache` (as `Reset`) and `RestoreConsole`
 on to it.
 
 ### The output writes the text, the encoder the pictures (`AnsiConsoleOutput`)
@@ -320,7 +320,7 @@ What the image model costs in memory, and the choices made to keep it down. A fu
 | Render target cache | cell | 72 | `Pixel[,]` |
 | `PixelImage` | distinct cell of picture | 56 + 512 + ~130 | the object, its pixels in a slab, the content cache's node, entry and dictionary slot |
 | Pixel image cache | terminal | 24 MB min, 3 screens | pixels of distinct cells kept, LRU |
-| Converter scratch | terminal | one screen of BGRA | the visible pixels of the picture being rendered, 8 MB at full HD, grown never shrunk |
+| Converter scratch | terminal | one screen of BGRA | the visible pixels of the picture being converted, 8 MB at full HD, grown never shrunk |
 | Output writer | terminal | 64 KB | the `StreamWriter` behind `Console.Out`; image payloads pass through an 8 KB (4096-character) stack chunk |
 | Text-only app | | 0 | none of the above but the two per-cell buffers |
 
@@ -328,14 +328,14 @@ An encoder's own memory is the encoder library's.
 
 - **No per-cell allocations on the hot path.** A frame that changes nothing allocates a few hundred
   bytes; a brush stroke about a kilobyte in the converter (one pixel image into the current slab).
-- **Slabs.** New pixel images of one render are copied into one 32 KB array of 64 cells rather than a
+- **Slabs.** New pixel images of one conversion are copied into one 32 KB array of 64 cells rather than a
   536-byte array each: a new picture is 250 allocations rather than 16,000, and nothing sits in the
   large object heap. A cell that outlives its slab-mates keeps their 63 cells' bytes alive, which is
   the trade: the cache counts each cell's own bytes, so its budget understates memory only while a
   slab is partly held, and never by more than a slab.
 - **Dominant colour without a dictionary.** The colours of the cell are sorted on the stack and the
   longest run wins.
-- **Spans at the seams.** `PixelImage.Bgra`, the visible pixels into `RenderCells` and out of
+- **Spans at the seams.** `PixelImage.Bgra`, the visible pixels into `ConvertCells` and out of
   `GetVisiblePixels`, and image payloads (`WriteBytes`) are
   `ReadOnlySpan<byte>`/`Span<byte>`: callers pass
   slices of pooled or reused arrays, and nothing is sized to the array it happens to be in.
@@ -347,9 +347,9 @@ In `src/Tests/Consolonia.Core.Tests`:
 | Tests | Cover |
 |---|---|
 | `BitmapConverterTests` | The visible pixels of a picture at its own size, measured by the framebuffer rather than the layout size. |
-| `CellRenderingTests` | Cell reuse across versions, reallocation on a size change, showing nothing until complete, least-recently-drawn eviction. |
-| `PixelImageRenderCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` | The converter: an edited cell is the only one made again, identical cells share one image, a cell keeps its exact pixels; drawing at target size, over a picture, clipped, partially redrawn, edited, at a new version, on a console with `SupportsPixelImages`. |
-| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | With a recording encoder: the factory is asked with the output and its capabilities; `SupportsPixelImages` is set with an encoder and cleared without; the encoder renders once a frame with the screen; the text over a picture with and without `SupportsTextOverlay` (default background, or the picture's colour; a space, or nothing); after `WriteBytes`, and after the last column, `SetCaretPosition` moves the cursor; the encoder's output is inside the synchronized update; the cursor goes back to the caret after the encoder moves it; an encoder that throws still leaves the update closed; `Reset` and `RestoreConsole` are forwarded, and `Reset` follows `RestoreConsole`. Without an encoder a picture is block glyphs: a picture cell with no symbol is a block glyph, a space over it is text, a backdrop leaves the picture. |
+| `CellConversionTests` | Cell reuse across versions, reallocation on a size change, showing nothing until complete, least-recently-drawn eviction. |
+| `PixelImageConvertCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` | The converter: an edited cell is the only one made again, identical cells share one image, a cell keeps its exact pixels; drawing at target size, over a picture, clipped, partially redrawn, edited, at a new version, on a console with `SupportsPixelImages`. |
+| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | With a recording encoder: the factory is asked with the output and its capabilities; `SupportsPixelImages` is set with an encoder and cleared without; the encoder writes once a frame with the screen; the text over a picture with and without `SupportsTextOverlay` (default background, or the picture's colour; a space, or nothing); after `WriteBytes`, and after the last column, `SetCaretPosition` moves the cursor; the encoder's output is inside the synchronized update; the cursor goes back to the caret after the encoder moves it; an encoder that throws still leaves the update closed; `Reset` and `RestoreConsole` are forwarded, and `Reset` follows `RestoreConsole`. Without an encoder a picture is block glyphs: a picture cell with no symbol is a block glyph, a space over it is text, a backdrop leaves the picture. |
 | `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again. |
 | `AnsiConsoleOutputWriteTests` | Writing the frame: order of text and bytes, UTF-8, split and lone surrogates, text written to `Console.Out` first, a payload longer than a chunk, one synchronized update per frame, an empty frame. |
 | `WithLifetimeFixture/PixelTests` | Image cells compare by image; an image background composes with a glyph, keeps the image under paint, dies by an opaque background, takes the cell when drawn over text; shade and brighten paint it; the effective colour. |

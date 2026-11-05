@@ -132,8 +132,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         /// <summary>
         ///     Regression test: a picture larger than the clip (zoomed, or scrolled partly out of view) was
-        ///     rendered whole, at a size a terminal can refuse outright, so it vanished. Only the visible
-        ///     cells are rendered now, and the cells outside the clip are left alone.
+        ///     converted whole, at a size a terminal can refuse outright, so it vanished. Only the visible
+        ///     cells are converted now, and the cells outside the clip are left alone.
         /// </summary>
         [Test]
         public void PictureLargerThanTheClipRendersOnlyItsVisibleCells()
@@ -159,8 +159,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         /// <summary>
         ///     Regression test: a partial redraw (a dialog opening over the picture) clips to the region being
-        ///     redrawn, and a rendering was made per clip. The cells outside it kept showing the earlier one,
-        ///     which the cache could then evict. A redraw of part of the picture reuses the rendering of the
+        ///     redrawn, and a conversion was made per clip. The cells outside it kept showing the earlier one,
+        ///     which the cache could then evict. A redraw of part of the picture reuses the conversion of the
         ///     whole on-screen picture.
         /// </summary>
         [Test]
@@ -202,7 +202,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
 
         /// <summary>
         ///     A picture edited in place (a writeable bitmap, as a paint program draws into) is the same
-        ///     bitmap at a new version. Its rendering is refilled, not remade: untouched cells keep their
+        ///     bitmap at a new version. Its conversion is refilled, not remade: untouched cells keep their
         ///     images and the touched one gets a new one.
         /// </summary>
         [Test]

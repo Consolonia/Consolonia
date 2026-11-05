@@ -12,7 +12,7 @@ namespace Consolonia.Core.Tests
     ///     their image, and only a cell with new pixels gets a new one.
     /// </summary>
     [TestFixture]
-    public class PixelImageRenderCellsTests
+    public class PixelImageConvertCellsTests
     {
         private const int CellWidth = 8;
         private const int CellHeight = 16;
@@ -48,10 +48,10 @@ namespace Consolonia.Core.Tests
             return buffer[new PixelPoint(x, y)].Background.Image;
         }
 
-        private static PixelBuffer Render(byte[] picture)
+        private static PixelBuffer Convert(byte[] picture)
         {
             var cells = new PixelBuffer(CellsWide, CellsHigh);
-            PixelImageBitmapConverter.RenderCells(picture, cells, CellWidth, CellHeight);
+            PixelImageBitmapConverter.ConvertCells(picture, cells, CellWidth, CellHeight);
             return cells;
         }
 
@@ -62,10 +62,10 @@ namespace Consolonia.Core.Tests
         {
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
-            PixelBuffer first = Render(picture);
+            PixelBuffer first = Convert(picture);
 
             FillCell(picture, 2, 1, 0x11, 0x22, 0x33);
-            PixelBuffer second = Render(picture);
+            PixelBuffer second = Convert(picture);
 
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
@@ -89,14 +89,14 @@ namespace Consolonia.Core.Tests
             for (int cellX = 0; cellX < CellsWide; cellX++)
                 FillCell(canvas, cellX, cellY, (byte)seed, (byte)(seed >> 8), 0x7F);
 
-            PixelBuffer first = Render(canvas);
+            PixelBuffer first = Convert(canvas);
             PixelImage shared = CellAt(first, 0, 0);
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
                 Assert.That(CellAt(first, x, y), Is.SameAs(shared), $"cell {x},{y} in the first frame");
 
             FillCell(canvas, 1, 1, 0x11, 0x22, 0x33);
-            PixelBuffer second = Render(canvas);
+            PixelBuffer second = Convert(canvas);
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
                 if (x != 1 || y != 1)
@@ -105,19 +105,19 @@ namespace Consolonia.Core.Tests
 
         /// <summary>
         ///     The converter refills one cell buffer per picture on every edit rather than making a new one:
-        ///     rendering into the buffer that holds the previous frame gives exactly the cells a fresh one gets.
+        ///     conversion into the buffer that holds the previous frame gives exactly the cells a fresh one gets.
         /// </summary>
         [Test]
-        public void RenderingIntoTheBufferOfThePreviousFrameGivesTheSameCells()
+        public void ConvertingIntoTheBufferOfThePreviousFrameGivesTheSameCells()
         {
             int seed = _seed += 0x100;
             byte[] picture = Picture(seed);
             var reused = new PixelBuffer(CellsWide, CellsHigh);
-            PixelImageBitmapConverter.RenderCells(picture, reused, CellWidth, CellHeight);
+            PixelImageBitmapConverter.ConvertCells(picture, reused, CellWidth, CellHeight);
 
             FillCell(picture, 3, 0, 0x44, 0x55, 0x66);
-            PixelImageBitmapConverter.RenderCells(picture, reused, CellWidth, CellHeight);
-            PixelBuffer fresh = Render(picture);
+            PixelImageBitmapConverter.ConvertCells(picture, reused, CellWidth, CellHeight);
+            PixelBuffer fresh = Convert(picture);
 
             for (int y = 0; y < CellsHigh; y++)
             for (int x = 0; x < CellsWide; x++)
@@ -127,7 +127,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void PixelsThatAreNotExactlyTheCellsAreRefused()
         {
-            Assert.Throws<ArgumentException>(() => PixelImageBitmapConverter.RenderCells(
+            Assert.Throws<ArgumentException>(() => PixelImageBitmapConverter.ConvertCells(
                 new byte[Width * CellHeight * 4], new PixelBuffer(CellsWide, CellsHigh), CellWidth, CellHeight));
         }
 
@@ -139,7 +139,7 @@ namespace Consolonia.Core.Tests
             byte[] picture = Picture(seed);
             FillCell(picture, 1, 0, 0xFE, 0xFD, 0xFC);
 
-            PixelBuffer buffer = Render(picture);
+            PixelBuffer buffer = Convert(picture);
 
             PixelImage cell = CellAt(buffer, 1, 0);
             Assert.That(cell.Width, Is.EqualTo(CellWidth));
@@ -155,7 +155,7 @@ namespace Consolonia.Core.Tests
         [Test]
         public void PictureCellsHaveNoSymbolAndAreOneCellWide()
         {
-            Pixel cell = Render(Picture(_seed += 0x100))[0, 0];
+            Pixel cell = Convert(Picture(_seed += 0x100))[0, 0];
 
             Assert.That(cell.Foreground.Symbol.NothingToDraw(), "no symbol, whatever color an overlay gives it");
             Assert.That(cell.Width, Is.EqualTo(1));

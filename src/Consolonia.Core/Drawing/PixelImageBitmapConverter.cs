@@ -21,7 +21,7 @@ namespace Consolonia.Core.Drawing
     ///     same image, is not dirty, and is not written again: a change to the picture rewrites only the
     ///     cells it touched, and a flat canvas is one image shared by every cell.
     /// </remarks>
-    internal sealed class PixelImageBitmapConverter : CellBitmapConverter<CellRendering>
+    internal sealed class PixelImageBitmapConverter : CellBitmapConverter<CellConversion>
     {
         /// <summary>
         ///     Pixel bytes of pixel images kept at least. The budget grows to <see cref="ScreensOfPixelImages" />
@@ -56,8 +56,8 @@ namespace Consolonia.Core.Drawing
         [ThreadStatic] private static int _slabUsed;
 
         private static readonly
-            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
-            RenderedBitmapCache = new();
+            ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<ConversionKey, CellConversion>>>
+            ConvertedBitmapCache = new();
 
         private static readonly PixelImageCache PixelImages = new(MinPixelImageBudgetBytes);
 
@@ -66,17 +66,17 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<RenderingKey, CellRendering>>>
-            Renderings => RenderedBitmapCache;
+        protected override ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<ConversionKey, CellConversion>>>
+            Conversions => ConvertedBitmapCache;
 
-        protected override void Render(DrawingContextImpl context, CellRendering rendering,
+        protected override void Convert(DrawingContextImpl context, CellConversion conversion,
             ReadOnlySpan<byte> pixels, int cellPixelWidth, int cellPixelHeight,
             IPlatformRenderInterface renderInterface)
         {
             PixelImages.EnsureBudget(ScreensOfPixelImages * 4L *
                                     context.PixelBuffer.Width * cellPixelWidth *
                                     context.PixelBuffer.Height * cellPixelHeight);
-            RenderCells(pixels, rendering.Cells, cellPixelWidth, cellPixelHeight);
+            ConvertCells(pixels, conversion.Cells, cellPixelWidth, cellPixelHeight);
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace Consolonia.Core.Drawing
         /// <exception cref="ArgumentException">
         ///     <paramref name="visibleBytes" /> is not the pixels of exactly the cells.
         /// </exception>
-        internal static void RenderCells(ReadOnlySpan<byte> visibleBytes, PixelBuffer cells, int cellPixelWidth,
+        internal static void ConvertCells(ReadOnlySpan<byte> visibleBytes, PixelBuffer cells, int cellPixelWidth,
             int cellPixelHeight)
         {
             int cellsWide = cells.Width;

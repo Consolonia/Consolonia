@@ -103,7 +103,7 @@ namespace Consolonia.Core.Drawing
         /// <summary>
         ///     The converter drawing bitmaps on this terminal, made on first use so that the console's
         ///     capabilities are known. The drawing contexts borrow it: a resize replaces them, and the
-        ///     renderings it keeps outlive them.
+        ///     conversions it keeps outlive them.
         /// </summary>
         internal BitmapConverter BitmapConverter => _bitmapRenderer ??= BitmapConverter.Create(_console);
 

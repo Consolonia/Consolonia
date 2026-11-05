@@ -46,7 +46,7 @@ pixel buffer holds image cells only when the console can show images; one line i
 
 ## How it differs from the image converter
 
-- **No caching.** Nothing is kept between frames: no `CellRendering`, no content cache. Every draw
+- **No caching.** Nothing is kept between frames: no `CellConversion`, no content cache. Every draw
   scales and classifies the intersected cells again. Each cell is a glyph and two colours, and the
   render target already skips cells that match what the terminal shows (`RenderTarget._cache`), so a
   redraw that changes nothing writes nothing.
