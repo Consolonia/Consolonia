@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 using Avalonia.Media;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -119,13 +120,40 @@ namespace Consolonia.Imaging
 
             RenderNewRuns(cellWidth, cellHeight);
 
-            // the cursor is where the sixel is drawn; after one, the output knows it no longer knows where
-            // the cursor is
+            int lastRow = height - 1;
+            bool marginsSet = false;
             foreach (Run run in _runs)
             {
+                if (!marginsSet && _cells[run.Start].Position.Y == lastRow && height >= 3)
+                {
+                    // the rows below are the last ones, see LastRowMargins
+                    _output.WriteBytes(LastRowMargins(height));
+                    marginsSet = true;
+                }
+
+                // the cursor is where the sixel is drawn; after one, the output knows it no longer knows
+                // where the cursor is
                 _output.SetCaretPosition(_cells[run.Start].Position);
                 _output.WriteBytes(run.Rendered);
             }
+
+            if (marginsSet)
+                _output.WriteBytes(ResetMargins);
+        }
+
+        /// <summary>Scroll margins back to the whole screen (DECSTBM with no rows).</summary>
+        internal static ReadOnlySpan<byte> ResetMargins => "\u001b[r"u8;
+
+        /// <summary>
+        ///     Scroll margins (DECSTBM) of every row but the last, set around the sixels of the last row. A
+        ///     terminal counts a sixel's height in bands of 6 pixels, so a cell's sixel can reach a few
+        ///     pixels below it; on the last row that would scroll the screen up a line, under everything
+        ///     the output and the render target remember. With the cursor below the scroll margins there is
+        ///     nothing to scroll, and the sixel is cut off at the bottom of the screen.
+        /// </summary>
+        internal static byte[] LastRowMargins(int height)
+        {
+            return Encoding.ASCII.GetBytes($"\u001b[1;{height - 1}r");
         }
 
         /// <summary>The terminal may no longer show what was sent: every picture cell is sent again.</summary>

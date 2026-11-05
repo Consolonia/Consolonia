@@ -141,9 +141,13 @@ namespace Consolonia.Imaging
             byte[] output = RentOrGrow(ref _scratchRenderBuf, maxOutput);
             int pos = 0;
 
-            // DCS q
+            // DCS 0;1 q: pixels the image leaves unset are transparent. By default a terminal fills them
+            // with the background color, out to the cell boundary below the last band
             output[pos++] = 0x1B;
             output[pos++] = (byte)'P';
+            output[pos++] = (byte)'0';
+            output[pos++] = (byte)';';
+            output[pos++] = (byte)'1';
             output[pos++] = (byte)'q';
 
             // Raster attributes "1;1;W;H
