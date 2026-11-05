@@ -17,12 +17,14 @@ namespace Consolonia.Benchmarks
             if (args.Length == 1 && args[0] == "--digest")
             {
                 ConsoleOutputBenchmarks.PrintDigests();
+                ImageOutputBenchmarks.PrintDigests();
                 return;
             }
 
             if (args.Length == 1 && args[0] == "--alloc")
             {
                 ConsoleOutputBenchmarks.PrintAllocations();
+                ImageOutputBenchmarks.PrintAllocations();
                 return;
             }
 
