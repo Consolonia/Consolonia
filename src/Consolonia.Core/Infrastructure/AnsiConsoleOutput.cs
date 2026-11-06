@@ -408,7 +408,7 @@ namespace Consolonia.Core.Infrastructure
             }
 
             // if it's whitespace we can't emit it or it will erase the picture
-            if (pixel.Foreground.Symbol.IsWhiteSpace())
+            if (pixel.Foreground.Symbol.IsWhiteSpace)
                 return;
 
             // The picture doesn't support text overlay, and the cell has a glyph to draw over it. We approximate
