@@ -213,6 +213,14 @@ namespace Consolonia.Core.Drawing
         private void RenderToDevice(Snapshot.Regions regions)
         {
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
+
+            // The terminal has changed size and the buffer has not been replaced yet: a frame of the old
+            // size would land in a terminal of the new one, where rows past its last column wrap (the last
+            // row scrolls the screen) and pictures are placed at the wrong cells. The resize redraws
+            // everything, so the dirty regions are kept for it.
+            PixelBufferSize consoleSize = _console.Size;
+            if (consoleSize.Width != pixelBuffer.Width || consoleSize.Height != pixelBuffer.Height) return;
+
             Snapshot dirtyRegions = regions.GetSnapshotAndClear();
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;

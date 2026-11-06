@@ -100,6 +100,37 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
+        ///     Between the terminal changing size and the buffer being replaced, no frame is written: one of
+        ///     the old size would wrap in the terminal of the new one and place pictures at the wrong cells.
+        ///     What was dirty stays dirty for the frame after the resize.
+        /// </summary>
+        [Test]
+        public void NoFrameIsWrittenWhileTheConsoleSizeDiffersFromTheBuffer()
+        {
+            var pixel = new Pixel(new PixelForeground(new Symbol('R'), Colors.White),
+                new PixelBackground(Colors.Blue));
+            // a new window is dirty all over
+            _renderTarget.RenderToDevice();
+            PixelBufferSize size = _console.Size;
+
+            _consoleWindowImpl.PixelBuffer[3, 2] = pixel;
+            _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(3, 2, 1, 1));
+            try
+            {
+                _console.Size = new PixelBufferSize((ushort)(size.Width - 1), size.Height);
+                _renderTarget.RenderToDevice();
+                Assert.That(_console.PixelBuffer[3, 2], Is.Not.EqualTo(pixel), "not written at the old size");
+            }
+            finally
+            {
+                _console.Size = size;
+            }
+
+            _renderTarget.RenderToDevice();
+            Assert.That(_console.PixelBuffer[3, 2], Is.EqualTo(pixel), "written by the next frame");
+        }
+
+        /// <summary>
         ///     The screen a frame ends with is what was written, not the pixel buffer: a cell changed but not
         ///     marked dirty is not written, so an image encoder must not see it either.
         /// </summary>
