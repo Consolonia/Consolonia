@@ -329,6 +329,7 @@ namespace Consolonia.PlatformSupport
                         TryEnableMouseButtonSupport();
 
             TryToSupportKitty();
+            TryToSupportPointerShapes();
 
             WriteText(Esc.EnableBracketedPasteMode);
 
@@ -420,6 +421,9 @@ namespace Consolonia.PlatformSupport
                 WriteText(Esc.DisableKittyKeyboard);
                 _isKittyKeyboardEnabled = false;
             }
+
+            if (SupportedPointerShapes.Count > 0)
+                WriteText(Esc.ResetPointerShape);
 
             WriteText(Esc.DisableAllMouseEvents);
             WriteText(Esc.DisableExtendedMouseTracking);
