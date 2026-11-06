@@ -191,22 +191,22 @@ namespace Consolonia.Imaging.Tests
         }
 
         /// <summary>
-        ///     A picture cell with no symbol is the picture, and one with any symbol is text, a space as
-        ///     much as a glyph: a space drawn over a picture is a text cell.
+        ///     A space drawn over a picture, the gap between two words of a caption, leaves the picture
+        ///     showing: nothing is written in the cell, and the picture is not sent again.
         /// </summary>
         [Test]
-        public void SixelPictureCellWithNoSymbolIsThePictureAndASpaceOverItIsText()
+        public void SixelSpaceOverAPictureShowsThePicture()
         {
             Open(ConsoleCapabilities.SupportsSixel);
             Pixel picture = ImageCell(SolidImage(10, 20, 30));
             Pixel spaceOverPicture = picture.Blend(new Pixel(new PixelForeground(Symbol.Space, Colors.White)));
 
             string asPicture = Frame((0, 0, picture));
-            string asText = Frame((0, 0, spaceOverPicture));
+            string withSpace = Frame((0, 0, spaceOverPicture));
 
             Assert.That(Count(asPicture, SixelStart), Is.EqualTo(1), "the picture");
-            Assert.That(Count(asText, SixelStart), Is.Zero, "the space is a text cell");
-            Assert.That(asText, Does.EndWith(" "), "the space is written");
+            Assert.That(Count(withSpace, SixelStart), Is.Zero, "the picture is already there");
+            Assert.That(withSpace, Does.Not.Contain(" "), "no space written over it");
         }
 
         /// <summary>
@@ -261,19 +261,17 @@ namespace Consolonia.Imaging.Tests
         }
 
         /// <summary>
-        ///     Under kitty the picture is a placement below the text, so a picture cell with no symbol is
-        ///     written as a space (the picture shows through it), never as a missing character, which would
-        ///     leave the terminal's cursor where it was.
+        ///     Under kitty the picture is a placement below the text, so a picture cell is written as a space
+        ///     on the default background, which the picture shows through.
         /// </summary>
         [Test]
-        public void KittyWritesAPictureCellWithNoSymbolAsASpace()
+        public void KittyWritesAPictureCellAsASpace()
         {
             Open(ConsoleCapabilities.SupportsKittyGraphics);
 
             string frame = Frame((0, 0, ImageCell(SolidImage(10, 20, 30))));
 
             Assert.That(frame, Does.Contain("\u001b[49m "), "a space on the default background");
-            Assert.That(frame.IndexOf('\0', StringComparison.Ordinal), Is.EqualTo(-1), "no missing character");
         }
 
         [Test]

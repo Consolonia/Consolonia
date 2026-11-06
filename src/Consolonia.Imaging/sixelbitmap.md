@@ -14,11 +14,11 @@ protocol; the choice between sixel and text is made when the cell is written.
 1. **A glyph wins the cell.** The encoder's `SupportsTextOverlay` is false, so the output writes an
    image cell with a glyph (the mouse cursor, a window edge crossing the picture) as text, on
    `Pixel.EffectiveBackgroundColor`: the paint over the picture's dominant colour, so the cell still
-   looks like the picture rather than a hole in it. A picture cell with no glyph it leaves alone.
-   A picture cell with any symbol, a space included, is written as text. The converter makes picture
-   cells with no symbol, and gaps that layout never drew keep none, so they show the picture; a
-   translucent overlay blended over a picture cell colours its foreground but draws no symbol, so the
-   cell still shows the picture, dimmed.
+   looks like the picture rather than a hole in it. A picture cell holding a space
+   (`Symbol.IsWhiteSpace`) it leaves alone. The converter makes picture cells
+   spaces, so gaps that layout never drew and the spaces between a caption's words show the picture;
+   a translucent overlay blended over a picture cell draws no glyph, so the cell still shows the
+   picture, dimmed.
 2. **Changed cells are found.** `WriteImages(screen)` walks the screen against the encoder's own
    record of what it sent to each cell: the picture's digest and the paint over it, or nothing where
    the cell is text. A picture cell whose picture or paint differs from the record is gathered, and
@@ -154,7 +154,7 @@ screen.
 
 | Tests | Cover |
 |---|---|
-| `Consolonia.Imaging.Tests/ImageEncoderTests` (`Sixel*`) | Neighbours on a row are one sixel at the run's first cell, with the cursor put back after; cells apart are separate sixels; a glyph over a picture is text on the picture's colour and no sixel, a space too; a backdrop leaves the picture; a cell is sent again only when what it shows changed, and everything after a reset; a dimmed run is different bytes and the un-dimmed run comes back from the cache byte for byte. |
+| `Consolonia.Imaging.Tests/ImageEncoderTests` (`Sixel*`) | Neighbours on a row are one sixel at the run's first cell, with the cursor put back after; cells apart are separate sixels; a glyph over a picture is text on the picture's colour and no sixel; a space over it leaves the picture; a backdrop leaves the picture; a cell is sent again only when what it shows changed, and everything after a reset; a dimmed run is different bytes and the un-dimmed run comes back from the cache byte for byte. |
 | `Consolonia.Imaging.Tests/SixelPaletteTests` | Only used colours are defined. A transient image renders the same bytes without keeping them. Too-small arrays are refused. Exact versus Wu quantisation. Rounded percentages. |
 | `PixelImageConvertCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` (core) | The converter, which is the same for every image protocol (see [bitmap.md](../Consolonia.Core/Drawing/bitmap.md#tests)). |
 | `WithLifetimeFixture/PixelTests` (core) | Image cells compare by image; the effective colour of a painted image cell. |
