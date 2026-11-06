@@ -413,8 +413,8 @@ namespace Consolonia.Imaging.Tests
         }
 
         /// <summary>
-        ///     After a reset nothing the terminal shows is trusted: every block is sent again under its id,
-        ///     which replaces whatever the terminal still had for it.
+        ///     After a reset nothing the terminal shows is trusted: the image sent before is deleted, and every
+        ///     block is sent again under a new id, before it is placed.
         /// </summary>
         [Test]
         public void KittySendsEverythingAgainAfterTheCacheIsReset()
@@ -422,14 +422,39 @@ namespace Consolonia.Imaging.Tests
             Open(ConsoleCapabilities.SupportsKittyGraphics);
             PixelImage image = SolidImage(10, 20, 30);
             string first = Frame((0, 0, ImageCell(image)));
+            string firstId = ImageIdOfFirstTransmit(first);
 
             _output.ResetCache();
             string again = Frame((0, 0, ImageCell(image)));
 
+            string deleted = $"a=d,d=I,q=2,i={firstId}";
+            Assert.That(again, Does.Contain(deleted), "the image sent before is deleted");
             Assert.That(Count(again, KittyTransmit), Is.EqualTo(1), "sent again");
-            Assert.That(ImageIdOfFirstTransmit(again), Is.EqualTo(ImageIdOfFirstTransmit(first)), "under the same id");
+            Assert.That(ImageIdOfFirstTransmit(again), Is.Not.EqualTo(firstId), "under a new id");
+            Assert.That(again.IndexOf(deleted, StringComparison.Ordinal),
+                Is.LessThan(again.IndexOf(KittyTransmit, StringComparison.Ordinal)), "deleted before it is sent");
             Assert.That(Count(again, KittyPlace), Is.EqualTo(1), "placed again");
-            Assert.That(again, Does.Not.Contain("a=d,"));
+        }
+
+        /// <summary>
+        ///     A block with a picture before a reset and none after it (a resize moved the picture, or the
+        ///     screen no longer reaches it) has its image deleted. Forgetting it instead left its picture on
+        ///     screen for good, whatever was drawn over it.
+        /// </summary>
+        [Test]
+        public void KittyDeletesTheImageOfABlockLeftWithoutAPictureByAResize()
+        {
+            Open(ConsoleCapabilities.SupportsKittyGraphics);
+            string first = Frame((KittyConsoleImageEncoder.BlockColumns, 0, ImageCell(SolidImage(10, 20, 30))));
+
+            // a narrower screen, without that block
+            _output.Size = new PixelBufferSize(KittyConsoleImageEncoder.BlockColumns, Rows);
+            _screen = new PixelBuffer(KittyConsoleImageEncoder.BlockColumns, Rows);
+            _output.ResetCache();
+            string narrower = Frame();
+
+            Assert.That(narrower, Does.Contain($"a=d,d=I,q=2,i={ImageIdOfFirstTransmit(first)}"));
+            Assert.That(Count(narrower, KittyTransmit), Is.Zero);
         }
 
         /// <summary>A block with no picture left has its image deleted, and the terminal holds nothing for it.</summary>

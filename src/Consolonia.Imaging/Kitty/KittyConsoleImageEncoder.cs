@@ -28,7 +28,7 @@ namespace Consolonia.Imaging
     ///         and how much a change re-sends.
     ///     </para>
     ///     <para>
-    ///         One image id per block position, for the life of the session. Transmitting under an id
+    ///         One image id per block position, until a reset deletes them all. Transmitting under an id
     ///         the terminal already holds replaces that image and every placement of it, so a block that
     ///         changed is sent again and its old picture is gone with no delete, and the terminal never holds
     ///         more images than the screen has blocks. Nothing is ever placed that was not transmitted in the
@@ -53,6 +53,9 @@ namespace Consolonia.Imaging
         private readonly Dictionary<(int X, int Y), BlockState> _blocks = new();
 
         private readonly List<(int X, int Y)> _blocksToForget = new();
+
+        /// <summary>Set by <see cref="Reset" />: the next frame deletes every block's image before sending.</summary>
+        private bool _deleteAllBeforeNextFrame;
 
         /// <summary>The encoded bytes of the block being transmitted: PNG or zlib. One stream, emptied per block.</summary>
         private readonly MemoryStream _encoded = new();
@@ -103,6 +106,14 @@ namespace Consolonia.Imaging
             int screenWidth = screen.Width;
             // which cells of the block being placed a placement already covers
             Span<bool> placed = stackalloc bool[BlockColumns * BlockRows];
+
+            if (_deleteAllBeforeNextFrame)
+            {
+                foreach (BlockState state in _blocks.Values)
+                    _output.WriteText(KittyGraphics.BuildDeleteSequence(state.ImageId));
+                _blocks.Clear();
+                _deleteAllBeforeNextFrame = false;
+            }
 
             for (int blockY = 0; blockY < screen.Height; blockY += BlockRows)
             for (int blockX = 0; blockX < screenWidth; blockX += BlockColumns)
@@ -157,14 +168,19 @@ namespace Consolonia.Imaging
         }
 
         /// <summary>
-        ///     The terminal may no longer show what was sent (the screen was resized, and terminals differ in
-        ///     what becomes of placements then; or another program had the terminal), so every block is sent
-        ///     again next frame. The ids stay: sending under them replaces whatever the terminal still holds.
+        ///     The terminal may no longer show what was sent where it was sent (the screen was resized, and
+        ///     terminals differ in what becomes of placements then; or another program had the terminal). The
+        ///     next frame first deletes every image this encoder sent, with its placements, then sends every
+        ///     block again under new ids: the terminal then holds exactly what that frame placed.
         /// </summary>
+        /// <remarks>
+        ///     Forgetting what was sent without deleting it left images in the terminal no block knew of: a
+        ///     block that had no picture after a resize, or that a narrower screen no longer had, was never
+        ///     deleted, and its picture stayed on screen whatever was drawn over it.
+        /// </remarks>
         public void Reset()
         {
-            foreach (BlockState state in _blocks.Values)
-                state.Sent = default;
+            _deleteAllBeforeNextFrame = true;
         }
 
         /// <summary>
@@ -366,6 +382,7 @@ namespace Consolonia.Imaging
             foreach (((int x, int y), BlockState state) in _blocks)
                 if (x >= screenWidth || y >= screenHeight)
                 {
+                    // its id is forgotten with it, so its image goes now or never
                     if (state.Sent != default)
                         _output.WriteText(KittyGraphics.BuildDeleteSequence(state.ImageId));
                     _blocksToForget.Add((x, y));
