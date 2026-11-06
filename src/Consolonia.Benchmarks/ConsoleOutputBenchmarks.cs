@@ -15,11 +15,10 @@ namespace Consolonia.Benchmarks
     /// <summary>
     ///     What AnsiConsoleOutput costs to get a frame out: the escape sequences built, buffered and written
     ///     to the output stream (a null stream here, so the terminal's side is not measured), as the render
-    ///     target drives it: the changed cells written between the frame's begin and end. With no image
-    ///     encoder registered, a picture goes out as block glyphs.
+    ///     target drives it: the changed cells written between the frame's begin and end.
     /// </summary>
     /// <remarks>
-    ///     A full screen is 240x67 cells of 8x16 pixels (1920x1072), a photo's worth of distinct cells.
+    ///     A full screen is 240x67 cells.
     /// </remarks>
     [MemoryDiagnoser]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
@@ -28,20 +27,14 @@ namespace Consolonia.Benchmarks
     {
         private const int CellsWide = 240;
         private const int CellsHigh = 67;
-        private const int CellWidth = 8;
-        private const int CellHeight = 16;
-        private const int Width = CellsWide * CellWidth;
-        private const int Height = CellsHigh * CellHeight;
 
         private TextWriter _originalOut = null!;
         private AnsiConsoleOutput _output = null!;
-        private PixelBuffer _picture = null!;
         private PixelBuffer _text = null!;
 
         private static (string Name, Action<ConsoleOutputBenchmarks> Run)[] Scenarios =>
         [
-            (nameof(TextFullScreen), b => b.TextFullScreen()),
-            (nameof(BlockGlyphPicture), b => b.BlockGlyphPicture())
+            (nameof(TextFullScreen), b => b.TextFullScreen())
         ];
 
         [GlobalSetup]
@@ -66,9 +59,6 @@ namespace Consolonia.Benchmarks
                     new PixelBackground(background));
             }
 
-            // a screen of picture as the converter makes it
-            _picture = Picture(Width, Height, 0);
-
             _originalOut = Console.Out;
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
             _output.RedirectOutput(stream);
@@ -79,31 +69,6 @@ namespace Consolonia.Benchmarks
         {
             Console.Out.Flush();
             Console.SetOut(_originalOut);
-        }
-
-        /// <summary>A photo-like picture, as the converter cuts it into cells.</summary>
-        private static PixelBuffer Picture(int width, int height, int seed)
-        {
-            var cells = new PixelBuffer((ushort)(width / CellWidth), (ushort)(height / CellHeight));
-            PixelImageBitmapConverter.ConvertCells(Photo(width, height, seed), cells, CellWidth, CellHeight);
-            return cells;
-        }
-
-        private static byte[] Photo(int width, int height, int seed)
-        {
-            byte[] bgrx = new byte[width * height * 4];
-            for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-            {
-                int offset = (y * width + x) * 4;
-                int noise = (int)((uint)((x * 73856093) ^ (y * 19349663) ^ (seed * 83492791)) >> 13) & 7;
-                bgrx[offset] = (byte)((x * 255 / width + noise + seed) & 0xFF);
-                bgrx[offset + 1] = (byte)(y * 255 / height + noise);
-                bgrx[offset + 2] = (byte)((x + y) * 255 / (width + height) + noise);
-                bgrx[offset + 3] = 0xFF;
-            }
-
-            return bgrx;
         }
 
         /// <summary>A frame in which every cell of <paramref name="screen" /> changed.</summary>
@@ -120,13 +85,6 @@ namespace Consolonia.Benchmarks
         public void TextFullScreen()
         {
             WholeScreen(_output, _text);
-        }
-
-        /// <summary>A full-screen picture with no image encoder: a block glyph per cell.</summary>
-        [Benchmark]
-        public void BlockGlyphPicture()
-        {
-            WholeScreen(_output, _picture);
         }
 
         /// <summary>

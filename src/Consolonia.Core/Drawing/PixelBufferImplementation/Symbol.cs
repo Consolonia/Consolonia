@@ -188,6 +188,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                    string.IsNullOrEmpty(Complex);
         }
 
+        /// <summary>A one-cell whitespace character, such as a space: written, it shows only its background.</summary>
+        public bool IsWhiteSpace()
+        {
+            return Complex == null && Width == 1 && char.IsWhiteSpace(Character);
+        }
+
         public Symbol Blend(ref Symbol symbolAbove)
         {
             if (symbolAbove.NothingToDraw())

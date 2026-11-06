@@ -29,11 +29,6 @@ the rest of the UI like any other glyph.
 4. **Blend into the buffer.** Each cell is `Blend`ed over what the pixel buffer already holds, and
    the whole intersected rectangle is marked dirty.
 
-The per-cell transform (four quadrant colours to a glyph and two colours) is also `FromPixels`, which
-takes a whole cell of pixels and averages each quadrant. `AnsiConsoleOutput` uses it when a console
-reports no image protocol but is given image cells anyway: they are written as block glyphs in the
-picture's colours under the cell's paint. The encoder is chosen from the probe's answer alone.
-
 ## Why it is a converter and not an encoder
 
 Image encoders exist because the terminal shows something a text cell cannot

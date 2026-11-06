@@ -57,11 +57,11 @@ only as capabilities it probes for; what is sent for an image cell is the encode
   colour, or for an image cell the paint over the picture's dominant colour, for the few places that
   need one colour (the mouse cursor's contrast, a glyph a protocol cannot draw over an image, the
   fallback with no protocol, `Invert`).
-- **A picture cell's foreground has no symbol** (`PixelImageBitmapConverter.PictureCellForeground`:
-  no glyph, like `Symbol.Empty`, but one cell wide, since width 0 marks the cells a wide glyph covers,
-  which are never written). A picture cell with any symbol, a space included, is written as text by
-  the block-glyph fallback (an encoder decides for itself); gaps that layout never drew keep no
-  symbol and show the picture.
+- **A picture cell's foreground is a space** (`PixelImageBitmapConverter.PictureCellForeground`,
+  `PixelForeground.Space`), like any cell nothing has been drawn in. A space over a picture (any
+  one-cell whitespace, `Symbol.IsWhiteSpace`) shows the picture; a glyph is written as text. So the gap between two words of a
+  caption shows the picture, as do gaps that layout never drew. A space over a picture always sits on
+  a see-through background: an opaque one replaces the picture when it is blended.
 - **`Pixel.Blend`** has one rule for pictures: an image cell above takes the cell whole (its own
   colours are transparent and would otherwise read as nothing drawn). Everything else is the general
   rule: an opaque background evicts the image through the opaque fast path, a translucent one merges
@@ -71,7 +71,7 @@ only as capabilities it probes for; what is sent for an image cell is the encode
   image cell, since shifting a transparent colour by a step would leave it as it is.
 - **Size.** A `Pixel` holds `Foreground` and `Background` as readonly struct fields, as it did before
   pictures; the image reference makes it 72 bytes. Packing it smaller is left to a separate change.
-  The render target's cache of what the terminal shows is `Pixel[,]`, initialised to `Pixel.Empty`.
+  The render target's cache of what the terminal shows is a `PixelBuffer`, initialised to `Pixel.Empty`.
 
 ## Choosing a converter
 
@@ -207,8 +207,8 @@ on to it.
 ### The output writes the text, the encoder the pictures (`AnsiConsoleOutput`)
 
 `WritePixel` writes a plain cell as a glyph in colours (SGR state diffed against the last cell,
-consecutive cells with no cursor move between them). With no encoder, an image cell is a block glyph
-in the picture's colours under its paint (`QuadPixelBitmapConverter.FromPixels`), its own glyph kept.
+consecutive cells with no cursor move between them). With no encoder the pixel buffer holds no image
+cells: pictures were drawn as block glyphs, which are plain cells.
 
 With an encoder, `WritePixel` writes only the text of an image cell, and the encoder draws every
 picture at the end of the frame. The text depends on one fact about the protocol,
@@ -218,7 +218,7 @@ cells they cover (sixel).
 | Image cell | `SupportsTextOverlay` | Without it |
 |---|---|---|
 | A glyph over the picture | the glyph on the terminal's default background (`ESC[49m`), the picture showing through | the glyph on `EffectiveBackgroundColor`, the paint over the picture's dominant colour |
-| Nothing drawn over it | a space on the default background | nothing: the picture covers the cell |
+| A space: nothing drawn over it, or a space drawn | the space on the default background | nothing: the picture covers the cell |
 
 Some terminals hide a picture drawn below the text under any explicit cell background, even black;
 the default background is the one every terminal shows it through. A terminal cell has no
@@ -307,7 +307,7 @@ dotnet run -c Release --project src/Consolonia.Benchmarks -- --alloc
 | Class | What it measures |
 |---|---|
 | `PixelImageFrameBenchmarks` | The converter's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. Nothing reaches a terminal. |
-| `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (`BeginUpdate`, changed cells written, `EndUpdate`): a screen of text, and a full-screen picture with no encoder registered (block glyphs). The terminal's side is not measured. |
+| `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (`BeginUpdate`, changed cells written, `EndUpdate`): a screen of text. The terminal's side is not measured. |
 | `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console with `SupportsPixelImages`: redrawn unchanged, one pixel painted, a new picture. The unit test console keeps no output and has no encoder, so this is drawing and diffing. |
 
 `--alloc` prints the bytes each `ConsoleOutputBenchmarks` scenario allocates in one run after a
@@ -360,7 +360,7 @@ In `src/Tests/Consolonia.Core.Tests`:
 | `BitmapConverterTests` | The visible pixels of a picture at its own size, measured by the framebuffer rather than the layout size. |
 | `CellConversionTests` | Cell reuse across versions, reallocation on a size change, showing nothing until complete, least-recently-drawn eviction. |
 | `PixelImageConvertCellsTests`, `WithLifetimeFixture/PixelImageBitmapConverterTests` | The converter: an edited cell is the only one made again, identical cells share one image, a cell keeps its exact pixels; drawing at target size, over a picture, clipped, partially redrawn, edited, at a new version, on a console with `SupportsPixelImages`. |
-| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | With a recording encoder: the factory is asked with the output and its capabilities; `SupportsPixelImages` is set with an encoder and cleared without; the encoder writes once a frame with the screen; the text over a picture with and without `SupportsTextOverlay` (default background, or the picture's colour; a space, or nothing); after `WriteBytes`, and after the last column, `SetCaretPosition` moves the cursor; the encoder's output is inside the synchronized update; the cursor goes back to the caret after the encoder moves it; an encoder that throws still leaves the update closed; `Reset` and `RestoreConsole` are forwarded, and `Reset` follows `RestoreConsole`. Without an encoder a picture is block glyphs: a picture cell with no symbol is a block glyph, a space over it is text, a backdrop leaves the picture. |
+| `WithLifetimeFixture/AnsiConsoleOutputImageTests` | With a recording encoder: the factory is asked with the output and its capabilities; `SupportsPixelImages` is set with an encoder and cleared without; the encoder writes once a frame with the screen; the text over a picture with and without `SupportsTextOverlay` (default background, or the picture's colour; a space, or nothing); after `WriteBytes`, and after the last column, `SetCaretPosition` moves the cursor; the encoder's output is inside the synchronized update; the cursor goes back to the caret after the encoder moves it; an encoder that throws still leaves the update closed; `Reset` and `RestoreConsole` are forwarded, and `Reset` follows `RestoreConsole`. |
 | `WithLifetimeFixture/RenderTargetTests` | After the terminal's contents are lost, every cell is written again; a frame ends with the screen as written, not the pixel buffer; a frame from another thread waits for the drawing under way. |
 | `AnsiConsoleOutputWriteTests` | Writing the frame: order of text and bytes, UTF-8, split and lone surrogates, text written to `Console.Out` first, a payload longer than a chunk, one synchronized update per frame, an empty frame. |
 | `WithLifetimeFixture/PixelTests` | Image cells compare by image; an image background composes with a glyph, keeps the image under paint, dies by an opaque background, takes the cell when drawn over text; shade and brighten paint it; the effective colour. |

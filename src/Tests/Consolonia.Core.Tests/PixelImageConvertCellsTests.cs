@@ -149,15 +149,15 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
-        ///     A picture cell draws no symbol, so the encoders show the picture until something is drawn
-        ///     over it, and is one cell wide, unlike the cells a wide glyph covers, which are never written.
+        ///     A picture cell is a space, like any cell nothing has been drawn in, so the encoders show the
+        ///     picture until a glyph is drawn over it.
         /// </summary>
         [Test]
-        public void PictureCellsHaveNoSymbolAndAreOneCellWide()
+        public void PictureCellsAreSpaces()
         {
             Pixel cell = Convert(Picture(_seed += 0x100))[0, 0];
 
-            Assert.That(cell.Foreground.Symbol.NothingToDraw(), "no symbol, whatever color an overlay gives it");
+            Assert.That(cell.Foreground, Is.EqualTo(PixelForeground.Space));
             Assert.That(cell.Width, Is.EqualTo(1));
         }
 

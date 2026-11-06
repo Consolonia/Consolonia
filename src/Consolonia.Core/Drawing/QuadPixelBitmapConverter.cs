@@ -53,47 +53,6 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     The text cell for a cell of a picture given as its pixels (<paramref name="width" /> x
-        ///     <paramref name="height" /> BGRA): each quadrant's pixels averaged to one color, then the four
-        ///     colors as a block glyph in two colors. For a console output that has an image cell but no
-        ///     protocol to show it with.
-        /// </summary>
-        internal static Pixel FromPixels(ReadOnlySpan<byte> bgra, int width, int height, bool complexEmoji)
-        {
-            int halfWidth = Math.Max(1, width / 2);
-            int halfHeight = Math.Max(1, height / 2);
-            return FromQuadrants(
-                AverageBlock(bgra, width, 0, 0, halfWidth, halfHeight),
-                AverageBlock(bgra, width, halfWidth, 0, width - halfWidth, halfHeight),
-                AverageBlock(bgra, width, 0, halfHeight, halfWidth, height - halfHeight),
-                AverageBlock(bgra, width, halfWidth, halfHeight, width - halfWidth, height - halfHeight),
-                complexEmoji);
-        }
-
-        private static BgraColor AverageBlock(ReadOnlySpan<byte> bgra, int imageWidth, int x, int y, int width,
-            int height)
-        {
-            if (width <= 0 || height <= 0)
-                return BgraColor.Transparent;
-
-            long b = 0, g = 0, r = 0, a = 0;
-            for (int row = y; row < y + height; row++)
-            {
-                int offset = (row * imageWidth + x) * 4;
-                for (int column = 0; column < width; column++, offset += 4)
-                {
-                    b += bgra[offset];
-                    g += bgra[offset + 1];
-                    r += bgra[offset + 2];
-                    a += bgra[offset + 3];
-                }
-            }
-
-            int count = width * height;
-            return new BgraColor((byte)(b / count), (byte)(g / count), (byte)(r / count), (byte)(a / count));
-        }
-
-        /// <summary>
         ///     The text cell for four quadrant colors (top left, top right, bottom left, bottom right): the
         ///     pixels split into a foreground and a background group, and the split mapped to the block
         ///     character that draws the foreground quadrants.

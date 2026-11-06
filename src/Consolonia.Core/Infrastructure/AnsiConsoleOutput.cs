@@ -6,7 +6,6 @@ using Avalonia;
 using Avalonia.Logging;
 using Avalonia.Media;
 using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Helpers.Logging;
 using Consolonia.Core.Text;
@@ -121,17 +120,9 @@ namespace Consolonia.Core.Infrastructure
                 0) // todo: do we still need to write width ==0 or -1 ? if so - ensure not to messup the caret position changes
                 return;
 
-            if (pixel.Background.Image != null)
+            if (pixel.Background.Image != null && _imageEncoder != null)
             {
-                if (_imageEncoder != null)
-                {
-                    // the text over the picture; the picture is the encoder's, at EndUpdate
-                    WriteTextOverPicture(position, in pixel);
-                    return;
-                }
-
-                // a picture on a console the probe found no image protocol for: block glyphs
-                WriteTextCell(position, AsQuadCell(in pixel), false);
+                WriteTextOverPicture(position, in pixel);
                 return;
             }
 
@@ -401,56 +392,27 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     An image cell as the text cell a terminal without an image protocol shows for it: a block
-        ///     glyph in the picture's colors, under the cell's paint, with the cell's own glyph kept if it
-        ///     has one.
-        /// </summary>
-        private Pixel AsQuadCell(in Pixel pixel)
-        {
-            PixelImage image = pixel.Background.Image;
-            Pixel quad = QuadPixelBitmapConverter.FromPixels(image.Bgra, image.Width, image.Height,
-                Capabilities.HasFlag(ConsoleCapabilities.SupportsComplexEmoji));
-            Color paint = pixel.Background.Color;
-            var painted = new Pixel(
-                new PixelForeground(quad.Foreground.Symbol,
-                    Pixel.MergeColors(quad.Foreground.Color, paint, true)),
-                new PixelBackground(Pixel.MergeColors(quad.Background.Color, paint, false)),
-                pixel.CaretStyle);
-            // a picture cell with any symbol is written as text; one with none (nothing drawn over the
-            // picture) is the picture
-            return pixel.Foreground.IsNothingToDraw()
-                ? painted
-                : new Pixel(pixel.Foreground, painted.Background, pixel.CaretStyle);
-        }
-
-        /// <summary>
-        ///     The text of an image cell, with an encoder to draw its picture. Where the protocol draws the
-        ///     picture below the text, the cell is its glyph, or a space, on the terminal's default background,
-        ///     which every terminal shows the picture through (some hide it under any explicit background, even
-        ///     black). Where the picture replaces the cells it covers, a glyph over it is a text cell on the
-        ///     color the cell looks, and a cell with none is left to the picture.
+        ///     The text of an image cell, with an encoder to draw its picture. A picture cell is a space until
+        ///     a glyph is drawn over it, and a space shows the picture. Where the protocol draws the picture
+        ///     below the text, the cell is written as it is on the terminal's default background, which every
+        ///     terminal shows the picture through (some hide it under any explicit background, even black).
+        ///     Where the picture replaces the cells it covers, a glyph over it is a text cell on the color the
+        ///     cell looks, and a space is left to the picture.
         /// </summary>
         private void WriteTextOverPicture(PixelBufferCoordinate position, in Pixel pixel)
         {
-            // a picture cell with any symbol is text; one with none (nothing drawn over the picture,
-            // whatever color an overlay blended into it) is the picture
-            bool nothingDrawn = pixel.Foreground.IsNothingToDraw();
-
             if (_imageEncoder.SupportsTextOverlay)
             {
-                PixelForeground foreground = pixel.Foreground;
-                // written, a missing glyph is no character at all, and the terminal's cursor would not move
-                Pixel cell = nothingDrawn
-                    ? new Pixel(new PixelForeground(Symbol.Space, foreground.Color, foreground.Weight,
-                        foreground.Style, foreground.TextDecoration), pixel.Background, pixel.CaretStyle)
-                    : pixel;
-                WriteTextCell(position, in cell, true);
+                WriteTextCell(position, in pixel, true);
                 return;
             }
 
-            if (nothingDrawn)
+            // if it's whitespace we can't emit it or it will erase the picture
+            if (pixel.Foreground.Symbol.IsWhiteSpace())
                 return;
 
+            // The picture doesn't support text overlay, and the cell has a glyph to draw over it. We approximate
+            // the picture with a the effective background color of the pixel.
             var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.EffectiveBackgroundColor),
                 pixel.CaretStyle);
             WriteTextCell(position, in textCell, false);
@@ -572,8 +534,8 @@ namespace Consolonia.Core.Infrastructure
 
             position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
             if (pixel.Width > 1 || pixel.Foreground.Symbol.Complex != null)
-                // then we force set the next position to where we want to be because again
-                // we can't rely on the terminal to advance the caret correctly.
+            // then we force set the next position to where we want to be because again
+            // we can't rely on the terminal to advance the caret correctly.
             {
                 SetCaretPositionInternal(position);
             }

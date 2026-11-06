@@ -289,50 +289,6 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(_factory.Encoder.Calls, Is.EqualTo(new[] { "Reset", "RestoreConsole", "Reset" }));
         }
 
-        /// <summary>
-        ///     A picture cell with no symbol is the picture, and one with any symbol is text, a space as
-        ///     much as a glyph.
-        /// </summary>
-        [Test]
-        public void WithoutAnEncoderAPictureCellWithNoSymbolIsABlockGlyphAndASpaceOverItIsText()
-        {
-            Open(ConsoleCapabilities.None, false);
-            Pixel picture = ImageCell(SolidImage(10, 20, 30));
-            Pixel spaceOverPicture = picture.Blend(new Pixel(new PixelForeground(Symbol.Space, Colors.White)));
-
-            string asPicture = Frame((0, 0, picture));
-            string asText = Frame((0, 0, spaceOverPicture));
-
-            Assert.That(asText, Does.EndWith(" "), "the space is written");
-            Assert.That(asPicture, Does.Not.Contain(" "), "the picture's block glyph, not a space");
-        }
-
-        /// <summary>
-        ///     A modal's translucent backdrop blended over a picture cell, as the converter makes it, colors
-        ///     the cell's foreground but draws no symbol on it: the cell is still the picture, dimmed.
-        /// </summary>
-        [Test]
-        public void WithoutAnEncoderABackdropBlendedOverAPictureCellLeavesThePicture()
-        {
-            Open(ConsoleCapabilities.None, false);
-            Pixel dimmed = ImageCell(SolidImage(10, 20, 30))
-                .Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
-
-            string frame = Frame((0, 0, dimmed));
-
-            Assert.That(frame, Does.Not.Contain(" "), "still the picture's block glyph");
-        }
-
-        [Test]
-        public void WithoutAnEncoderAPictureIsBlockGlyphs()
-        {
-            Open(ConsoleCapabilities.SupportsSixel, false);
-
-            string frame = Frame((0, 0, ImageCell(SolidImage(10, 20, 30))));
-
-            Assert.That(frame, Does.Contain("\u001b[48;2;10;20;30m"), "the picture's color as the cell's");
-        }
-
         private sealed class RecordingEncoderFactory : IConsoleImageEncoderFactory
         {
             public bool Creates { get; set; }
