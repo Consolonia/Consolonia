@@ -1,12 +1,12 @@
 #pragma warning disable CA5394 // Do not use insecure randomness
 using System;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
-    public partial class SomeDialogWindow : ManagedWindow
+    public partial class SomeDialogWindow : Window
     {
         internal const string DialogTitle = "Dialog popup";
 
@@ -19,7 +19,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
             Title = DialogTitle;
             Width = width;
             Height = height;
-            AnimateWindow = ConsoloniaLifetime.Console.GetType().Name != "UnitTestConsole";
             AttachedToVisualTree += OnShowDialog;
         }
 

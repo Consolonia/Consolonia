@@ -1,13 +1,13 @@
 #pragma warning disable CA5394 // Do not use insecure randomness
 using System;
+using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Iciclecreek.Avalonia.WindowManager;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
-    public partial class MyDialog : ManagedWindow
+    public partial class MyDialog : Window
     {
         private static int _dialogCount;
 
@@ -28,7 +28,6 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         {
             InitializeComponent();
             // this.Background = brushes[Random.Shared.Next(0, brushes.Length)];
-            AnimateWindow = ConsoloniaLifetime.Console.GetType().Name != "UnitTestConsole";
 
             DataContext = new MyDialogViewModel
             {
