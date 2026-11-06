@@ -29,140 +29,154 @@
             </Style>
         </Styles>
     </UserControl.Styles>
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Panel>
-            <Panel Width="40"
-                   Height="30">
-                <Border BorderBrush="Blue"
-                        BorderThickness="1"
-                        VerticalAlignment="Top"
-                        HorizontalAlignment="Left">
-                    <!--<Panel Background="Purple"/>-->
-                    <Border.Styles>
-                        <Style Selector="Border">
-                            <Style.Animations>
-                                <Animation Duration="0:0:5"
-                                           IterationCount="INFINITE"
-                                           PlaybackDirection="Alternate">
-                                    <KeyFrame Cue="0%">
-                                        <Setter Property="Width"
-                                                Value="5" />
-                                    </KeyFrame>
-                                    <KeyFrame Cue="100%">
-                                        <Setter Property="Width"
-                                                Value="25" />
-                                    </KeyFrame>
-                                </Animation>
-                                <Animation Duration="0:0:3"
-                                           IterationCount="INFINITE"
-                                           PlaybackDirection="Alternate">
-                                    <KeyFrame Cue="0%">
-                                        <Setter Property="Height"
-                                                Value="30" />
-                                    </KeyFrame>
-                                    <KeyFrame Cue="100%">
-                                        <Setter Property="Height"
-                                                Value="4" />
-                                    </KeyFrame>
-                                </Animation>
-                            </Style.Animations>
-                        </Style>
-                    </Border.Styles>
-                </Border>
+    <Panel>
+        <!-- A photo behind the animations, so the boxes are drawn over an image rather than a flat
+             background. It gets the middle quarter of the page and keeps its aspect ratio. -->
+        <Grid ColumnDefinitions="* 2* *"
+              RowDefinitions="* 2* *">
+            <Image x:Name="BackgroundImage"
+                   Grid.Row="1"
+                   Grid.Column="1"
+                   Stretch="Uniform" />
+        </Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <Panel>
+                <Panel Width="40"
+                       Height="30">
+                    <Border BorderBrush="Blue"
+                            Background="Transparent"
+                            BorderThickness="1"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Left">
+                        <!--<Panel Background="Purple"/>-->
+                        <Border.Styles>
+                            <Style Selector="Border">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:5"
+                                               IterationCount="INFINITE"
+                                               PlaybackDirection="Alternate">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="Width"
+                                                    Value="5" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="Width"
+                                                    Value="25" />
+                                        </KeyFrame>
+                                    </Animation>
+                                    <Animation Duration="0:0:3"
+                                               IterationCount="INFINITE"
+                                               PlaybackDirection="Alternate">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="Height"
+                                                    Value="30" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="Height"
+                                                    Value="4" />
+                                        </KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Border.Styles>
+                    </Border>
 
-                <Border BorderThickness="1"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Right">
-                    <!--<Panel Background="Orange" />-->
-                    <Border.BorderBrush>
-                        <console:LineBrush LineStyle="Bold"
-                                           Brush="Blue" />
-                    </Border.BorderBrush>
-                    <Border.Styles>
-                        <Style Selector="Border">
-                            <Style.Animations>
-                                <Animation Duration="0:0:2"
-                                           IterationCount="INFINITE"
-                                           PlaybackDirection="Alternate">
-                                    <KeyFrame Cue="0%">
-                                        <Setter Property="Width"
-                                                Value="2" />
-                                    </KeyFrame>
-                                    <KeyFrame Cue="100%">
-                                        <Setter Property="Width"
-                                                Value="40" />
-                                    </KeyFrame>
-                                </Animation>
-                                <Animation Duration="0:0:3.5"
-                                           IterationCount="INFINITE"
-                                           PlaybackDirection="Alternate">
-                                    <KeyFrame Cue="0%">
-                                        <Setter Property="Height"
-                                                Value="2" />
-                                    </KeyFrame>
-                                    <KeyFrame Cue="100%">
-                                        <Setter Property="Height"
-                                                Value="10" />
-                                    </KeyFrame>
-                                </Animation>
-                            </Style.Animations>
-                        </Style>
-                    </Border.Styles>
-                </Border>
+                    <Border BorderThickness="1"
+                            Background="Transparent"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right">
+                        <!--<Panel Background="Orange" />-->
+                        <Border.BorderBrush>
+                            <console:LineBrush LineStyle="Bold"
+                                               Brush="Blue" />
+                        </Border.BorderBrush>
+                        <Border.Styles>
+                            <Style Selector="Border">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:2"
+                                               IterationCount="INFINITE"
+                                               PlaybackDirection="Alternate">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="Width"
+                                                    Value="2" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="Width"
+                                                    Value="40" />
+                                        </KeyFrame>
+                                    </Animation>
+                                    <Animation Duration="0:0:3.5"
+                                               IterationCount="INFINITE"
+                                               PlaybackDirection="Alternate">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="Height"
+                                                    Value="2" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="Height"
+                                                    Value="10" />
+                                        </KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Border.Styles>
+                    </Border>
 
 
-                <Border BorderThickness="1"
-                        VerticalAlignment="Bottom"
-                        HorizontalAlignment="Right">
-                    <!--<Panel Background="Green"/>-->
-                    <Border.BorderBrush>
-                        <console:LineBrush LineStyle="DoubleLine"
-                                           Brush="Blue" />
-                    </Border.BorderBrush>
-                    <Border.Styles>
-                        <Style Selector="Border">
-                            <Style.Animations>
-                                <Animation Duration="0:0:7.4"
-                                           IterationCount="INFINITE"
-                                           PlaybackDirection="Alternate">
-                                    <KeyFrame Cue="0%">
-                                        <Setter Property="Width"
-                                                Value="4" />
-                                    </KeyFrame>
-                                    <KeyFrame Cue="100%">
-                                        <Setter Property="Width"
-                                                Value="38" />
-                                    </KeyFrame>
-                                </Animation>
-                                <Animation Duration="0:0:5.5"
-                                           IterationCount="INFINITE"
-                                           PlaybackDirection="Alternate">
-                                    <KeyFrame Cue="0%">
-                                        <Setter Property="Height"
-                                                Value="12" />
-                                    </KeyFrame>
-                                    <KeyFrame Cue="100%">
-                                        <Setter Property="Height"
-                                                Value="22" />
-                                    </KeyFrame>
-                                </Animation>
-                            </Style.Animations>
-                        </Style>
-                    </Border.Styles>
-                </Border>
+                    <Border BorderThickness="1"
+                            Background="Transparent"
+                            VerticalAlignment="Bottom"
+                            HorizontalAlignment="Right">
+                        <!--<Panel Background="Green"/>-->
+                        <Border.BorderBrush>
+                            <console:LineBrush LineStyle="DoubleLine"
+                                               Brush="Blue" />
+                        </Border.BorderBrush>
+                        <Border.Styles>
+                            <Style Selector="Border">
+                                <Style.Animations>
+                                    <Animation Duration="0:0:7.4"
+                                               IterationCount="INFINITE"
+                                               PlaybackDirection="Alternate">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="Width"
+                                                    Value="4" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="Width"
+                                                    Value="38" />
+                                        </KeyFrame>
+                                    </Animation>
+                                    <Animation Duration="0:0:5.5"
+                                               IterationCount="INFINITE"
+                                               PlaybackDirection="Alternate">
+                                        <KeyFrame Cue="0%">
+                                            <Setter Property="Height"
+                                                    Value="12" />
+                                        </KeyFrame>
+                                        <KeyFrame Cue="100%">
+                                            <Setter Property="Height"
+                                                    Value="22" />
+                                        </KeyFrame>
+                                    </Animation>
+                                </Style.Animations>
+                            </Style>
+                        </Border.Styles>
+                    </Border>
+                </Panel>
+
+                <Panel Width="7"
+                       Height="7"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Top"
+                       Margin="2"
+                       Classes="background_animation" />
+
+                <Button Content="Pause IO for 5 seconds"
+                        Click="PauseButton_OnClick"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top" />
             </Panel>
-
-            <Panel Width="7"
-                   Height="7"
-                   HorizontalAlignment="Right"
-                   VerticalAlignment="Top"
-                   Margin="2"
-                   Classes="background_animation" />
-
-            <Button Content="Pause IO for 5 seconds"
-                    Click="PauseButton_OnClick"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top" />
-        </Panel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Panel>
 </UserControl>

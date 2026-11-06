@@ -11,6 +11,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
     [JsonConverter(typeof(PixelForegroundConverter))]
     public readonly struct PixelForeground : IEquatable<PixelForeground>
     {
+        /// <summary>Not set, in the byte that holds a style or a decoration.</summary>
+        private const byte None = 0xFF;
+
         public static readonly PixelForeground Default = new();
 
         public static readonly PixelForeground Space = new(Symbol.Space, Colors.Transparent);
@@ -21,9 +24,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             Symbol = Symbol.Space;
             Color = Colors.Transparent;
-            Weight = null;
-            Style = null;
-            TextDecoration = null;
+            PackedWeight = 0;
+            PackedStyle = None;
+            PackedTextDecoration = None;
         }
 
         public PixelForeground(Symbol symbol, Color color,
@@ -32,26 +35,51 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
             Symbol = symbol;
             Color = color;
-            Weight = weight;
-            Style = style;
-            TextDecoration = textDecoration;
+            PackedWeight = weight ?? 0;
+            PackedStyle = style == null ? None : (byte)style.Value;
+            PackedTextDecoration = textDecoration == null ? None : (byte)textDecoration.Value;
+        }
+
+        /// <summary>The attributes as packed, for <see cref="Pixel" />, which stores them flat.</summary>
+        internal PixelForeground(Symbol symbol, Color color, FontWeight packedWeight, byte packedStyle,
+            byte packedTextDecoration)
+        {
+            Symbol = symbol;
+            Color = color;
+            PackedWeight = packedWeight;
+            PackedStyle = packedStyle;
+            PackedTextDecoration = packedTextDecoration;
         }
 
 #pragma warning disable CA1051 // Do not declare visible instance fields
         public readonly Symbol Symbol;
         public readonly Color Color;
-        public readonly FontWeight? Weight;
-        public readonly FontStyle? Style;
-        public readonly TextDecorationLocation? TextDecoration;
 #pragma warning restore CA1051 // Do not declare visible instance fields
+
+        // The three optional attributes packed into 6 bytes rather than three nullable enums of 8 each:
+        // every cell of the pixel buffer carries them, and it keeps a Pixel within a cache line.
+        // FontWeight has no zero (Thin is 100), so 0 is "not set"; the other two fit a byte with a sentinel.
+
+        public FontWeight? Weight => PackedWeight == 0 ? null : PackedWeight;
+
+        public FontStyle? Style => PackedStyle == None ? null : (FontStyle)PackedStyle;
+
+        public TextDecorationLocation? TextDecoration =>
+            PackedTextDecoration == None ? null : (TextDecorationLocation)PackedTextDecoration;
+
+        internal FontWeight PackedWeight { get; }
+
+        internal byte PackedStyle { get; }
+
+        internal byte PackedTextDecoration { get; }
 
         public bool Equals(PixelForeground other)
         {
             return Symbol.Equals(other.Symbol) &&
                    Color.Equals(other.Color) &&
-                   Weight == other.Weight &&
-                   Style == other.Style &&
-                   TextDecoration == other.TextDecoration;
+                   PackedWeight == other.PackedWeight &&
+                   PackedStyle == other.PackedStyle &&
+                   PackedTextDecoration == other.PackedTextDecoration;
         }
 
         public PixelForeground Shade()
@@ -87,8 +115,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Symbol, Color, (int)(Weight ?? FontWeight.Normal), (int)(Style ?? FontStyle.Normal),
-                TextDecoration);
+            return HashCode.Combine(Symbol, Color, (int)PackedWeight, PackedStyle, PackedTextDecoration);
         }
 
         public static bool operator ==(PixelForeground left, PixelForeground right)

@@ -1,9 +1,11 @@
 // DUPFINDER_ignore
 
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Avalonia.Media;
 using Consolonia.Controls;
+using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using NUnit.Framework;
 
@@ -95,6 +97,119 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(!pixel.Equals((object)pixel2));
             Assert.That(!pixel.Equals(pixel2));
             Assert.That(pixel != pixel2);
+        }
+
+        /// <summary>
+        ///     A Pixel is copied on every blend and every frame and compared for every dirty cell: its
+        ///     fields are stored flat so that two references, three ints, a char and five bytes take 40
+        ///     bytes, not the 56 the nested structs padded to, image reference included.
+        /// </summary>
+        [Test]
+        public void PixelIsFortyBytes()
+        {
+            Assert.That(Unsafe.SizeOf<Pixel>(), Is.EqualTo(40));
+        }
+
+        [Test]
+        public void ImageCellsCompareByImage()
+        {
+            // regression: an image cell carries no character and no pattern, so pixels which ignored the
+            // image compared equal and the pixel buffer diff kept showing the previous picture
+            CellImage image = CreateCellImage(10);
+            CellImage otherImage = CreateCellImage(200);
+
+            Pixel pixel = CreateImagePixel(image);
+            Pixel samePixel = CreateImagePixel(image);
+            Pixel otherPixel = CreateImagePixel(otherImage);
+
+            Assert.That(pixel == samePixel);
+            Assert.That(pixel.GetHashCode(), Is.EqualTo(samePixel.GetHashCode()));
+            Assert.That(pixel != otherPixel);
+            Assert.That(pixel.Equals((object)otherPixel), Is.False);
+        }
+
+        /// <summary>
+        ///     The "image as cell background" model: cell = (color | picture under a paint) + foreground
+        ///     glyph. The paint accumulates through the same blend as a plain cell's color.
+        /// </summary>
+        [Test]
+        public void ImageBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
+        {
+            CellImage image = CreateCellImage(200);
+            Pixel imagePixel = CreateImagePixel(image);
+
+            Pixel withGlyph = imagePixel.Blend(new Pixel(
+                new PixelForeground(new Symbol('▕'), Colors.Gray),
+                PixelBackground.Transparent));
+            Assert.That(withGlyph.Foreground.Symbol.Character, Is.EqualTo('▕'));
+            Assert.That(withGlyph.Background.Image, Is.SameAs(image),
+                "a glyph with transparent background lands OVER the picture, not evicting it");
+
+            var backdrop = new Pixel(new PixelBackground(Color.Parse("#7F000000")));
+            Pixel dimmed = imagePixel.Blend(backdrop);
+            Assert.That(dimmed.Background.Image, Is.SameAs(image), "a translucent paint must not evict the picture");
+            Assert.That(dimmed.Background.Color, Is.EqualTo(Color.Parse("#7F000000")),
+                "the paint accumulates in the cell's color, for the output to lay over the picture");
+            Assert.That(imagePixel.Blend(backdrop), Is.EqualTo(dimmed),
+                "the same paint must yield the same cell, else every frame re-sends it");
+
+            Pixel covered = imagePixel.Blend(new Pixel(new PixelBackground(Colors.White)));
+            Assert.That(covered.Background.Image, Is.Null,
+                "an opaque background owns the cell: the picture must be evicted");
+
+            Pixel overText = new Pixel(new PixelForeground(new Symbol('a'), Colors.Red),
+                new PixelBackground(Colors.Blue)).Blend(imagePixel);
+            Assert.That(overText, Is.EqualTo(imagePixel), "an image cell drawn over a text cell takes it whole");
+        }
+
+        /// <summary>
+        ///     Where a cell needs one color for a picture (the mouse cursor's contrast, text on a terminal
+        ///     that cannot draw it over an image), the paint composited over the picture's dominant color.
+        /// </summary>
+        [Test]
+        public void TheEffectiveColorOfAnImageCellIsThePaintOverItsDominantColor()
+        {
+            // a mostly gray picture with a sliver of red: gray is the dominant color
+            byte[] bgra = new byte[8 * 16 * 4];
+            for (int i = 0; i < bgra.Length; i += 4)
+            {
+                bool red = i < 8 * 4;
+                bgra[i] = red ? (byte)0 : (byte)200;
+                bgra[i + 1] = red ? (byte)0 : (byte)200;
+                bgra[i + 2] = red ? (byte)255 : (byte)200;
+                bgra[i + 3] = 255;
+            }
+
+            var image = new CellImage(bgra, 8, 16);
+            Pixel pixel = CreateImagePixel(image);
+            Assert.That(image.DominantColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
+            Assert.That(pixel.EffectiveBackgroundColor, Is.EqualTo(Color.FromRgb(200, 200, 200)));
+
+            Pixel dimmed = pixel.Blend(new Pixel(new PixelBackground(Color.Parse("#7F000000"))));
+            Color effective = dimmed.EffectiveBackgroundColor;
+            Assert.That(effective.A, Is.EqualTo(0xFF));
+            Assert.That(effective.R, Is.InRange(90, 110), "black at half alpha over gray 200");
+
+            Assert.That(new Pixel(new PixelBackground(Colors.Blue)).EffectiveBackgroundColor, Is.EqualTo(Colors.Blue),
+                "a plain cell's effective color is its color");
+        }
+
+        private static CellImage CreateCellImage(byte gray)
+        {
+            byte[] bgra = new byte[8 * 16 * 4];
+            for (int i = 0; i < bgra.Length; i += 4)
+            {
+                bgra[i] = bgra[i + 1] = bgra[i + 2] = gray;
+                bgra[i + 3] = 0xFF;
+            }
+
+            return new CellImage(bgra, 8, 16);
+        }
+
+        private static Pixel CreateImagePixel(CellImage image)
+        {
+            return new Pixel(CellImageBitmapRenderer.PictureCellForeground,
+                new PixelBackground(Colors.Transparent, image));
         }
 
         [Test]

@@ -140,13 +140,23 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         {
         }
 
+        /// <summary>The fields as they are, for <see cref="Pixel" />, which stores them flat.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal Symbol(char character, string reference, byte pattern, byte width)
+        {
+            Character = character;
+            Complex = reference;
+            Pattern = pattern;
+            Width = width;
+        }
+
 
         public bool Equals(Symbol other)
         {
             return Character == other.Character &&
-                   string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
                    Width == other.Width &&
-                   Pattern == other.Pattern;
+                   Pattern == other.Pattern &&
+                   string.Equals(Complex, other.Complex, StringComparison.Ordinal);
         }
 
 
@@ -182,10 +192,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Complex != null && Complex.Length > 1 ? Complex : new string(Character, 1);
         }
 
+        /// <summary>No character and no complex text: blending this over a symbol leaves that symbol.</summary>
         public bool NothingToDraw()
         {
-            return Character == char.MinValue &&
-                   string.IsNullOrEmpty(Complex);
+            return Character == char.MinValue && string.IsNullOrEmpty(Complex);
         }
 
         public Symbol Blend(ref Symbol symbolAbove)
@@ -208,11 +218,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public override bool Equals([NotNullWhen(true)] object obj)
         {
-            return obj is Symbol other &&
-                   Character == other.Character &&
-                   string.Equals(Complex, other.Complex, StringComparison.Ordinal) &&
-                   Width == other.Width &&
-                   Pattern == other.Pattern;
+            return obj is Symbol other && Equals(other);
         }
 
         public override int GetHashCode()

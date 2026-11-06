@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using System.Threading.Tasks;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
@@ -71,10 +73,48 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
+        ///     A frame starts: what is written until <see cref="EndUpdate" /> is one frame. An output that
+        ///     can have the terminal show a frame all at once (a DEC 2026 synchronized update) opens it here.
+        /// </summary>
+        void BeginUpdate()
+        {
+        }
+
+        /// <summary>
+        ///     The frame <see cref="BeginUpdate" /> started is written, caret included; <paramref name="screen" />
+        ///     is what the terminal should now show. An output with per-frame work besides the cells (an image
+        ///     protocol placing its pictures) does it here, leaving the cursor where the caret was put, then
+        ///     closes the update and flushes.
+        /// </summary>
+        void EndUpdate(PixelBuffer screen)
+        {
+            Flush();
+        }
+
+        /// <summary>
+        ///     The render target no longer trusts what the terminal shows (the screen was resized, another
+        ///     program had the terminal) and will write every cell again. Whatever the output believes about
+        ///     the terminal's state is no longer true either.
+        /// </summary>
+        void ResetCache()
+        {
+        }
+
+        /// <summary>
         ///     Write raw text to the console
         /// </summary>
         /// <param name="str"></param>
         void WriteText(string str);
+
+        /// <summary>
+        ///     Write raw ASCII escape sequences given as bytes, such as image payloads, which an output that
+        ///     buffers bytes takes without converting them to text and back.
+        /// </summary>
+        /// <remarks>Like <see cref="WriteText" />, this does not move the caret position.</remarks>
+        void WriteBytes(ReadOnlySpan<byte> ascii)
+        {
+            WriteText(Encoding.ASCII.GetString(ascii));
+        }
 
         /// <summary>
         ///     Flush any buffered output
