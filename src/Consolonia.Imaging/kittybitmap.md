@@ -14,7 +14,7 @@ sixel: pixels are sent when they change, and nothing is remembered about the ter
 
 1. **Cells are written on the default background.** The encoder's `SupportsTextOverlay` is true, so
    the output writes an image cell as an ordinary text cell with the terminal's default background
-   (`ESC[49m`), and a cell with no symbol as a space. Text sits above the placement, so the picture
+   (`ESC[49m`); a picture cell is a space until a glyph is drawn over it. Text sits above the placement, so the picture
    shows through spaces.
    Konsole draws below-text (z<0) placements under any explicit cell background, so painting the
    cell a colour, even black, hides the picture there; kitty draws them above either way. A glyph

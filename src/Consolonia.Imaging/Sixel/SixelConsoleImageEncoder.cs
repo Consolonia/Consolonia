@@ -79,7 +79,7 @@ namespace Consolonia.Imaging
                 ref readonly Pixel pixel = ref screen.CellAt(x, y);
                 ref SentCell sent = ref _sent[y * width + x];
                 PixelImage image = pixel.Background.Image;
-                if (image == null || pixel.Width <= 0 || !pixel.Foreground.IsNothingToDraw())
+                if (image == null || pixel.Width <= 0 || !pixel.Foreground.Symbol.IsWhiteSpace)
                 {
                     // text, which replaced whatever sixel was in the cell
                     sent = default;
