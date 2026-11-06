@@ -152,7 +152,7 @@ namespace Consolonia.Core.Drawing
             if (dirtyRegions.IsEmpty) return;
 
             if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
-                InitializeCacheInternal();
+                _cache = InitializeCache(pixelBuffer.Width, pixelBuffer.Height);
 
 #if FPS
             var now = _stopwatch.Elapsed;
