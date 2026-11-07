@@ -9,6 +9,10 @@ using Consolonia.Core.Helpers.Logging;
 
 namespace Consolonia.Core.Helpers.InputProcessing
 {
+    // todo: low: $100 prize for showing me how to significantly simplify this processor (possible with IMatcher contract)
+    // in a way I don't have to spend several hours every time to just understand how it works
+    // $50 for partial satisfaction
+    
     public class InputProcessor<T>(IEnumerable<IMatcher<T>> matchers)
     {
         private readonly ParametrizedLogger _infoLogger = Log.CreateInputLogger(LogEventLevel.Information);
@@ -61,7 +65,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
                             currentTopMatcherIndex == Matchers.Length) // no one yet accepted new character
                         {
                             logSb.Insert(1, "?");
-                            AppendResult flushResult = TryFlushStartingFrom(i);
+                            AppendResult flushResult = TryFlushStartingFrom(i, resetPendingStartMatcher: true);
                             if (flushResult != AppendResult.Match && canRetry)
                             {
                                 // The old prefix is resolved; retry the unconsumed input once.
@@ -120,25 +124,37 @@ namespace Consolonia.Core.Helpers.InputProcessing
             _previousTopMatcherIndex = currentTopMatcherIndex;
         }
 
-        private AppendResult TryFlushStartingFrom(int startIndex)
+        private AppendResult TryFlushStartingFrom(int startIndex, bool resetPendingStartMatcher = false)
         {
             for (int i = startIndex; i < Matchers.Length; i++)
             {
                 switch (Matchers[i].TryFlush())
                 {
                     case AppendResult.AutoFlushed:
+                    {
                         _infoLogger.Log3(
                             "Matcher {Matcher} at index {MatcherIndex} flushed successfully, resetting matchers from index {NextMatcherIndex}",
                             Matchers[i].GetDebugInfo(), i, i + 1);
                         ResetMatchersFrom(i + 1);
                         return AppendResult.AutoFlushed;
+                    }
 
                     case AppendResult.Match:
+                    {
+                        if (resetPendingStartMatcher && i == startIndex)
+                        {
+                            Matchers[i].Reset();
+                            continue;
+                        }
+
                         return AppendResult.Match;
+                    }
 
                     case AppendResult.NoMatch:
+                    {
                         Matchers[i].Reset();
                         continue;
+                    }
                 }
             }
 
