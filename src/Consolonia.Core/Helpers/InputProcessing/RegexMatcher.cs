@@ -38,7 +38,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             }
             else
             {
-                _accumulator.Length-=rune.Utf8SequenceLength;
+                _accumulator.Length-=rune.Utf16SequenceLength;
             }
 
             return matchResultInternal;
