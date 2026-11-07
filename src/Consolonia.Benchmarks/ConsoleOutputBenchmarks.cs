@@ -5,8 +5,6 @@ using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Media;
 using BenchmarkDotNet.Attributes;
-using Consolonia.Controls;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
