@@ -152,7 +152,7 @@ namespace Consolonia.Core.Infrastructure
         ///     and has told us its cell size, without which those pixels cannot be turned back into cells.
         /// </summary>
         protected bool TerminalSupportsPixelMouse =>
-            _consoleOutput is AnsiConsoleOutput { SupportsSgrPixelsMouse: true } &&
+            _consoleOutput.Capabilities.HasFlag(ConsoleCapabilities.SupportsPixelMouse) &&
             _reportedCellPixelSize is { Width: > 0, Height: > 0 };
 
         /// <summary>
@@ -186,7 +186,9 @@ namespace Consolonia.Core.Infrastructure
         public virtual void PrepareConsole()
         {
             _consoleOutput.PrepareConsole();
-            Capabilities |= _consoleOutput.Capabilities;
+            // the output says the terminal can report the mouse in pixels; the console says so only once it
+            // has turned that on (see TerminalSupportsPixelMouse)
+            Capabilities |= _consoleOutput.Capabilities & ~ConsoleCapabilities.SupportsPixelMouse;
         }
 
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)

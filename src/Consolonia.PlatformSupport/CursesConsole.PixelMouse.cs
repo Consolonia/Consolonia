@@ -28,6 +28,7 @@ namespace Consolonia.PlatformSupport
             WriteText(Esc.EnableSgrPixelsMouse);
             Flush();
             _pixelMouse = true;
+            Capabilities |= ConsoleCapabilities.SupportsPixelMouse;
         }
     }
 }

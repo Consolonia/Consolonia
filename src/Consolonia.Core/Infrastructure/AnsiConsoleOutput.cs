@@ -92,13 +92,6 @@ namespace Consolonia.Core.Infrastructure
 
         public int CellPixelHeight { get; private set; }
 
-        /// <summary>
-        ///     True when the terminal answered that it can report the mouse in pixels (SGR-Pixels,
-        ///     DEC private mode 1016). Only detected here: the console reading input turns it on,
-        ///     because only it knows whether it can read those reports.
-        /// </summary>
-        internal bool SupportsSgrPixelsMouse { get; private set; }
-
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void SetTitle(string title)
         {
@@ -299,9 +292,12 @@ namespace Consolonia.Core.Infrastructure
             if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSynchronizedOutput;
 
+            // the terminal can report the mouse in pixels; only detected here: the console reading input
+            // turns it on, because only it knows whether it can read those reports.
             // CONSOLONIA_PIXEL_MOUSE=0 keeps the mouse in whole cells even where pixels are on offer
-            SupportsSgrPixelsMouse = ResponseIndicatesSgrPixelsMouseSupport(graphicsProbeResponse) &&
-                                     Environment.GetEnvironmentVariable("CONSOLONIA_PIXEL_MOUSE") != "0";
+            if (ResponseIndicatesSgrPixelsMouseSupport(graphicsProbeResponse) &&
+                Environment.GetEnvironmentVariable("CONSOLONIA_PIXEL_MOUSE") != "0")
+                Capabilities |= ConsoleCapabilities.SupportsPixelMouse;
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
 

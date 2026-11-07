@@ -1,3 +1,4 @@
+using Consolonia.Controls;
 using Consolonia.Core.Text;
 using static Vanara.PInvoke.Kernel32;
 
@@ -32,6 +33,7 @@ namespace Consolonia.PlatformSupport
             WriteText(Esc.EnableExtendedMouseTracking);
             WriteText(Esc.EnableSgrPixelsMouse);
             Flush();
+            Capabilities |= ConsoleCapabilities.SupportsPixelMouse;
         }
 
         private INPUT_RECORD[] ReadInputRecords()
@@ -53,6 +55,7 @@ namespace Consolonia.PlatformSupport
                 WriteText(Esc.DisableWin32InputMode);
                 _windowsConsole.ConsoleMode &= ~CONSOLE_INPUT_MODE.ENABLE_VIRTUAL_TERMINAL_INPUT;
                 _vtInputDecoder = null;
+                Capabilities &= ~ConsoleCapabilities.SupportsPixelMouse;
             }
 
             base.Dispose(disposing);
