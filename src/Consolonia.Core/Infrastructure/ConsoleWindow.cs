@@ -113,7 +113,7 @@ namespace Consolonia.Core.Infrastructure
             Debug.WriteLine($"ConsoleWindow.SetTransparencyLevelHint({transparencyLevels}) called, not implemented");
         }
 
-        public void SetFrameThemeVariant(PlatformThemeVariant themeVariant)
+        public void SetFrameThemeVariant(PlatformThemeVariant? themeVariant)
         {
             //todo: Light or dark
             switch (themeVariant)

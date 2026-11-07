@@ -120,8 +120,10 @@ namespace Consolonia.Core.Tests
 
             IEnumerable<IMatcher<char>> matchers =
             [
+#pragma warning disable CS0618 // Type or member is obsolete: We still have to test it tho
                 new StartsEndsWithMatcher<char>(s => OnComplete("!" + s), c => new Rune(c), "<13>", "</13>"),
                 new StartsEndsWithMatcher<char>(s => OnComplete("!!" + s), c => new Rune(c), "<14>", "</14>"),
+#pragma warning restore CS0618 // Type or member is obsolete
                 new GenericMatcher<char>(c => OnComplete(c.ToString()))
             ];
 

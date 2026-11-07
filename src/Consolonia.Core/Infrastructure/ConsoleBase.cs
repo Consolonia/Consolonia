@@ -7,7 +7,6 @@ using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
-using Consolonia.Core.Helpers;
 
 namespace Consolonia.Core.Infrastructure
 {
@@ -47,8 +46,6 @@ namespace Consolonia.Core.Infrastructure
         {
             Task.Run(async () =>
             {
-                await Helper.WaitDispatcherInitialized();
-
                 while (!Disposed)
                 {
                     await WaitPauseTaskIfNecessaryAsync();
@@ -69,6 +66,11 @@ namespace Consolonia.Core.Infrastructure
         {
             //todo: key and mouse input now can be dispatched on any thread (from avalonia 12)
             await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Input);
+        }
+
+        protected void DispatchInputAsyncWait(Action action)
+        {
+            DispatchInputAsync(action).Wait();
         }
 
         #region IConsoleInput

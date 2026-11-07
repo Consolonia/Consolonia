@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Avalonia;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 
@@ -20,12 +21,7 @@ namespace Consolonia.Core.Drawing
         {
         }
 
-        public void Save(string fileName, int? quality = null)
-        {
-            throw new NotSupportedException();
-        }
-
-        public void Save(Stream stream, int? quality = null)
+        public void Save(Stream stream, BitmapEncoderOptions options)
         {
             throw new NotSupportedException();
         }

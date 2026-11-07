@@ -32,6 +32,16 @@ namespace Consolonia.ManagedWindows.Storage
             return results;
         }
 
+        public async Task<OpenFilePickerResult> OpenFilePickerWithResultAsync(FilePickerOpenOptions options)
+        {
+            IReadOnlyList<IStorageFile> files = await OpenFilePickerAsync(options);
+            return new OpenFilePickerResult
+            {
+                Files = files,
+                SelectedFileType = null
+            };
+        }
+
         public Task<IStorageBookmarkFolder> OpenFolderBookmarkAsync(string bookmark)
         {
             throw new NotImplementedException();

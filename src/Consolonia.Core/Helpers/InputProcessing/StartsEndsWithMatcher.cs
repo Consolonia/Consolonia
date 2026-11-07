@@ -6,6 +6,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
     /// <summary>
     ///     Matches a sequence of characters that starts with a given string and ends with another given string.
     /// </summary>
+    [Obsolete("Use with caution 79927B8B-848F-437D-AEDD-5E52FB993526", false)]
     public class StartsEndsWithMatcher<T>(
         Action<string> onComplete,
         Func<T, Rune> toRune,
@@ -31,6 +32,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
             if (startsWithTrue && toTest.EndsWith(endsWith, StringComparison.Ordinal))
             {
+                // consider this https://github.com/Consolonia/Consolonia/pull/708#discussion_r4447661127 before fixing OutOfRangeException (79927B8B-848F-437D-AEDD-5E52FB993526)
                 string output = toTest.Substring(startsWith.Length,
                     toTest.Length - startsWith.Length - endsWith.Length);
 
