@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -218,6 +219,10 @@ namespace Consolonia.PlatformSupport
                         _keyModifiers = new KeyModifiers();
                         _inputProcessor.ProcessChunk(inputs);
                     }
+                    catch (TargetInvocationException exception) when (IsDispatcherException(exception))
+                    {
+                        // The dispatcher has already seen the original exception. Keep processing input.
+                    }
                     catch (Exception exception)
                     {
                         Dispatcher.UIThread.Post(
@@ -226,6 +231,14 @@ namespace Consolonia.PlatformSupport
                     }
             });
         }
+
+        internal static bool IsDispatcherException(Exception exception)
+        {
+            return exception.Data.Contains(GetDispatcherExceptionDataKey(null));
+        }
+
+        [UnsafeAccessor(UnsafeAccessorKind.StaticField, Name = "ExceptionDataKey")]
+        private static extern ref object GetDispatcherExceptionDataKey(Dispatcher dispatcher);
 
         private readonly List<(int code, int wch)> _rowInputBuffer = new(1000); //todo: low magic number
 
@@ -336,6 +349,7 @@ namespace Consolonia.PlatformSupport
                         TryEnableMouseButtonSupport();
 
             TryToSupportKitty();
+            TryToSupportPointerShapes();
 
             WriteText(Esc.EnableBracketedPasteMode);
 
@@ -427,6 +441,9 @@ namespace Consolonia.PlatformSupport
                 WriteText(Esc.DisableKittyKeyboard);
                 _isKittyKeyboardEnabled = false;
             }
+
+            if (SupportedPointerShapes.Count > 0)
+                WriteText(Esc.ResetPointerShape);
 
             WriteText(Esc.DisableAllMouseEvents);
             WriteText(Esc.DisableExtendedMouseTracking);
