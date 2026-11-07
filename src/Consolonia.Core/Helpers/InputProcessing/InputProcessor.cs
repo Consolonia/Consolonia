@@ -28,8 +28,8 @@ namespace Consolonia.Core.Helpers.InputProcessing
             TryFlushStartingFrom(0);
             LogMatchersState();
         }
-
-        private void ProcessSingleInput(T input)
+        
+        private void ProcessSingleInput(T input, bool canRetry = true /*solving "AAB" input for {"AB, "A"} matchers*/)
         {
             _infoLogger.Log2("Processing single input: {Input}", input);
             int currentTopMatcherIndex = Matchers.Length;
@@ -56,10 +56,19 @@ namespace Consolonia.Core.Helpers.InputProcessing
                     if (result == AppendResult.NoMatch)
                     {
                         logSb.Insert(0, '❌');
-                        if (isPreviousTopMatcher)
+                        if (_previousTopMatcherIndex >= 0 && // there was some top matcher 
+                            i >= _previousTopMatcherIndex && // we've reached it or a lower candidate
+                            currentTopMatcherIndex == Matchers.Length) // no one yet accepted new character
                         {
                             logSb.Insert(1, "?");
-                            TryFlushStartingFrom(i);
+                            AppendResult flushResult = TryFlushStartingFrom(i);
+                            if (flushResult != AppendResult.Match && canRetry)
+                            {
+                                // The old prefix is resolved; retry the unconsumed input once.
+                                _previousTopMatcherIndex = -1;
+                                ProcessSingleInput(input, canRetry: false);
+                                return;
+                            }
                         }
                         else
                         {
@@ -111,7 +120,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             _previousTopMatcherIndex = currentTopMatcherIndex;
         }
 
-        private void TryFlushStartingFrom(int startIndex)
+        private AppendResult TryFlushStartingFrom(int startIndex)
         {
             for (int i = startIndex; i < Matchers.Length; i++)
             {
@@ -122,16 +131,18 @@ namespace Consolonia.Core.Helpers.InputProcessing
                             "Matcher {Matcher} at index {MatcherIndex} flushed successfully, resetting matchers from index {NextMatcherIndex}",
                             Matchers[i].GetDebugInfo(), i, i + 1);
                         ResetMatchersFrom(i + 1);
-                        return;
+                        return AppendResult.AutoFlushed;
 
                     case AppendResult.Match:
-                        return;
+                        return AppendResult.Match;
 
                     case AppendResult.NoMatch:
                         Matchers[i].Reset();
                         continue;
                 }
             }
+
+            return AppendResult.NoMatch;
         }
 
         private void ResetMatchersFrom(int startIndex)

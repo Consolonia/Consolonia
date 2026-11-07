@@ -12,6 +12,58 @@ namespace Consolonia.Core.Tests
     public class InputProcessorTests
     {
         [Test]
+        public void RejectedFixedLengthRegexYieldsToFallback()
+        {
+            List<string> output = [];
+            var processor = new InputProcessor<char>([
+                new RegexMatcher<char>(_ => output.Add("escape"), c => new Rune(c), @"^\x1B+$", 2),
+                new GenericMatcher<char>(c => output.Add("key:" + c))
+            ]);
+
+            processor.ProcessChunk("\x1b".ToCharArray());
+            Assert.IsEmpty(output);
+
+            processor.ProcessChunk("a".ToCharArray());
+            CollectionAssert.AreEqual(new[] { "key:\x1b", "key:a" }, output);
+        }
+
+        [Test]
+        public void SequenceTableRestartsAtNewEscapeAfterIncompleteSequence()
+        {
+            List<string> output = [];
+            var processor = new InputProcessor<char>([
+                new PasteBlockMatcher<char>(s => output.Add("paste:" + s), c => new Rune(c)),
+                new SequenceTableMatcher<char, string>(output.Add, c => new Rune(c),
+                    [("\x1b[A", "up")], _ => true),
+                new GenericMatcher<char>(c => output.Add("key:" + c))
+            ]);
+
+            processor.ProcessChunk("\x1b[".ToCharArray());
+            Assert.IsEmpty(output);
+
+            processor.ProcessChunk("\x1b[A".ToCharArray());
+            CollectionAssert.AreEqual(new[] { "key:\x1b", "key:[", "up" }, output);
+        }
+
+        [TestCase("aab", "a sequence")]
+        [TestCase("aaab", "a a sequence")]
+        [TestCase("ac", "a c")]
+        [TestCase("abab", "sequence sequence")]
+        public void SequenceRestartPreservesInputExactlyOnce(string input, string expected)
+        {
+            List<string> output = [];
+            var processor = new InputProcessor<char>([
+                new SequenceTableMatcher<char, string>(output.Add, c => new Rune(c),
+                    [("ab", "sequence")], _ => true),
+                new GenericMatcher<char>(c => output.Add(c.ToString()))
+            ]);
+
+            processor.ProcessChunk(input.ToCharArray());
+
+            Assert.AreEqual(expected, string.Join(" ", output));
+        }
+
+        [Test]
         public void LockedSequenceYieldsToNonTextInputAndCanStartAgain()
         {
             List<string> output = [];
