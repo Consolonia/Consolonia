@@ -117,6 +117,12 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 new PixelBackground(Colors.Black));
         }
 
+        private static Pixel GlyphOverPicture()
+        {
+            return ImageCell(SolidImage(10, 20, 30))
+                .Blend(new Pixel(new PixelForeground(new Symbol('x'), Colors.White)));
+        }
+
         [Test]
         public void TheFactoryIsAskedWithTheOutputAndItsCapabilities()
         {
@@ -160,10 +166,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         {
             Open(ConsoleCapabilities.None, true);
             _factory.Encoder.SupportsTextOverlay = true;
-            Pixel glyph = ImageCell(SolidImage(10, 20, 30))
-                .Blend(new Pixel(new PixelForeground(new Symbol('x'), Colors.White)));
 
-            string frame = Frame((0, 0, glyph));
+            string frame = Frame((0, 0, GlyphOverPicture()));
 
             Assert.That(frame, Does.Contain(Esc.DefaultBackground + "x"));
             Assert.That(frame, Does.Not.Contain("48;2;"), "no explicit background to hide the picture");
@@ -184,10 +188,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         public void WithoutTextOverlayAGlyphOverAPictureIsOnThePicturesColor()
         {
             Open(ConsoleCapabilities.None, true);
-            Pixel glyph = ImageCell(SolidImage(10, 20, 30))
-                .Blend(new Pixel(new PixelForeground(new Symbol('x'), Colors.White)));
 
-            string frame = Frame((0, 0, glyph));
+            string frame = Frame((0, 0, GlyphOverPicture()));
 
             Assert.That(frame, Does.Contain("\u001b[48;2;10;20;30m"));
             Assert.That(frame, Does.Contain("x"));
