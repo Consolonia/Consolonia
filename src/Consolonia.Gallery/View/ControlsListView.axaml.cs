@@ -28,7 +28,6 @@ namespace Consolonia.Gallery.View
 
     public partial class ControlsListView : UserControl
     {
-        private static readonly HttpClient Client = new();
         private readonly IEnumerable<GalleryItem> _items;
         private string[] _commandLineArgs;
 
@@ -132,8 +131,18 @@ namespace Consolonia.Gallery.View
 
         private static async Task ShowCode(string xamlFile)
         {
-            string xaml = await Client.GetStringAsync(new Uri(
-                $"https://raw.githubusercontent.com/jinek/Consolonia/refs/heads/main/src/Consolonia.Gallery/Gallery/GalleryViews/{xamlFile}"));
+            string xaml = "Failed to load code :(";
+            try
+            {
+                xaml = await GalleryHttp.Client.GetStringAsync(new Uri(
+                    $"https://raw.githubusercontent.com/jinek/Consolonia/refs/heads/main/src/Consolonia.Gallery/Gallery/GalleryViews/{xamlFile}"));
+            }
+            catch (HttpRequestException)
+            {
+            }
+            catch (TaskCanceledException)
+            {
+            }
 
             var dialog = new XamlDialogWindow
             {

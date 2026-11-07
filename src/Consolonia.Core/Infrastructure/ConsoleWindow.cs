@@ -65,6 +65,16 @@ namespace Consolonia.Core.Infrastructure
 
         internal Snapshot.Regions DirtyRegions { get; } = new();
 
+        /// <summary>
+        ///     Held while <see cref="PixelBuffer" /> is drawn into and the frame written out (a drawing
+        ///     context's whole life), while a frame of the mouse cursor alone is written, and while the buffer
+        ///     is replaced on a resize: no frame is ever written from a buffer half drawn.
+        /// </summary>
+        /// <remarks>
+        ///     Taken before the render target's own lock, never after it.
+        /// </remarks>
+        internal object RenderLock { get; } = new();
+
         public PixelBuffer PixelBuffer { get; private set; }
 
         private IMouseDevice MouseDevice { get; }
@@ -353,6 +363,17 @@ namespace Consolonia.Core.Infrastructure
 
         public event Action<ConsoleCursor> CursorChanged;
 
+        /// <summary>
+        ///     The terminal may no longer show what was written to it: console I/O resumed after another
+        ///     program had the terminal. Whatever renders to it forgets what it wrote and writes it all again.
+        /// </summary>
+        internal event Action TerminalContentsLost;
+
+        internal void NotifyTerminalContentsLost()
+        {
+            TerminalContentsLost?.Invoke();
+        }
+
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
             var presentationSource = (IPresentationSource)_inputRoot;
@@ -407,7 +428,13 @@ namespace Consolonia.Core.Infrastructure
         private void OnConsoleOnResized()
         {
             var size = new Size(Console.Size.Width, Console.Size.Height);
-            PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
+            // not while a frame is drawn into the old buffer; Resized is raised outside the lock, as what
+            // it sets off may draw
+            lock (RenderLock)
+            {
+                PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
+            }
+
             Resized!(size, WindowResizeReason.Unspecified);
         }
 

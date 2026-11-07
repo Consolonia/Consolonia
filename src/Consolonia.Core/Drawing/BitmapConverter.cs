@@ -1,0 +1,393 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Consolonia.Controls;
+using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
+
+namespace Consolonia.Core.Drawing
+{
+    /// <summary>
+    ///     What a conversion of a bitmap is for: the size it is drawn at and how it was scaled. The picture's
+    ///     version and the part of it on screen are not part of the key: a conversion is refilled in place
+    ///     when they change (see <see cref="CellConversion" />).
+    /// </summary>
+    // The properties are only read through the generated Equals/GetHashCode: together they are a cache key.
+    // ReSharper disable NotAccessedPositionalProperty.Global
+    internal readonly record struct ConversionKey(
+        PixelSize TargetSize,
+        BitmapInterpolationMode InterpolationMode);
+    // ReSharper restore NotAccessedPositionalProperty.Global
+
+    /// <summary>
+    ///     Strategy for drawing a bitmap into the pixel buffer, chosen by the console's capabilities: cells
+    ///     showing a <see cref="PixelImage" /> for a console with an image protocol, block glyphs otherwise.
+    /// </summary>
+    internal abstract class BitmapConverter
+    {
+        protected BitmapConverter(IConsoleOutput console)
+        {
+            ConsoleOutput = console;
+        }
+
+        /// <summary>The console the pictures go to: its cell size and capabilities.</summary>
+        protected IConsoleOutput ConsoleOutput { get; }
+
+        /// <summary>
+        ///     The converter for the console (capabilities are detected in PrepareConsole): pixel images when
+        ///     the console can show pictures, block glyphs otherwise.
+        /// </summary>
+        internal static BitmapConverter Create(IConsoleOutput console)
+        {
+            if (console.Capabilities.HasFlag(ConsoleCapabilities.SupportsPixelImages))
+                return new PixelImageBitmapConverter(console);
+
+            return new QuadPixelBitmapConverter(console);
+        }
+
+        /// <summary>
+        ///     Draws <paramref name="source" /> into the pixel buffer of <paramref name="context" /> over
+        ///     <paramref name="targetRect" /> (cell coordinates), limited to the visible
+        ///     <paramref name="intersectedRect" />, and tracks dirty regions.
+        /// </summary>
+        public abstract void Draw(DrawingContextImpl context, IBitmapImpl source,
+            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
+            BitmapInterpolationMode interpolationMode);
+
+        /// <summary>
+        ///     The part of <paramref name="targetRect" /> on screen, in cells relative to the target: what a
+        ///     conversion covers.
+        /// </summary>
+        /// <remarks>
+        ///     The screen, not the clip. A partial redraw (a dialog opening over the picture, say) clips to
+        ///     the region being redrawn, and converting by that clip made a conversion per redraw region. The
+        ///     cells outside it still showed the earlier conversion, and once the cache evicted that one, the
+        ///     image protocol deleted its image and those cells went blank. The screen bounds the size just
+        ///     as well, and stays the same however the picture is redrawn.
+        /// </remarks>
+        protected static PixelRect OnScreenCellsInTarget(DrawingContextImpl context, PixelRect targetRect)
+        {
+            var screen = new PixelRect(0, 0, context.PixelBuffer.Width, context.PixelBuffer.Height);
+            PixelRect onScreen = screen.Intersect(targetRect);
+            return new PixelRect(onScreen.X - targetRect.X, onScreen.Y - targetRect.Y,
+                onScreen.Width, onScreen.Height);
+        }
+
+        /// <summary>
+        ///     Where <paramref name="intersectedRect" /> falls in a conversion of <paramref name="convertedCells" />
+        ///     (cells relative to <paramref name="targetRect" />).
+        /// </summary>
+        protected static PixelRect IntersectedRectInConversion(PixelRect targetRect, PixelRect convertedCells,
+            PixelRect intersectedRect)
+        {
+            return new PixelRect(intersectedRect.X - targetRect.X - convertedCells.X,
+                intersectedRect.Y - targetRect.Y - convertedCells.Y,
+                intersectedRect.Width, intersectedRect.Height);
+        }
+
+        /// <summary>
+        ///     Copies the pixels <paramref name="source" /> shows in <paramref name="visible" /> when it is drawn
+        ///     at <paramref name="targetSize" /> into <paramref name="destination" />, as tightly packed BGRA rows.
+        /// </summary>
+        /// <param name="source">The picture.</param>
+        /// <param name="renderInterface">Scales the picture when it is not drawn at its own size.</param>
+        /// <param name="targetSize">The size in pixels the whole picture is drawn at.</param>
+        /// <param name="visible">The part of the drawn picture to copy, in pixels of <paramref name="targetSize" />.</param>
+        /// <param name="interpolationMode">How the picture is scaled.</param>
+        /// <param name="destination">
+        ///     Exactly 4 bytes per visible pixel. The caller owns it, so a converter refilling a conversion on
+        ///     every edit of a picture keeps one rather than allocating a screen of pixels each time.
+        /// </param>
+        /// <exception cref="NotSupportedException">
+        ///     The scaled pixels are not 32 bits each. Only BGRA and RGBA (converted) are read.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        ///     <paramref name="destination" /> is not the size of the visible pixels.
+        /// </exception>
+        /// <remarks>
+        ///     Only the visible part is scaled, never the whole picture at the size it is drawn. A picture
+        ///     zoomed far past the screen would otherwise be scaled, and for the image protocols sent to the
+        ///     terminal, at a size the terminal refuses (XTerm.NET stops at four megapixels), and the whole
+        ///     picture would vanish rather than show its visible part.
+        /// </remarks>
+        internal static void GetVisiblePixels(IBitmapImpl source, IPlatformRenderInterface renderInterface,
+            PixelSize targetSize, PixelRect visible, BitmapInterpolationMode interpolationMode, Span<byte> destination)
+        {
+            if (destination.Length != visible.Width * visible.Height * 4)
+                throw new ArgumentException("The destination is not the size of the visible pixels.",
+                    nameof(destination));
+
+            var readableSource = (IReadableBitmapImpl)source;
+            using ILockedFramebuffer sourceFrame = readableSource.Lock();
+
+            // The pixels actually there. Not source.PixelSize: an AspectRatioAdjustedBitmap reports half
+            // its height to layout, and measuring by that put the picture's top half where all of it goes.
+            PixelSize sourceSize = sourceFrame.Size;
+
+            // drawn at its own size: the visible part is a plain copy, unless the pixels need converting
+            if (sourceSize == targetSize && sourceFrame.Format == PixelFormat.Bgra8888)
+            {
+                CopyWindow(sourceFrame, visible.X, visible.Y, visible.Width, visible.Height, destination);
+                return;
+            }
+
+            // the source pixels behind the visible part, widened to whole pixels
+            double scaleX = (double)sourceSize.Width / targetSize.Width;
+            double scaleY = (double)sourceSize.Height / targetSize.Height;
+            int left = Math.Clamp((int)Math.Floor(visible.X * scaleX), 0, sourceSize.Width - 1);
+            int top = Math.Clamp((int)Math.Floor(visible.Y * scaleY), 0, sourceSize.Height - 1);
+            int right = Math.Clamp((int)Math.Ceiling(visible.Right * scaleX), left + 1, sourceSize.Width);
+            int bottom = Math.Clamp((int)Math.Ceiling(visible.Bottom * scaleY), top + 1, sourceSize.Height);
+
+            // Scaled as a piece, then cut down to the visible part: widening put the piece's edge a
+            // fraction of a pixel outside it, and this is where that fraction comes back off.
+            int offsetX = Math.Max(0, (int)Math.Round(visible.X - left / scaleX));
+            int offsetY = Math.Max(0, (int)Math.Round(visible.Y - top / scaleY));
+            var scaledSize = new PixelSize(
+                Math.Max((int)Math.Round((right - left) / scaleX), offsetX + visible.Width),
+                Math.Max((int)Math.Round((bottom - top) / scaleY), offsetY + visible.Height));
+
+            int bytesPerPixel = sourceFrame.Format.BitsPerPixel / 8;
+            using IBitmapImpl piece = renderInterface.LoadBitmap(sourceFrame.Format,
+                readableSource.AlphaFormat ?? AlphaFormat.Premul,
+                sourceFrame.Address + top * sourceFrame.RowBytes + left * bytesPerPixel,
+                new PixelSize(right - left, bottom - top), sourceFrame.Dpi, sourceFrame.RowBytes);
+            using IBitmapImpl scaled = renderInterface.ResizeBitmap(piece, scaledSize, interpolationMode);
+            using ILockedFramebuffer scaledFrame = ((IReadableBitmapImpl)scaled).Lock();
+
+            CopyWindow(scaledFrame, offsetX, offsetY, visible.Width, visible.Height, destination);
+        }
+
+        private static unsafe void CopyWindow(ILockedFramebuffer frame, int x, int y, int width, int height,
+            Span<byte> window)
+        {
+            if (frame.Format.BitsPerPixel != 32)
+                throw new NotSupportedException(
+                    $"Bitmaps with {frame.Format.BitsPerPixel} bits per pixel are not supported.");
+
+            ReadOnlySpan<byte> pixels = MemoryMarshal.CreateReadOnlySpan(
+                ref Unsafe.AsRef<byte>((void*)frame.Address), frame.RowBytes * frame.Size.Height);
+            CopyBlock(pixels, frame.RowBytes, x, y, width, height, window);
+
+            if (frame.Format == PixelFormat.Rgba8888)
+                for (int i = 0; i < window.Length; i += 4)
+                    (window[i], window[i + 2]) = (window[i + 2], window[i]);
+        }
+
+        /// <summary>
+        ///     Copies the <paramref name="width" /> x <paramref name="height" /> block at (x, y) out of an
+        ///     image of 4 bytes per pixel, <paramref name="imageRowBytes" /> per row, into the tightly packed
+        ///     <paramref name="block" />.
+        /// </summary>
+        protected static void CopyBlock(ReadOnlySpan<byte> image, int imageRowBytes, int x, int y,
+            int width, int height, Span<byte> block)
+        {
+            int blockRowBytes = width * 4;
+            for (int row = 0; row < height; row++)
+                image.Slice((y + row) * imageRowBytes + x * 4, blockRowBytes)
+                    .CopyTo(block.Slice(row * blockRowBytes, blockRowBytes));
+        }
+
+        /// <summary>
+        ///     Blends the visible part of a converted per-cell bitmap into the pixel buffer and marks it
+        ///     dirty, as every drawing operation does.
+        /// </summary>
+        /// <param name="context">The drawing context whose pixel buffer takes the cells.</param>
+        /// <param name="convertedBitmap">The conversion, one cell per cell.</param>
+        /// <param name="intersectedRect">The cells of the pixel buffer to fill.</param>
+        /// <param name="convertedOrigin">
+        ///     The cell of the conversion that goes to the top-left cell of <paramref name="intersectedRect" />.
+        /// </param>
+        protected static void CopyConvertedBitmap(DrawingContextImpl context, PixelBuffer convertedBitmap,
+            PixelRect intersectedRect, PixelPoint convertedOrigin)
+        {
+            PixelBuffer pixelBuffer = context.PixelBuffer;
+            for (int y = 0; y < intersectedRect.Height; y++)
+            for (int x = 0; x < intersectedRect.Width; x++)
+            {
+                var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
+                pixelBuffer[destPoint] = pixelBuffer[destPoint]
+                    .Blend(convertedBitmap[new PixelPoint(convertedOrigin.X + x, convertedOrigin.Y + y)]);
+            }
+
+            context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+        }
+
+        /// <summary>
+        ///     The picture itself, out of the <see cref="AspectRatioAdjustedBitmap" /> it may be wrapped in:
+        ///     the conversions are kept per picture, and a wrapper is made anew each time it is drawn.
+        /// </summary>
+        protected static IBitmapImpl UnwrapBitmap(IBitmapImpl bitmapImpl)
+        {
+            return bitmapImpl is AspectRatioAdjustedBitmap adjustedBitmap
+                ? adjustedBitmap.InnerBitmap
+                : bitmapImpl;
+        }
+    }
+
+    /// <summary>
+    ///     A converter that turns the on-screen part of a picture into cells, once per picture and size:
+    ///     drawing the same again reuses the conversion, a new version or a scroll refills it in place, and
+    ///     only the cells that changed are copied into the pixel buffer.
+    /// </summary>
+    /// <remarks>
+    ///     The pixels a conversion is made from pass through one buffer the converter keeps, never larger than
+    ///     the screen in BGRA (only visible cells are converted), rather than a buffer per conversion: a cell
+    ///     copies the pixels it needs, so nothing reads them once the cells are made, and a picture at four
+    ///     zoom levels kept four screens of them.
+    /// </remarks>
+    /// <typeparam name="TConversion">What a conversion holds besides its cells.</typeparam>
+    internal abstract class CellBitmapConverter<TConversion> : BitmapConverter
+        where TConversion : CellConversion, new()
+    {
+        /// <summary>
+        ///     Conversions kept per bitmap, one per size it is drawn at: a picture shown at several zoom
+        ///     levels has one for each, and the least recently drawn goes once there are more than this.
+        /// </summary>
+        private const int MaxConversionsPerBitmap = 4;
+
+        /// <summary>The visible pixels of the picture being converted; see the remarks.</summary>
+        private byte[] _pixels;
+
+        protected CellBitmapConverter(IConsoleOutput console)
+            : base(console)
+        {
+        }
+
+        /// <summary>The conversions of each picture, kept for as long as the picture is.</summary>
+        protected abstract ConditionalWeakTable<IBitmapImpl, List<KeyValuePair<ConversionKey, TConversion>>>
+            Conversions { get; }
+
+        /// <summary>
+        ///     Fills <see cref="CellConversion.Cells" /> of <paramref name="conversion" />, every cell, from
+        ///     <paramref name="pixels" />: BGRA rows of exactly the visible cells, valid for this call only.
+        /// </summary>
+        protected abstract void Convert(DrawingContextImpl context, TConversion conversion, ReadOnlySpan<byte> pixels,
+            int cellPixelWidth, int cellPixelHeight, IPlatformRenderInterface renderInterface);
+
+        /// <summary>Whether a conversion of the current version can still be shown, or must be made again.</summary>
+        protected virtual bool IsReusable(TConversion conversion)
+        {
+            return true;
+        }
+
+        public sealed override void Draw(DrawingContextImpl context, IBitmapImpl source,
+            IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
+            BitmapInterpolationMode interpolationMode)
+        {
+            int cellPixelWidth = ConsoleOutput.CellPixelWidth;
+            int cellPixelHeight = ConsoleOutput.CellPixelHeight;
+
+            var targetSize = new PixelSize(targetRect.Width * cellPixelWidth,
+                targetRect.Height * cellPixelHeight);
+            PixelRect visibleCells = OnScreenCellsInTarget(context, targetRect);
+            IBitmapImpl bitmap = UnwrapBitmap(source);
+
+            TConversion conversion = FindOrAdd(Conversions.GetOrCreateValue(bitmap),
+                new ConversionKey(targetSize, interpolationMode));
+            if (!conversion.Shows(bitmap.Version, visibleCells) || !IsReusable(conversion))
+            {
+                // only the visible cells are converted, so the conversion starts at the first of them
+                conversion.Prepare(visibleCells);
+                var visiblePixels = new PixelRect(visibleCells.X * cellPixelWidth, visibleCells.Y * cellPixelHeight,
+                    visibleCells.Width * cellPixelWidth, visibleCells.Height * cellPixelHeight);
+                int pixelBytes = visiblePixels.Width * visiblePixels.Height * 4;
+                if (_pixels == null || _pixels.Length < pixelBytes)
+                    _pixels = GC.AllocateUninitializedArray<byte>(pixelBytes);
+                Span<byte> pixels = _pixels.AsSpan(0, pixelBytes);
+                GetVisiblePixels(source, renderInterface, targetSize, visiblePixels, interpolationMode, pixels);
+                Convert(context, conversion, pixels, cellPixelWidth, cellPixelHeight, renderInterface);
+                conversion.Complete(bitmap.Version);
+            }
+
+            CopyConvertedBitmap(context, conversion.Cells, intersectedRect,
+                IntersectedRectInConversion(targetRect, visibleCells, intersectedRect).Position);
+        }
+
+        /// <summary>
+        ///     The conversion for <paramref name="key" />, made when there is none, and now the most recently
+        ///     drawn (last in the list). The least recently drawn goes once there are too many.
+        /// </summary>
+        internal static TConversion FindOrAdd(List<KeyValuePair<ConversionKey, TConversion>> conversions,
+            ConversionKey key)
+        {
+            for (int i = 0; i < conversions.Count; i++)
+            {
+                if (conversions[i].Key != key)
+                    continue;
+
+                KeyValuePair<ConversionKey, TConversion> found = conversions[i];
+                if (i != conversions.Count - 1)
+                {
+                    conversions.RemoveAt(i);
+                    conversions.Add(found);
+                }
+
+                return found.Value;
+            }
+
+            while (conversions.Count >= MaxConversionsPerBitmap)
+                conversions.RemoveAt(0);
+
+            var conversion = new TConversion();
+            conversions.Add(new KeyValuePair<ConversionKey, TConversion>(key, conversion));
+            return conversion;
+        }
+    }
+
+    /// <summary>
+    ///     The cells a picture converts to at one size. A converter keeps one per picture and size and
+    ///     refills it in place for each new version or visible part, so an edit allocates nothing the size
+    ///     of the screen: the cell buffer (40 bytes a cell) is made once, not once per brush stroke.
+    ///     Touched only from the render thread, like everything a converter draws with.
+    /// </summary>
+    internal class CellConversion
+    {
+        private bool _complete;
+
+        /// <summary>The version of the picture the cells show, once <see cref="Shows" /> can be true.</summary>
+        public int Version { get; private set; }
+
+        /// <summary>The cells of the picture the conversion covers, relative to where it is drawn.</summary>
+        public PixelRect VisibleCells { get; private set; }
+
+        /// <summary>One cell per visible cell.</summary>
+        public PixelBuffer Cells { get; private set; }
+
+        /// <summary>
+        ///     Whether the cells show <paramref name="version" /> of the picture over
+        ///     <paramref name="visibleCells" />.
+        /// </summary>
+        public bool Shows(int version, PixelRect visibleCells)
+        {
+            return _complete && Version == version && VisibleCells == visibleCells;
+        }
+
+        /// <summary>
+        ///     Makes room for a conversion of <paramref name="visibleCells" />, keeping the cells when their
+        ///     size is unchanged, and shows nothing until <see cref="Complete" />: a conversion that throws
+        ///     leaves a conversion that is made again, not one claiming to show the previous version.
+        /// </summary>
+        internal void Prepare(PixelRect visibleCells)
+        {
+            _complete = false;
+            VisibleCells = visibleCells;
+
+            if (Cells == null || Cells.Width != visibleCells.Width || Cells.Height != visibleCells.Height)
+                Cells = new PixelBuffer((ushort)visibleCells.Width, (ushort)visibleCells.Height);
+        }
+
+        /// <summary>
+        ///     The cells now show <paramref name="version" /> over the cells given to <see cref="Prepare" />.
+        /// </summary>
+        internal void Complete(int version)
+        {
+            Version = version;
+            _complete = true;
+        }
+    }
+}
