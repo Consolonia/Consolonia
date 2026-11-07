@@ -114,18 +114,24 @@ namespace Consolonia.Core.Helpers.InputProcessing
         private void TryFlushStartingFrom(int startIndex)
         {
             for (int i = startIndex; i < Matchers.Length; i++)
-                if (Matchers[i].TryFlush())
-                {
-                    _infoLogger.Log3(
-                        "Matcher {Matcher} at index {MatcherIndex} flushed successfully, resetting matchers from index {NextMatcherIndex}",
-                        Matchers[i].GetDebugInfo(), i, i + 1);
-                    ResetMatchersFrom(i + 1);
-                    break;
-                }
-            /*else
             {
-                // because of 15F2A2C4-218D-4B4D-86CE-330A312EF6A6 we can not reset all others even if it seems logical
-            }*/
+                switch (Matchers[i].TryFlush())
+                {
+                    case AppendResult.AutoFlushed:
+                        _infoLogger.Log3(
+                            "Matcher {Matcher} at index {MatcherIndex} flushed successfully, resetting matchers from index {NextMatcherIndex}",
+                            Matchers[i].GetDebugInfo(), i, i + 1);
+                        ResetMatchersFrom(i + 1);
+                        return;
+
+                    case AppendResult.Match:
+                        return;
+
+                    case AppendResult.NoMatch:
+                        Matchers[i].Reset();
+                        continue;
+                }
+            }
         }
 
         private void ResetMatchersFrom(int startIndex)

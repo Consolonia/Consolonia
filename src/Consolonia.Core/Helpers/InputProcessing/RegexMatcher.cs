@@ -38,7 +38,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             }
             else
             {
-                _accumulator.Length--;
+                _accumulator.Length-=rune.Utf8SequenceLength;
             }
 
             return matchResultInternal;
@@ -50,12 +50,12 @@ namespace Consolonia.Core.Helpers.InputProcessing
             return _regex.IsMatch(toTest) ? AppendResult.Match : AppendResult.NoMatch;
         }
 
-        public override bool TryFlush()
+        public override AppendResult TryFlush()
         {
-            if (_accumulator.Length == 0) return false;
+            if (_accumulator.Length == 0) return AppendResult.NoMatch;
 
             if (autoFlushOnLength != null)
-                return false;
+                return AppendResult.Match;
 
             string currentAccumulated = _accumulator.ToString();
             bool matches = MatchResultInternal(currentAccumulated) == AppendResult.Match;
@@ -63,9 +63,10 @@ namespace Consolonia.Core.Helpers.InputProcessing
             {
                 Complete((currentAccumulated, _accumulatedKeys.ToArray()));
                 Reset();
+                return AppendResult.AutoFlushed;
             }
 
-            return matches;
+            return AppendResult.NoMatch;
         }
 
         private protected int GetAccumulatedLength()

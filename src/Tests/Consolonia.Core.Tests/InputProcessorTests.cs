@@ -12,6 +12,43 @@ namespace Consolonia.Core.Tests
     public class InputProcessorTests
     {
         [Test]
+        public void LockedSequenceYieldsToNonTextInputAndCanStartAgain()
+        {
+            List<string> output = [];
+            var processor = new InputProcessor<(int, int)>([
+                new SafeLockMatcher(
+                    new SequenceTableMatcher<int, string>(output.Add, c => new Rune(c),
+                        [("\x1b[A", "up")], _ => true), 0, 0),
+                new SafeLockMatcher(new GenericMatcher<int>(_ => output.Add("special key")), 1)
+            ]);
+
+            processor.ProcessChunk(new[] { (0, 27), (0, (int)'[') });
+            Assert.IsEmpty(output);
+
+            processor.ProcessChunk(new[] { (1, 42) });
+            CollectionAssert.AreEqual(new[] { "special key" }, output);
+
+            processor.ProcessChunk(new[] { (0, 27), (0, (int)'['), (0, (int)'A') });
+            CollectionAssert.AreEqual(new[] { "special key", "up" }, output);
+        }
+
+        [Test]
+        public void TextBelowMinimumDoesNotRetainInputHandledByFallback()
+        {
+            List<string> output = [];
+            var processor = new InputProcessor<char>([
+                new TextInputMatcher<char>(s => output.Add("text:" + s.Item1), c => new Rune(c), 3),
+                new GenericMatcher<char>(c => output.Add("key:" + c))
+            ]);
+
+            processor.ProcessChunk("ab".ToCharArray());
+            processor.ProcessChunk("cd".ToCharArray());
+            processor.ProcessChunk("efg".ToCharArray());
+
+            CollectionAssert.AreEqual(new[] { "key:a", "key:b", "key:c", "key:d", "text:efg" }, output);
+        }
+
+        [Test]
         public void RealLifeTest()
         {
             List<(Type, ConsoleKey?, string?, string?)> output = [];
@@ -138,6 +175,91 @@ namespace Consolonia.Core.Tests
             void OnComplete(string newStr)
             {
                 result = string.Join(" ", result, newStr);
+            }
+        }
+
+        [Test]
+        public void PasteConsumesEachInputWhileCapturingAndCompletesOnlyAtClosingTag()
+        {
+            List<string> output = [];
+            var matcher = new PasteBlockMatcher<char>(output.Add, c => new Rune(c));
+            const string opening = "\x1b[200~";
+            const string closing = "\x1b[201~";
+
+            for (int i = 0; i < opening.Length; i++)
+                Assert.AreEqual(i == opening.Length - 1 ? AppendResult.AutoFlushed : AppendResult.Match,
+                    matcher.Append(opening[i]));
+
+            matcher.Reset();
+            Assert.AreEqual(AppendResult.Match, matcher.TryFlush());
+            Assert.IsEmpty(output);
+
+            foreach (char c in "hello" + closing[..^1])
+            {
+                Assert.AreEqual(AppendResult.AutoFlushed, matcher.Append(c));
+                matcher.Reset();
+                Assert.AreEqual(AppendResult.Match, matcher.TryFlush());
+                Assert.IsEmpty(output);
+            }
+
+            Assert.AreEqual(AppendResult.AutoFlushed, matcher.Append(closing[^1]));
+            matcher.Reset();
+            CollectionAssert.AreEqual(new[] { "hello" }, output);
+            Assert.AreEqual(AppendResult.NoMatch, matcher.TryFlush());
+            Assert.AreEqual(AppendResult.NoMatch, matcher.Append('x'));
+        }
+
+        [Test]
+        public void PartialPasteOpeningPreservesLowerMatcherAcrossChunks()
+        {
+            List<string> output = [];
+            var paste = new PasteBlockMatcher<char>(s => output.Add("paste:" + s), c => new Rune(c));
+            var processor = new InputProcessor<char>([
+                paste,
+                new RegexMatcher<char>(s => output.Add("key:" + s.Item1), c => new Rune(c),
+                    @"\A\x1b(?:\[A?)?\z", autoFlushOnLength: 3)
+            ]);
+
+            processor.ProcessChunk("\x1b[".ToCharArray());
+            Assert.AreEqual(AppendResult.Match, paste.TryFlush());
+            Assert.IsEmpty(output);
+
+            processor.ProcessChunk("A".ToCharArray());
+            CollectionAssert.AreEqual(new[] { "key:\x1b[A" }, output);
+        }
+
+        [Test]
+        public void ResetClearsIncompletePasteOpeningTag()
+        {
+            List<string> output = [];
+            var matcher = new PasteBlockMatcher<char>(output.Add, c => new Rune(c));
+
+            foreach (char c in "\x1b[200") matcher.Append(c);
+            matcher.Reset();
+
+            Assert.AreEqual(AppendResult.NoMatch, matcher.TryFlush());
+            Assert.AreEqual(AppendResult.NoMatch, matcher.Append('~'));
+            Assert.IsEmpty(output);
+        }
+
+        [Test]
+        public void PasteCaptureSurvivesEveryChunkBoundary()
+        {
+            const string input = "\x1b[200~hello\x1b[201~";
+            for (int split = 1; split < input.Length; split++)
+            {
+                List<string> output = [];
+                var processor = new InputProcessor<char>([
+                    new PasteBlockMatcher<char>(s => output.Add("paste:" + s), c => new Rune(c)),
+                    new GenericMatcher<char>(c => output.Add("key:" + c))
+                ]);
+
+                processor.ProcessChunk(input[..split].ToCharArray());
+                Assert.IsEmpty(output, $"Incomplete paste emitted input at split {split}");
+
+                processor.ProcessChunk((input[split..] + "x").ToCharArray());
+                CollectionAssert.AreEqual(new[] { "paste:hello", "key:x" }, output,
+                    $"Incorrect output at split {split}");
             }
         }
 
