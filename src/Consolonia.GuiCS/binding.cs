@@ -349,6 +349,7 @@ namespace Unix.Terminal {
 		static public int resize_term (int lines, int columns) => methods.resize_term (lines, columns);
 		static public int resizeterm (int lines, int columns) => methods.resizeterm (lines, columns);
 		static public int erasechar() => methods.erasechar();
+		static public bool set_escdelay (int ms) => methods.set_escdelay != null && methods.set_escdelay (ms) != ERR;
 		static public void use_env (bool f) => methods.use_env (f);
 		static public int flushinp () => methods.flushinp ();
 		static public int def_prog_mode () => methods.def_prog_mode ();
@@ -439,6 +440,7 @@ namespace Unix.Terminal {
 		public delegate int resetty ();
 		public delegate IntPtr curses_version ();
 		public delegate int erasechar();
+		public delegate int set_escdelay (int ms);
 	}
 	
 	internal class NativeMethods {
@@ -513,6 +515,7 @@ namespace Unix.Terminal {
 		public readonly Delegates.resetty resetty;
 		public readonly Delegates.curses_version curses_version;
 		public readonly Delegates.erasechar erasechar;
+		public readonly Delegates.set_escdelay set_escdelay;
 		public UnmanagedLibrary UnmanagedLibrary;
 
 		public NativeMethods (UnmanagedLibrary lib)
@@ -589,6 +592,11 @@ namespace Unix.Terminal {
 			resetty = lib.GetNativeMethodDelegate<Delegates.resetty> ("resetty");
 			curses_version = lib.GetNativeMethodDelegate<Delegates.curses_version> ("curses_version");
 			erasechar = lib.GetNativeMethodDelegate<Delegates.erasechar>("erasechar");
+
+			// ncurses before 5.8 doesn't have it
+			IntPtr escdelay = lib.LoadSymbol ("set_escdelay");
+			if (escdelay != IntPtr.Zero)
+				set_escdelay = Marshal.GetDelegateForFunctionPointer<Delegates.set_escdelay> (escdelay);
 		}
 	}
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member

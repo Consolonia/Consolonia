@@ -28,7 +28,7 @@ namespace Consolonia.Core.Helpers
 
         public void StartReading()
         {
-            Task _ = Task.Run(async () =>
+            Task _ = Task.Run(() =>
             {
                 while (!_disposed)
                     try
@@ -41,7 +41,6 @@ namespace Consolonia.Core.Helpers
                     }
                     catch (Exception exception)
                     {
-                        await Helper.WaitDispatcherInitialized();
                         Dispatcher.UIThread.Post(
                             () => throw new ConsoloniaException("Exception in input loop", exception),
                             DispatcherPriority.MaxValue);

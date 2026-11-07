@@ -179,14 +179,36 @@ namespace Consolonia.PlatformSupport
         [MethodImpl(MethodImplOptions.Synchronized)]
         public override void StartInputLoop()
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH,
+                    _ =>
+                    {
+                        Task unused = DispatchInputAsync(ApplyTerminalResize);
+                    });
+
+                // A resize before this point had no handler.
+                ApplyTerminalResize();
+            }
+
+            _gpmMonitor?.Start();
             StartEventLoop();
+        }
+
+        private void ApplyTerminalResize()
+        {
+            Curses.resizeterm(0, 0);
+            CheckSize();
         }
 
         private void StartEventLoop()
         {
-            Task _ = Task.Run(async () =>
+            Task _ = Task.Run(() =>
             {
-                await Helper.WaitDispatcherInitialized();
+                int? escDelay = ConsoloniaPlatform.Settings?.EscDelay;
+                if (escDelay != null && Environment.GetEnvironmentVariable("ESCDELAY") == null &&
+                    !Curses.set_escdelay(escDelay.Value))
+                    _verboseLogger.Log2("set_escdelay isn't available");
 
                 _inputBuffer.StartReading();
 
@@ -311,16 +333,6 @@ namespace Consolonia.PlatformSupport
 
             if (_eraseCharacter != 127)
                 _verboseLogger.Log2("Erase character is {EraseCharacter}", _eraseCharacter);
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                _sigwinchRegistration = PosixSignalRegistration.Create(PosixSignal.SIGWINCH, _ =>
-                {
-                    Task unused = DispatchInputAsync(() =>
-                    {
-                        Curses.resizeterm(0, 0);
-                        CheckSize();
-                    });
-                });
 
             Curses.raw();
             Curses.noecho();

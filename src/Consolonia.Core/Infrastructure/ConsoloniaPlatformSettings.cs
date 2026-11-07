@@ -19,5 +19,10 @@ namespace Consolonia.Core.Infrastructure
         ///     <seealso cref="ConsoloniaPlatform.NotSupported" />
         /// </summary>
         public bool UnsafeRendering { get; init; } = true;
+
+        /// <summary>
+        ///     Milliseconds curses waits after ESC for a key sequence. Null, or a set ESCDELAY, keeps curses' own.
+        /// </summary>
+        public int? EscDelay { get; init; } = 50;
     }
 }
