@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Core.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+    <PropertyGroup>
+        <Description>Shows pictures as real pixels in terminals that support the kitty graphics protocol or sixel. Enable with UseConsoloniaImaging().</Description>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="JeremyAnsel.ColorQuant" Version="3.0.74" />
+        <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Consolonia.Core\Consolonia.Core.csproj" />
+        <ProjectReference Include="..\Consolonia.Controls\Consolonia.Controls.csproj" />
+    </ItemGroup>
+
+</Project>

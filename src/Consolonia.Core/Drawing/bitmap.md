@@ -4,7 +4,10 @@ Architecture notes for the bitmap pipeline. A picture becomes cells of the pixel
 other drawing; which image protocol shows them, and how, is the console output's business. Image
 protocols (sixel, kitty graphics) are not implemented in core: an encoder library gives the console
 an `IConsoleImageEncoderFactory`, and without one pictures are block glyphs
-([quadbitmap.md](quadbitmap.md)).
+([quadbitmap.md](quadbitmap.md)). `Consolonia.Imaging` is that library, enabled with
+`UseConsoloniaImaging()`; its protocols are described in
+[kittybitmap.md](../../Consolonia.Imaging/kittybitmap.md) and
+[sixelbitmap.md](../../Consolonia.Imaging/sixelbitmap.md).
 
 ## The pipeline at a glance
 
