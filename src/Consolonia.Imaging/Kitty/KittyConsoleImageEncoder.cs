@@ -1,0 +1,405 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.IO.Compression;
+using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Consolonia.Core.Drawing;
+using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Infrastructure;
+
+namespace Consolonia.Imaging
+{
+    /// <summary>
+    ///     Shows image cells through the kitty graphics protocol. A kitty picture is a <em>placement</em>,
+    ///     an object below the text rather than the content of a cell, so text shows over it
+    ///     (<see cref="SupportsTextOverlay" />): the output writes an image cell as an ordinary cell on the
+    ///     default background, and at the end of every frame each block of the screen whose picture
+    ///     changed is transmitted again under the block's own image id and placed at its cells.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Blocks, because kitty cannot portably change part of an image once transmitted, so the
+    ///         image is the unit of retransmission: one image per picture meant a brush stroke re-sent the
+    ///         whole picture. A block of a few cells is the compromise between how many images a screen is
+    ///         and how much a change re-sends.
+    ///     </para>
+    ///     <para>
+    ///         One image id per block position, until a reset deletes them all. Transmitting under an id
+    ///         the terminal already holds replaces that image and every placement of it, so a block that
+    ///         changed is sent again and its old picture is gone with no delete, and the terminal never holds
+    ///         more images than the screen has blocks. Nothing is ever placed that was not transmitted in the
+    ///         same frame, so no placement can name an image the terminal has dropped. The earlier encoder
+    ///         kept images by content and placed them again by id, and a terminal that had trimmed one left a
+    ///         hole; the only state here is what each position was last sent, which is this encoder's own.
+    ///     </para>
+    /// </remarks>
+    [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
+        Justification = "The MemoryStream is over a managed array and holds nothing a Dispose would free")]
+    internal sealed class KittyConsoleImageEncoder : IConsoleImageEncoder
+    {
+        /// <summary>Block size in cells: small enough that a stroke touches few, large enough to be few.</summary>
+        internal const int BlockColumns = 8;
+
+        internal const int BlockRows = 4;
+
+        /// <summary>Bytes of the description of one cell in a block's key: its image's digest and its paint.</summary>
+        private const int KeyBytesPerCell = 16 + 4;
+
+        /// <summary>What each block position was last sent: its image id and the key of the pixels placed.</summary>
+        private readonly Dictionary<(int X, int Y), BlockState> _blocks = new();
+
+        private readonly List<(int X, int Y)> _blocksToForget = new();
+
+        /// <summary>Set by <see cref="Reset" />: the next frame deletes every block's image before sending.</summary>
+        private bool _deleteAllBeforeNextFrame;
+
+        /// <summary>The encoded bytes of the block being transmitted: PNG or zlib. One stream, emptied per block.</summary>
+        private readonly MemoryStream _encoded = new();
+
+        private readonly IConsoleOutput _output;
+        private byte[] _blockKey;
+        private byte[] _blockScratch;
+
+        /// <summary>
+        ///     The platform's bitmaps, which encode PNG; null sends RGBA. Looked up on the first transmit, not
+        ///     in the constructor: the console makes its encoder while it is constructed, before the
+        ///     application binds the render interface. Null again once it has failed to encode.
+        /// </summary>
+        private IPlatformRenderInterface _renderInterface;
+
+        private bool _renderInterfaceResolved;
+
+        public KittyConsoleImageEncoder(IConsoleOutput output)
+        {
+            _output = output;
+        }
+
+        /// <summary>
+        ///     The placements are below the text. Konsole draws below-text (z&lt;0) placements under any
+        ///     explicit cell background, so the output writes an image cell on the default background, which
+        ///     every terminal shows them through; kitty draws them above background colors either way.
+        /// </summary>
+        public bool SupportsTextOverlay => true;
+
+        /// <summary>
+        ///     Walks the screen in blocks. A block whose picture changed since it was last sent (its cells'
+        ///     images, their paint, or which of its cells show a picture) is transmitted again under its id,
+        ///     which replaces what the terminal showed for it, and placed at its image cells, cropped
+        ///     rectangle by rectangle (z=-2, below the text, above background colors). A block with no
+        ///     picture any more has its image deleted. Paint is composited into the pixels: a dimmed
+        ///     picture is a different picture.
+        /// </summary>
+        /// <remarks>
+        ///     Only image cells are ever under a placement. A placement below the text is drawn above the
+        ///     cells' background colors, and a terminal need not show a cell's color through the image's
+        ///     transparent pixels: placing a whole block put the picture over a dialog's body and left only
+        ///     its border glyphs.
+        /// </remarks>
+        public void WriteImages(PixelBuffer screen)
+        {
+            int cellPixelWidth = _output.CellPixelWidth;
+            int cellPixelHeight = _output.CellPixelHeight;
+            int screenWidth = screen.Width;
+            // which cells of the block being placed a placement already covers
+            Span<bool> placed = stackalloc bool[BlockColumns * BlockRows];
+
+            if (_deleteAllBeforeNextFrame)
+            {
+                foreach (BlockState state in _blocks.Values)
+                    _output.WriteText(KittyGraphics.BuildDeleteSequence(state.ImageId));
+                _blocks.Clear();
+                _deleteAllBeforeNextFrame = false;
+            }
+
+            for (int blockY = 0; blockY < screen.Height; blockY += BlockRows)
+            for (int blockX = 0; blockX < screenWidth; blockX += BlockColumns)
+            {
+                int columns = Math.Min(BlockColumns, screenWidth - blockX);
+                int rows = Math.Min(BlockRows, screen.Height - blockY);
+                bool anyImage = TryGetBlockKey(screen, blockX, blockY, columns, rows, cellPixelWidth,
+                    cellPixelHeight, out PictureKey key);
+
+                _blocks.TryGetValue((blockX, blockY), out BlockState state);
+                if (!anyImage)
+                {
+                    if (state != null && state.Sent != default)
+                    {
+                        _output.WriteText(KittyGraphics.BuildDeleteSequence(state.ImageId));
+                        state.Sent = default;
+                    }
+
+                    continue;
+                }
+
+                if (state == null)
+                {
+                    state = new BlockState { ImageId = KittyGraphics.AllocateImageId() };
+                    _blocks[(blockX, blockY)] = state;
+                }
+
+                if (state.Sent == key)
+                    continue;
+
+                // the pixels first, replacing the block's previous image and placements, then the placements
+                TransmitBlock(state.ImageId, screen, blockX, blockY, columns, rows, cellPixelWidth, cellPixelHeight);
+                state.Sent = key;
+
+                placed.Clear();
+                int placementId = 0;
+                for (int y = blockY; y < blockY + rows; y++)
+                for (int x = blockX; x < blockX + columns; x++)
+                {
+                    if (placed[(y - blockY) * columns + x - blockX] || screen.CellAt(x, y).Background.Image == null)
+                        continue;
+
+                    (int width, int height) = GrowPlacement(screen, placed, blockX, blockY, columns, rows, x, y);
+                    _output.SetCaretPosition(new PixelBufferCoordinate((ushort)x, (ushort)y));
+                    _output.WriteText(KittyGraphics.BuildRectPlacementSequence(state.ImageId, ++placementId,
+                        (x - blockX) * cellPixelWidth, (y - blockY) * cellPixelHeight,
+                        width * cellPixelWidth, height * cellPixelHeight));
+                }
+            }
+
+            ForgetBlocksOutside(screenWidth, screen.Height);
+        }
+
+        /// <summary>
+        ///     The terminal may no longer show what was sent where it was sent (the screen was resized, and
+        ///     terminals differ in what becomes of placements then; or another program had the terminal). The
+        ///     next frame first deletes every image this encoder sent, with its placements, then sends every
+        ///     block again under new ids: the terminal then holds exactly what that frame placed.
+        /// </summary>
+        /// <remarks>
+        ///     Forgetting what was sent without deleting it left images in the terminal no block knew of: a
+        ///     block that had no picture after a resize, or that a narrower screen no longer had, was never
+        ///     deleted, and its picture stayed on screen whatever was drawn over it.
+        /// </remarks>
+        public void Reset()
+        {
+            _deleteAllBeforeNextFrame = true;
+        }
+
+        /// <summary>
+        ///     Deletes every image this session transmitted and every placement, so none is left in the
+        ///     terminal's memory when the application gives it back.
+        /// </summary>
+        public void RestoreConsole()
+        {
+            _output.WriteText(KittyGraphics.BuildDeleteTransmittedImagesSequence());
+            _output.WriteText(KittyGraphics.DeleteAllImages);
+        }
+
+        /// <summary>
+        ///     The rectangle of image cells of the block that grows from the image cell (x, y): rightward
+        ///     while cells show an image, then downward while the whole width of the next row does, never
+        ///     into a cell already <paramref name="placed" /> (one flag per cell of the block, row by row).
+        ///     Marks the cells it takes as placed.
+        /// </summary>
+        private static (int Width, int Height) GrowPlacement(PixelBuffer screen, Span<bool> placed,
+            int blockX, int blockY, int columns, int rows, int x, int y)
+        {
+            int column = x - blockX;
+            int row = y - blockY;
+
+            int width = 1;
+            while (column + width < columns && !placed[row * columns + column + width] &&
+                   screen.CellAt(x + width, y).Background.Image != null)
+                width++;
+
+            int height = 1;
+            while (row + height < rows)
+            {
+                bool joins = true;
+                for (int i = 0; i < width && joins; i++)
+                    joins = !placed[(row + height) * columns + column + i] &&
+                            screen.CellAt(x + i, y + height).Background.Image != null;
+                if (!joins)
+                    break;
+                height++;
+            }
+
+            for (int r = row; r < row + height; r++)
+                placed.Slice(r * columns + column, width).Fill(true);
+
+            return (width, height);
+        }
+
+        /// <summary>
+        ///     What a block shows, as a key: each cell's image digest and paint, zero for a cell without an
+        ///     image. False when no cell of the block shows an image.
+        /// </summary>
+        private bool TryGetBlockKey(PixelBuffer screen, int blockX, int blockY, int columns, int rows,
+            int cellPixelWidth, int cellPixelHeight, out PictureKey key)
+        {
+            int bytes = columns * rows * KeyBytesPerCell;
+            if (_blockKey == null || _blockKey.Length < bytes)
+                _blockKey = new byte[BlockColumns * BlockRows * KeyBytesPerCell];
+            Span<byte> description = _blockKey.AsSpan(0, bytes);
+            description.Clear();
+
+            bool anyImage = false;
+            int offset = 0;
+            for (int row = 0; row < rows; row++)
+            for (int column = 0; column < columns; column++, offset += KeyBytesPerCell)
+            {
+                PixelBackground background = screen.CellAt(blockX + column, blockY + row).Background;
+                if (background.Image == null)
+                    continue;
+
+                anyImage = true;
+                MemoryMarshal.Write(description[offset..], background.Image.Digest);
+                BitConverter.TryWriteBytes(description[(offset + 16)..], background.Color.ToUInt32());
+            }
+
+            key = anyImage ? PictureKey.Of(description, columns * cellPixelWidth, rows * cellPixelHeight) : default;
+            return anyImage;
+        }
+
+        /// <summary>
+        ///     Sends the block as one image under <paramref name="imageId" />, its cells' pixels side by side
+        ///     with each cell's paint composited in and a cell without an image transparent: PNG through the
+        ///     platform's bitmaps when there are any (every kitty terminal decodes it, and a photograph is
+        ///     half the bytes), RGBA with zlib otherwise.
+        /// </summary>
+        private void TransmitBlock(int imageId, PixelBuffer screen, int blockX, int blockY, int columns, int rows,
+            int cellPixelWidth, int cellPixelHeight)
+        {
+            int blockWidth = columns * cellPixelWidth;
+            int blockHeight = rows * cellPixelHeight;
+            int blockBytes = blockWidth * blockHeight * 4;
+            if (_blockScratch == null || _blockScratch.Length < blockBytes)
+                _blockScratch = new byte[BlockColumns * cellPixelWidth * BlockRows * cellPixelHeight * 4];
+            Span<byte> block = _blockScratch.AsSpan(0, blockBytes);
+            block.Clear();
+
+            int blockRowBytes = blockWidth * 4;
+            int cellRowBytes = cellPixelWidth * 4;
+            for (int row = 0; row < rows; row++)
+            for (int column = 0; column < columns; column++)
+            {
+                PixelBackground background = screen.CellAt(blockX + column, blockY + row).Background;
+                PixelImage image = background.Image;
+                if (image == null)
+                    continue;
+
+                int cellOffset = row * cellPixelHeight * blockRowBytes + column * cellRowBytes;
+                ReadOnlySpan<byte> bgra = image.Bgra;
+                for (int y = 0; y < cellPixelHeight; y++)
+                    bgra.Slice(y * cellRowBytes, cellRowBytes).CopyTo(block.Slice(cellOffset + y * blockRowBytes));
+
+                if (background.Color.A != 0)
+                    PixelImage.Paint(block, blockRowBytes, cellOffset, cellPixelWidth, cellPixelHeight,
+                        background.Color);
+            }
+
+            MemoryStream encoded = _encoded;
+            encoded.SetLength(0);
+            if (TryEncodePng(block, blockWidth, blockHeight, encoded))
+            {
+                KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, Encoded(),
+                    KittyImageFormat.Png);
+                return;
+            }
+
+            // RGBA: the blue and red bytes swap. Fastest is zlib level 1: level 6 saved a quarter of the
+            // bytes on photographs and cost more than twice the time per block, and this is the fallback.
+            for (int i = 0; i < block.Length; i += 4)
+                (block[i], block[i + 2]) = (block[i + 2], block[i]);
+
+            encoded.SetLength(0);
+            using (var zlib = new ZLibStream(encoded, CompressionLevel.Fastest, true))
+            {
+                zlib.Write(block);
+            }
+
+            KittyGraphics.WriteTransmitSequence(_output, imageId, blockWidth, blockHeight, Encoded(),
+                KittyImageFormat.Rgba, true);
+        }
+
+        /// <summary>What <see cref="_encoded" /> holds, without copying it out.</summary>
+        private ReadOnlySpan<byte> Encoded()
+        {
+            return _encoded.GetBuffer().AsSpan(0, (int)_encoded.Length);
+        }
+
+        /// <summary>
+        ///     Writes the PNG of <paramref name="width" /> x <paramref name="height" /> BGRA pixels to
+        ///     <paramref name="png" /> through the platform's bitmaps (a bitmap loaded from the pixels and
+        ///     saved, which Avalonia does through Skia). False, with nothing written, where the platform has
+        ///     none or cannot encode: the headless tests, the benchmarks, a platform without an image codec.
+        ///     A platform that cannot is not asked again, so the failure costs one exception, not one a block.
+        /// </summary>
+        private unsafe bool TryEncodePng(ReadOnlySpan<byte> bgra, int width, int height, MemoryStream png)
+        {
+            if (!_renderInterfaceResolved)
+            {
+                _renderInterface = AvaloniaLocator.Current.GetService<IPlatformRenderInterface>();
+                _renderInterfaceResolved = true;
+            }
+
+            if (_renderInterface == null)
+                return false;
+
+            try
+            {
+                fixed (byte* pixels = bgra)
+                {
+                    // Without the Skia fallback ConsoloniaPlatform answers with a DummyBitmap, which saves
+                    // nothing (below). A picture is a DummyBitmap there too and DrawBitmap skips it, so
+                    // only bitmaps made without the platform (the tests' fakes) get here with no Skia.
+                    // An application's own not-supported handler may answer null.
+                    using IBitmapImpl bitmap = _renderInterface.LoadBitmap(PixelFormat.Bgra8888, AlphaFormat.Premul,
+                        (IntPtr)pixels, new PixelSize(width, height), new Vector(96, 96), width * 4);
+                    // ReSharper disable once ConstantConditionalAccessQualifier annotated non-null, but it can be
+                    bitmap?.Save(png, PngBitmapEncoderOptions.Default);
+                    // a platform with no image codec saves nothing rather than throwing
+                    if (png.Length > 0)
+                        return true;
+                }
+            }
+            catch (Exception exception) when (exception is NotSupportedException or NotImplementedException
+                                                  or ConsoloniaNotSupportedException)
+            {
+                // no bitmaps here (the headless tests): as with no codec, RGBA from now on
+            }
+
+            png.SetLength(0);
+            _renderInterface = null;
+            return false;
+        }
+
+        /// <summary>
+        ///     Deletes the images of block positions the screen no longer has (it shrank), so the terminal
+        ///     holds no more than the screen's blocks.
+        /// </summary>
+        private void ForgetBlocksOutside(int screenWidth, int screenHeight)
+        {
+            _blocksToForget.Clear();
+            foreach (((int x, int y), BlockState state) in _blocks)
+                if (x >= screenWidth || y >= screenHeight)
+                {
+                    // its id is forgotten with it, so its image goes now or never
+                    if (state.Sent != default)
+                        _output.WriteText(KittyGraphics.BuildDeleteSequence(state.ImageId));
+                    _blocksToForget.Add((x, y));
+                }
+
+            foreach ((int X, int Y) position in _blocksToForget)
+                _blocks.Remove(position);
+        }
+
+        /// <summary>
+        ///     A block position's image id, for the session, and the key of what was last sent under it:
+        ///     default when the terminal holds nothing for it.
+        /// </summary>
+        private sealed class BlockState
+        {
+            public int ImageId;
+            public PictureKey Sent;
+        }
+    }
+}

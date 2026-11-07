@@ -189,16 +189,12 @@ namespace Consolonia.Core.Drawing
                     case MoveConsoleCaretToPositionBrush moveBrush:
                     {
                         var head = rectangleRect.TopLeft.ToPixelPoint();
-                        if (CurrentClip.ContainsExclusive(head))
+                        if (CurrentClip.ContainsExclusive(head) &&
+                            _pixelBuffer.CellAt(head.X, head.Y).CaretStyle != moveBrush.CaretStyle)
                         {
-                            Pixel pixel = _pixelBuffer[head];
-                            if (pixel.CaretStyle != moveBrush.CaretStyle)
-                            {
-                                // only be dirty if something changed
-                                ConsoleWindowImpl.DirtyRegions.AddRect(new PixelRect(head, new PixelSize(1, 1)));
-                                _pixelBuffer[head] =
-                                    pixel.Blend(new Pixel(moveBrush.CaretStyle));
-                            }
+                            // only be dirty if something changed
+                            ConsoleWindowImpl.DirtyRegions.AddRect(new PixelRect(head, new PixelSize(1, 1)));
+                            _pixelBuffer.Blend(head, new Pixel(moveBrush.CaretStyle));
                         }
 
                         return;
@@ -296,7 +292,7 @@ namespace Consolonia.Core.Drawing
                 var head = line.PStart.Transform(Transform).ToPixelPoint();
                 if (CurrentClip.ContainsExclusive(head))
                 {
-                    _pixelBuffer[head] = _pixelBuffer[head].Blend(new Pixel(moveBrush.CaretStyle));
+                    _pixelBuffer.Blend(head, new Pixel(moveBrush.CaretStyle));
                     ConsoleWindowImpl.DirtyRegions.AddRect(
                         CurrentClip.Intersect(new PixelRect(head, new PixelSize(1, 1))));
                 }
@@ -327,13 +323,13 @@ namespace Consolonia.Core.Drawing
 
             for (int x = intersectRect.X; x < intersectRect.Right; x++)
             {
-                Pixel oldPixel = _pixelBuffer[head];
-                var newPixelForeground = new PixelForeground(oldPixel.Foreground.Symbol,
-                    oldPixel.Foreground.Color,
-                    oldPixel.Foreground.Weight,
-                    oldPixel.Foreground.Style,
+                PixelForeground oldForeground = _pixelBuffer.CellAt(head.X, head.Y).Foreground;
+                var newPixelForeground = new PixelForeground(oldForeground.Symbol,
+                    oldForeground.Color,
+                    oldForeground.Weight,
+                    oldForeground.Style,
                     textDecoration);
-                _pixelBuffer[head] = oldPixel.Blend(new Pixel(newPixelForeground));
+                _pixelBuffer.Blend(head, new Pixel(newPixelForeground));
 
                 head = head.WithX(head.X + 1);
             }
@@ -377,7 +373,7 @@ namespace Consolonia.Core.Drawing
                     pixelAbove = solidPixel;
                 }
 
-                _pixelBuffer[x, y] = _pixelBuffer[x, y].Blend(pixelAbove);
+                _pixelBuffer.Blend(x, y, in pixelAbove);
             }
 
             ConsoleWindowImpl.DirtyRegions.AddRect(targetRect);
@@ -606,7 +602,7 @@ namespace Consolonia.Core.Drawing
                 Color lineColor = brush.ColorAt(head, gradientBounds);
                 var newPixel = new Pixel(new PixelForeground(symbol, lineColor));
 
-                _pixelBuffer[head] = _pixelBuffer[head].Blend(newPixel);
+                _pixelBuffer.Blend(head, in newPixel);
 
                 if (isVertical)
                     head = head.WithY(head.Y + 1);

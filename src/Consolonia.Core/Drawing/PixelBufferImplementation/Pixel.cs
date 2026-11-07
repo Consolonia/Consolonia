@@ -124,9 +124,32 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         public bool Equals(Pixel other)
         {
-            return EqualityComparer<PixelForeground>.Default.Equals(Foreground, other.Foreground) &&
-                   EqualityComparer<PixelBackground>.Default.Equals(Background, other.Background) &&
-                   CaretStyle == other.CaretStyle;
+            return Same(in this, in other);
+        }
+
+        /// <summary>
+        ///     The field compare behind <see cref="Equals(Pixel)" /> and the operators, on two cells in place:
+        ///     the render target runs it on every cell of a frame against its cache, and a by-value compare
+        ///     would copy both cells, and their foregrounds, backgrounds and symbols, first.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool Same(in Pixel left, in Pixel right)
+        {
+            ref readonly PixelForeground leftForeground = ref left.Foreground;
+            ref readonly PixelForeground rightForeground = ref right.Foreground;
+            ref readonly Symbol leftSymbol = ref leftForeground.Symbol;
+            ref readonly Symbol rightSymbol = ref rightForeground.Symbol;
+            return leftSymbol.Character == rightSymbol.Character &&
+                   leftSymbol.Width == rightSymbol.Width &&
+                   leftSymbol.Pattern == rightSymbol.Pattern &&
+                   leftForeground.Color == rightForeground.Color &&
+                   left.Background.Color == right.Background.Color &&
+                   ReferenceEquals(left.Background.Image, right.Background.Image) &&
+                   leftForeground.Weight == rightForeground.Weight &&
+                   leftForeground.Style == rightForeground.Style &&
+                   leftForeground.TextDecoration == rightForeground.TextDecoration &&
+                   left.CaretStyle == right.CaretStyle &&
+                   string.Equals(leftSymbol.Complex, rightSymbol.Complex, StringComparison.Ordinal);
         }
 
         public Pixel Shade()
@@ -153,11 +176,15 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// <summary>
         ///     Blend the pixelAbove with this pixel.
         /// </summary>
-        /// <param name="pixelAbove"></param>
+        /// <param name="pixelAbove">
+        ///     The cell laid over this one, read in place: a blend copies the result out and nothing in.
+        ///     Blending into a cell of a <see cref="PixelBuffer" /> goes through
+        ///     <see cref="PixelBuffer.Blend(int, int, in Pixel)" />, which reads and writes the cell where it is.
+        /// </param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Pixel Blend(Pixel pixelAbove)
+        public Pixel Blend(in Pixel pixelAbove)
         {
             PixelForeground newForeground;
             CaretStyle newCaretStyle;
@@ -235,14 +262,14 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return HashCode.Combine(Foreground, Background, CaretStyle);
         }
 
-        public static bool operator ==(Pixel left, Pixel right)
+        public static bool operator ==(in Pixel left, in Pixel right)
         {
-            return left.Equals(right);
+            return Same(in left, in right);
         }
 
-        public static bool operator !=(Pixel left, Pixel right)
+        public static bool operator !=(in Pixel left, in Pixel right)
         {
-            return !left.Equals(right);
+            return !Same(in left, in right);
         }
     }
 }
