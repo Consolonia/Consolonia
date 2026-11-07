@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Platform;
@@ -17,6 +18,7 @@ using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
+using Consolonia.Core.Text;
 using Window = Avalonia.Controls.Window;
 
 namespace Consolonia.Core.Infrastructure
@@ -37,6 +39,9 @@ namespace Consolonia.Core.Infrastructure
         private StandardCursorType _cursorType = StandardCursorType.Arrow;
         private bool _disposedValue;
         private IInputRoot _inputRoot;
+
+        /// <summary>The pointer shape last sent to the terminal, so the same one is not sent again.</summary>
+        private string _pointerShape;
 
         public ConsoleWindowImpl()
         {
@@ -532,12 +537,66 @@ namespace Consolonia.Core.Infrastructure
             }
         }
 
+        /// <summary>
+        ///     Hands the renderer the cursor for the current type and position, and the terminal the
+        ///     pointer shape for it.
+        /// </summary>
+        /// <remarks>
+        ///     Reached from the UI thread, through <see cref="SetCursor" />, and from whichever thread
+        ///     the console raises mouse events on. Serialised so that the shape sent to the terminal,
+        ///     the record of it in <see cref="_pointerShape" />, and the cursor handed on all come from
+        ///     one reading of the cursor type, and reach the terminal and the renderer in the same
+        ///     order.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.Synchronized)]
         private void UpdateCursor()
         {
             OnCursorChanged(
                 new ConsoleCursor(
                     new PixelBufferCoordinate((ushort)_cursorPosition.X, (ushort)_cursorPosition.Y),
-                    GetCursorText()));
+                    ApplyPointerShape() ? string.Empty : GetCursorText()));
+        }
+
+        /// <summary>
+        ///     Has the terminal draw the pointer for the current cursor type, where it can.
+        /// </summary>
+        /// <returns>True when the terminal draws it, so no character pointer is needed.</returns>
+        /// <remarks>
+        ///     Shape by shape: a terminal that has the shape draws a real pointer; for one it does not
+        ///     have -- or an Avalonia cursor with no CSS equivalent -- the terminal is put back to its
+        ///     default and the character pointer is drawn over it, as for a terminal without the
+        ///     protocol at all.
+        /// </remarks>
+        private bool ApplyPointerShape()
+        {
+            IReadOnlySet<string> supported = Console.SupportedPointerShapes;
+            if (supported.Count == 0)
+                return false;
+
+            string shape = PointerShapes.For(_cursorType);
+            bool terminalDraws = shape != null && supported.Contains(shape);
+            string wanted = terminalDraws ? shape : PointerShapes.Default;
+
+            // Every mouse move comes through here; only a change is worth a write.
+            if (wanted != _pointerShape)
+            {
+                // The shape itself was looked up above; only "default" is still in question.
+                if (terminalDraws || supported.Contains(PointerShapes.Default))
+                {
+                    Console.SetPointerShape(wanted);
+                }
+                else if (_pointerShape != null)
+                {
+                    // A terminal that answered the query without "default" still has to be taken
+                    // off the shape set last, or it shows beside the character pointer.
+                    Console.WriteText(Esc.ResetPointerShape);
+                    Console.Flush();
+                }
+
+                _pointerShape = wanted;
+            }
+
+            return terminalDraws;
         }
 
         private string GetCursorText()
