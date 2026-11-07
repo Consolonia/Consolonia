@@ -13,7 +13,6 @@ using Avalonia.Input.Platform;
 using Avalonia.Input.Raw;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
-using Consolonia.Core.Helpers;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.InternalHelpers;
 using Terminal.Gui;
@@ -124,8 +123,6 @@ namespace Consolonia.PlatformSupport
         {
             Task.Run(async () =>
             {
-                await Helper.WaitDispatcherInitialized();
-
                 while (!Disposed /*inject ThreadAbortException*/)
                 {
                     await WaitPauseTaskIfNecessaryAsync();
