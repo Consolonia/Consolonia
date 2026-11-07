@@ -72,8 +72,8 @@ namespace Consolonia.Core.Drawing
             IPlatformRenderInterface renderInterface)
         {
             PixelImages.EnsureBudget(ScreensOfPixelImages * 4L *
-                                    context.PixelBuffer.Width * cellPixelWidth *
-                                    context.PixelBuffer.Height * cellPixelHeight);
+                                     context.PixelBuffer.Width * cellPixelWidth *
+                                     context.PixelBuffer.Height * cellPixelHeight);
             ConvertCells(pixels, conversion.Cells, cellPixelWidth, cellPixelHeight);
         }
 

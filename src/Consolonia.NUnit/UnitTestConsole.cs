@@ -27,6 +27,9 @@ namespace Consolonia.NUnit
         // ReSharper disable once MemberCanBePrivate.Global
         public PixelBuffer PixelBuffer { get; }
 
+        /// <summary>The screen the last frame ended with, as the render target hands it over.</summary>
+        public PixelBuffer LastFrameScreen { get; private set; }
+
         public PixelBufferSize Size { get; set; }
 
         /// <summary>Settable so a test can opt into a protocol the real terminal would have to advertise.</summary>
@@ -59,9 +62,6 @@ namespace Consolonia.NUnit
             else
                 PixelBuffer[position] = pixel;
         }
-
-        /// <summary>The screen the last frame ended with, as the render target hands it over.</summary>
-        public PixelBuffer LastFrameScreen { get; private set; }
 
         public void EndUpdate(PixelBuffer screen)
         {

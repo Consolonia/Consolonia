@@ -36,16 +36,16 @@ namespace Consolonia.Core.Infrastructure
 
         private static readonly UTF8Encoding Utf8NoBom = new(false);
 
-        // what the frame being written holds, for the flush log
-        private int _frameChars;
-        private int _frameImageChars;
-        private int _frameImages;
-
         /// <summary>
         ///     Where the terminal's cursor is not known, after a payload written with <see cref="WriteBytes" />:
         ///     the next write moves it, wherever <see cref="_headBufferPoint" /> says it is.
         /// </summary>
         private bool _caretUnknown;
+
+        // what the frame being written holds, for the flush log
+        private int _frameChars;
+        private int _frameImageChars;
+        private int _frameImages;
 
         private PixelBufferCoordinate _headBufferPoint;
 
@@ -207,16 +207,6 @@ namespace Consolonia.Core.Infrastructure
                 CloseUpdate();
                 Flush();
             }
-        }
-
-        private void CloseUpdate()
-        {
-            if (!_synchronizedUpdateOpen)
-                return;
-
-            WaitPauseTaskIfNecessary();
-            Console.Out.Write(Esc.EndSynchronizedUpdate);
-            _synchronizedUpdateOpen = false;
         }
 
         /// <summary>
@@ -392,6 +382,27 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
+        ///     Takes the image library's factory and asks it for the encoder of the image protocol the
+        ///     capabilities name, now if the console is prepared and again whenever it is.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        public void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        {
+            _imageEncoderFactory = factory;
+            InstallImageEncoder();
+        }
+
+        private void CloseUpdate()
+        {
+            if (!_synchronizedUpdateOpen)
+                return;
+
+            WaitPauseTaskIfNecessary();
+            Console.Out.Write(Esc.EndSynchronizedUpdate);
+            _synchronizedUpdateOpen = false;
+        }
+
+        /// <summary>
         ///     The text of an image cell, with an encoder to draw its picture. A picture cell is a space until
         ///     a glyph is drawn over it, and a space shows the picture. Where the protocol draws the picture
         ///     below the text, the cell is written as it is on the terminal's default background, which every
@@ -534,8 +545,8 @@ namespace Consolonia.Core.Infrastructure
 
             position = new PixelBufferCoordinate((ushort)(position.X + pixel.Width), position.Y);
             if (pixel.Width > 1 || pixel.Foreground.Symbol.Complex != null)
-            // then we force set the next position to where we want to be because again
-            // we can't rely on the terminal to advance the caret correctly.
+                // then we force set the next position to where we want to be because again
+                // we can't rely on the terminal to advance the caret correctly.
             {
                 SetCaretPositionInternal(position);
             }
@@ -546,17 +557,6 @@ namespace Consolonia.Core.Infrastructure
 
                 _headBufferPoint = position;
             }
-        }
-
-        /// <summary>
-        ///     Takes the image library's factory and asks it for the encoder of the image protocol the
-        ///     capabilities name, now if the console is prepared and again whenever it is.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
-        {
-            _imageEncoderFactory = factory;
-            InstallImageEncoder();
         }
 
         /// <summary>
