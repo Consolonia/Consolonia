@@ -90,9 +90,9 @@ namespace Consolonia
 
             MainWindow.Show();
 
-            Console.StartInputLoop();
             try
             {
+                Console.StartInputLoop();
                 Dispatcher.UIThread.MainLoop(_cts.Token);
                 Environment.ExitCode = _exitCode;
                 return _exitCode;
