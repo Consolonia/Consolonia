@@ -790,10 +790,8 @@ namespace Consolonia.PlatformSupport
 
             // general keys backup
             yield return new SafeLockMatcher(
-                new GenericMatcher<int>(i =>
-                {
-                    DispatchInputAsyncWait(() => { ProcessKeyInternal(i); });
-                }, EscapeDoesNotComeItselfInCurses), 0);
+                new GenericMatcher<int>(i => { DispatchInputAsyncWait(() => { ProcessKeyInternal(i); }); },
+                    EscapeDoesNotComeItselfInCurses), 0);
 
             yield break;
 

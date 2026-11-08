@@ -74,13 +74,13 @@ namespace Consolonia.Core.Tests
                 new SafeLockMatcher(new GenericMatcher<int>(_ => output.Add("special key")), 1)
             ]);
 
-            processor.ProcessChunk(new[] { (0, 27), (0, (int)'[') });
+            processor.ProcessChunk(new[] { (0, 27), (0, '[') });
             Assert.IsEmpty(output);
 
             processor.ProcessChunk(new[] { (1, 42) });
             CollectionAssert.AreEqual(new[] { "special key" }, output);
 
-            processor.ProcessChunk(new[] { (0, 27), (0, (int)'['), (0, (int)'A') });
+            processor.ProcessChunk(new[] { (0, 27), (0, '['), (0, 'A') });
             CollectionAssert.AreEqual(new[] { "special key", "up" }, output);
         }
 
@@ -269,7 +269,7 @@ namespace Consolonia.Core.Tests
             var processor = new InputProcessor<char>([
                 paste,
                 new RegexMatcher<char>(s => output.Add("key:" + s.Item1), c => new Rune(c),
-                    @"\A\x1b(?:\[A?)?\z", autoFlushOnLength: 3)
+                    @"\A\x1b(?:\[A?)?\z", 3)
             ]);
 
             processor.ProcessChunk("\x1b[".ToCharArray());

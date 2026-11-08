@@ -31,8 +31,8 @@ namespace Consolonia.Core.Helpers.InputProcessing
         public override AppendResult TryFlush()
         {
             return Accumulator.Length != 0
-                    ? AppendResult.Match
-                    : AppendResult.NoMatch;
+                ? AppendResult.Match
+                : AppendResult.NoMatch;
         }
 
         /// <summary>

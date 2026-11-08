@@ -33,7 +33,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
     //  |  how just half of it works                                                   |
     //  |  $50 for a partial relief.                                                   |
     //  +------------------------------------------------------------------------------+
-    
+
     public class InputProcessor<T>(IEnumerable<IMatcher<T>> matchers)
     {
         private readonly ParametrizedLogger _infoLogger = Log.CreateInputLogger(LogEventLevel.Information);
@@ -53,7 +53,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             TryFlushStartingFrom(0);
             LogMatchersState();
         }
-        
+
         private void ProcessSingleInput(T input, bool canRetry = true /*solving "AAB" input for {"AB, "A"} matchers*/)
         {
             _infoLogger.Log2("Processing single input: {Input}", input);
@@ -86,12 +86,12 @@ namespace Consolonia.Core.Helpers.InputProcessing
                             currentTopMatcherIndex == Matchers.Length) // no one yet accepted new character
                         {
                             logSb.Insert(1, "?");
-                            AppendResult flushResult = TryFlushStartingFrom(i, resetPendingStartMatcher: true);
+                            AppendResult flushResult = TryFlushStartingFrom(i, true);
                             if (flushResult != AppendResult.Match && canRetry)
                             {
                                 // The old prefix is resolved; retry the unconsumed input once.
                                 _previousTopMatcherIndex = -1;
-                                ProcessSingleInput(input, canRetry: false);
+                                ProcessSingleInput(input, false);
                                 return;
                             }
                         }
@@ -148,7 +148,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
         private AppendResult TryFlushStartingFrom(int startIndex, bool resetPendingStartMatcher = false)
         {
             for (int i = startIndex; i < Matchers.Length; i++)
-            {
                 switch (Matchers[i].TryFlush())
                 {
                     case AppendResult.AutoFlushed:
@@ -177,7 +176,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
                         continue;
                     }
                 }
-            }
 
             return AppendResult.NoMatch;
         }
