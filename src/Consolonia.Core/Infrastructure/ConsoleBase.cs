@@ -333,6 +333,11 @@ namespace Consolonia.Core.Infrastructure
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
         {
+            // with stdin redirected there is no terminal to answer and Console.KeyAvailable throws: no
+            // reply, so every probe falls back
+            if (Console.IsInputRedirected)
+                return string.Empty;
+
             // conhost/ConPTY synthesizes key events from terminal replies and swallows APC ones
             // (the kitty graphics handshake); virtual terminal input passes the reply through raw
             using VirtualTerminalInput.Scope scope = VirtualTerminalInput.Enable();
