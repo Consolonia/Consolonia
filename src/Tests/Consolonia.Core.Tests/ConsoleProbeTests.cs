@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.CompilerServices;
+using Consolonia.Controls;
 using Consolonia.Core.Dummy;
 using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
@@ -33,6 +34,20 @@ namespace Consolonia.Core.Tests
             var console = (ProbingConsole)RuntimeHelpers.GetUninitializedObject(typeof(ProbingConsole));
 
             Assert.That(console.Request("\u001b[c", 'c', 50), Is.Empty);
+        }
+
+        [Test]
+        public void ACapabilitiesWithoutACellSizeHasTheDefaultOne()
+        {
+            IConsoleCapabilities capabilities = new CapabilitiesWithoutCellSize();
+
+            Assert.That((capabilities.CellPixelWidth, capabilities.CellPixelHeight), Is.EqualTo((8, 16)));
+        }
+
+        /// <summary>A console written before the cell size was part of the interface.</summary>
+        private sealed class CapabilitiesWithoutCellSize : IConsoleCapabilities
+        {
+            public ConsoleCapabilities Capabilities => ConsoleCapabilities.None;
         }
 
 #pragma warning disable CA1812 // made by RuntimeHelpers.GetUninitializedObject
