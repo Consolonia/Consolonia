@@ -6,7 +6,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
     /// <summary>
     ///     Matches a sequence of characters that starts with a given string and ends with another given string.
     /// </summary>
-    [Obsolete("Use with caution: only one instance of this matcher can work", false)]
     public class StartsEndsWithMatcher<T>(
         Action<string> onComplete,
         Func<T, Rune> toRune,
