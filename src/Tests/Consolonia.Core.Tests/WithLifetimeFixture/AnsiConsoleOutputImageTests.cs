@@ -290,6 +290,18 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             Assert.That(_factory.Encoder.Calls, Is.EqualTo(new[] { "Reset", "RestoreConsole", "Reset" }));
         }
 
+        [Test]
+        public void AfterAResetTheFirstCellMovesTheCursorEvenWhereItWasLeft()
+        {
+            Open(ConsoleCapabilities.None, false);
+            Frame((0, 0, TextCell('a')));
+
+            // another program had the terminal and may have left the cursor anywhere
+            _output.ResetCache();
+
+            Assert.That(Frame((1, 0, TextCell('b'))), Does.Contain(Esc.SetCursorPosition(1, 0)));
+        }
+
         private sealed class RecordingEncoderFactory : IConsoleImageEncoderFactory
         {
             public bool Creates { get; set; }

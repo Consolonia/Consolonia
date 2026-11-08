@@ -210,12 +210,14 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Forgets what the terminal is believed to show: the colors and attributes last set (another
-        ///     program may have changed them) and what the image encoder has placed.
+        ///     Forgets what the terminal is believed to show: the colors and attributes last set and where the
+        ///     cursor is (another program may have changed them), and what the image encoder has placed.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void ResetCache()
         {
+            // the first cell written moves the cursor, even to where _headBufferPoint says it already is
+            _caretUnknown = true;
             _lastBackground = Colors.Transparent;
             _lastBackgroundIsDefault = false;
             _lastForeground = Colors.Transparent;
