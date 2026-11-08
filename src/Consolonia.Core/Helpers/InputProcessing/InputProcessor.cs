@@ -9,9 +9,30 @@ using Consolonia.Core.Helpers.Logging;
 
 namespace Consolonia.Core.Helpers.InputProcessing
 {
-    // todo: low: $100 prize for showing me how to significantly simplify this processor (possible with IMatcher contract)
-    // in a way I don't have to spend several hours every time to just understand how it works
-    // $50 for partial satisfaction
+    //  +------------------------------------------------------------------------------+
+    //  |                                    WANTED            _     _    ___   ___    |
+    //  |                               DEAD OR READABLE      | |   / |  / _ \ / _ \   |
+    //  |                                                    / __)  | | | | | | | | |  |
+    //  |                             .-----------------.    \__ \  | | | |_| | |_| |  |
+    //  |                             |      INPUT      |    (   /  |_|  \___/ \___/   |
+    //  |                             |        v        |     |_|                      |
+    //  |                             |   +--> if --+   |                              |
+    //  |                             |   |    v   |    |                              |
+    //  |                             |   |   ??? <+    |                              |
+    //  |                             |   |  / | \      |                              |
+    //  |                             |   +-- if --+    |                              |
+    //  |                             |      retry      |                              |
+    //  |                             |     OUTPUT      |                              |
+    //  |                             '-----------------'                              |
+    //  |                                                                              |
+    //  |                              INPUT PROCESSOR                                 |
+    //  |                                                                              |
+    //  |  todo: low: $100 bounty for teaching me how to significantly simplify this   |
+    //  |  processor (possibly with IMatcher contract)                                 |
+    //  |  in a way I don't have to spend several hours every time to  understand      |
+    //  |  how just half of it works                                                   |
+    //  |  $50 for a partial relief.                                                   |
+    //  +------------------------------------------------------------------------------+
     
     public class InputProcessor<T>(IEnumerable<IMatcher<T>> matchers)
     {
