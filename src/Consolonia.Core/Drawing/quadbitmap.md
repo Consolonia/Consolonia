@@ -62,7 +62,7 @@ pixel buffer holds image cells only when the console can show images; one line i
   the pixels are not square: a cell is usually twice as tall as wide.
   `AspectRatioAdjustedBitmap` reports half the height to layout for that reason.
 - Each cell can show only two colours, so fine detail and gradients within a cell are lost.
-- Some quadrant glyphs are missing from IBM code pages (the `TODO`s in the converter). Without
+- Some quadrant glyphs are missing from IBM code pages. Without
   `SupportsComplexEmoji`, the converter sticks to half blocks.
 
 ## Benchmarks

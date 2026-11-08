@@ -342,7 +342,7 @@ namespace Consolonia.Core.Drawing
     /// <summary>
     ///     The cells a picture converts to at one size. A converter keeps one per picture and size and
     ///     refills it in place for each new version or visible part, so an edit allocates nothing the size
-    ///     of the screen: the cell buffer (40 bytes a cell) is made once, not once per brush stroke.
+    ///     of the screen: the cell buffer (72 bytes a cell) is made once, not once per brush stroke.
     ///     Touched only from the render thread, like everything a converter draws with.
     /// </summary>
     internal class CellConversion
