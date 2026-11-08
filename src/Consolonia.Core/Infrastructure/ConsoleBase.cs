@@ -307,7 +307,15 @@ namespace Consolonia.Core.Infrastructure
             int rows = Console.WindowHeight;
 
             string response = RequestAnsiResponse("\x1b[14t", 't', 200);
+            return CellSizeFromReport(response, cols, rows);
+        }
 
+        /// <summary>
+        ///     The cell size from a text area size report ("CSI 4;height;width t"), or 8x16 pixels when the
+        ///     report is missing or malformed, or gives a cell under a pixel (fewer pixels than cells).
+        /// </summary>
+        internal static (int CellWidth, int CellHeight) CellSizeFromReport(string response, int cols, int rows)
+        {
             int heightPx = 0;
             int widthPx = 0;
             int idx4 = response.IndexOf('4');
@@ -325,7 +333,8 @@ namespace Consolonia.Core.Infrastructure
                 }
             }
 
-            if (widthPx > 0 && heightPx > 0 && cols > 0 && rows > 0)
+            // a zero quotient would have pictures scaled to nothing
+            if (cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows)
                 return (widthPx / cols, heightPx / rows);
 
             return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);

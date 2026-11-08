@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using Consolonia.Core.Dummy;
+using Consolonia.Core.Infrastructure;
 using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
@@ -9,6 +10,18 @@ namespace Consolonia.Core.Tests
     [TestFixture]
     public class ConsoleProbeTests
     {
+        [TestCase("\u001b[4;800;1600t", 200, 50, 8, 16, TestName = "A report gives the cell size")]
+        [TestCase("", 200, 50, 8, 16, TestName = "No report falls back")]
+        [TestCase("\u001b[4;8x0;1600t", 200, 50, 8, 16, TestName = "A malformed report falls back")]
+        // fewer pixels than cells: a zero-sized cell would scale every picture to nothing
+        [TestCase("\u001b[4;40;100t", 200, 50, 8, 16, TestName = "A report under a pixel a cell falls back")]
+        [TestCase("\u001b[4;800;1600t", 0, 0, 8, 16, TestName = "No columns falls back")]
+        public void CellSizeFromReport(string response, int cols, int rows, int expectedWidth, int expectedHeight)
+        {
+            Assert.That(ConsoleBase.CellSizeFromReport(response, cols, rows),
+                Is.EqualTo((expectedWidth, expectedHeight)));
+        }
+
         [Test]
         public void WithStdinRedirectedAProbeGetsNoReply()
         {
