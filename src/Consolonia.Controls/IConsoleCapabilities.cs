@@ -53,7 +53,13 @@ namespace Consolonia.Controls
         ///     The console has an image encoder, so it can show pixel images (through sixel, kitty graphics
         ///     or another protocol). Without an encoder, images are drawn with block characters.
         /// </summary>
-        SupportsPixelImages = 0x200
+        SupportsPixelImages = 0x200,
+
+        /// <summary>
+        ///     The mouse is reported in pixels (SGR-Pixels, DEC private mode 1016), so pointer positions carry
+        ///     where in a cell the pointer is, as fractional cells
+        /// </summary>
+        SupportsPixelMouse = 0x400
     }
 
     public interface IConsoleCapabilities

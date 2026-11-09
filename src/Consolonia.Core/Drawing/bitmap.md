@@ -7,7 +7,8 @@ an `IConsoleImageEncoderFactory`, and without one pictures are block glyphs
 ([quadbitmap.md](quadbitmap.md)). `Consolonia.Imaging` is that library, enabled with
 `UseConsoloniaImaging()`; its protocols are described in
 [kittybitmap.md](../../Consolonia.Imaging/kittybitmap.md) and
-[sixelbitmap.md](../../Consolonia.Imaging/sixelbitmap.md).
+[sixelbitmap.md](../../Consolonia.Imaging/sixelbitmap.md). The pipeline every frame goes through,
+picture or text, is in [rendering.md](rendering.md).
 
 ## The pipeline at a glance
 
@@ -74,7 +75,9 @@ only as capabilities it probes for; what is sent for an image cell is the encode
   image cell, since shifting a transparent colour by a step would leave it as it is.
 - **Size.** A `Pixel` holds `Foreground` and `Background` as readonly struct fields, as it did before
   pictures; the image reference makes it 72 bytes. Packing it smaller is left to a separate change.
-  The render target's cache of what the terminal shows is a `PixelBuffer`, initialised to `Pixel.Empty`.
+  The render target's cache of what the terminal shows is a `PixelBuffer`, initialised to `Pixel.Empty`. Cells are blended in place and compared by reference, so a frame
+  does not copy them around; what that is worth is measured in
+  [rendering.md](rendering.md#what-a-frame-costs).
 
 ## Choosing a converter
 
@@ -303,6 +306,7 @@ per frame, hence the chunks.
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*PixelImageFrame*" --job short
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*ConsoleOutput*"
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*BitmapFrame*"
+dotnet run -c Release --project src/Consolonia.Benchmarks -- --filter "*TextFrame*"
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --digest
 dotnet run -c Release --project src/Consolonia.Benchmarks -- --alloc
 ```
@@ -312,6 +316,7 @@ dotnet run -c Release --project src/Consolonia.Benchmarks -- --alloc
 | `PixelImageFrameBenchmarks` | The converter's per-frame work for a full-screen picture (240×67 cells of 8×16, 1920×1072): unchanged, one cell changed, one cell changed including the copy out of the bitmap, every cell new. Nothing reaches a terminal. |
 | `ConsoleOutputBenchmarks` | Getting a frame out through `AnsiConsoleOutput` to a null stream, as the render target drives it (`BeginUpdate`, changed cells written, `EndUpdate`): a screen of text. The terminal's side is not measured. |
 | `BitmapFrameBenchmarks` | A whole frame (draw into the pixel buffer, then `RenderToDevice`) of a full-screen picture on the unit test console with `SupportsPixelImages`: redrawn unchanged, one pixel painted, a new picture. The unit test console keeps no output and has no encoder, so this is drawing and diffing. |
+| `TextFrameBenchmarks` | The same whole frame for a screen of text with no picture: redrawn unchanged, one character typed, every cell changed. The baseline for what a picture adds; the table is in [rendering.md](rendering.md#benchmark). |
 
 `--alloc` prints the bytes each `ConsoleOutputBenchmarks` scenario allocates in one run after a
 warm-up run, from the thread's allocation counter: exact, quick, and the figure to compare between
@@ -321,7 +326,7 @@ two builds.
 to the output path should leave the digests unchanged.
 
 The remaining per-frame cost of an unchanged or one-cell frame is hashing every visible cell. Every
-dirty cell goes through the render target's compare with its `_cache`, as every other drawing does.
+dirty cell goes through the render target's compare with its `_cache`, as every other drawing does, in place on both sides.
 
 ## Memory
 

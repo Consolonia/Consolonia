@@ -289,16 +289,25 @@ namespace Consolonia.Core.Infrastructure
             CellPixelHeight = cellH;
             CellPixelWidth = cellW;
 
-            // Send three queries in one round trip:
+            // Send four queries in one round trip:
             // - Kitty graphics query. Kitty-capable terminals reply "APC _Gi=31;OK ST". Others ignore it.
             // - DECRQM for mode 2026 (synchronized output). The reply is "CSI ? 2026;<state>$y".
+            // - DECRQM for mode 1016 (SGR-Pixels mouse). The reply is "CSI ? 1016;<state>$y".
             // - DA1 (device attributes). The reply looks like "ESC[?62;4;22c". Feature 4 means sixel.
             // Every terminal answers DA1, and it is the only reply that contains 'c'. So the read stops at 'c'.
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
-                Esc.QueryKittyGraphics + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
+                Esc.QueryKittyGraphics + Esc.RequestSynchronizedOutputMode +
+                Esc.RequestSgrPixelsMouseMode + Esc.RequestDeviceAttributes,
                 'c', 1000) ?? string.Empty;
             if (ResponseIndicatesSynchronizedOutputSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSynchronizedOutput;
+
+            // the terminal can report the mouse in pixels; only detected here: the console reading input
+            // turns it on, because only it knows whether it can read those reports.
+            // CONSOLONIA_PIXEL_MOUSE=0 keeps the mouse in whole cells even where pixels are on offer
+            if (ResponseIndicatesSgrPixelsMouseSupport(graphicsProbeResponse) &&
+                Environment.GetEnvironmentVariable("CONSOLONIA_PIXEL_MOUSE") != "0")
+                Capabilities |= ConsoleCapabilities.SupportsPixelMouse;
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
 
@@ -635,10 +644,25 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         internal static bool ResponseIndicatesSynchronizedOutputSupport(string response)
         {
+            return ResponseIndicatesPrivateModeSupport(response, 2026);
+        }
+
+        /// <summary>
+        ///     Checks whether the response to <see cref="Esc.RequestSgrPixelsMouseMode" /> reports DEC
+        ///     private mode 1016 as available, by the same DECRPM states as
+        ///     <see cref="ResponseIndicatesSynchronizedOutputSupport" />.
+        /// </summary>
+        internal static bool ResponseIndicatesSgrPixelsMouseSupport(string response)
+        {
+            return ResponseIndicatesPrivateModeSupport(response, 1016);
+        }
+
+        private static bool ResponseIndicatesPrivateModeSupport(string response, int mode)
+        {
             if (string.IsNullOrEmpty(response))
                 return false;
 
-            const string prefix = "[?2026;";
+            string prefix = $"[?{mode};";
             int start = response.IndexOf(prefix, StringComparison.Ordinal);
             if (start < 0)
                 return false;

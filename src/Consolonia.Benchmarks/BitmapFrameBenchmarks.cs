@@ -1,14 +1,12 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia;
-using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
 using BenchmarkDotNet.Attributes;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
-using Consolonia.Fonts;
 using Consolonia.NUnit;
 
 namespace Consolonia.Benchmarks
@@ -48,18 +46,7 @@ namespace Consolonia.Benchmarks
         {
             var console = new UnitTestConsole(new PixelBufferSize(PixelImageFrameBenchmarks.CellsWide,
                 PixelImageFrameBenchmarks.CellsHigh));
-            _scope = AvaloniaLocator.EnterScope();
-            _lifetime = ApplicationStartup.CreateLifetime(AppBuilder.Configure<BenchmarkApp>()
-                .UseConsole(console)
-                .UseConsolonia()
-                .UseConsoleColorMode(new RgbConsoleColorMode())
-                .WithConsoleFonts()
-                .With<IPlatformSettings>(new ConsoloniaPlatformSettings
-                {
-                    UnsafeInput = false,
-                    UnsafeRendering = false
-                }), []);
-            console.SetupLifetime(_lifetime);
+            _lifetime = BenchmarkLifetime.Start(console, out _scope);
             // Pretend the console supports pixel images, so the converter produces pixel images.
             // The converter does not depend on which image protocol the console uses.
             console.Capabilities |= ConsoleCapabilities.SupportsPixelImages;
@@ -124,7 +111,5 @@ namespace Consolonia.Benchmarks
             _lifetime?.Dispose();
             _scope?.Dispose();
         }
-
-        private sealed class BenchmarkApp : Application;
     }
 }

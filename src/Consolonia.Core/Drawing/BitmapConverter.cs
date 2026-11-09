@@ -211,11 +211,8 @@ namespace Consolonia.Core.Drawing
             PixelBuffer pixelBuffer = context.PixelBuffer;
             for (int y = 0; y < intersectedRect.Height; y++)
             for (int x = 0; x < intersectedRect.Width; x++)
-            {
-                var destPoint = new PixelPoint(intersectedRect.X + x, intersectedRect.Y + y);
-                pixelBuffer[destPoint] = pixelBuffer[destPoint]
-                    .Blend(convertedBitmap[new PixelPoint(convertedOrigin.X + x, convertedOrigin.Y + y)]);
-            }
+                pixelBuffer.Blend(intersectedRect.X + x, intersectedRect.Y + y,
+                    in convertedBitmap.CellAt(convertedOrigin.X + x, convertedOrigin.Y + y));
 
             context.ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
