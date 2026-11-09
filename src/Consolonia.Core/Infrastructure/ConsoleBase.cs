@@ -32,6 +32,9 @@ namespace Consolonia.Core.Infrastructure
 
         private readonly IConsoleOutput _consoleOutput;
 
+        /// <summary>The cell size the terminal reported, unrounded; empty when it reported none.</summary>
+        private Avalonia.Size _reportedCellPixelSize;
+
         protected ConsoleBase(IConsoleOutput consoleOutput)
         {
             if (consoleOutput is ConsoleBase)
@@ -150,6 +153,24 @@ namespace Consolonia.Core.Infrastructure
 
         public int CellPixelHeight => _consoleOutput.CellPixelHeight;
 
+        /// <summary>
+        ///     True when the terminal can report the mouse in pixels (SGR-Pixels, DEC private mode 1016)
+        ///     and has told us its cell size, without which those pixels cannot be turned back into cells.
+        /// </summary>
+        protected bool TerminalSupportsPixelMouse =>
+            _consoleOutput.Capabilities.HasFlag(ConsoleCapabilities.SupportsPixelMouse) &&
+            _reportedCellPixelSize is { Width: > 0, Height: > 0 };
+
+        /// <summary>
+        ///     Turns the position in an SGR-Pixels mouse report (one-based pixels) into a cell position,
+        ///     keeping the fraction that says where in the cell the pointer is.
+        /// </summary>
+        protected Point PixelToCell(int x, int y)
+        {
+            return new Point(Math.Max(0, x - 1) / _reportedCellPixelSize.Width,
+                Math.Max(0, y - 1) / _reportedCellPixelSize.Height);
+        }
+
         public event Action Resized;
 
         public virtual void ClearScreen()
@@ -171,7 +192,9 @@ namespace Consolonia.Core.Infrastructure
         public virtual void PrepareConsole()
         {
             _consoleOutput.PrepareConsole();
-            Capabilities |= _consoleOutput.Capabilities;
+            // the output says the terminal can report the mouse in pixels; the console says so only once it
+            // has turned that on (see TerminalSupportsPixelMouse)
+            Capabilities |= _consoleOutput.Capabilities & ~ConsoleCapabilities.SupportsPixelMouse;
         }
 
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
@@ -319,6 +342,11 @@ namespace Consolonia.Core.Infrastructure
             int rows = Console.WindowHeight;
 
             string response = RequestAnsiResponse("\x1b[14t", 't', 200);
+
+            // SGR-Pixels mouse positions are converted to cells with the unrounded cell size.
+            if (TryParseTextAreaSize(response, cols, rows, out int widthPx, out int heightPx))
+                _reportedCellPixelSize = new Avalonia.Size((double)widthPx / cols, (double)heightPx / rows);
+
             return CellSizeFromReport(response, cols, rows);
         }
 
@@ -328,16 +356,24 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         internal static (int CellWidth, int CellHeight) CellSizeFromReport(string response, int cols, int rows)
         {
-            // A stray keypress can arrive before or after the reply, so search for the reply in the text.
-            Match report = TextAreaSizeReport.Match(response);
-            int heightPx = report.Success ? int.Parse(report.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
-            int widthPx = report.Success ? int.Parse(report.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
-
-            // A cell size of zero would scale images to nothing.
-            if (cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows)
+            if (TryParseTextAreaSize(response, cols, rows, out int widthPx, out int heightPx))
                 return (widthPx / cols, heightPx / rows);
 
             return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
+        }
+
+        /// <summary>
+        ///     Finds the text area size in pixels in a reply to "CSI 14 t". Returns false if there is no
+        ///     report, or if it gives a cell less than one pixel (that would scale images to nothing).
+        /// </summary>
+        private static bool TryParseTextAreaSize(string response, int cols, int rows, out int widthPx,
+            out int heightPx)
+        {
+            // A stray keypress can arrive before or after the reply, so search for the reply in the text.
+            Match report = TextAreaSizeReport.Match(response);
+            heightPx = report.Success ? int.Parse(report.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            widthPx = report.Success ? int.Parse(report.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
+            return cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows;
         }
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)

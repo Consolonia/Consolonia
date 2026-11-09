@@ -354,6 +354,9 @@ namespace Consolonia.PlatformSupport
             WriteText(Esc.EnableBracketedPasteMode);
 
             base.PrepareConsole();
+
+            // after the base, whose probe is what finds out whether the terminal reports pixels
+            TryToSupportPixelMouse();
         }
 
         private const Curses.Event BasicMouseEvents = Curses.Event.Button1Pressed | Curses.Event.Button1Released |
@@ -442,6 +445,8 @@ namespace Consolonia.PlatformSupport
                 _isKittyKeyboardEnabled = false;
             }
 
+            if (_pixelMouse)
+                WriteText(Esc.DisableSgrPixelsMouse);
             if (SupportedPointerShapes.Count > 0)
                 WriteText(Esc.ResetPointerShape);
 
@@ -913,7 +918,8 @@ namespace Consolonia.PlatformSupport
 
             const double velocity = 1;
 
-            var point = new Point(ev.X, ev.Y);
+            // under SGR-Pixels ncurses decodes the reports as usual, so its zero-based cells are pixels
+            Point point = _pixelMouse ? PixelToCell(ev.X + 1, ev.Y + 1) : new Point(ev.X, ev.Y);
             RawInputModifiers modifiers = MouseModifiersFlagTranslator.Translate(ev.ButtonState);
             RawPointerEventType rawPointerEventType = RawPointerEventTypeFlagTranslator.Translate(ev.ButtonState);
 
