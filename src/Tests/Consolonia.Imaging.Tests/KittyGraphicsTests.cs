@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
-using Consolonia.Imaging;
 using NUnit.Framework;
 
 namespace Consolonia.Imaging.Tests

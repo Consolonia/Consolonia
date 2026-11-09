@@ -1,6 +1,5 @@
 using System;
 using System.Text;
-using Consolonia.Imaging;
 using NUnit.Framework;
 
 namespace Consolonia.Imaging.Tests

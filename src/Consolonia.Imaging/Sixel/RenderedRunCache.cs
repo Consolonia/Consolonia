@@ -43,7 +43,8 @@ namespace Consolonia.Imaging
         /// </summary>
         public void Add(PictureKey key, byte[] rendered)
         {
-            ref LinkedListNode<Entry> slot = ref CollectionsMarshal.GetValueRefOrAddDefault(_entries, key, out bool held);
+            ref LinkedListNode<Entry> slot =
+                ref CollectionsMarshal.GetValueRefOrAddDefault(_entries, key, out bool held);
             if (held)
                 return;
 

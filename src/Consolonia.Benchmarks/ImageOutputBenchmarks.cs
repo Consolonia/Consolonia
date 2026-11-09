@@ -35,6 +35,8 @@ namespace Consolonia.Benchmarks
         private const int Width = CellsWide * CellWidth;
         private const int Height = CellsHigh * CellHeight;
         private static readonly Color Dim = Color.FromArgb(0x7F, 0, 0, 0);
+
+        private PixelBuffer _dimmed = null!;
         private AnsiConsoleOutput _kittyOutput = null!;
         private PixelBuffer _newPicture = null!;
 
@@ -45,8 +47,6 @@ namespace Consolonia.Benchmarks
         private Pixel _strokeCell;
         private PixelBuffer _strokeScreen = null!;
         private PixelBuffer _text = null!;
-
-        private PixelBuffer _dimmed = null!;
 
         /// <summary>Each scenario, with what has to happen before every run of it.</summary>
         private static (string Name, Action<ImageOutputBenchmarks> Prepare, Action<ImageOutputBenchmarks> Run)[]

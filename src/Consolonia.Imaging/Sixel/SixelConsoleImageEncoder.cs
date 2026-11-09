@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using Avalonia.Media;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
@@ -54,6 +53,9 @@ namespace Consolonia.Imaging
         {
             _output = output;
         }
+
+        /// <summary>Scroll margins back to the whole screen (DECSTBM with no rows).</summary>
+        internal static ReadOnlySpan<byte> ResetMargins => "\u001b[r"u8;
 
         public bool SupportsTextOverlay => false;
 
@@ -142,8 +144,11 @@ namespace Consolonia.Imaging
                 _output.WriteBytes(ResetMargins);
         }
 
-        /// <summary>Scroll margins back to the whole screen (DECSTBM with no rows).</summary>
-        internal static ReadOnlySpan<byte> ResetMargins => "\u001b[r"u8;
+        /// <summary>The terminal may no longer show what was sent: every picture cell is sent again.</summary>
+        public void Reset()
+        {
+            Array.Clear(_sent);
+        }
 
         /// <summary>
         ///     Scroll margins (DECSTBM) of every row but the last, set around the sixels of the last row. A
@@ -155,12 +160,6 @@ namespace Consolonia.Imaging
         internal static byte[] LastRowMargins(int height)
         {
             return Encoding.ASCII.GetBytes($"\u001b[1;{height - 1}r");
-        }
-
-        /// <summary>The terminal may no longer show what was sent: every picture cell is sent again.</summary>
-        public void Reset()
-        {
-            Array.Clear(_sent);
         }
 
         /// <summary>What a run shows: each cell's image and the paint over it.</summary>
