@@ -13,10 +13,11 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     /// <summary>
-    ///     What AnsiConsoleOutput does with the cells of the pixel buffer that show a picture: with an
-    ///     encoder from the <see cref="IConsoleImageEncoderFactory" /> it is given, the output writes the text
-    ///     over the pictures and the encoder renders them at the end of the frame's update; without one, a
-    ///     picture is block glyphs.
+    ///     Tests what AnsiConsoleOutput does with pixel buffer cells that show a picture.
+    ///     When the <see cref="IConsoleImageEncoderFactory" /> provides an encoder, the output writes the text
+    ///     cells and the encoder draws the pictures at the end of each frame.
+    ///     Without an encoder, the output does not report pixel image support, so pictures are drawn as
+    ///     block characters instead.
     /// </summary>
     [TestFixture]
     [NonParallelizable] // Console.Out and the locator are process-wide
@@ -59,12 +60,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _factory.Creates = withEncoder;
             _stream = new MemoryStream();
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(Columns, Rows) };
-            _output.RedirectOutput(_stream, capabilities);
-            _output.SetImageEncoderFactory(_factory);
+            _output.RedirectOutput(_stream, capabilities, _factory);
             _screen = new PixelBuffer(Columns, Rows);
         }
 
-        /// <summary>A frame as the render target writes one: the given cells changed, then the frame ends.</summary>
+        /// <summary>
+        ///     Writes one frame the way the render target does: BeginUpdate, the changed cells, then EndUpdate.
+        ///     Returns what was written.
+        /// </summary>
         private string Frame(params (int X, int Y, Pixel Pixel)[] changed)
         {
             Clear();
@@ -79,7 +82,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             return Written();
         }
 
-        /// <summary>Forgets what was written so far, buffered or not.</summary>
+        /// <summary>Flushes the output and then discards everything written so far.</summary>
         private void Clear()
         {
             _output.Flush();
@@ -220,8 +223,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     After a glyph in the last column the terminal's cursor is still on that row, waiting to wrap:
-        ///     the next character goes to the next row on its own, but anything else needs the move.
+        ///     After a character is written in the last column, the terminal's cursor stays on that row until
+        ///     the next character, which wraps to the next row. So text at the start of the next row needs no
+        ///     cursor move. Moving the caret there still needs an explicit move.
         /// </summary>
         [Test]
         public void AfterTheLastColumnTextNeedsNoMoveButTheCaretDoes()
@@ -288,6 +292,18 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _output.RestoreConsole();
 
             Assert.That(_factory.Encoder.Calls, Is.EqualTo(new[] { "Reset", "RestoreConsole", "Reset" }));
+        }
+
+        [Test]
+        public void AfterAResetTheFirstCellMovesTheCursorEvenWhereItWasLeft()
+        {
+            Open(ConsoleCapabilities.None, false);
+            Frame((0, 0, TextCell('a')));
+
+            // Simulate another program using the terminal. It may have left the cursor anywhere.
+            _output.ResetCache();
+
+            Assert.That(Frame((1, 0, TextCell('b'))), Does.Contain(Esc.SetCursorPosition(1, 0)));
         }
 
         private sealed class RecordingEncoderFactory : IConsoleImageEncoderFactory

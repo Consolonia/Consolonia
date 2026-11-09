@@ -6,23 +6,23 @@ using Avalonia.Media;
 namespace Consolonia.Core.Drawing.PixelBufferImplementation
 {
     /// <summary>
-    ///     The pixels one cell of a picture shows: a cell-sized BGRA image a <see cref="PixelBackground" />
-    ///     refers to. What the terminal is sent for it (a sixel, a kitty image, a block glyph) is the
-    ///     console output's business; the pixel buffer only holds the reference.
+    ///     The pixels of one cell of an image. It is a cell-sized BGRA image that a
+    ///     <see cref="PixelBackground" /> refers to. The console output decides what to send to the terminal
+    ///     for it (a sixel, a kitty image, or a block character). The pixel buffer only holds the reference.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Compared by reference. The converter that makes pixel images keeps one instance per distinct
-    ///         content (see <see cref="PixelImageCache" />), so two cells showing the same pixels share one
-    ///         instance and compare equal, and a cell whose pixels did not change keeps its instance and is
-    ///         not written again. The bytes are a copy the image owns: a picture is edited in place and
-    ///         scaled to the cells it is drawn at, so nothing else holds these pixels unchanged.
+    ///         Instances are compared by reference. The converter keeps one instance per distinct content
+    ///         (see <see cref="PixelImageCache" />). So two cells with the same pixels share one instance and
+    ///         compare equal. A cell whose pixels did not change keeps its instance and is not written again.
+    ///         The image owns a copy of its pixels. This is needed because the source bitmap can be edited in
+    ///         place and is scaled to the drawn size, so no other buffer keeps these exact pixels.
     ///     </para>
     ///     <para>
-    ///         The pixels may sit in an array shared with other pixel images made in the same render (a
-    ///         slab), at an offset: one allocation for a handful of cells rather than an array header and a
-    ///         heap object per cell. An instance is 56 bytes: the slab reference, its offset, the size, the
-    ///         16-byte digest the converter finds it by, and the dominant color once computed.
+    ///         The pixels may be stored at an offset in an array shared with other pixel images (a slab).
+    ///         One allocation then serves many cells, instead of one array and one heap object per cell.
+    ///         An instance holds the slab reference, the offset, the width and height, the 16-byte digest,
+    ///         and the cached dominant color (about 56 bytes).
     ///     </para>
     /// </remarks>
     public sealed class PixelImage
@@ -30,13 +30,18 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         private readonly int _offset;
         private readonly byte[] _pixels;
 
-        /// <summary>The dominant color as ARGB once computed, 0 (which an opaque color never is) until then.</summary>
+        /// <summary>
+        ///     The cached dominant color as ARGB. It is 0 until computed. A computed value is always opaque,
+        ///     so it is never 0.
+        /// </summary>
         private uint _dominantColor;
 
         /// <param name="bgra">Exactly <paramref name="width" /> x <paramref name="height" /> pixels, 4 bytes each, row by row.</param>
         /// <param name="width">Width of the cell in pixels.</param>
         /// <param name="height">Height of the cell in pixels.</param>
-        /// <exception cref="ArgumentException"><paramref name="bgra" /> is not exactly the pixels of the cell.</exception>
+        /// <exception cref="ArgumentException">
+        ///     <paramref name="bgra" /> does not have exactly width x height x 4 bytes.
+        /// </exception>
         public PixelImage(byte[] bgra, int width, int height)
             : this(bgra ?? throw new ArgumentNullException(nameof(bgra)), 0, width, height,
                 XxHash128.HashToUInt128(bgra))
@@ -46,12 +51,12 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     A pixel image whose pixels are the <paramref name="width" /> x <paramref name="height" /> x 4
-        ///     bytes of <paramref name="pixels" /> from <paramref name="offset" />, already hashed to
-        ///     <paramref name="digest" />. For the converter, which hashes a cell to look it up before it
-        ///     decides to keep it, and keeps the new cells of one render in one array.
+        ///     Creates a pixel image from <paramref name="width" /> x <paramref name="height" /> x 4 bytes of
+        ///     <paramref name="pixels" />, starting at <paramref name="offset" />. <paramref name="digest" /> is
+        ///     the precomputed hash of those bytes. Used by the converter, which hashes a cell to look it up in
+        ///     the cache before creating it, and stores new cells in a shared array (a slab).
         /// </summary>
-        /// <exception cref="ArgumentException">The pixels run past the end of <paramref name="pixels" />.</exception>
+        /// <exception cref="ArgumentException">The pixels extend past the end of <paramref name="pixels" />.</exception>
         internal PixelImage(byte[] pixels, int offset, int width, int height, UInt128 digest)
         {
             ArgumentNullException.ThrowIfNull(pixels);
@@ -78,15 +83,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         public int Height { get; }
 
         /// <summary>
-        ///     The 128-bit XXH3 hash of the pixels: what the converter finds the instance by, and what an
-        ///     encoder describes a cell's picture by.
+        ///     The 128-bit XXH3 hash of the pixels. The cache uses it as the lookup key, and encoders use it to
+        ///     identify the image.
         /// </summary>
         public UInt128 Digest { get; }
 
         /// <summary>
-        ///     The opaque color covering most of the cell, computed on first use. Where a cell needs a
-        ///     single color (a glyph a protocol cannot draw over the picture, the mouse cursor's contrast),
-        ///     this keeps it looking like the picture rather than a hole in it.
+        ///     The most common color in the cell, as an opaque color. It is computed on first use. It is used
+        ///     where a cell needs a single color, for example for text that the image protocol cannot draw over
+        ///     the image, or for the mouse cursor contrast. This keeps the cell close to the image instead of
+        ///     showing a hole.
         /// </summary>
         public Color DominantColor
         {
@@ -104,39 +110,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     Composites <paramref name="paint" /> over the <paramref name="width" /> x <paramref name="height" />
-        ///     BGRA pixels at <paramref name="offset" /> of an image <paramref name="rowBytes" /> wide: what a
-        ///     translucent overlay on a cell does to the picture when the cell is encoded.
-        /// </summary>
-        public static void Paint(Span<byte> bgra, int rowBytes, int offset, int width, int height, Color paint)
-        {
-            int alpha = paint.A;
-            int inverse = 255 - alpha;
-            int blue = paint.B * alpha;
-            int green = paint.G * alpha;
-            int red = paint.R * alpha;
-            for (int y = 0; y < height; y++)
-            {
-                int i = offset + y * rowBytes;
-                for (int x = 0; x < width; x++, i += 4)
-                {
-                    bgra[i] = (byte)((blue + bgra[i] * inverse) / 255);
-                    bgra[i + 1] = (byte)((green + bgra[i + 1] * inverse) / 255);
-                    bgra[i + 2] = (byte)((red + bgra[i + 2] * inverse) / 255);
-                }
-            }
-        }
-
-        /// <summary>
-        ///     The most frequent color, alpha left out (a translucent picture's colors are still its colors),
-        ///     as opaque ARGB. The colors are sorted on the stack and the longest run wins: no dictionary,
-        ///     and for the few hundred pixels of a cell faster than one.
+        ///     Returns the most frequent color as opaque ARGB. Alpha is ignored when counting, so translucent
+        ///     pixels count by their RGB color. The colors are sorted (on the stack for small cells) and the
+        ///     longest run of equal values wins. For the few hundred pixels in a cell this is faster than a
+        ///     dictionary.
         /// </summary>
         private uint FindDominantColor()
         {
             ReadOnlySpan<uint> pixels = MemoryMarshal.Cast<byte, uint>(Bgra);
             Span<uint> colors = pixels.Length <= 2048 ? stackalloc uint[pixels.Length] : new uint[pixels.Length];
-            // a BGRA pixel read as a little-endian uint is ARGB; the mask leaves RGB
+            // A BGRA pixel read as a little-endian uint is ARGB. The mask removes the alpha.
             for (int i = 0; i < pixels.Length; i++)
                 colors[i] = pixels[i] & 0x00FFFFFF;
             colors.Sort();

@@ -9,8 +9,9 @@ namespace Consolonia.Benchmarks
     internal class Program
     {
         /// <summary>
-        ///     Runs the benchmarks the arguments select, e.g. <c>--filter *BitmapFrame*</c>; with none,
-        ///     BenchmarkDotNet asks which to run.
+        ///     Runs the benchmarks selected by the arguments, for example <c>--filter *BitmapFrame*</c>.
+        ///     With no arguments, BenchmarkDotNet asks which benchmarks to run.
+        ///     <c>--digest</c> and <c>--alloc</c> run the <see cref="ConsoleOutputBenchmarks" /> checks instead.
         /// </summary>
         private static void Main(string[] args)
         {

@@ -6,15 +6,17 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     The pixel images made so far, by what they show, so the same pixels always get the same
-    ///     instance: the pixel buffer compares images by reference, and a cell whose pixels did not change
-    ///     must keep its image to not be written again. Least recently used first out beyond a budget of
-    ///     pixel bytes; eviction only ends the sharing, a cell on screen holds its image by reference.
+    ///     A cache of pixel images, keyed by their content, so the same pixels always get the same instance.
+    ///     This matters because the pixel buffer compares images by reference. A cell whose pixels did not
+    ///     change must keep the same instance, or it is written to the terminal again.
+    ///     When the cached pixel bytes exceed the budget, the least recently used images are removed.
+    ///     Removal only stops sharing. A cell on screen still holds a reference to its image.
+    ///     Thread-safe.
     /// </summary>
     /// <remarks>
-    ///     Found by the 128-bit XXH3 digest of the pixels and the size, so two different cells never share
-    ///     a key in practice and nothing needs keeping to compare against. It is not cryptographic, which is
-    ///     fine: the pixels are the app's own, not an adversary's.
+    ///     The key is the 128-bit XXH3 hash of the pixels plus the size. In practice two different cells never
+    ///     get the same key, so the pixels do not need to be compared. XXH3 is not a cryptographic hash. That is
+    ///     fine here, because the pixels come from the app, not from an attacker.
     /// </remarks>
     internal sealed class PixelImageCache
     {
@@ -23,13 +25,13 @@ namespace Consolonia.Core.Drawing
         private long _budget;
         private long _bytes;
 
-        /// <param name="budget">Pixel bytes to hold before the least recently used are dropped.</param>
+        /// <param name="budget">The maximum bytes of pixel data to keep before old images are removed.</param>
         public PixelImageCache(long budget)
         {
             _budget = budget;
         }
 
-        /// <summary>Raises the budget to at least <paramref name="budget" />; it never shrinks.</summary>
+        /// <summary>Raises the budget to at least <paramref name="budget" />. The budget never shrinks.</summary>
         public void EnsureBudget(long budget)
         {
             lock (_images)
@@ -38,7 +40,9 @@ namespace Consolonia.Core.Drawing
             }
         }
 
-        /// <summary>The image made for these pixels, marked most recently used.</summary>
+        /// <summary>
+        ///     Looks up the cached image for a pixel hash and size. If found, marks it as most recently used.
+        /// </summary>
         public bool TryGet(UInt128 digest, int width, int height, out PixelImage image)
         {
             lock (_images)
@@ -57,12 +61,13 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Holds <paramref name="image" /> unless one for the same pixels is already held, then drops the
-        ///     least recently used until the bytes held are back within budget. The newest is never dropped.
+        ///     Adds <paramref name="image" /> unless an image with the same pixels is already cached. After adding,
+        ///     removes the least recently used images until the cache is within budget. The newest image is
+        ///     never removed.
         /// </summary>
         /// <returns>
-        ///     The image held for these pixels: <paramref name="image" />, or the one already there. Callers
-        ///     keep THAT one, so every cell showing the same pixels shares one instance and compares equal.
+        ///     The cached image for these pixels. This is either <paramref name="image" /> or the existing one.
+        ///     Callers must use the returned image, so that all cells with the same pixels share one instance.
         /// </returns>
         public PixelImage GetOrAdd(PixelImage image)
         {

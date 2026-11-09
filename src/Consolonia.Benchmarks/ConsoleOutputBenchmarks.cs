@@ -11,9 +11,10 @@ using Consolonia.Core.Infrastructure;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     What AnsiConsoleOutput costs to get a frame out: the escape sequences built, buffered and written
-    ///     to the output stream (a null stream here, so the terminal's side is not measured), as the render
-    ///     target drives it: the changed cells written between the frame's begin and end.
+    ///     Measures the cost of AnsiConsoleOutput writing one frame. This includes building, buffering and
+    ///     writing the escape sequences. The calls match what the render target does: BeginUpdate, then
+    ///     WritePixel for each changed cell, then EndUpdate.
+    ///     The output goes to a null stream, so the terminal's own work is not measured.
     /// </summary>
     /// <remarks>
     ///     A full screen is 240x67 cells.
@@ -45,7 +46,7 @@ namespace Consolonia.Benchmarks
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleColorMode>().ToConstant(new RgbConsoleColorMode());
 
-            // a screen of text in runs of eight cells per color, as a UI draws it
+            // A screen of text. Each run of eight cells shares one color, like typical UI text.
             _text = new PixelBuffer(CellsWide, CellsHigh);
             for (int i = 0; i < CellsWide * CellsHigh; i++)
             {
@@ -69,7 +70,7 @@ namespace Consolonia.Benchmarks
             Console.SetOut(_originalOut);
         }
 
-        /// <summary>A frame in which every cell of <paramref name="screen" /> changed.</summary>
+        /// <summary>Writes one frame in which every cell of <paramref name="screen" /> changed.</summary>
         private static void WholeScreen(AnsiConsoleOutput output, PixelBuffer screen)
         {
             output.BeginUpdate();
@@ -86,8 +87,9 @@ namespace Consolonia.Benchmarks
         }
 
         /// <summary>
-        ///     The SHA-256 of the bytes each scenario writes, to show a change to the output path writes the
-        ///     same bytes.
+        ///     <c>--digest</c>: prints the byte count and SHA-256 hash of the output of each scenario.
+        ///     Compare the hashes before and after a change to the output code to check that it still
+        ///     writes the same bytes.
         /// </summary>
         public static void PrintDigests()
         {
@@ -106,8 +108,8 @@ namespace Consolonia.Benchmarks
         }
 
         /// <summary>
-        ///     <c>--alloc</c>: the bytes each scenario allocates in one run, after a warm-up run, from the
-        ///     thread's allocation counter.
+        ///     <c>--alloc</c>: prints how many bytes each scenario allocates in one run. Each scenario runs
+        ///     once to warm up first. The count comes from the current thread's allocation counter.
         /// </summary>
         public static void PrintAllocations()
         {

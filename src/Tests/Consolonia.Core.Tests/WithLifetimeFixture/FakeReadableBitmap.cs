@@ -8,8 +8,8 @@ using Avalonia.Platform;
 namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     /// <summary>
-    ///     Minimal readable bitmap over a pinned BGRA buffer. The real render interface cannot create one
-    ///     here because Consolonia.Core.Tests has no Skia fallback.
+    ///     A minimal readable bitmap backed by a pinned BGRA array. The tests need this because
+    ///     Consolonia.Core.Tests has no Skia fallback, so the real render interface cannot create a bitmap here.
     /// </summary>
     internal sealed class FakeReadableBitmap : IReadableBitmapImpl
     {
@@ -21,7 +21,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             RowBytes = size.Width * 4;
             _pixels = GC.AllocateArray<byte>(RowBytes * size.Height, true);
 
-            // a recognizable gradient, so every cell differs
+            // Fill with a gradient so that every cell is different.
             for (int y = 0; y < size.Height; y++)
             for (int x = 0; x < size.Width; x++)
             {
@@ -59,7 +59,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             throw new NotSupportedException();
         }
 
-        /// <summary>Paints <paramref name="area" /> one opaque color.</summary>
+        /// <summary>Fills <paramref name="area" /> with one opaque color.</summary>
         public FakeReadableBitmap Fill(PixelRect area, byte blue, byte green, byte red)
         {
             for (int y = area.Y; y < area.Bottom; y++)

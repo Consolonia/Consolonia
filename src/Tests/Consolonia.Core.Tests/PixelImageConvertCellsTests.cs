@@ -8,8 +8,8 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     How the converter turns visible pixels into cells showing pixel images: cells seen before reuse
-    ///     their image, and only a cell with new pixels gets a new one.
+    ///     Tests how the converter turns visible pixels into cells that show pixel images. A cell whose pixels
+    ///     were seen before reuses the same image. Only a cell with new pixels gets a new image.
     /// </summary>
     [TestFixture]
     public class PixelImageConvertCellsTests
@@ -20,7 +20,10 @@ namespace Consolonia.Core.Tests
         private const int CellsHigh = 2;
         private const int Width = CellsWide * CellWidth;
 
-        /// <summary>Each cell a solid color unique to this test run, so nothing comes from the shared cache.</summary>
+        /// <summary>
+        ///     Makes a picture where each cell is one solid color. The colors depend on <paramref name="seed" />,
+        ///     so they are new to this test run and no image comes from the shared cache.
+        /// </summary>
         private static byte[] Picture(int seed)
         {
             byte[] bgrx = new byte[CellsWide * CellWidth * CellsHigh * CellHeight * 4];
@@ -76,9 +79,10 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
-        ///     A flat canvas (Paintty's blank picture) is one distinct block repeated: every cell must
-        ///     share ONE cached image from the first frame, or the first brush stroke, which makes every
-        ///     cell hit the cache's single instance, re-sends the whole canvas as "changed".
+        ///     A blank canvas in a paint program has the same pixels in every cell. Every cell must share one
+        ///     cached image from the first frame. Otherwise, on the first brush stroke every cell would switch
+        ///     to the one cached image, which is a different object from the image it had before. Then the
+        ///     whole canvas would be sent again as "changed".
         /// </summary>
         [Test]
         public void IdenticalCellsShareOneImageFromTheFirstFrame()
@@ -104,8 +108,9 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
-        ///     The converter refills one cell buffer per picture on every edit rather than making a new one:
-        ///     conversion into the buffer that holds the previous frame gives exactly the cells a fresh one gets.
+        ///     On each edit, the converter refills the same cell buffer instead of making a new one. This test
+        ///     checks that converting into the buffer that holds the previous frame gives the same cells as
+        ///     converting into a new buffer.
         /// </summary>
         [Test]
         public void ConvertingIntoTheBufferOfThePreviousFrameGivesTheSameCells()
@@ -131,7 +136,10 @@ namespace Consolonia.Core.Tests
                 new byte[Width * CellHeight * 4], new PixelBuffer(CellsWide, CellsHigh), CellWidth, CellHeight));
         }
 
-        /// <summary>A cell's image is its own pixels, exactly, and knows the color covering most of them.</summary>
+        /// <summary>
+        ///     A cell's image holds exactly the cell's pixels. Its dominant color is the color of most of
+        ///     those pixels.
+        /// </summary>
         [Test]
         public void ACellKeepsItsExactPixels()
         {
@@ -149,8 +157,8 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
-        ///     A picture cell is a space, like any cell nothing has been drawn in, so the encoders show the
-        ///     picture until a glyph is drawn over it.
+        ///     A picture cell has a space as its foreground, like an empty cell. The encoders show the picture
+        ///     until a character is drawn on top of it.
         /// </summary>
         [Test]
         public void PictureCellsAreSpaces()
@@ -162,8 +170,9 @@ namespace Consolonia.Core.Tests
         }
 
         /// <summary>
-        ///     Both constructors guard the same way: the one taking a slab checks that the cell's pixels
-        ///     lie within it, and the public one, which goes through it, that they are exactly the cell's.
+        ///     Both constructors reject bad input. The internal constructor takes a shared array (a slab) and an
+        ///     offset, and checks that the cell's pixels fit inside the array. The public constructor calls the
+        ///     internal one, and also checks that the array is exactly the size of one cell.
         /// </summary>
         [Test]
         public void PixelImagesRefusePixelsThatAreNotTheCells()
