@@ -164,8 +164,8 @@ The converter finds a cell's `PixelImage` by **what the pixels show**, not by wh
   ends the sharing, a cell on screen holds its image by reference. `GetOrAdd` returns the image
   already held, so every cell showing the same pixels shares one instance and compares equal.
 
-`PixelImage.Digest` and `PixelImage.Paint` are public, so an encoder can describe a cell's picture
-and composite its paint; what an encoder caches is its own.
+`PixelImage.Digest` is public, so an encoder can describe a cell's picture; what an encoder caches
+is its own.
 
 A blank canvas is one block repeated. With content keys it is one `PixelImage`, not one per cell,
 and the first edit changes only the cells it touched.
