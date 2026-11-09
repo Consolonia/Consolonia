@@ -1,16 +1,79 @@
+using System;
+using System.IO;
+using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 
 namespace Consolonia.Gallery.Gallery.GalleryViews
 {
     // ReSharper disable once UnusedType.Global
     public partial class GalleryAnimations : UserControl
     {
+        private const string BackgroundUrl = "https://picsum.photos/1024/768";
+        private const string FallbackBackground = "avares://Consolonia.Gallery/Resources/0.jpg";
+
+        /// <summary>How long to wait for Picsum before showing the bundled image instead.</summary>
+        private static readonly TimeSpan BackgroundTimeout = TimeSpan.FromSeconds(5);
+
         public GalleryAnimations()
         {
             InitializeComponent();
+            LoadBackground();
+        }
+
+        /// <summary>
+        ///     Shows a random Picsum photo behind the animations. If the download fails, shows a bundled image.
+        /// </summary>
+        private async void LoadBackground()
+        {
+            BackgroundImage.Source = await DownloadBackgroundAsync() ?? LoadFallbackBackground();
+        }
+
+        /// <returns>
+        ///     The downloaded photo. Null when offline, when the request fails or times out, or when the
+        ///     reply is not an image.
+        /// </returns>
+        private static async Task<Bitmap> DownloadBackgroundAsync()
+        {
+            if (!GalleryHttp.UseNetwork)
+                return null;
+
+            byte[] bytes;
+            try
+            {
+                using var timeout = new CancellationTokenSource(BackgroundTimeout);
+                bytes = await GalleryHttp.Client.GetByteArrayAsync(new Uri(BackgroundUrl), timeout.Token);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+            {
+                return null;
+            }
+
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    using var stream = new MemoryStream(bytes);
+                    return new Bitmap(stream);
+                }
+                catch (ArgumentException)
+                {
+                    // The reply is not an image (for example an error page or a partial download).
+                    // Return null so the bundled image is shown instead.
+                    return null;
+                }
+            });
+        }
+
+        private static Bitmap LoadFallbackBackground()
+        {
+            using Stream stream = AssetLoader.Open(new Uri(FallbackBackground));
+            return new Bitmap(stream);
         }
 
         private async void PauseButton_OnClick(object _, RoutedEventArgs _2)

@@ -15,6 +15,9 @@ namespace Consolonia.Core.Text
 
         // style modifiers
         public const string Reset = "\u001b[0m";
+
+        // Sets the terminal's default background color (SGR 49) instead of an explicit color.
+        public const string DefaultBackground = "\u001b[49m";
         public const string Normal = "\u001b[22m";
         public const string Bold = "\u001b[1m";
         public const string Dim = "\u001b[2m";
@@ -83,6 +86,25 @@ namespace Consolonia.Core.Text
         // Query current progressive enhancement flags. A terminal supporting the
         // Kitty keyboard protocol will reply with "CSI ? <flags> u".
         public const string QueryKittyKeyboardFlags = "\u001b[?u";
+
+        // Queries Primary Device Attributes (DA1). Reply: "CSI ? <class> ; <feature> ; ... c".
+        // Feature 4 means sixel graphics support.
+        public const string RequestDeviceAttributes = "\u001b[c";
+
+        // Kitty graphics protocol query. It sends a 1x1 RGB image with a=q (query only).
+        // A terminal with the protocol replies "APC _Gi=31;OK ST" and does not store the image.
+        // Other terminals ignore it.
+        public const string QueryKittyGraphics = "\u001b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\u001b\\";
+
+        // DECRQM for DEC private mode 2026. Reply: "CSI ? 2026 ; <state> $ y".
+        // State 1, 2 or 3 means synchronized output is supported. 0 means the mode is unknown,
+        // and 4 means it is permanently off.
+        public const string RequestSynchronizedOutputMode = "\u001b[?2026$p";
+
+        // Synchronized output. The terminal does not repaint between begin and end. So a frame that
+        // arrives in several chunks is shown all at once, without tearing.
+        public const string BeginSynchronizedUpdate = "\u001b[?2026h";
+        public const string EndSynchronizedUpdate = "\u001b[?2026l";
 
         /// <summary>
         ///     XTVERSION: asks the terminal its name and version, answered <c>DCS &gt; | text ST</c>.

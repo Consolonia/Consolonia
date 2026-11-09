@@ -70,6 +70,17 @@ namespace Consolonia.Core.Infrastructure
 
         internal Snapshot.Regions DirtyRegions { get; } = new();
 
+        /// <summary>
+        ///     A lock that ensures no frame is written from a half-drawn buffer. It is held in these cases:
+        ///     while a drawing context draws into <see cref="PixelBuffer" /> and writes the frame (the whole
+        ///     life of the context), while a frame for only the mouse cursor is written, and while a resize
+        ///     replaces the buffer.
+        /// </summary>
+        /// <remarks>
+        ///     Take this lock before the render target's own lock, never after it.
+        /// </remarks>
+        internal object RenderLock { get; } = new();
+
         public PixelBuffer PixelBuffer { get; private set; }
 
         private IMouseDevice MouseDevice { get; }
@@ -358,6 +369,18 @@ namespace Consolonia.Core.Infrastructure
 
         public event Action<ConsoleCursor> CursorChanged;
 
+        /// <summary>
+        ///     Raised when the terminal may no longer show what was written to it, because console I/O resumed
+        ///     after another program used the terminal. Renderers should forget what they wrote and write
+        ///     everything again.
+        /// </summary>
+        internal event Action TerminalContentsLost;
+
+        internal void NotifyTerminalContentsLost()
+        {
+            TerminalContentsLost?.Invoke();
+        }
+
         private void OnShowAccessKeyPropertyChanged(AvaloniaPropertyChangedEventArgs<bool> args)
         {
             var presentationSource = (IPresentationSource)_inputRoot;
@@ -412,7 +435,13 @@ namespace Consolonia.Core.Infrastructure
         private void OnConsoleOnResized()
         {
             var size = new Size(Console.Size.Width, Console.Size.Height);
-            PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
+            // Do not replace the buffer while a frame is being drawn into it. Raise Resized outside the
+            // lock, because its handlers may draw.
+            lock (RenderLock)
+            {
+                PixelBuffer = new PixelBuffer((ushort)size.Width, (ushort)size.Height);
+            }
+
             Resized!(size, WindowResizeReason.Unspecified);
         }
 

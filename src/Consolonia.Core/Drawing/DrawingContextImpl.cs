@@ -17,7 +17,6 @@ namespace Consolonia.Core.Drawing
     internal partial class DrawingContextImpl : IDrawingContextImpl
     {
         private readonly Stack<PixelRect> _clipStack = new(100);
-        private readonly ConsoleWindowImpl _consoleWindowImpl;
         private readonly PixelBuffer _pixelBuffer;
         private readonly Matrix _postTransform = Matrix.Identity;
 
@@ -28,7 +27,7 @@ namespace Consolonia.Core.Drawing
 
         public DrawingContextImpl(ConsoleWindowImpl consoleWindowImpl, RenderTarget renderTarget)
         {
-            _consoleWindowImpl = consoleWindowImpl;
+            ConsoleWindowImpl = consoleWindowImpl;
             _renderTarget = renderTarget;
             _pixelBuffer = consoleWindowImpl.PixelBuffer;
             _clipStack.Push(_pixelBuffer.Size);
@@ -37,11 +36,13 @@ namespace Consolonia.Core.Drawing
         // ReSharper disable once ConvertToAutoPropertyWhenPossible Don't use this inside the class
         internal PixelBuffer PixelBuffer => _pixelBuffer;
 
+        internal ConsoleWindowImpl ConsoleWindowImpl { get; }
+
         private PixelRect CurrentClip => _clipStack.Peek();
 
         void IDisposable.Dispose()
         {
-            _renderTarget.RenderToDevice();
+            _renderTarget.EndDrawing();
         }
 
         public void Clear(Color color)
@@ -90,7 +91,7 @@ namespace Consolonia.Core.Drawing
             glyphTypefaceRender.DrawGlyphRun(this, startPosition, glyphRunImpl, foregroundColor,
                 out PixelRect rectToRefresh);
 
-            _consoleWindowImpl.DirtyRegions.AddRect(rectToRefresh);
+            ConsoleWindowImpl.DirtyRegions.AddRect(rectToRefresh);
         }
 
         public IDrawingContextLayerImpl CreateLayer(PixelSize size)

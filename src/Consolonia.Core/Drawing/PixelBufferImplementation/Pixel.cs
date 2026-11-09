@@ -112,6 +112,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         [JsonIgnore] public ushort Width => Foreground.Symbol.Width;
 
+        /// <summary>
+        ///     The visible background color of the cell, as a single color. For a plain cell this is the
+        ///     background color. For an image cell this is the background color blended over the image's
+        ///     <see cref="PixelImage.DominantColor" />. Use it where one color is needed for the whole cell.
+        /// </summary>
+        [JsonIgnore]
+        public Color EffectiveBackgroundColor => Background.Image == null
+            ? Background.Color
+            : MergeColors(Background.Image.DominantColor, Background.Color, false);
+
         public bool Equals(Pixel other)
         {
             return EqualityComparer<PixelForeground>.Default.Equals(Foreground, other.Foreground) &&
@@ -136,7 +146,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     Foreground.Weight,
                     Foreground.Style,
                     Foreground.TextDecoration),
-                new PixelBackground(Foreground.Color),
+                new PixelBackground(Foreground.Color, Background.Image),
                 CaretStyle);
         }
 
@@ -153,9 +163,11 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             CaretStyle newCaretStyle;
 
             Color aboveBgColor = pixelAbove.Background.Color;
-            byte aboveBgA = aboveBgColor.A;
+            // An image cell above replaces the whole cell, like an opaque color does. Its background color
+            // is only the (usually transparent) tint over the image, so its alpha is ignored here.
+            byte aboveBgA = pixelAbove.Background.Image != null ? (byte)0xFF : aboveBgColor.A;
 
-            bool isNoForegroundOnTop;
+            bool foregroundAboveIsTransparent;
 
             switch (aboveBgA)
             {
@@ -165,17 +177,19 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                 // Fast path: fully transparent overlay with no foreground and no caret change -> nothing to do
                 case 0x0:
                 {
-                    isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
-                    if (isNoForegroundOnTop && pixelAbove.CaretStyle == CaretStyle.None)
+                    foregroundAboveIsTransparent = pixelAbove.Foreground.IsTransparent;
+                    if (foregroundAboveIsTransparent && pixelAbove.CaretStyle == CaretStyle.None)
                         return this;
-                    newForeground = isNoForegroundOnTop ? Foreground : Foreground.Blend(pixelAbove.Foreground);
+                    newForeground = foregroundAboveIsTransparent
+                        ? Foreground
+                        : Foreground.Blend(pixelAbove.Foreground);
                     newCaretStyle = CaretStyle.Blend(pixelAbove.CaretStyle);
                 }
                     break;
                 default:
                     newCaretStyle = pixelAbove.CaretStyle;
-                    isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
-                    if (isNoForegroundOnTop)
+                    foregroundAboveIsTransparent = pixelAbove.Foreground.IsTransparent;
+                    if (foregroundAboveIsTransparent)
                         // merge the PixelForeground color with the pixelAbove background color
                         newForeground = new PixelForeground(Foreground.Symbol,
                             MergeColors(Foreground.Color, aboveBgColor, true),
@@ -188,8 +202,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     break;
             }
 
-            // Background is always blended
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false));
+            // The overlay is not opaque here (the opaque case returned above), so the image below is kept.
+            // The background color is blended. For an image cell it is the tint drawn over the image.
+            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
+                Background.Image);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
         }
@@ -199,7 +215,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         /// <returns>source blended into target</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
+        internal static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
         {
             // Fast paths to avoid calling into the ConsoleColorMode when not needed
             byte a = source.A;
