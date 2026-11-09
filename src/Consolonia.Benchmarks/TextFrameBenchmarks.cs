@@ -8,11 +8,9 @@ using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
 using BenchmarkDotNet.Attributes;
-using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
-using Consolonia.Fonts;
 using Consolonia.NUnit;
 
 namespace Consolonia.Benchmarks
@@ -43,13 +41,13 @@ namespace Consolonia.Benchmarks
         private ConsoloniaLifetime _lifetime = null!;
         private RenderTarget _renderTarget = null!;
 
+        private IDisposable _scope = null!;
+
         // the rows of two screens of text that differ in every cell, and a row with one character typed
         private IGlyphRunImpl[] _screenA = null!;
         private IGlyphRunImpl[] _screenB = null!;
-        private IGlyphRunImpl _typedRow = null!;
-
-        private IDisposable _scope = null!;
         private bool _toggle;
+        private IGlyphRunImpl _typedRow = null!;
         private ConsoleWindowImpl _window = null!;
 
         [GlobalSetup]

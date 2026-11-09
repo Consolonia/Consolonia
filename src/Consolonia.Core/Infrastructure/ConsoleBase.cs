@@ -33,7 +33,7 @@ namespace Consolonia.Core.Infrastructure
         private readonly IConsoleOutput _consoleOutput;
 
         /// <summary>The cell size the terminal reported, unrounded; empty when it reported none.</summary>
-        private Avalonia.Size _reportedCellPixelSize;
+        private Size _reportedCellPixelSize;
 
         protected ConsoleBase(IConsoleOutput consoleOutput)
         {
@@ -345,7 +345,7 @@ namespace Consolonia.Core.Infrastructure
 
             // SGR-Pixels mouse positions are converted to cells with the unrounded cell size.
             if (TryParseTextAreaSize(response, cols, rows, out int widthPx, out int heightPx))
-                _reportedCellPixelSize = new Avalonia.Size((double)widthPx / cols, (double)heightPx / rows);
+                _reportedCellPixelSize = new Size((double)widthPx / cols, (double)heightPx / rows);
 
             return CellSizeFromReport(response, cols, rows);
         }

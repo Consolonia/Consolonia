@@ -294,7 +294,7 @@ namespace Consolonia.PlatformSupport
                     AddKeyPress(decoded, (ushort)('A' + c - 1), c, controlKeys | CONTROL_KEY_STATE.LEFT_CTRL_PRESSED);
                     return;
                 case >= 'a' and <= 'z':
-                    AddKeyPress(decoded, (ushort)char.ToUpperInvariant(c), c, controlKeys);
+                    AddKeyPress(decoded, char.ToUpperInvariant(c), c, controlKeys);
                     return;
                 case >= 'A' and <= 'Z':
                     AddKeyPress(decoded, c, c, controlKeys | CONTROL_KEY_STATE.SHIFT_PRESSED);
@@ -386,7 +386,7 @@ namespace Consolonia.PlatformSupport
                 return [];
 
             string[] parts = parameters.Split(';');
-            var values = new int[parts.Length];
+            int[] values = new int[parts.Length];
             for (int i = 0; i < parts.Length; i++)
                 values[i] = int.TryParse(parts[i], out int value) ? value : -1;
             return values;

@@ -1,14 +1,12 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using Avalonia;
-using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
 using BenchmarkDotNet.Attributes;
 using Consolonia.Controls;
 using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
-using Consolonia.Fonts;
 using Consolonia.NUnit;
 
 namespace Consolonia.Benchmarks

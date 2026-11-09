@@ -41,7 +41,8 @@ namespace Consolonia.Core.Tests
 
             List<KEY_EVENT_RECORD> keys = Keys(decoded);
             Assert.That(keys, Has.Count.EqualTo(3));
-            Assert.That((keys[0].wVirtualKeyCode, keys[0].wVirtualScanCode, keys[0].bKeyDown), Is.EqualTo(((ushort)38, (ushort)72, true)));
+            Assert.That((keys[0].wVirtualKeyCode, keys[0].wVirtualScanCode, keys[0].bKeyDown),
+                Is.EqualTo(((ushort)38, (ushort)72, true)));
             Assert.That(keys[1].bKeyDown, Is.False);
             Assert.That((keys[2].uChar, keys[2].dwControlKeyState), Is.EqualTo(('A', CONTROL_KEY_STATE.SHIFT_PRESSED)));
         }

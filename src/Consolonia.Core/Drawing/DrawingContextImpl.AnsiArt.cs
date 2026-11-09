@@ -1,5 +1,4 @@
 using Avalonia;
-using Consolonia.Core.Drawing.PixelBufferImplementation;
 
 namespace Consolonia.Core.Drawing
 {
@@ -29,10 +28,8 @@ namespace Consolonia.Core.Drawing
                 //todo: low this is bad default scaling
                 if (ax >= 0 && ax < pixelBufferBitmap.Buffer.Width && ay >= 0 &&
                     ay < pixelBufferBitmap.Buffer.Height)
-                {
                     // todo: handle opacity if necessary
                     _pixelBuffer.Blend(new PixelPoint(px, py), in pixelBufferBitmap.Buffer.CellAt(ax, ay));
-                }
             }
 
             ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
