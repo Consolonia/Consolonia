@@ -1,3 +1,5 @@
+// DUPFINDER_ignore
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +15,6 @@ using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 using Consolonia.Core.Text;
-using Consolonia.Imaging;
 using NUnit.Framework;
 
 namespace Consolonia.Imaging.Tests

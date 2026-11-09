@@ -7,10 +7,10 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
+// ReSharper disable once CheckNamespace
 namespace Consolonia.Imaging
 {
     /// <summary>
@@ -54,15 +54,15 @@ namespace Consolonia.Imaging
 
         private readonly List<(int X, int Y)> _blocksToForget = new();
 
-        /// <summary>Set by <see cref="Reset" />: the next frame deletes every block's image before sending.</summary>
-        private bool _deleteAllBeforeNextFrame;
-
         /// <summary>The encoded bytes of the block being transmitted: PNG or zlib. One stream, emptied per block.</summary>
         private readonly MemoryStream _encoded = new();
 
         private readonly IConsoleOutput _output;
         private byte[] _blockKey;
         private byte[] _blockScratch;
+
+        /// <summary>Set by <see cref="Reset" />: the next frame deletes every block's image before sending.</summary>
+        private bool _deleteAllBeforeNextFrame;
 
         /// <summary>
         ///     The platform's bitmaps, which encode PNG; null sends RGBA. Looked up on the first transmit, not

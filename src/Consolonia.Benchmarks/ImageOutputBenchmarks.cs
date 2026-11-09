@@ -35,6 +35,8 @@ namespace Consolonia.Benchmarks
         private const int Width = CellsWide * CellWidth;
         private const int Height = CellsHigh * CellHeight;
         private static readonly Color Dim = Color.FromArgb(0x7F, 0, 0, 0);
+
+        private PixelBuffer _dimmed = null!;
         private AnsiConsoleOutput _kittyOutput = null!;
         private PixelBuffer _newPicture = null!;
 
@@ -45,8 +47,6 @@ namespace Consolonia.Benchmarks
         private Pixel _strokeCell;
         private PixelBuffer _strokeScreen = null!;
         private PixelBuffer _text = null!;
-
-        private PixelBuffer _dimmed = null!;
 
         /// <summary>Each scenario, with what has to happen before every run of it.</summary>
         private static (string Name, Action<ImageOutputBenchmarks> Prepare, Action<ImageOutputBenchmarks> Run)[]
@@ -71,17 +71,8 @@ namespace Consolonia.Benchmarks
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleColorMode>().ToConstant(new RgbConsoleColorMode());
 
-            // a screen of text in runs of eight cells per color, as a UI draws it
-            _text = new PixelBuffer(CellsWide, CellsHigh);
-            for (int i = 0; i < CellsWide * CellsHigh; i++)
-            {
-                int run = i / 8;
-                Color foreground = Color.FromRgb((byte)(run * 37), (byte)(run * 11), 200);
-                Color background = Color.FromRgb(20, (byte)(run * 5), (byte)(run * 3));
-                _text[(ushort)(i % CellsWide), (ushort)(i / CellsWide)] = new Pixel(
-                    new PixelForeground(new Symbol((char)('A' + i % 26)), foreground),
-                    new PixelBackground(background));
-            }
+            // the same screen of text as ConsoleOutputBenchmarks
+            _text = Screens.Text(CellsWide, CellsHigh);
 
             // a screen of picture as the converter makes it
             _picture = Picture(Width, Height, 0);
@@ -108,9 +99,9 @@ namespace Consolonia.Benchmarks
             _dimmed = Dimmed(_picture);
             foreach (AnsiConsoleOutput output in new[] { _sixelOutput, _kittyOutput })
             {
-                WholeScreen(output, _picture);
-                WholeScreen(output, _dimmed);
-                WholeScreen(output, _picture);
+                Screens.WholeScreen(output, _picture);
+                Screens.WholeScreen(output, _dimmed);
+                Screens.WholeScreen(output, _picture);
             }
         }
 
@@ -121,7 +112,7 @@ namespace Consolonia.Benchmarks
         [IterationSetup(Target = nameof(SixelDialogClosed))]
         public void SetupDialogOpen()
         {
-            WholeScreen(_sixelOutput, _dimmed);
+            Screens.WholeScreen(_sixelOutput, _dimmed);
         }
 
         /// <summary>A picture no cell of which has been seen before, for the scenarios that send one.</summary>
@@ -172,16 +163,6 @@ namespace Consolonia.Benchmarks
             return bgrx;
         }
 
-        /// <summary>A frame in which every cell of <paramref name="screen" /> changed.</summary>
-        private static void WholeScreen(AnsiConsoleOutput output, PixelBuffer screen)
-        {
-            output.BeginUpdate();
-            for (ushort y = 0; y < CellsHigh; y++)
-            for (ushort x = 0; x < CellsWide; x++)
-                output.WritePixel(new PixelBufferCoordinate(x, y), screen[x, y]);
-            output.EndUpdate(screen);
-        }
-
         /// <summary>A frame in which one cell changed to pixels never seen before, as under a brush.</summary>
         private void OneCell(AnsiConsoleOutput output)
         {
@@ -195,21 +176,21 @@ namespace Consolonia.Benchmarks
         [Benchmark(Baseline = true)]
         public void TextFullScreen()
         {
-            WholeScreen(_sixelOutput, _text);
+            Screens.WholeScreen(_sixelOutput, _text);
         }
 
         /// <summary>A full-screen picture never sent: a run per row, quantized and encoded.</summary>
         [Benchmark]
         public void SixelNewPicture()
         {
-            WholeScreen(_sixelOutput, _newPicture);
+            Screens.WholeScreen(_sixelOutput, _newPicture);
         }
 
         /// <summary>The picture shown again after a modal dimmed it: every run comes from the cache.</summary>
         [Benchmark]
         public void SixelDialogClosed()
         {
-            WholeScreen(_sixelOutput, _picture);
+            Screens.WholeScreen(_sixelOutput, _picture);
         }
 
         [Benchmark]
@@ -222,7 +203,7 @@ namespace Consolonia.Benchmarks
         [Benchmark]
         public void KittyNewPicture()
         {
-            WholeScreen(_kittyOutput, _newPicture);
+            Screens.WholeScreen(_kittyOutput, _newPicture);
         }
 
         /// <summary>Every block sent again under its id, as after a resize or a resume.</summary>
@@ -230,7 +211,7 @@ namespace Consolonia.Benchmarks
         public void KittyAfterReset()
         {
             _kittyOutput.ResetCache();
-            WholeScreen(_kittyOutput, _picture);
+            Screens.WholeScreen(_kittyOutput, _picture);
         }
 
         [Benchmark]

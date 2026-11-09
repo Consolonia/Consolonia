@@ -1,3 +1,5 @@
+// DUPFINDER_ignore
+
 using System;
 using Avalonia;
 using Avalonia.Platform;

@@ -3,7 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Security.Cryptography;
 using Avalonia;
-using Avalonia.Media;
 using BenchmarkDotNet.Attributes;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
@@ -46,17 +45,7 @@ namespace Consolonia.Benchmarks
         {
             AvaloniaLocator.CurrentMutable.Bind<IConsoleColorMode>().ToConstant(new RgbConsoleColorMode());
 
-            // A screen of text. Each run of eight cells shares one color, like typical UI text.
-            _text = new PixelBuffer(CellsWide, CellsHigh);
-            for (int i = 0; i < CellsWide * CellsHigh; i++)
-            {
-                int run = i / 8;
-                Color foreground = Color.FromRgb((byte)(run * 37), (byte)(run * 11), 200);
-                Color background = Color.FromRgb(20, (byte)(run * 5), (byte)(run * 3));
-                _text[(ushort)(i % CellsWide), (ushort)(i / CellsWide)] = new Pixel(
-                    new PixelForeground(new Symbol((char)('A' + i % 26)), foreground),
-                    new PixelBackground(background));
-            }
+            _text = Screens.Text(CellsWide, CellsHigh);
 
             _originalOut = Console.Out;
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
@@ -70,20 +59,10 @@ namespace Consolonia.Benchmarks
             Console.SetOut(_originalOut);
         }
 
-        /// <summary>Writes one frame in which every cell of <paramref name="screen" /> changed.</summary>
-        private static void WholeScreen(AnsiConsoleOutput output, PixelBuffer screen)
-        {
-            output.BeginUpdate();
-            for (ushort y = 0; y < CellsHigh; y++)
-            for (ushort x = 0; x < CellsWide; x++)
-                output.WritePixel(new PixelBufferCoordinate(x, y), screen[x, y]);
-            output.EndUpdate(screen);
-        }
-
         [Benchmark(Baseline = true)]
         public void TextFullScreen()
         {
-            WholeScreen(_output, _text);
+            Screens.WholeScreen(_output, _text);
         }
 
         /// <summary>
