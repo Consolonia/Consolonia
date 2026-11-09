@@ -292,8 +292,7 @@ namespace Consolonia.Imaging
                     bgra.Slice(y * cellRowBytes, cellRowBytes).CopyTo(block.Slice(cellOffset + y * blockRowBytes));
 
                 if (background.Color.A != 0)
-                    PixelImage.Paint(block, blockRowBytes, cellOffset, cellPixelWidth, cellPixelHeight,
-                        background.Color);
+                    block.Paint(blockRowBytes, cellOffset, cellPixelWidth, cellPixelHeight, background.Color);
             }
 
             MemoryStream encoded = _encoded;

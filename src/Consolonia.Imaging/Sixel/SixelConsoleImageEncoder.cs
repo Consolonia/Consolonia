@@ -227,7 +227,7 @@ namespace Consolonia.Imaging
                             .CopyTo(bgra.AsSpan(y * frameRowBytes + column * cellRowBytes, cellRowBytes));
 
                     if (cell.Paint.A != 0)
-                        PixelImage.Paint(bgra, frameRowBytes, column * cellRowBytes, cellWidth, cellHeight, cell.Paint);
+                        bgra.AsSpan().Paint(frameRowBytes, column * cellRowBytes, cellWidth, cellHeight, cell.Paint);
                 }
             }
 

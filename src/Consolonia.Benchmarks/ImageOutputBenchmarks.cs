@@ -98,11 +98,10 @@ namespace Consolonia.Benchmarks
 
             _originalOut = Console.Out;
             _sixelOutput = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
-            _sixelOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsSixel);
-            _sixelOutput.SetImageEncoderFactory(new ConsoleImageEncoderFactory());
+            _sixelOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsSixel, new ConsoleImageEncoderFactory());
             _kittyOutput = new AnsiConsoleOutput { Size = new PixelBufferSize(CellsWide, CellsHigh) };
-            _kittyOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsKittyGraphics);
-            _kittyOutput.SetImageEncoderFactory(new ConsoleImageEncoderFactory());
+            _kittyOutput.RedirectOutput(stream, ConsoleCapabilities.SupportsKittyGraphics,
+                new ConsoleImageEncoderFactory());
 
             // the picture shown, dimmed and shown again, so the per-frame scenarios start from a terminal that
             // has it and the sixel run cache holds both
