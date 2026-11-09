@@ -27,14 +27,17 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         }
 
         /// <summary>
-        ///     Puts a random Picsum photo behind the animations, or a bundled one when offline.
+        ///     Shows a random Picsum photo behind the animations. If the download fails, shows a bundled image.
         /// </summary>
         private async void LoadBackground()
         {
             BackgroundImage.Source = await DownloadBackgroundAsync() ?? LoadFallbackBackground();
         }
 
-        /// <returns>The downloaded photo, or null when offline or when the reply is not an image.</returns>
+        /// <returns>
+        ///     The downloaded photo. Null when offline, when the request fails or times out, or when the
+        ///     reply is not an image.
+        /// </returns>
         private static async Task<Bitmap> DownloadBackgroundAsync()
         {
             if (!GalleryHttp.UseNetwork)
@@ -60,7 +63,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                 }
                 catch (ArgumentException)
                 {
-                    // not an image (an error page, a truncated download): show the bundled image instead
+                    // The reply is not an image (for example an error page or a partial download).
+                    // Return null so the bundled image is shown instead.
                     return null;
                 }
             });

@@ -21,8 +21,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         private const string PicsumListUrl = "https://picsum.photos/v2/list?page=1&limit=25";
 
         /// <summary>
-        ///     A terminal renders an image into a handful of cells, so the multi-megapixel
-        ///     originals are pure download cost.
+        ///     The largest width or height, in pixels, to request from Picsum. A terminal shows an image in
+        ///     only a few cells, so downloading the full multi-megapixel original would be wasted.
         /// </summary>
         private const int MaxImageEdge = 1024;
 
@@ -56,8 +56,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         }
 
         /// <summary>
-        ///     Two lines of text drawn over a thumbnail: one on an opaque background, one on none, so
-        ///     both ways of putting text over an image can be seen on every picture.
+        ///     Creates two lines of text to show on top of a thumbnail. One line has an opaque background and
+        ///     the other has a transparent background. This shows both kinds of text over an image.
         /// </summary>
         private static StackPanel CreateCaption()
         {
@@ -83,8 +83,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         }
 
         /// <summary>
-        ///     Asks Picsum which photos exist and turns each one into a down-scaled image url.
-        ///     Returns an empty list when the gallery is running offline.
+        ///     Gets the photo list from Picsum and returns a URL for a scaled-down copy of each photo.
+        ///     Returns an empty list when offline or when the request fails.
         /// </summary>
         private static async Task<IReadOnlyList<string>> FetchPicsumSourcesAsync()
         {
@@ -108,8 +108,8 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                     sources.Add($"https://picsum.photos/id/{id}/{width}/{height}");
                 }
             }
-            // InvalidOperationException, KeyNotFoundException and FormatException: a reply that is
-            // JSON but not the list of photos expected.
+            // InvalidOperationException, KeyNotFoundException and FormatException mean the reply is
+            // valid JSON but not the expected list of photos.
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException
                                           or InvalidOperationException or KeyNotFoundException
                                           or FormatException)
@@ -152,10 +152,10 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
                     return new Bitmap(stream);
                 });
             }
-            // ArgumentException: the reply is not an image (an error page, a truncated download)
+            // ArgumentException means the reply is not an image (for example an error page or a partial download).
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or ArgumentException)
             {
-                // A photo that will not download or decode just stays blank.
+                // If a photo fails to download or decode, its thumbnail stays blank.
             }
         }
 

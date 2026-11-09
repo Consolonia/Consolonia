@@ -12,9 +12,11 @@ namespace Consolonia.Core.Tests
     public class BitmapConverterTests
     {
         /// <summary>
-        ///     The visible part of a picture drawn at its own size is exactly its pixels under that part. Also
-        ///     when wrapped for layout, as every bitmap the render interface loads is: the wrapper reports half
-        ///     the height, and measuring the picture by it mapped the top half over the whole area.
+        ///     Draws a picture at its own size and checks that the visible pixels are exactly the source pixels
+        ///     in the visible rectangle.
+        ///     The second case wraps the bitmap in <see cref="AspectRatioAdjustedBitmap" />, as the render
+        ///     interface does for every bitmap it loads. The wrapper reports half the height for layout.
+        ///     Regression: the converter used that reported size, so the top half was stretched over the whole area.
         /// </summary>
         [TestCase(false, TestName = "VisiblePixelsOfAPictureAtItsOwnSizeAreItsPixelsThere")]
         [TestCase(true, TestName = "VisiblePixelsAreMeasuredByThePixelsNotTheLayoutSize")]

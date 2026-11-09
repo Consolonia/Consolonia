@@ -5,11 +5,14 @@ using NUnit.Framework;
 
 namespace Consolonia.Core.Tests
 {
-    /// <summary>The cache the pixel image converter finds the image for a cell's pixels in.</summary>
+    /// <summary>
+    ///     Tests <see cref="PixelImageCache" />. The pixel image converter uses this cache to find an existing
+    ///     image for a cell's pixels.
+    /// </summary>
     [TestFixture]
     public class PixelImageCacheTests
     {
-        /// <summary>One pixel, so an image is 4 bytes of the budget.</summary>
+        /// <summary>Makes a one-pixel image, so each image uses 4 bytes of the cache's size limit.</summary>
         private static PixelImage Image(byte value)
         {
             byte[] bgra = { value, value, value, 0xFF };

@@ -4,14 +4,15 @@ using System.Runtime.InteropServices;
 namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
-    ///     Turns on the Windows console's pass-through of terminal replies, for as long as one is expected.
+    ///     Turns on virtual terminal input on Windows while waiting for a reply from the terminal, so the
+    ///     reply arrives unchanged.
     /// </summary>
     /// <remarks>
     ///     Without it, conhost/ConPTY turns the terminal's escape sequence replies into key events. CSI and DCS
-    ///     replies survive as their own characters (so cursor position and cell size queries work), but an APC
-    ///     reply, which is how the kitty graphics query is answered, is swallowed up to its terminating escape,
-    ///     leaving only the trailing backslash. ENABLE_VIRTUAL_TERMINAL_INPUT passes the reply through raw.
-    ///     Held only for the round trip, because the input loop wants key events, not raw sequences.
+    ///     replies keep all their characters, so cursor position and cell size queries work. But an APC reply
+    ///     (the kitty graphics query uses APC) is dropped up to its final escape. Only the trailing backslash
+    ///     remains. ENABLE_VIRTUAL_TERMINAL_INPUT passes the reply through unchanged.
+    ///     Keep it on only while waiting for a reply, because the input loop needs key events, not raw sequences.
     /// </remarks>
     internal static class VirtualTerminalInput
     {
@@ -31,10 +32,10 @@ namespace Consolonia.Core.Infrastructure
         private static extern bool SetConsoleMode(nint handle, uint mode);
 
         /// <summary>
-        ///     Enables virtual terminal input, returning a scope which restores the previous console
-        ///     mode when disposed. Every case which cannot or must not change the mode (another
-        ///     operating system, redirected input, a console that refused, the mode already enabled
-        ///     by someone else) returns a scope which restores nothing.
+        ///     Enables virtual terminal input. Returns a scope that restores the previous console mode when
+        ///     disposed. If the mode cannot or should not be changed, the returned scope does nothing. This
+        ///     happens on other operating systems, with redirected input, when the console refuses the change,
+        ///     or when the mode is already enabled.
         /// </summary>
         public static Scope Enable()
         {
@@ -47,7 +48,7 @@ namespace Consolonia.Core.Infrastructure
             if (!GetConsoleMode(handle, out uint mode))
                 return default;
 
-            // already enabled by someone else, so not ours to turn off again
+            // Someone else already enabled it, so we must not turn it off later.
             if ((mode & EnableVirtualTerminalInputFlag) != 0)
                 return default;
 
@@ -57,7 +58,7 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Puts back whatever console mode was there before, if this scope changed it.
+        ///     Restores the previous console mode when disposed, if this scope changed it.
         /// </summary>
         public readonly struct Scope : IDisposable
         {

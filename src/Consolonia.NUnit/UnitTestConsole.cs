@@ -27,12 +27,15 @@ namespace Consolonia.NUnit
         // ReSharper disable once MemberCanBePrivate.Global
         public PixelBuffer PixelBuffer { get; }
 
-        /// <summary>The screen the last frame ended with, as the render target hands it over.</summary>
+        /// <summary>The screen passed to the last <see cref="EndUpdate" /> call by the render target.</summary>
         public PixelBuffer LastFrameScreen { get; private set; }
 
         public PixelBufferSize Size { get; set; }
 
-        /// <summary>Settable so a test can opt into a protocol the real terminal would have to advertise.</summary>
+        /// <summary>
+        ///     The console capabilities. A test can set them to turn on a protocol that a real terminal would
+        ///     have to report.
+        /// </summary>
         public ConsoleCapabilities Capabilities { get; set; }
 
         public int CellPixelWidth => DefaultCellPixelSize.Width;

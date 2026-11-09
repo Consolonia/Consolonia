@@ -11,44 +11,52 @@ using Consolonia.Core.Infrastructure;
 namespace Consolonia.Core.Drawing
 {
     /// <summary>
-    ///     Converts a bitmap as cells whose background is a <see cref="PixelImage" />: the pixels of that cell
-    ///     of the picture. For any console with an image protocol; which protocol, and what is sent for a
-    ///     cell, is the console output's business.
+    ///     Converts a bitmap into cells whose background is a <see cref="PixelImage" />. Each pixel image holds
+    ///     the pixels of one cell. Used for any console that supports an image protocol. The console output
+    ///     decides which protocol to use and what to send for each cell.
     /// </summary>
     /// <remarks>
-    ///     Each cell's image is kept by the pixels it shows and reused wherever they show again. The
-    ///     pixel buffer compares images by reference, so a cell whose pixels did not change keeps the
-    ///     same image, is not dirty, and is not written again: a change to the picture rewrites only the
-    ///     cells it touched, and a flat canvas is one image shared by every cell.
+    ///     Pixel images are cached by content, so cells with the same pixels share one instance. The pixel
+    ///     buffer compares images by reference. A cell whose pixels did not change keeps the same instance,
+    ///     so it is not dirty and is not written to the terminal again. When the bitmap changes, only the
+    ///     changed cells are rewritten. A bitmap of one solid color uses one image for all its cells.
     /// </remarks>
     internal sealed class PixelImageBitmapConverter : CellBitmapConverter<CellConversion>
     {
         /// <summary>
-        ///     Pixel bytes of pixel images kept at least. The budget grows to <see cref="ScreensOfPixelImages" />
-        ///     screens on a larger screen, so a full-screen picture never evicts its own cells while it is
-        ///     being made. Eviction only ends deduplication: a cell on screen holds its image by reference.
+        ///     The minimum cache size, in bytes of pixel data. On a large screen the budget grows to
+        ///     <see cref="ScreensOfPixelImages" /> screens, so a full-screen bitmap never evicts its own cells
+        ///     while it is being converted. Eviction only stops sharing. A cell on screen still holds a
+        ///     reference to its image.
         /// </summary>
         private const long MinPixelImageBudgetBytes = 24L * 1024 * 1024;
 
-        /// <summary>Screens' worth of pixel images kept, so pictures shown again are not cut again.</summary>
+        /// <summary>
+        ///     The cache size in screens of pixel data. This lets a bitmap that is shown again reuse its
+        ///     cached images.
+        /// </summary>
         private const int ScreensOfPixelImages = 3;
 
         /// <summary>
-        ///     New pixel images share an array of this many cells (a slab), filled across conversions until full,
-        ///     so a new picture is a few hundred allocations rather than one per cell and a brush stroke is
-        ///     one slot of the current slab. Small enough that a slab stays out of the large object heap,
-        ///     and that a cell outliving its slab-mates holds on to little: the cache counts each cell's own
-        ///     bytes, and a slab is freed once no cell of it is held anywhere.
+        ///     The number of cells in one slab. A slab is one array shared by several new pixel images. It is
+        ///     filled across conversions until full. So a new bitmap needs a few hundred allocations instead of
+        ///     one per cell, and a brush stroke usually uses one slot of the current slab. The slab is small
+        ///     enough to stay out of the large object heap. It is also small enough that one surviving cell
+        ///     does not keep much memory alive. The cache counts only each cell's own bytes, and a slab is
+        ///     freed when none of its cells are referenced.
         /// </summary>
         internal const int CellsPerSlab = 64;
 
         /// <summary>
-        ///     The foreground of a picture cell: a space, like every cell before anything is drawn in it.
-        ///     A blank cell over a picture shows the picture, so it does until a glyph is drawn there.
+        ///     The foreground of an image cell: a space, the same as an empty cell. A space over an image
+        ///     shows the image. Text drawn later replaces the space.
         /// </summary>
         internal static readonly PixelForeground PictureCellForeground = PixelForeground.Space;
 
-        /// <summary>The slab the next new pixel image goes into, and how much of it is taken. Per render thread.</summary>
+        /// <summary>
+        ///     The current slab for new pixel images, and the number of bytes already used in it.
+        ///     One per render thread.
+        /// </summary>
         [ThreadStatic] private static byte[] _slab;
 
         [ThreadStatic] private static int _slabUsed;
@@ -78,11 +86,11 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Turns the visible pixels into a buffer of cells showing their pixel images, reusing every image
-        ///     already made for the same pixels.
+        ///     Converts the visible pixels into cells with pixel image backgrounds. Reuses a cached image
+        ///     when one already exists for the same pixels.
         /// </summary>
         /// <param name="visibleBytes">BGRA pixels of exactly the visible cells, row by row.</param>
-        /// <param name="cells">One cell per visible cell. Every cell is written; what it held is not read.</param>
+        /// <param name="cells">One cell per visible cell. Every cell is overwritten. Old contents are not read.</param>
         /// <param name="cellPixelWidth">The width of a cell in pixels.</param>
         /// <param name="cellPixelHeight">The height of a cell in pixels.</param>
         /// <exception cref="ArgumentException">
@@ -98,7 +106,8 @@ namespace Consolonia.Core.Drawing
             if (visibleBytes.Length != visibleWidth * cellsHigh * cellPixelHeight * 4)
                 throw new ArgumentException("The pixels are not those of exactly the cells.", nameof(visibleBytes));
 
-            // cut into a scratch cell first: most cells are in the cache, and only a new one gets a copy of its own
+            // Copy each cell into a scratch buffer first. Most cells are already cached, so only new cells
+            // need their own copy.
             Span<byte> cellBgra = cellBytes <= 4096 ? stackalloc byte[cellBytes] : new byte[cellBytes];
             byte[] slab = _slab;
             int slabUsed = _slabUsed;
@@ -125,8 +134,9 @@ namespace Consolonia.Core.Drawing
                         _slabUsed = slabUsed += cellBytes;
                 }
 
-                // the picture as the cell's BACKGROUND, the foreground left free so glyphs drawn later land
-                // over it. The color starts transparent: it is the paint translucent overlays accumulate
+                // The image is the cell's background. The foreground stays free, so text drawn later appears
+                // on top of the image. The background color starts transparent. Translucent overlays drawn
+                // later blend into this color.
                 cells[new PixelPoint(cellX, cellY)] = new Pixel(PictureCellForeground,
                     new PixelBackground(Colors.Transparent, image));
             }

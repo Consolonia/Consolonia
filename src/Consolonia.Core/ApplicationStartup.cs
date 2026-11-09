@@ -79,8 +79,9 @@ namespace Consolonia
                 }, nameof(TextShaper))
                 .UseStandardRuntimePlatformSubsystem()
                 .UseWindowingSubsystem(() => new ConsoloniaPlatform().Initialize(), nameof(ConsoloniaPlatform))
-                // The console was prepared in its constructor, before an image library (UseConsoloniaImaging)
-                // registered its encoder factory; now that everything is registered, the output gets its encoder.
+                // The console was prepared in its constructor. At that time an image library
+                // (UseConsoloniaImaging) had not registered its encoder factory yet. Now that all services are
+                // registered, give the output its image encoder.
                 .AfterPlatformServicesSetup(_ =>
                 {
                     if (AvaloniaLocator.Current.GetService<IConsoleImageEncoderFactory>() == null)

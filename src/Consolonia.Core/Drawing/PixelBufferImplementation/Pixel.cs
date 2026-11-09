@@ -113,9 +113,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         [JsonIgnore] public ushort Width => Foreground.Symbol.Width;
 
         /// <summary>
-        ///     The color the background looks: its color for a plain cell, and for an image cell the paint
-        ///     blended over the picture's <see cref="PixelImage.DominantColor" />. For the places that need
-        ///     one color for the cell.
+        ///     The visible background color of the cell, as a single color. For a plain cell this is the
+        ///     background color. For an image cell this is the background color blended over the image's
+        ///     <see cref="PixelImage.DominantColor" />. Use it where one color is needed for the whole cell.
         /// </summary>
         [JsonIgnore]
         public Color EffectiveBackgroundColor => Background.Image == null
@@ -163,8 +163,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             CaretStyle newCaretStyle;
 
             Color aboveBgColor = pixelAbove.Background.Color;
-            // an image cell's own color is the (transparent) paint over its picture: it takes the cell
-            // whole, as an opaque overlay does
+            // An image cell above replaces the whole cell, like an opaque color does. Its background color
+            // is only the (usually transparent) tint over the image, so its alpha is ignored here.
             byte aboveBgA = pixelAbove.Background.Image != null ? (byte)0xFF : aboveBgColor.A;
 
             bool foregroundAboveIsTransparent;
@@ -202,8 +202,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     break;
             }
 
-            // Background is always blended. An image survives a non-opaque overlay (only an opaque one
-            // evicts it, above), and the color accumulated here is the paint over the picture.
+            // The overlay is not opaque here (the opaque case returned above), so the image below is kept.
+            // The background color is blended. For an image cell it is the tint drawn over the image.
             var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
                 Background.Image);
 

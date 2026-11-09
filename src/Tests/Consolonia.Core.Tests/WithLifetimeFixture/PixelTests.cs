@@ -101,8 +101,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         [Test]
         public void ImageCellsCompareByImage()
         {
-            // regression: an image cell carries no character and no pattern, so pixels which ignored the
-            // image compared equal and the pixel buffer diff kept showing the previous picture
+            // Regression test. An image cell has no character and no pattern. When the comparison ignored
+            // the image, two cells with different images were equal, so the pixel buffer diff did not
+            // write the new picture and the old one stayed on screen.
             PixelImage image = CreatePixelImage(10);
             PixelImage otherImage = CreatePixelImage(200);
 
@@ -117,8 +118,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     The "image as cell background" model: cell = (color | picture under a paint) + foreground
-        ///     glyph. The paint accumulates through the same blend as a plain cell's color.
+        ///     Tests the "image as cell background" model. A cell's background is either a color or a picture.
+        ///     A picture can have a translucent color painted over it. The foreground character is drawn on
+        ///     top of the background. Translucent paint over a picture is blended the same way as over a plain
+        ///     color. An opaque background removes the picture.
         /// </summary>
         [Test]
         public void ImageBackgroundComposesWithForegroundAndDiesByOpaqueBackground()
@@ -151,13 +154,14 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Where a cell needs one color for a picture (the mouse cursor's contrast, text on a terminal
-        ///     that cannot draw it over an image), the paint composited over the picture's dominant color.
+        ///     Sometimes a single color is needed for an image cell, for example to pick a contrasting mouse
+        ///     cursor color, or for text on a terminal that cannot draw text over an image. That color is the
+        ///     cell's paint blended over the picture's dominant color.
         /// </summary>
         [Test]
         public void TheEffectiveColorOfAnImageCellIsThePaintOverItsDominantColor()
         {
-            // a mostly gray picture with a sliver of red: gray is the dominant color
+            // A mostly gray picture with a thin strip of red. Gray is the dominant color.
             byte[] bgra = new byte[8 * 16 * 4];
             for (int i = 0; i < bgra.Length; i += 4)
             {

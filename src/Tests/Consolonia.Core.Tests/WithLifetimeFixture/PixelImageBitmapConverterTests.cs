@@ -11,8 +11,8 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     /// <summary>
-    ///     How a picture becomes cells showing <see cref="PixelImage" />s, on a console that shows pixel
-    ///     images: the converter is the same whichever protocol the console's encoder speaks.
+    ///     Tests how a picture is turned into cells that show <see cref="PixelImage" />s. The console is set
+    ///     up to support pixel images. The converter works the same for every image protocol.
     /// </summary>
     [TestFixture]
     public sealed class PixelImageBitmapConverterTests : IDisposable
@@ -60,8 +60,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Regression test: a bitmap already at the target size skips the resize, and the converter used to
-        ///     read from the null resize result and throw. Four cells across at 8x16 per cell is exactly 32x32.
+        ///     Regression test. When a bitmap is already at the target size, the converter skips the resize.
+        ///     The converter used to read the resize result anyway, which was null, and threw.
+        ///     Here the bitmap is 4x2 cells, which at 8x16 pixels per cell is exactly 32x32 pixels.
         /// </summary>
         [Test]
         public void DrawsBitmapAlreadyAtTargetSizeWithoutResizing()
@@ -86,8 +87,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Regression test: all image cells look alike to the pixel buffer diff unless the image itself is
-        ///     part of the comparison, and a second picture drawn over the first was dropped as "unchanged".
+        ///     Regression test. Image cells have no character, so they all look the same to the pixel buffer
+        ///     diff unless the diff also compares the image. Before the fix, a second picture drawn over the
+        ///     first was treated as "unchanged" and was not drawn.
         /// </summary>
         [Test]
         public void DrawingAnotherBitmapOverTheFirstReplacesTheCells()
@@ -116,7 +118,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                     $"cell {x},{y} should show the second picture");
         }
 
-        /// <summary>A flat canvas is one image, shared by every cell showing it.</summary>
+        /// <summary>A plain one-color picture produces one image, and every cell shares it.</summary>
         [Test]
         public void CellsThatLookAlikeShareOneImage()
         {
@@ -131,9 +133,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Regression test: a picture larger than the clip (zoomed, or scrolled partly out of view) was
-        ///     converted whole, at a size a terminal can refuse outright, so it vanished. Only the visible
-        ///     cells are converted now, and the cells outside the clip are left alone.
+        ///     Regression test. A picture can be larger than the clip, for example when zoomed or partly
+        ///     scrolled out of view. It used to be converted whole, at a size some terminals reject, so it
+        ///     disappeared. Now only the visible cells are converted, and cells outside the clip are not touched.
         /// </summary>
         [Test]
         public void PictureLargerThanTheClipRendersOnlyItsVisibleCells()
@@ -143,7 +145,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             var size = new PixelSize(cellsWide * _console.CellPixelWidth, cellsHigh * _console.CellPixelHeight);
             using var bitmap = new FakeReadableBitmap(size);
 
-            // scrolled two cells left and one up, and clipped to a 3x2 viewport
+            // The picture is scrolled two cells left and one cell up, and clipped to a 3x2 viewport.
             var destRect = new Rect(-2, -1, cellsWide, cellsHigh);
             _dc.PushClip(new Rect(0, 0, 3, 2));
             Assert.DoesNotThrow(() => _dc.DrawBitmap(bitmap, 1, new Rect(destRect.Size), destRect));
@@ -158,10 +160,10 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Regression test: a partial redraw (a dialog opening over the picture) clips to the region being
-        ///     redrawn, and a conversion was made per clip. The cells outside it kept showing the earlier one,
-        ///     which the cache could then evict. A redraw of part of the picture reuses the conversion of the
-        ///     whole on-screen picture.
+        ///     Regression test. A partial redraw (for example, a dialog opening over the picture) clips to the
+        ///     region being redrawn. The converter used to make a separate conversion for each clip. Cells
+        ///     outside the clip still showed images from the earlier conversion, and the cache could then evict
+        ///     those images. Now a partial redraw reuses the conversion of the whole visible picture.
         /// </summary>
         [Test]
         public void PartialRedrawReusesTheRenderingOfTheWholePicture()
@@ -180,8 +182,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     An edit to the picture (a new bitmap, as a paint program publishes per stroke) keeps the image
-        ///     of every cell it did not touch, so only the touched cell is dirty and written again.
+        ///     Draws a picture, then draws a new bitmap with one pixel changed (as a paint program might do for
+        ///     each stroke). Cells that did not change keep the same image object. Only the changed cell gets a
+        ///     new image, so only that cell needs to be written again.
         /// </summary>
         [Test]
         public void EditedPictureKeepsTheImagesOfUntouchedCells()
@@ -192,7 +195,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             using var before = new FakeReadableBitmap(PictureSize);
             PixelImage[,] images = DrawPicture(before);
 
-            // the same picture with one pixel of cell 2,1 painted over
+            // The same picture, with one pixel in cell (2,1) changed.
             using FakeReadableBitmap after = new FakeReadableBitmap(PictureSize)
                 .Fill(new PixelRect(2 * cellWidth + 1, cellHeight + 1, 1, 1), 0, 0, 255);
             DrawPicture(after);
@@ -201,9 +204,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     A picture edited in place (a writeable bitmap, as a paint program draws into) is the same
-        ///     bitmap at a new version. Its conversion is refilled, not remade: untouched cells keep their
-        ///     images and the touched one gets a new one.
+        ///     Edits a bitmap in place (like a writeable bitmap in a paint program) and increments its version.
+        ///     The existing conversion is refilled instead of created again. Unchanged cells keep their images,
+        ///     and only the changed cell gets a new one.
         /// </summary>
         [Test]
         public void ANewVersionOfTheSameBitmapRefillsItsRendering()
@@ -220,7 +223,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             AssertOnlyCellHasANewImage(images, 1, 2);
         }
 
-        /// <summary>Draws a picture over the top-left cells and returns the image each cell got.</summary>
+        /// <summary>Draws the picture in the top-left cells and returns the image of each cell.</summary>
         private PixelImage[,] DrawPicture(FakeReadableBitmap bitmap)
         {
             var destRect = new Rect(0, 0, PictureCellsWide, PictureCellsHigh);

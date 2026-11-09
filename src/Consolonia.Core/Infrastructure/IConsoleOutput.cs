@@ -82,30 +82,32 @@ namespace Consolonia.Core.Infrastructure
         void WritePixel(PixelBufferCoordinate position, in Pixel pixel);
 
         /// <summary>
-        ///     A frame starts: what is written until <see cref="EndUpdate" /> is one frame. An output that
-        ///     can have the terminal show a frame all at once (a DEC 2026 synchronized update) opens it here.
+        ///     Starts a frame. Everything written until <see cref="EndUpdate" /> belongs to one frame. If the
+        ///     terminal can show a whole frame at once (synchronized update, DEC mode 2026), the output starts
+        ///     that here.
         /// </summary>
         void BeginUpdate()
         {
         }
 
         /// <summary>
-        ///     The frame <see cref="BeginUpdate" /> started is written, caret included; <paramref name="screen" />
-        ///     is what the terminal should now show: every cell as it was last written, not the pixel buffer
-        ///     drawn into (the cell under the mouse cursor, for one, is written as the cursor). An output
-        ///     with per-frame work besides the cells (an image
-        ///     protocol placing its pictures) does it here, leaving the cursor where the caret was put, then
-        ///     closes the update and flushes.
+        ///     Ends the frame started by <see cref="BeginUpdate" />. All cells and the caret are already written.
+        ///     The output does any other per-frame work here (for example, an image protocol places its images)
+        ///     and leaves the cursor at the caret position. Then it closes the synchronized update and flushes.
         /// </summary>
+        /// <param name="screen">
+        ///     What the terminal should show now. This is every cell as it was last written, not the pixel
+        ///     buffer that was drawn into. For example, the cell under the mouse cursor contains the cursor.
+        /// </param>
         void EndUpdate(PixelBuffer screen)
         {
             Flush();
         }
 
         /// <summary>
-        ///     The render target no longer trusts what the terminal shows (the screen was resized, another
-        ///     program had the terminal) and will write every cell again. Whatever the output believes about
-        ///     the terminal's state is no longer true either.
+        ///     Clears any cached terminal state. The render target calls this when the terminal may no longer
+        ///     show what was written (the screen was resized, or another program used the terminal). The render
+        ///     target then writes every cell again.
         /// </summary>
         void ResetCache()
         {
@@ -118,13 +120,13 @@ namespace Consolonia.Core.Infrastructure
         void WriteText(string str);
 
         /// <summary>
-        ///     Write raw ASCII escape sequences given as bytes, such as image payloads, which an output that
-        ///     buffers bytes takes without converting them to text and back.
+        ///     Writes raw escape sequences given as ASCII bytes, such as image payloads. An output that buffers
+        ///     bytes can write them without converting them to text first.
         /// </summary>
         /// <remarks>
-        ///     Where the terminal's cursor is afterwards is the payload's business (a sixel moves it, by an
-        ///     amount that depends on the terminal), so the output assumes nothing: the next
-        ///     <see cref="SetCaretPosition" /> moves it whatever position it last set.
+        ///     The payload may move the terminal's cursor. For example, a sixel image moves it by an amount
+        ///     that depends on the terminal. So the output must treat the cursor position as unknown. The next
+        ///     <see cref="SetCaretPosition" /> must move the cursor, even to the position that was last set.
         /// </remarks>
         void WriteBytes(ReadOnlySpan<byte> ascii)
         {
