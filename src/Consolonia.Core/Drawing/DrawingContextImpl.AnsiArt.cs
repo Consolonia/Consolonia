@@ -38,7 +38,7 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            _consoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
+            ConsoleWindowImpl.DirtyRegions.AddRect(intersectedRect);
         }
     }
 }

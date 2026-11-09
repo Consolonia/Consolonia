@@ -34,6 +34,10 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => DefaultCellPixelSize.Width;
+
+        public int CellPixelHeight => DefaultCellPixelSize.Height;
+
         public virtual void SetTitle(string title)
         {
             WaitPauseTaskIfNecessary();
@@ -45,14 +49,25 @@ namespace Consolonia.Core.Infrastructure
             WaitPauseTaskIfNecessary();
             lock (this)
             {
+                // Buffered text is written at the cursor position when it is flushed. So flush it before
+                // moving the cursor. The render target sets the caret position before the frame's final
+                // Flush. Without this flush, the last text of the frame would be written at the caret.
+                Flush();
+
                 try
                 {
-                    Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
+                    MoveCursor(bufferPoint);
+
+                    // A WritePixel at this position does not need to move the cursor again.
+                    _currentPosition = bufferPoint;
                 }
                 catch (ArgumentOutOfRangeException)
                 {
                     // ignore
                     // this happens while resizing.
+                    // The cursor did not move, so its position is unknown. Set a position that no cell has,
+                    // so the next WritePixel always moves the cursor.
+                    _currentPosition = new PixelBufferCoordinate(ushort.MaxValue, ushort.MaxValue);
                 }
             }
         }
@@ -199,6 +214,12 @@ namespace Consolonia.Core.Infrastructure
         {
             WaitPauseTaskIfNecessary();
             Console.Clear();
+        }
+
+        /// <summary>Moves the console's cursor. Tests override this because they have no console.</summary>
+        internal virtual void MoveCursor(PixelBufferCoordinate bufferPoint)
+        {
+            Console.SetCursorPosition(bufferPoint.X, bufferPoint.Y);
         }
     }
 }
