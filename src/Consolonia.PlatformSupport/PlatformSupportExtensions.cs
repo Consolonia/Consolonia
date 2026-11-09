@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
@@ -30,7 +31,7 @@ namespace Consolonia
             // console (and its dependencies) when publishing for another OS.
             IConsole console;
             if (OperatingSystem.IsWindows())
-                console = new Win32Console(Console.IsOutputRedirected || IsWindowsTerminal()
+                console = new Win32Console(Console.IsOutputRedirected || IsPseudoConsole()
                     ? new AnsiConsoleOutput()
                     : new WindowsLegacyConsoleOutput());
             else if (Environment.OSVersion.Platform is PlatformID.Unix or PlatformID.MacOSX)
@@ -129,8 +130,7 @@ namespace Consolonia
             if (Design.IsDesignMode)
                 result = new RgbConsoleColorMode();
             else if (OperatingSystem.IsWindows())
-                // if output is redirected, or we are a windows terminal we use the win32 ANSI based console.
-                result = Console.IsOutputRedirected || IsWindowsTerminal()
+                result = Console.IsOutputRedirected || IsPseudoConsole()
                     ? new RgbConsoleColorMode()
                     : new EgaConsoleColorMode(true);
             else
@@ -164,10 +164,34 @@ namespace Consolonia
             return builder.UseConsoleColorMode(result);
         }
 
-        private static bool IsWindowsTerminal()
+        /// <summary>
+        ///     True when the console is a ConPTY pseudoconsole -- Windows Terminal, VS Code, WezTerm, an
+        ///     OpenSSH session -- rather than the legacy console host.
+        /// </summary>
+        private static bool IsPseudoConsole()
         {
-            return Environment.GetEnvironmentVariable("WT_SESSION") is not null ||
-                   Environment.GetEnvironmentVariable("VSAPPIDNAME") != null;
+            try
+            {
+                IntPtr window = GetConsoleWindow();
+                if (window == IntPtr.Zero)
+                    return false;
+
+                char[] className = new char[64];
+                int length = GetClassName(window, className, className.Length);
+                return new string(className, 0, Math.Max(length, 0)) == "PseudoConsoleWindow";
+            }
+            catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+            {
+                return false;
+            }
         }
+
+#pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr hWnd, [Out] char[] lpClassName, int nMaxCount);
+#pragma warning restore CA5392
     }
 }
