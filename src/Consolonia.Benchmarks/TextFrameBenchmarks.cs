@@ -56,18 +56,7 @@ namespace Consolonia.Benchmarks
         public void Setup()
         {
             var console = new UnitTestConsole(new PixelBufferSize(CellsWide, CellsHigh));
-            _scope = AvaloniaLocator.EnterScope();
-            _lifetime = ApplicationStartup.CreateLifetime(AppBuilder.Configure<BenchmarkApp>()
-                .UseConsole(console)
-                .UseConsolonia()
-                .UseConsoleColorMode(new RgbConsoleColorMode())
-                .WithConsoleFonts()
-                .With<IPlatformSettings>(new ConsoloniaPlatformSettings
-                {
-                    UnsafeInput = false,
-                    UnsafeRendering = false
-                }), []);
-            console.SetupLifetime(_lifetime);
+            _lifetime = BenchmarkLifetime.Start(console, out _scope);
 
             _window = new ConsoleWindowImpl();
             _renderTarget = new RenderTarget(new IPlatformRenderSurface[] { _window });
@@ -143,7 +132,5 @@ namespace Consolonia.Benchmarks
             _lifetime?.Dispose();
             _scope?.Dispose();
         }
-
-        private sealed class BenchmarkApp : Application;
     }
 }
