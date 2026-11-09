@@ -26,7 +26,7 @@ namespace Consolonia.Core.Infrastructure
     /// </remarks>
     public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
-        /// <summary>A text area size report: "CSI 4;height;width t", in pixels.</summary>
+        /// <summary>Matches a text area size report, "CSI 4;height;width t", with sizes in pixels.</summary>
         private static readonly Regex TextAreaSizeReport =
             new(@"\e\[4;(\d{1,5});(\d{1,5})t", RegexOptions.CultureInvariant);
 
@@ -282,8 +282,8 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Has the output get its image encoder now that the application is set up; see
-        ///     <see cref="AnsiConsoleOutput.RefreshImageEncoder" />.
+        ///     Tells the output to create its image encoder, now that the application is set up.
+        ///     See <see cref="AnsiConsoleOutput.RefreshImageEncoder" />.
         /// </summary>
         internal void RefreshImageEncoder()
         {
@@ -291,8 +291,8 @@ namespace Consolonia.Core.Infrastructure
                 return;
 
             ansiConsoleOutput.RefreshImageEncoder();
-            // the output's capabilities were copied when the console was prepared, before it had an
-            // encoder; pixel images are supported once it has one
+            // This console copied the output's capabilities when the console was prepared. At that time the
+            // output had no encoder yet. So add SupportsPixelImages if the output now has one.
             Capabilities |= _consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages;
         }
 
@@ -323,17 +323,17 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     The cell size from a text area size report ("CSI 4;height;width t"), or 8x16 pixels when the
-        ///     report is missing or malformed, or gives a cell under a pixel (fewer pixels than cells).
+        ///     Returns the cell size in pixels from a text area size report ("CSI 4;height;width t").
+        ///     Returns 8x16 if the report is missing or malformed, or if it gives fewer pixels than cells.
         /// </summary>
         internal static (int CellWidth, int CellHeight) CellSizeFromReport(string response, int cols, int rows)
         {
-            // a stray keypress can land around the reply, so the reply is found rather than expected whole
+            // A stray keypress can arrive before or after the reply, so search for the reply in the text.
             Match report = TextAreaSizeReport.Match(response);
             int heightPx = report.Success ? int.Parse(report.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
             int widthPx = report.Success ? int.Parse(report.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
 
-            // a zero quotient would have pictures scaled to nothing
+            // A cell size of zero would scale images to nothing.
             if (cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows)
                 return (widthPx / cols, heightPx / rows);
 
@@ -342,13 +342,13 @@ namespace Consolonia.Core.Infrastructure
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
         {
-            // with stdin redirected there is no terminal to answer and Console.KeyAvailable throws: no
-            // reply, so every probe falls back
+            // When stdin is redirected, there is no terminal to reply and Console.KeyAvailable throws.
+            // Return no reply, so every query uses its fallback.
             if (Console.IsInputRedirected)
                 return string.Empty;
 
-            // conhost/ConPTY synthesizes key events from terminal replies and swallows APC ones
-            // (the kitty graphics handshake); virtual terminal input passes the reply through raw
+            // conhost/ConPTY turns terminal replies into key events and drops APC replies (such as the
+            // kitty graphics reply). Virtual terminal input passes the reply through unchanged.
             using VirtualTerminalInput.Scope scope = VirtualTerminalInput.Enable();
 
             WriteText(request);
@@ -360,7 +360,8 @@ namespace Consolonia.Core.Infrastructure
             {
                 if (!Console.KeyAvailable)
                 {
-                    // polling without this pins a core for the whole timeout on terminals which never reply
+                    // Without this sleep, polling would keep a CPU core busy for the whole timeout on
+                    // terminals that never reply.
                     Thread.Sleep(1);
                     continue;
                 }

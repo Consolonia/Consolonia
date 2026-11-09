@@ -8,8 +8,9 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     A picture's conversion is kept per size and refilled in place for each version and visible part,
-    ///     so an edit allocates no screen-sized buffers.
+    ///     Tests <see cref="CellConversion" />. The converter keeps one conversion per target size and
+    ///     refills it in place when the picture changes or scrolls. This way an edit does not allocate new
+    ///     screen-sized buffers.
     /// </summary>
     [TestFixture]
     public class CellConversionTests

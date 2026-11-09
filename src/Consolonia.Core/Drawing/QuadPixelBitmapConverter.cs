@@ -25,8 +25,8 @@ namespace Consolonia.Core.Drawing
             IPlatformRenderInterface renderInterface, PixelRect targetRect, PixelRect intersectedRect,
             BitmapInterpolationMode interpolationMode)
         {
-            // two pixels across and two down per cell, and only the cells being drawn are scaled: a
-            // picture zoomed far past the screen is not scaled whole every frame
+            // Each cell is 2x2 pixels. Only the cells being drawn are scaled, so a bitmap zoomed far beyond
+            // the screen is not scaled in full on every frame.
             var targetSize = new PixelSize(targetRect.Width * 2, targetRect.Height * 2);
             var visible = new PixelRect((intersectedRect.X - targetRect.X) * 2, (intersectedRect.Y - targetRect.Y) * 2,
                 intersectedRect.Width * 2, intersectedRect.Height * 2);
@@ -53,8 +53,8 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     The text cell for four quadrant colors (top left, top right, bottom left, bottom right): the
-        ///     pixels split into a foreground and a background group, and the split mapped to the block
+        ///     Creates a text cell from four quadrant colors (top left, top right, bottom left, bottom right).
+        ///     The colors are split into a foreground group and a background group. The cell uses the block
         ///     character that draws the foreground quadrants.
         /// </summary>
         private static Pixel FromQuadrants(BgraColor topLeft, BgraColor topRight, BgraColor bottomLeft,
@@ -65,10 +65,10 @@ namespace Consolonia.Core.Drawing
             byte pattern = GetColorsPattern(quadPixelColors, complexEmoji);
             char quadPixelChar = GetQuadPixelCharacter(pattern);
 
-            // nothing in the foreground draws nothing; with no quadrant left for the background, the
-            // background takes all four colours. It is NOT transparent: a transparent background lets
-            // the color under the picture show through the hairlines terminals leave around a full
-            // block glyph
+            // If no quadrant is in the foreground, the foreground is transparent.
+            // If all quadrants are in the foreground (full block), the background still gets the combined
+            // color of all four. It must not be transparent: terminals leave thin gaps around a full block
+            // glyph, and a transparent background would let the color under the bitmap show through.
             Color foreground = pattern == 0b0000
                 ? BgraColor.Transparent.ToColor()
                 : CombineQuadrants(quadPixelColors, pattern).ToColor();
@@ -113,8 +113,9 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     Combines the colors of the quadrants in a pattern, one bit per quadrant as
-        ///     <see cref="GetColorsPattern" /> returns it. A single quadrant keeps its color as it is.
+        ///     Combines the colors of the quadrants selected by <paramref name="pattern" />. The pattern has one
+        ///     bit per quadrant, as returned by <see cref="GetColorsPattern" />. If only one quadrant is
+        ///     selected, its color is returned unchanged.
         /// </summary>
         private static BgraColor CombineQuadrants(ReadOnlySpan<BgraColor> colors, byte pattern)
         {
@@ -155,8 +156,10 @@ namespace Consolonia.Core.Drawing
         ///     Cluster the 4 quad colors into two groups by relative closeness.
         /// </summary>
         /// <param name="colors">the 4 colors, top left, top right, bottom left, bottom right</param>
-        /// <param name="complexEmoji">whether the console draws the quadrant characters</param>
-        /// <returns>a 4-bit mask, one bit per color, set for the colors in the foreground group</returns>
+        /// <param name="complexEmoji">
+        ///     True if the console can draw the quadrant characters. If false, only the half blocks are used.
+        /// </param>
+        /// <returns>A 4-bit mask with one bit per color. A bit is set if the color is in the foreground group.</returns>
         private static byte GetColorsPattern(ReadOnlySpan<BgraColor> colors, bool complexEmoji)
         {
             if (!complexEmoji)

@@ -14,15 +14,16 @@ using Consolonia.NUnit;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     One whole frame of a full-screen picture: drawn into the pixel buffer as pixel images, then
-    ///     rendered to the console.
+    ///     Measures one full frame of a full-screen picture. The picture is drawn into the pixel buffer as
+    ///     pixel images, and then the render target renders the frame to the console.
     /// </summary>
     /// <remarks>
-    ///     The console is the unit test console, which keeps no output and has no image encoder, so what
-    ///     is measured is the work Consolonia does per frame before any encoding, the same whichever
-    ///     protocol an encoder speaks (<see cref="ConsoleOutputBenchmarks" /> measures the output).
-    ///     The scenarios: the picture drawn again unchanged (as when anything over it repaints), and a
-    ///     brush stroke changing one pixel of a writeable picture in place.
+    ///     The console is the unit test console. It keeps no output and has no image encoder. So this
+    ///     measures only the work Consolonia does per frame before encoding. That work is the same for
+    ///     every image protocol. <see cref="ConsoleOutputBenchmarks" /> measures the output side.
+    ///     Scenarios: the same picture drawn again with no changes (as when something on top of it
+    ///     repaints), a brush stroke that changes one pixel of the picture in place, and a picture
+    ///     that has never been shown.
     /// </remarks>
     [MemoryDiagnoser]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
@@ -59,7 +60,8 @@ namespace Consolonia.Benchmarks
                     UnsafeRendering = false
                 }), []);
             console.SetupLifetime(_lifetime);
-            // a console with an image encoder: the converter makes pixel images whatever its protocol
+            // Pretend the console supports pixel images, so the converter produces pixel images.
+            // The converter does not depend on which image protocol the console uses.
             console.Capabilities |= ConsoleCapabilities.SupportsPixelImages;
 
             _window = new ConsoleWindowImpl();
@@ -82,14 +84,14 @@ namespace Consolonia.Benchmarks
             Frame(_bitmap);
         }
 
-        /// <summary>The picture drawn again as it was: nothing reaches the terminal.</summary>
+        /// <summary>Draws the same picture again with no changes. Nothing is sent to the terminal.</summary>
         [Benchmark(Baseline = true)]
         public void RedrawUnchanged()
         {
             Frame();
         }
 
-        /// <summary>One pixel painted, as under a brush: one pixel image is new.</summary>
+        /// <summary>Changes one pixel, like a brush stroke, and draws the frame. Only one cell gets a new image.</summary>
         [Benchmark]
         public void BrushStroke()
         {
@@ -105,7 +107,7 @@ namespace Consolonia.Benchmarks
             _newPicture = new PinnedBitmap(PixelImageFrameBenchmarks.MakePicture(++_stroke), Width, Height);
         }
 
-        /// <summary>A picture never shown before over the whole screen: every cell is new and written.</summary>
+        /// <summary>Draws a full-screen picture that was never shown before. Every cell is new.</summary>
         [Benchmark]
         public void NewPicture()
         {

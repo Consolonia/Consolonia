@@ -102,8 +102,8 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     Lets what is below show through: no symbol, or a color with no alpha. Blended over another
-        ///     foreground, it leaves that one.
+        ///     True if this foreground draws nothing: it has no symbol, or its color is fully transparent.
+        ///     Blending it over another foreground leaves that foreground unchanged.
         /// </summary>
         public bool IsTransparent => Color.A == 0x0 || Symbol.IsEmpty;
 

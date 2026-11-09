@@ -7,7 +7,10 @@ using Avalonia.Platform;
 
 namespace Consolonia.Benchmarks
 {
-    /// <summary>A bitmap over pinned BGRA pixels, read the way the converter reads a real one.</summary>
+    /// <summary>
+    ///     A test bitmap backed by a pinned BGRA pixel array. The converter reads it through
+    ///     <see cref="Lock" />, the same way it reads a real bitmap.
+    /// </summary>
     internal sealed class PinnedBitmap : IReadableBitmapImpl
     {
         public PinnedBitmap(byte[] bgra, int width, int height)
@@ -17,7 +20,10 @@ namespace Consolonia.Benchmarks
             PixelSize = new PixelSize(width, height);
         }
 
-        /// <summary>The pixels, which an edit changes in place before bumping <see cref="Version" />.</summary>
+        /// <summary>
+        ///     The pixel data. To edit the bitmap, change these bytes in place and then increment
+        ///     <see cref="Version" />.
+        /// </summary>
         public byte[] Pixels { get; }
 
         public Vector Dpi => new(96, 96);

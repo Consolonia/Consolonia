@@ -2,13 +2,17 @@ using System.Net.Http;
 
 namespace Consolonia.Gallery.Gallery
 {
-    /// <summary>The gallery's one <see cref="HttpClient" />, and whether pages should use the network.</summary>
+    /// <summary>
+    ///     Holds the single <see cref="HttpClient" /> shared by the gallery pages, and tells pages whether
+    ///     they may use the network.
+    /// </summary>
     internal static class GalleryHttp
     {
         public static readonly HttpClient Client = new();
 
         /// <summary>
-        ///     False under the gallery's own tests, which run offline and should not wait on a download.
+        ///     False when the gallery runs under its unit tests (the console is UnitTestConsole).
+        ///     The tests run offline and should not wait for downloads.
         /// </summary>
         public static bool UseNetwork => ConsoloniaLifetime.Console.GetType().Name != "UnitTestConsole";
     }

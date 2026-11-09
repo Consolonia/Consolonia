@@ -24,25 +24,25 @@ namespace Consolonia.Core.Infrastructure
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
 
-        /// <summary>The most bytes of an image payload converted to chars for one write to Console.Out.</summary>
+        /// <summary>The maximum number of image payload bytes converted to chars for one write to Console.Out.</summary>
         private const int ImageChunkChars = 4096;
 
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
             new(() => AvaloniaLocator.Current.GetRequiredService<IConsoleColorMode>());
 
-        // each flushed frame's size, logged at Verbose in the Consolonia.Output area:
+        // Flush logs the size of each frame at Verbose level in the Consolonia.Output area. To see it, use:
         // .LogToTrace(LogEventLevel.Verbose, LogExtensions.GetAreaName(LogCategory.Output))
         private static readonly string OutputLogArea = LogExtensions.GetAreaName(LogCategory.Output);
 
         private static readonly UTF8Encoding Utf8NoBom = new(false);
 
         /// <summary>
-        ///     Where the terminal's cursor is not known, after a payload written with <see cref="WriteBytes" />:
-        ///     the next write moves it, wherever <see cref="_headBufferPoint" /> says it is.
+        ///     True when the terminal's cursor position is unknown, for example after <see cref="WriteBytes" />.
+        ///     The next write then moves the cursor, even if <see cref="_headBufferPoint" /> already matches.
         /// </summary>
         private bool _caretUnknown;
 
-        // what the frame being written holds, for the flush log
+        // Counts for the current frame. Flush logs them and resets them.
         private int _frameChars;
         private int _frameImageChars;
         private int _frameImages;
@@ -50,15 +50,15 @@ namespace Consolonia.Core.Infrastructure
         private PixelBufferCoordinate _headBufferPoint;
 
         /// <summary>
-        ///     Draws the pictures of the image cells, for the image protocol the console answered the probe
-        ///     with, as the <see cref="IConsoleImageEncoderFactory" /> makes it; null when there is no factory
-        ///     or it made none.
+        ///     The encoder that draws the images of image cells, using the image protocol the terminal supports.
+        ///     The <see cref="IConsoleImageEncoderFactory" /> creates it. Null when there is no factory or the
+        ///     factory returned no encoder.
         /// </summary>
         private IConsoleImageEncoder _imageEncoder;
 
         /// <summary>
-        ///     The factory <see cref="RedirectOutput" /> was given, used instead of the one registered with
-        ///     <see cref="AvaloniaLocator" />; null otherwise.
+        ///     The factory passed to <see cref="RedirectOutput" />. When set, it is used instead of the factory
+        ///     registered with <see cref="AvaloniaLocator" />. Otherwise null.
         /// </summary>
         private IConsoleImageEncoderFactory _imageEncoderFactory;
 
@@ -73,14 +73,17 @@ namespace Consolonia.Core.Infrastructure
         private TextWriter _originalOut;
 
         /// <summary>
-        ///     A glyph was written in the last column. <see cref="_headBufferPoint" /> is the start of the next
-        ///     row, which is where the next character goes, but the terminal's cursor is still on the old row
-        ///     with a pending wrap that only a printed character resolves: anything else placed at the cursor
-        ///     (an image, the caret) needs an explicit move.
+        ///     True after a character was written in the last column. <see cref="_headBufferPoint" /> then points
+        ///     to the start of the next row, where the next character goes. But the terminal's cursor stays in
+        ///     the last column with a pending wrap. Only printing a character moves it to the next row. So
+        ///     anything else written at the cursor (an image, or the caret) needs an explicit cursor move.
         /// </summary>
         private bool _pendingWrap;
 
-        /// <summary>Whether the frame being written opened a synchronized update, which Flush closes.</summary>
+        /// <summary>
+        ///     True when the current frame started a synchronized update (DEC mode 2026).
+        ///     <see cref="EndUpdate" /> closes it.
+        /// </summary>
         private bool _synchronizedUpdateOpen;
 
         internal Func<(int CellWidth, int CellHeight)> GetConsoleCellSizeHandler { get; set; }
@@ -148,12 +151,11 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Writes ASCII escape sequences given as bytes, image payloads above all, without building a
-        ///     string of them.
+        ///     Writes escape sequences given as ASCII bytes, mainly image payloads, without first building a string.
         /// </summary>
         /// <remarks>
-        ///     Where the cursor is afterwards is the payload's business, so it is not known: the next write
-        ///     moves it.
+        ///     The payload may move the cursor, so the cursor position is unknown afterwards. The next write
+        ///     moves the cursor explicitly.
         /// </remarks>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void WriteBytes(ReadOnlySpan<byte> ascii)
@@ -174,9 +176,9 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Opens a DEC 2026 synchronized update when the terminal has them: it shows everything up to
-        ///     the end marker <see cref="EndUpdate" /> writes at once, though the writer may send parts of a
-        ///     large frame before then.
+        ///     Starts a synchronized update (DEC mode 2026) if the terminal supports it and none is open.
+        ///     The terminal then shows everything written until <see cref="EndUpdate" /> at once. The writer
+        ///     may still send parts of a large frame to the terminal before that.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void BeginUpdate()
@@ -190,8 +192,9 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     The image encoder makes its pictures match the screen, the cursor goes back to where the frame
-        ///     left it (the caret), and the update is closed and sent, whatever the encoder throws.
+        ///     Ends the frame. The image encoder updates its images to match <paramref name="screen" />, and the
+        ///     cursor moves back to the caret position. Then the synchronized update is closed and the output is
+        ///     flushed. The close and flush happen even if the encoder throws.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void EndUpdate(PixelBuffer screen)
@@ -213,13 +216,13 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Forgets what the terminal is believed to show: the colors and attributes last set and where the
-        ///     cursor is (another program may have changed them), and what the image encoder has placed.
+        ///     Clears the cached terminal state, because another program may have changed it. This includes the
+        ///     last colors and text attributes, the cursor position, and the images the image encoder has placed.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void ResetCache()
         {
-            // the first cell written moves the cursor, even to where _headBufferPoint says it already is
+            // Make the next cell write move the cursor, even if _headBufferPoint already matches.
             _caretUnknown = true;
             _lastBackground = Colors.Transparent;
             _lastBackgroundIsDefault = false;
@@ -274,21 +277,23 @@ namespace Consolonia.Core.Infrastructure
             // If the cursor moves 2 positions, it indicates proper rendering of composite surrogate pairs.
             (int left, _) = Console.GetCursorPosition();
             Console.Write(TestEmoji);
-            // the writer buffers, so flush the emoji before asking where the cursor is
+            // The writer buffers output, so flush the emoji before reading the cursor position.
             Console.Out.Flush();
             (int left2, _) = Console.GetCursorPosition();
             if (left2 - left == 2)
                 Capabilities |= ConsoleCapabilities.SupportsComplexEmoji;
 
-            // 8x16 pixels is the fallback when the terminal does not report its cell size
+            // Use 8x16 pixels when there is no handler to get the cell size.
             (int cellW, int cellH) = GetConsoleCellSizeHandler?.Invoke() ??
                                      (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
             CellPixelHeight = cellH;
             CellPixelWidth = cellW;
 
-            // three queries in one round trip: kitty graphics (reply "APC _Gi=31;OK ST", ignored by others),
-            // DECRQM mode 2026 (reply "CSI?2026;<state>$y") and DA1 (reply "ESC[?62;4;22c", feature 4 = sixel).
-            // DA1 is answered by every terminal and is the only reply containing 'c', so it fences the read.
+            // Send three queries in one round trip:
+            // - Kitty graphics query. Kitty-capable terminals reply "APC _Gi=31;OK ST". Others ignore it.
+            // - DECRQM for mode 2026 (synchronized output). The reply is "CSI ? 2026;<state>$y".
+            // - DA1 (device attributes). The reply looks like "ESC[?62;4;22c". Feature 4 means sixel.
+            // Every terminal answers DA1, and it is the only reply that contains 'c'. So the read stops at 'c'.
             string graphicsProbeResponse = RequestAnsiResponseHandler?.Invoke(
                 Esc.QueryKittyGraphics + Esc.RequestSynchronizedOutputMode + Esc.RequestDeviceAttributes,
                 'c', 1000) ?? string.Empty;
@@ -297,13 +302,14 @@ namespace Consolonia.Core.Infrastructure
             if (DeviceAttributesIndicateSixelSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsSixel;
 
-            // some terminals answer the kitty query asynchronously, after DA1: give it one more short read
+            // Some terminals send the kitty reply after the DA1 reply. If it is missing, do one more short read.
             if (!ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
                 graphicsProbeResponse += RequestAnsiResponseHandler?.Invoke(string.Empty, '\\', 250) ?? string.Empty;
             if (ResponseIndicatesKittyGraphicsSupport(graphicsProbeResponse))
                 Capabilities |= ConsoleCapabilities.SupportsKittyGraphics;
 
-            // override for terminals which render a protocol without answering its query, or to force fallback
+            // CONSOLONIA_GRAPHICS can force a protocol on a terminal that supports it but does not answer the
+            // query. It can also turn the image protocols off.
             Capabilities = ApplyGraphicsProtocolOverride(Capabilities,
                 Environment.GetEnvironmentVariable("CONSOLONIA_GRAPHICS"));
             InstallImageEncoder();
@@ -317,11 +323,12 @@ namespace Consolonia.Core.Infrastructure
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void RestoreConsole()
         {
-            // an update an interruption left open would hold back everything that follows
+            // Close a synchronized update that is still open (for example after an interruption).
+            // Otherwise the terminal would hold back all output that follows.
             CloseUpdate();
 
-            // what the terminal holds for the encoder (stored images) is freed while it is still ours, and
-            // nothing it sent is on screen any more
+            // Let the encoder free the data it stored in the terminal (such as uploaded images) while we
+            // still own the terminal. Then forget what it placed, because none of it is on screen anymore.
             _imageEncoder?.RestoreConsole();
             _imageEncoder?.Reset();
 
@@ -387,10 +394,10 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Gets the encoder again from the <see cref="IConsoleImageEncoderFactory" /> registered with
+        ///     Creates the image encoder again from the <see cref="IConsoleImageEncoderFactory" /> registered with
         ///     <see cref="AvaloniaLocator" /> (<c>UseConsoloniaImaging</c> registers one). The console is
-        ///     prepared before the application is set up, so before the factory is registered; this is
-        ///     called once it is.
+        ///     prepared before the application is set up, so the factory is not registered yet at that time.
+        ///     Call this method after the factory is registered.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         internal void RefreshImageEncoder()
@@ -409,12 +416,12 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     The text of an image cell, with an encoder to draw its picture. A picture cell is a space until
-        ///     a glyph is drawn over it, and a space shows the picture. Where the protocol draws the picture
-        ///     below the text, the cell is written as it is on the terminal's default background, which every
-        ///     terminal shows the picture through (some hide it under any explicit background, even black).
-        ///     Where the picture replaces the cells it covers, a glyph over it is a text cell on the color the
-        ///     cell looks, and a space is left to the picture.
+        ///     Writes the text of a cell that has an image background. The encoder draws the image itself.
+        ///     If the protocol draws images below the text (<see cref="IConsoleImageEncoder.SupportsTextOverlay" />),
+        ///     the cell is written with the terminal's default background. Every terminal shows the image through
+        ///     the default background. Some terminals hide it under any explicit background, even black.
+        ///     If the image replaces the cells it covers, a space is not written, so the image stays visible.
+        ///     A glyph is written as a normal text cell on the cell's effective background color.
         /// </summary>
         private void WriteTextOverPicture(PixelBufferCoordinate position, in Pixel pixel)
         {
@@ -424,28 +431,30 @@ namespace Consolonia.Core.Infrastructure
                 return;
             }
 
-            // if it's whitespace we can't emit it or it will erase the picture
+            // Writing a space here would erase the image, so skip it.
             if (pixel.Foreground.Symbol.IsWhiteSpace)
                 return;
 
-            // The picture doesn't support text overlay, and the cell has a glyph to draw over it. We approximate
-            // the picture with the effective background color of the pixel.
+            // The protocol cannot draw text over the image, and the cell has a glyph. Write the glyph on the
+            // cell's effective background color, which approximates the image.
             var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.EffectiveBackgroundColor),
                 pixel.CaretStyle);
             WriteTextCell(position, in textCell, false);
         }
 
         /// <summary>
-        ///     Writes a cell as a glyph in colors. With <paramref name="defaultBackground" /> the cell gets the
-        ///     terminal's default background rather than its color: for a cell over a picture an image
-        ///     protocol draws below the text, which some terminals hide under any explicit cell background.
+        ///     Writes one cell as a glyph with its colors. If <paramref name="defaultBackground" /> is true, the
+        ///     cell uses the terminal's default background instead of its own background color. This is for a
+        ///     cell over an image that the protocol draws below the text. Some terminals hide such an image under
+        ///     any explicit cell background.
         /// </summary>
         private void WriteTextCell(PixelBufferCoordinate position, in Pixel pixel, bool defaultBackground)
         {
             //todo: performance of retrieval of the service, at least can be retrieved once
             Lazy<IConsoleColorMode> consoleColorMode = ConsoleColorMode;
 
-            // a pending wrap is no reason to move: the character resolves it, onto the next row
+            // A pending wrap needs no cursor move. Printing the character wraps the cursor to the next row,
+            // which is where _headBufferPoint already points.
             if (_caretUnknown || !position.Equals(_headBufferPoint))
                 SetCaretPositionInternal(position);
 
@@ -507,7 +516,8 @@ namespace Consolonia.Core.Infrastructure
 
             if (pixel.Foreground.Color != _lastForeground || backgroundChanged)
             {
-                // an image cell's color is the paint over the picture, not a background the console could map
+                // With defaultBackground, the mapped background is not used (the default background is written
+                // instead), so black is only a placeholder here.
                 (object mappedBackground, object mappedForeground) =
                     consoleColorMode.Value.MapColors(defaultBackground ? Colors.Black : pixel.Background.Color,
                         pixel.Foreground.Color, pixel.Foreground.Weight);
@@ -566,9 +576,10 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Asks the factory for the encoder of the image protocol the capabilities name. With one, the
-        ///     console shows pixel images (<see cref="ConsoleCapabilities.SupportsPixelImages" />); without,
-        ///     pictures are block glyphs.
+        ///     Asks the factory for an encoder for the image protocol in <see cref="Capabilities" />. If the
+        ///     factory returns one, the console supports pixel images
+        ///     (<see cref="ConsoleCapabilities.SupportsPixelImages" />). Otherwise images are drawn with block
+        ///     characters.
         /// </summary>
         private void InstallImageEncoder()
         {
@@ -590,8 +601,8 @@ namespace Consolonia.Core.Infrastructure
             if (string.IsNullOrEmpty(deviceAttributesResponse))
                 return false;
 
-            // the probe's other replies (DECRPM "ESC[?2026;2$y", kitty's APC) come first, so find the
-            // DA1 reply by its final 'c' and take the parameters from its own "[?"
+            // The probe's other replies (DECRPM "ESC[?2026;2$y" and the kitty APC reply) come first.
+            // So find the DA1 reply by its final 'c', then find the "[?" that starts it.
             int end = deviceAttributesResponse.LastIndexOf('c');
             int start = end > 0 ? deviceAttributesResponse.LastIndexOf("[?", end, StringComparison.Ordinal) : -1;
             if (start < 0)
@@ -599,7 +610,7 @@ namespace Consolonia.Core.Infrastructure
 
             string[] parameters = deviceAttributesResponse[(start + 2)..end].Split(';');
 
-            // the first parameter is the device class, the rest are supported features
+            // The first parameter is the device class. The rest are supported features.
             for (int i = 1; i < parameters.Length; i++)
                 if (parameters[i] == "4")
                     return true;
@@ -641,9 +652,9 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Applies the CONSOLONIA_GRAPHICS environment variable override to the detected capabilities:
-        ///     "kitty" forces kitty graphics on, "sixel" forces sixel (and kitty off), "quad" disables
-        ///     both graphics protocols. Any other value leaves detection untouched.
+        ///     Applies the CONSOLONIA_GRAPHICS environment variable to the detected capabilities.
+        ///     "kitty" turns kitty graphics on. "sixel" turns sixel on and kitty off. "quad" turns both
+        ///     image protocols off. Any other value keeps the detected capabilities. The value is not case-sensitive.
         /// </summary>
         internal static ConsoleCapabilities ApplyGraphicsProtocolOverride(ConsoleCapabilities capabilities,
             string overrideValue)
@@ -693,7 +704,10 @@ namespace Consolonia.Core.Infrastructure
             //todo: low: we can not simply test the presence of this bug (if it even exists), thus come back to this later
         }
 
-        /// <summary>The large-buffered, manually flushed writer over <paramref name="stream" /> (see PrepareConsole).</summary>
+        /// <summary>
+        ///     Replaces Console.Out with a writer over <paramref name="stream" /> that has a large buffer and
+        ///     does not flush automatically (see <see cref="PrepareConsole" />).
+        /// </summary>
         private static void InstallWriter(Stream stream)
         {
             Console.SetOut(new StreamWriter(stream, Utf8NoBom, 65536, true)
@@ -703,10 +717,9 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Writes frames to <paramref name="stream" /> the way <see cref="PrepareConsole" /> writes them
-        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given and
-        ///     with the encoder <paramref name="imageEncoderFactory" /> makes: for measuring and testing the
-        ///     output path.
+        ///     Sends output to <paramref name="stream" /> instead of stdout, without the terminal setup that
+        ///     <see cref="PrepareConsole" /> does. Uses the given <paramref name="capabilities" /> and an encoder
+        ///     from <paramref name="imageEncoderFactory" />. Used by tests and performance measurements.
         /// </summary>
         internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None,
             IConsoleImageEncoderFactory imageEncoderFactory = null)

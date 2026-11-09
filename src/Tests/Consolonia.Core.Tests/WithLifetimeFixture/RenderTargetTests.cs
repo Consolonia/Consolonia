@@ -13,9 +13,9 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests.WithLifetimeFixture
 {
     /// <summary>
-    ///     The render target writes only the cells that differ from what it last wrote. When the terminal
-    ///     may no longer show that (console I/O resumed after another program had the terminal), it forgets
-    ///     what it wrote and writes everything again.
+    ///     Tests what the render target writes to the console, and when. The render target writes only the
+    ///     cells that differ from what it last wrote. If the terminal contents may have been lost (for example,
+    ///     another program used the terminal), it forgets what it wrote and writes every cell again.
     /// </summary>
     [TestFixture]
     public sealed class RenderTargetTests : IDisposable
@@ -56,7 +56,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _renderTarget.RenderToDevice();
             Assert.That(_console.PixelBuffer[3, 2], Is.EqualTo(pixel));
 
-            // another program clears the terminal while the render target still believes the cell is there
+            // Simulate another program clearing the terminal. The render target still thinks the cell is shown.
             _console.PixelBuffer[3, 2] = Pixel.Space;
             _consoleWindowImpl.DirtyRegions.AddRect(new PixelRect(3, 2, 1, 1));
             _renderTarget.RenderToDevice();
@@ -69,10 +69,12 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     A frame is never written while a drawing context is open: from another thread (the mouse
-        ///     cursor's timer) it waits until the context is disposed, and then carries the finished drawing,
-        ///     not the half of it the first cell held. Written mid-draw, a resizing dialog showed the undimmed
-        ///     page drawn under it, and an image encoder sent its pictures.
+        ///     A frame must not be written while a drawing context is open. Here a frame is requested from
+        ///     another thread (as the mouse cursor's timer does) while drawing is in progress. The frame waits
+        ///     until the context is disposed, and then writes the finished drawing, not the half-drawn cell.
+        ///     Before the fix, frames written in the middle of drawing caused bugs. For example, a resizing
+        ///     dialog showed the page under it without the dim overlay, and an image encoder sent half-drawn
+        ///     pictures.
         /// </summary>
         [Test]
         public void AFrameFromAnotherThreadWaitsForTheDrawingUnderWay()
@@ -81,7 +83,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 new PixelBackground(Colors.Red));
             var finished = new Pixel(new PixelForeground(new Symbol('F'), Colors.White),
                 new PixelBackground(Colors.Blue));
-            // a new window is dirty all over
+            // A new window is dirty everywhere. Render it once to clear that.
             _renderTarget.RenderToDevice();
 
             IDrawingContextImpl context = _renderTarget.CreateDrawingContext(default, out _);
@@ -100,16 +102,16 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     Between the terminal changing size and the buffer being replaced, no frame is written: one of
-        ///     the old size would wrap in the terminal of the new one and place pictures at the wrong cells.
-        ///     What was dirty stays dirty for the frame after the resize.
+        ///     After the terminal changes size, no frame is written until the pixel buffer is resized to match.
+        ///     A frame at the old size would wrap in the resized terminal and put pictures in the wrong cells.
+        ///     Cells that were dirty stay dirty and are written by the first frame after the resize.
         /// </summary>
         [Test]
         public void NoFrameIsWrittenWhileTheConsoleSizeDiffersFromTheBuffer()
         {
             var pixel = new Pixel(new PixelForeground(new Symbol('R'), Colors.White),
                 new PixelBackground(Colors.Blue));
-            // a new window is dirty all over
+            // A new window is dirty everywhere. Render it once to clear that.
             _renderTarget.RenderToDevice();
             PixelBufferSize size = _console.Size;
 
@@ -131,8 +133,9 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         /// <summary>
-        ///     The screen a frame ends with is what was written, not the pixel buffer: a cell changed but not
-        ///     marked dirty is not written, so an image encoder must not see it either.
+        ///     At the end of a frame, the screen passed to the output must be what was actually written, not the
+        ///     pixel buffer. A cell that changed but was not marked dirty is not written, so an image encoder
+        ///     must not see it either.
         /// </summary>
         [Test]
         public void AFrameEndsWithTheScreenAsWrittenNotThePixelBuffer()
@@ -141,7 +144,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
                 new PixelBackground(Colors.Blue));
             var outsideDirty = new Pixel(new PixelForeground(new Symbol('Y'), Colors.White),
                 new PixelBackground(Colors.Red));
-            // a new window is dirty all over: written once, so only what is marked below is dirty
+            // A new window is dirty everywhere. Render it once so that only the cells marked below are dirty.
             _renderTarget.RenderToDevice();
 
             _consoleWindowImpl.PixelBuffer[3, 2] = written;
