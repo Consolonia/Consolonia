@@ -30,7 +30,7 @@ namespace Consolonia.PlatformSupport
     [SupportedOSPlatform("windows")]
     internal sealed class Win32VtInputDecoder
     {
-        private const char Escape = '\u001b';
+        private const char EscapeChar = '\u001b';
 
         /// <summary>A sequence longer than this is not one we know, and is dropped rather than held.</summary>
         private const int MaxSequenceLength = 64;
@@ -61,10 +61,10 @@ namespace Consolonia.PlatformSupport
                 }
 
             // nothing follows a lone escape in this read, so it was the Esc key
-            if (_pending.Length == 1 && _pending[0] == Escape)
+            if (_pending.Length == 1 && _pending[0] == EscapeChar)
             {
                 _pending.Clear();
-                AddKeyPress(decoded, VirtualKey.Escape, Escape, 0);
+                AddKeyPress(decoded, VirtualKey.Escape, EscapeChar, 0);
             }
 
             return [.. decoded];
@@ -74,18 +74,18 @@ namespace Consolonia.PlatformSupport
         {
             if (_pending.Length == 0)
             {
-                if (c == Escape)
+                if (c == EscapeChar)
                     _pending.Append(c);
                 else
                     AddCharacter(decoded, c, 0);
                 return;
             }
 
-            if (c == Escape)
+            if (c == EscapeChar)
             {
                 // escape escape: the first was the Esc key; a sequence cut short by an escape is dropped
                 if (_pending.Length == 1)
-                    AddKeyPress(decoded, VirtualKey.Escape, Escape, 0);
+                    AddKeyPress(decoded, VirtualKey.Escape, EscapeChar, 0);
                 _pending.Clear();
                 _pending.Append(c);
                 return;
@@ -283,8 +283,8 @@ namespace Consolonia.PlatformSupport
                 case '\b' or '\u007f':
                     AddKeyPress(decoded, VirtualKey.Back, '\b', controlKeys);
                     return;
-                case Escape:
-                    AddKeyPress(decoded, VirtualKey.Escape, Escape, controlKeys);
+                case EscapeChar:
+                    AddKeyPress(decoded, VirtualKey.Escape, EscapeChar, controlKeys);
                     return;
                 case ' ':
                     AddKeyPress(decoded, VirtualKey.Space, ' ', controlKeys);
