@@ -36,7 +36,8 @@ namespace Consolonia.Core.Drawing
                 return;
 
             _renderInterface ??= AvaloniaLocator.Current.GetRequiredService<IPlatformRenderInterface>();
-            // the render target's converter, kept for the terminal; a context without one (tests) makes its own
+            // Use the render target's converter, which lives as long as the terminal does.
+            // A context without a render target (for example in tests) creates its own.
             _bitmapRenderer ??= _renderTarget?.BitmapConverter ?? BitmapConverter.Create(ConsoleWindowImpl.Console);
             _bitmapRenderer.Draw(this, source, _renderInterface, targetRect, intersectedRect,
                 GetBitmapInterpolationMode());
@@ -48,8 +49,9 @@ namespace Consolonia.Core.Drawing
         }
 
         /// <summary>
-        ///     The interpolation the innermost render options ask for (RenderOptions.BitmapInterpolationMode, so
-        ///     an Image can keep its pixels hard-edged when enlarged), or medium quality when none do.
+        ///     Returns the bitmap interpolation mode from the innermost render options that set one, or
+        ///     medium quality if none do. This lets an Image set RenderOptions.BitmapInterpolationMode to keep
+        ///     hard pixel edges when it is enlarged.
         /// </summary>
         private BitmapInterpolationMode GetBitmapInterpolationMode()
         {

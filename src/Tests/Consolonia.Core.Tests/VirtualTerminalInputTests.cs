@@ -9,7 +9,8 @@ namespace Consolonia.Core.Tests
         [Test]
         public void EnableAndDisposeNeverThrow()
         {
-            // the test runner's redirected console yields a no-restore scope; it must still be safe to dispose
+            // The test runner redirects the console, so Enable returns a scope that has nothing to restore.
+            // Disposing that scope must still be safe.
             Assert.DoesNotThrow(() =>
             {
                 using (VirtualTerminalInput.Enable())

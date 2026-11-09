@@ -8,16 +8,16 @@ using Consolonia.Core.Drawing.PixelBufferImplementation;
 namespace Consolonia.Benchmarks
 {
     /// <summary>
-    ///     What the pixel image converter does for one frame of a full-screen picture: turn the visible
-    ///     pixels into cells showing pixel images, reusing every image it has made before.
+    ///     Measures the pixel image converter for one frame of a full-screen picture. The converter turns the
+    ///     visible pixels into cells that show pixel images. It reuses any image it has already made.
     /// </summary>
     /// <remarks>
-    ///     1920x1072 pixels in 8x16 cells is 240x67 cells. The scenarios are the ones a paint program
-    ///     produces: nothing changed, one cell changed (a brush stroke), and every cell new (a new
-    ///     picture, or a scroll). The pixel copy and the cell buffer are reused from frame to frame, as
-    ///     the converter's CellConversion reuses them, so what is measured is the work and the garbage of
-    ///     one frame, not of setting up for it. Nothing reaches a terminal here: what the console output
-    ///     makes of the cells is measured by <see cref="ConsoleOutputBenchmarks" />.
+    ///     The picture is 1920x1072 pixels. With 8x16-pixel cells, that is 240x67 cells.
+    ///     The scenarios match what a paint program does: nothing changed, one cell changed (a brush
+    ///     stroke), and every cell new (a new picture, or a scroll).
+    ///     The pixel array and the cell buffer are reused between frames, as the converter's CellConversion
+    ///     does. So the results show the time and allocations of one frame, not of the setup.
+    ///     Nothing is sent to a terminal. <see cref="ConsoleOutputBenchmarks" /> measures the console output.
     /// </remarks>
     [MemoryDiagnoser]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
@@ -46,7 +46,10 @@ namespace Consolonia.Benchmarks
             PixelImageBitmapConverter.ConvertCells(_frame, _cells, CellWidth, CellHeight);
         }
 
-        /// <summary>A photo-like picture: smooth gradients with fine noise, so cells differ.</summary>
+        /// <summary>
+        ///     Makes a photo-like BGRX picture: smooth gradients plus fine noise, so that cells differ.
+        ///     The same seed always gives the same picture.
+        /// </summary>
         internal static byte[] MakePicture(int seed)
         {
             byte[] bgrx = new byte[Width * Height * 4];
@@ -54,7 +57,7 @@ namespace Consolonia.Benchmarks
             for (int x = 0; x < Width; x++)
             {
                 int offset = (y * Width + x) * 4;
-                // a hash of the position: fine noise that is the same picture for the same seed
+                // Noise from a hash of the position and seed, so it is repeatable.
                 int noise = (int)((uint)((x * 73856093) ^ (y * 19349663) ^ (seed * 83492791)) >> 13) & 7;
                 bgrx[offset] = (byte)((x * 255 / Width + noise + seed) & 0xFF);
                 bgrx[offset + 1] = (byte)((y * 255 / Height + noise) & 0xFF);
@@ -65,7 +68,10 @@ namespace Consolonia.Benchmarks
             return bgrx;
         }
 
-        /// <summary>Paints a color no cell has had into one pixel of the cell the stroke lands on.</summary>
+        /// <summary>
+        ///     Simulates a brush stroke. Sets the top-left pixel of one cell to a color made from
+        ///     <paramref name="stroke" />. The stroke number picks the cell, so each stroke changes a different cell.
+        /// </summary>
         internal static void Stroke(byte[] bgrx, int stroke)
         {
             int cellX = stroke % CellsWide;
@@ -77,8 +83,9 @@ namespace Consolonia.Benchmarks
         }
 
         /// <summary>
-        ///     Every cell already cached, as after scrolling back to a picture: a conversion refilled by
-        ///     hashing alone. (A frame where nothing changed at all reuses its conversion and never gets here.)
+        ///     Converts a picture whose cells are all in the cache already, as after scrolling back to it.
+        ///     The only work is hashing each cell and looking it up. (In the real renderer, a frame with no
+        ///     change at all reuses the previous conversion and does not call the converter.)
         /// </summary>
         [Benchmark(Baseline = true)]
         public PixelBuffer FrameUnchanged()
@@ -88,7 +95,8 @@ namespace Consolonia.Benchmarks
         }
 
         /// <summary>
-        ///     One cell gets pixels it has never had, as under a brush: every other cell is reused.
+        ///     Changes one cell to new pixels, like a brush stroke, and converts the frame.
+        ///     Every other cell reuses its cached image.
         /// </summary>
         [Benchmark]
         public PixelBuffer FrameOneCellChanged()
@@ -99,8 +107,9 @@ namespace Consolonia.Benchmarks
         }
 
         /// <summary>
-        ///     The brush stroke from the bitmap: the visible pixels copied out of it into the conversion's
-        ///     pixel buffer, then converted. Everything the converter does per edit short of the terminal.
+        ///     Same brush stroke, but applied to the bitmap. The visible pixels are first copied out of the
+        ///     bitmap into the pixel array, then converted. This covers all the converter's work per edit,
+        ///     up to (but not including) the terminal output.
         /// </summary>
         [Benchmark]
         public PixelBuffer FrameOneCellChangedFromBitmap()

@@ -10,8 +10,9 @@ using NUnit.Framework;
 namespace Consolonia.Core.Tests
 {
     /// <summary>
-    ///     How AnsiConsoleOutput gets a frame out: text and image bytes through Console.Out in the order
-    ///     written, as the UTF-8 the terminal receives, in a synchronized update when the terminal has one.
+    ///     Tests how AnsiConsoleOutput writes a frame. Text and image bytes go out through Console.Out as
+    ///     UTF-8, in the order they were written. When the terminal supports synchronized output, each frame
+    ///     is wrapped in a synchronized update.
     /// </summary>
     [TestFixture]
     [NonParallelizable] // Console.Out is process-wide

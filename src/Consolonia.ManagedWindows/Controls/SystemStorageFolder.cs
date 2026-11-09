@@ -54,7 +54,8 @@ namespace Consolonia.ManagedWindows.Controls
 
         public Task<StorageItemProperties> GetBasicPropertiesAsync()
         {
-            // DirectoryInfo caches what it first read; creating a file in the folder since then changed it.
+            // DirectoryInfo caches the values it read the first time. Refresh so that changes made
+            // since then (for example a new file in the folder) are included.
             directoryInfo.Refresh();
             var properties = new StorageItemProperties(dateCreated: directoryInfo.CreationTime,
                 dateModified: directoryInfo.LastWriteTime);

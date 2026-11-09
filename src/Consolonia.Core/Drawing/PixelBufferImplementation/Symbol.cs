@@ -182,7 +182,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return Complex != null && Complex.Length > 1 ? Complex : new string(Character, 1);
         }
 
-        /// <summary>No symbol at all, as <see cref="Empty" />: blended over another symbol, it leaves that one.</summary>
+        /// <summary>
+        ///     True if there is no symbol, like <see cref="Empty" />. Blending an empty symbol over another
+        ///     symbol leaves that symbol unchanged.
+        /// </summary>
         public bool IsEmpty => Character == char.MinValue && string.IsNullOrEmpty(Complex);
 
         [Obsolete("Use IsEmpty.")]
@@ -191,11 +194,13 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return IsEmpty;
         }
 
-        /// <summary>A one-cell whitespace character, such as a space: written, it shows only its background.</summary>
+        /// <summary>
+        ///     True if this is a one-cell whitespace character, such as a space. It shows only the background.
+        /// </summary>
         /// <remarks>
-        ///     One cell wide only. The cell a wide space covers is never written, so over a picture that
-        ///     replaces the cells it covers (sixel) it could show neither the picture nor the space: a wide
-        ///     space is written as text instead.
+        ///     Wide whitespace does not count. The second cell of a wide character is never written. With an
+        ///     image protocol that replaces the cells it covers (sixel), that cell would show neither the image
+        ///     nor the space. So wide whitespace is written as text instead.
         /// </remarks>
         public bool IsWhiteSpace => Complex == null && Width == 1 && char.IsWhiteSpace(Character);
 

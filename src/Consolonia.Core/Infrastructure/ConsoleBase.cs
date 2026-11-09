@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -24,6 +26,10 @@ namespace Consolonia.Core.Infrastructure
     /// </remarks>
     public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
+        /// <summary>Matches a text area size report, "CSI 4;height;width t", with sizes in pixels.</summary>
+        private static readonly Regex TextAreaSizeReport =
+            new(@"\e\[4;(\d{1,5});(\d{1,5})t", RegexOptions.CultureInvariant);
+
         private readonly IConsoleOutput _consoleOutput;
 
         protected ConsoleBase(IConsoleOutput consoleOutput)
@@ -275,13 +281,19 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ResetCache();
         }
 
-        public virtual void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        /// <summary>
+        ///     Tells the output to create its image encoder, now that the application is set up.
+        ///     See <see cref="AnsiConsoleOutput.RefreshImageEncoder" />.
+        /// </summary>
+        internal void RefreshImageEncoder()
         {
-            _consoleOutput.SetImageEncoderFactory(factory);
-            // the output's capabilities were taken when the console was prepared; whether it shows pixel
-            // images is decided now
-            Capabilities = (Capabilities & ~ConsoleCapabilities.SupportsPixelImages) |
-                           (_consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages);
+            if (_consoleOutput is not AnsiConsoleOutput ansiConsoleOutput)
+                return;
+
+            ansiConsoleOutput.RefreshImageEncoder();
+            // This console copied the output's capabilities when the console was prepared. At that time the
+            // output had no encoder yet. So add SupportsPixelImages if the output now has one.
+            Capabilities |= _consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages;
         }
 
         public virtual void WriteText(string str)
@@ -307,25 +319,22 @@ namespace Consolonia.Core.Infrastructure
             int rows = Console.WindowHeight;
 
             string response = RequestAnsiResponse("\x1b[14t", 't', 200);
+            return CellSizeFromReport(response, cols, rows);
+        }
 
-            int heightPx = 0;
-            int widthPx = 0;
-            int idx4 = response.IndexOf('4');
-            if (idx4 >= 0 && response.EndsWith('t'))
-            {
-                string inner = response[(idx4 + 1)..^1];
-                string[] parts = inner.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                // a stray keypress can land in the reply, so a malformed one must fall back, not throw
-                if (parts.Length == 2 &&
-                    int.TryParse(parts[0], out int parsedHeightPx) &&
-                    int.TryParse(parts[1], out int parsedWidthPx))
-                {
-                    heightPx = parsedHeightPx;
-                    widthPx = parsedWidthPx;
-                }
-            }
+        /// <summary>
+        ///     Returns the cell size in pixels from a text area size report ("CSI 4;height;width t").
+        ///     Returns 8x16 if the report is missing or malformed, or if it gives fewer pixels than cells.
+        /// </summary>
+        internal static (int CellWidth, int CellHeight) CellSizeFromReport(string response, int cols, int rows)
+        {
+            // A stray keypress can arrive before or after the reply, so search for the reply in the text.
+            Match report = TextAreaSizeReport.Match(response);
+            int heightPx = report.Success ? int.Parse(report.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            int widthPx = report.Success ? int.Parse(report.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
 
-            if (widthPx > 0 && heightPx > 0 && cols > 0 && rows > 0)
+            // A cell size of zero would scale images to nothing.
+            if (cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows)
                 return (widthPx / cols, heightPx / rows);
 
             return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
@@ -333,8 +342,13 @@ namespace Consolonia.Core.Infrastructure
 
         protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
         {
-            // conhost/ConPTY synthesizes key events from terminal replies and swallows APC ones
-            // (the kitty graphics handshake); virtual terminal input passes the reply through raw
+            // When stdin is redirected, there is no terminal to reply and Console.KeyAvailable throws.
+            // Return no reply, so every query uses its fallback.
+            if (Console.IsInputRedirected)
+                return string.Empty;
+
+            // conhost/ConPTY turns terminal replies into key events and drops APC replies (such as the
+            // kitty graphics reply). Virtual terminal input passes the reply through unchanged.
             using VirtualTerminalInput.Scope scope = VirtualTerminalInput.Enable();
 
             WriteText(request);
@@ -346,7 +360,8 @@ namespace Consolonia.Core.Infrastructure
             {
                 if (!Console.KeyAvailable)
                 {
-                    // polling without this pins a core for the whole timeout on terminals which never reply
+                    // Without this sleep, polling would keep a CPU core busy for the whole timeout on
+                    // terminals that never reply.
                     Thread.Sleep(1);
                     continue;
                 }

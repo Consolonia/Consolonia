@@ -60,8 +60,7 @@ namespace Consolonia.Imaging.Tests
         {
             _stream = new MemoryStream();
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(Columns, Rows) };
-            _output.RedirectOutput(_stream, protocol);
-            _output.SetImageEncoderFactory(new ConsoleImageEncoderFactory());
+            _output.RedirectOutput(_stream, protocol, new ConsoleImageEncoderFactory());
             _screen = new PixelBuffer(Columns, Rows);
         }
 

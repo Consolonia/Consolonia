@@ -168,7 +168,7 @@ namespace Consolonia
             {
                 Dispatcher.UIThread.Post(() =>
                 {
-                    // the program that had the terminal may have drawn over or cleared anything
+                    // The program that used the terminal may have drawn over or cleared the screen.
                     consoleWindow.NotifyTerminalContentsLost();
                     consoleWindow.Paint(new Rect(0, 0, consoleWindow.ClientSize.Width,
                         consoleWindow.ClientSize.Height));

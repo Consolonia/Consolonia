@@ -19,9 +19,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         }
 
         /// <summary>
-        ///     A background showing a cell of a picture. <paramref name="color" /> is the paint laid over
-        ///     the picture: transparent for none, and translucent overlays blended onto the cell accumulate
-        ///     into it exactly as they do on a plain cell.
+        ///     Creates a background that shows a pixel image. <paramref name="color" /> is a tint drawn over the
+        ///     image. Use transparent for no tint. Translucent overlays blend into this color, the same way they
+        ///     blend into the color of a plain cell.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public PixelBackground(Color color, PixelImage image) : this(color)
@@ -44,7 +44,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 #pragma warning disable CA1051 // Do not declare visible instance fields
         public readonly Color Color = color;
 
-        /// <summary>The cell of a picture this background shows, or null for a plain color.</summary>
+        /// <summary>The pixel image shown in this cell, or null for a plain color background.</summary>
         public readonly PixelImage Image;
 #pragma warning restore CA1051 // Do not declare visible instance fields
 
