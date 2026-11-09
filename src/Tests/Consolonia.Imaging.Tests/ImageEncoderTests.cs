@@ -1,3 +1,5 @@
+// DUPFINDER_ignore
+
 using System;
 using System.Collections.Generic;
 using System.IO;
