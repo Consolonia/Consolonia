@@ -59,8 +59,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _factory.Creates = withEncoder;
             _stream = new MemoryStream();
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(Columns, Rows) };
-            _output.RedirectOutput(_stream, capabilities);
-            _output.SetImageEncoderFactory(_factory);
+            _output.RedirectOutput(_stream, capabilities, _factory);
             _screen = new PixelBuffer(Columns, Rows);
         }
 
@@ -288,6 +287,18 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _output.RestoreConsole();
 
             Assert.That(_factory.Encoder.Calls, Is.EqualTo(new[] { "Reset", "RestoreConsole", "Reset" }));
+        }
+
+        [Test]
+        public void AfterAResetTheFirstCellMovesTheCursorEvenWhereItWasLeft()
+        {
+            Open(ConsoleCapabilities.None, false);
+            Frame((0, 0, TextCell('a')));
+
+            // another program had the terminal and may have left the cursor anywhere
+            _output.ResetCache();
+
+            Assert.That(Frame((1, 0, TextCell('b'))), Does.Contain(Esc.SetCursorPosition(1, 0)));
         }
 
         private sealed class RecordingEncoderFactory : IConsoleImageEncoderFactory

@@ -86,11 +86,44 @@ namespace Consolonia.Core.Tests
             Assert.That(writer.ToString(), Is.EqualTo("[5,3]a"));
         }
 
+        [Test]
+        public void WritePixelAfterAFailedCaretMoveMovesTheCursor()
+        {
+            var output = new CursorRecordingNetConsoleOutput();
+            TextWriter originalWriter = Console.Out;
+            using var writer = new StringWriter();
+
+            try
+            {
+                Console.SetOut(writer);
+
+                // the console shrank: the move throws and the cursor stays where it was
+                output.FailMoves = true;
+                output.SetCaretPosition(new PixelBufferCoordinate(5, 3));
+                output.FailMoves = false;
+                // back at its size before the next frame, whose first cell is where the caret was meant to be
+                output.WritePixel(new PixelBufferCoordinate(5, 3), new Pixel(new Symbol('a', 1), Colors.Transparent));
+                output.Flush();
+            }
+            finally
+            {
+                Console.SetOut(originalWriter);
+            }
+
+            Assert.That(writer.ToString(), Is.EqualTo("[5,3]a"));
+        }
+
         /// <summary>Writes each cursor move to the output as "[x,y]", in order with the text.</summary>
         private sealed class CursorRecordingNetConsoleOutput : DefaultNetConsoleOutput
         {
+            /// <summary>Moves throw, as Console.SetCursorPosition does outside a console that shrank.</summary>
+            public bool FailMoves { get; set; }
+
             internal override void MoveCursor(PixelBufferCoordinate bufferPoint)
             {
+                if (FailMoves)
+                    throw new ArgumentOutOfRangeException(nameof(bufferPoint));
+
                 Console.Write($"[{bufferPoint.X},{bufferPoint.Y}]");
             }
         }

@@ -24,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
 
-        /// <summary>Characters of an image payload widened per write to Console.Out.</summary>
+        /// <summary>The most bytes of an image payload converted to chars for one write to Console.Out.</summary>
         private const int ImageChunkChars = 4096;
 
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
@@ -51,12 +51,15 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Draws the pictures of the image cells, for the image protocol the console answered the probe
-        ///     with, as <see cref="_imageEncoderFactory" /> makes it; null when there is no factory or it made
-        ///     none.
+        ///     with, as the <see cref="IConsoleImageEncoderFactory" /> makes it; null when there is no factory
+        ///     or it made none.
         /// </summary>
         private IConsoleImageEncoder _imageEncoder;
 
-        /// <summary>The image library's factory, from <see cref="SetImageEncoderFactory" />; null without one.</summary>
+        /// <summary>
+        ///     The factory <see cref="RedirectOutput" /> was given, used instead of the one registered with
+        ///     <see cref="AvaloniaLocator" />; null otherwise.
+        /// </summary>
         private IConsoleImageEncoderFactory _imageEncoderFactory;
 
         private Color _lastBackground = Colors.Transparent;
@@ -210,12 +213,14 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Forgets what the terminal is believed to show: the colors and attributes last set (another
-        ///     program may have changed them) and what the image encoder has placed.
+        ///     Forgets what the terminal is believed to show: the colors and attributes last set and where the
+        ///     cursor is (another program may have changed them), and what the image encoder has placed.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         public void ResetCache()
         {
+            // the first cell written moves the cursor, even to where _headBufferPoint says it already is
+            _caretUnknown = true;
             _lastBackground = Colors.Transparent;
             _lastBackgroundIsDefault = false;
             _lastForeground = Colors.Transparent;
@@ -382,13 +387,14 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Takes the image library's factory and asks it for the encoder of the image protocol the
-        ///     capabilities name, now if the console is prepared and again whenever it is.
+        ///     Gets the encoder again from the <see cref="IConsoleImageEncoderFactory" /> registered with
+        ///     <see cref="AvaloniaLocator" /> (<c>UseConsoloniaImaging</c> registers one). The console is
+        ///     prepared before the application is set up, so before the factory is registered; this is
+        ///     called once it is.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
-        public void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        internal void RefreshImageEncoder()
         {
-            _imageEncoderFactory = factory;
             InstallImageEncoder();
         }
 
@@ -423,7 +429,7 @@ namespace Consolonia.Core.Infrastructure
                 return;
 
             // The picture doesn't support text overlay, and the cell has a glyph to draw over it. We approximate
-            // the picture with a the effective background color of the pixel.
+            // the picture with the effective background color of the pixel.
             var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.EffectiveBackgroundColor),
                 pixel.CaretStyle);
             WriteTextCell(position, in textCell, false);
@@ -566,7 +572,9 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         private void InstallImageEncoder()
         {
-            _imageEncoder = _imageEncoderFactory?.CreateEncoder(this);
+            IConsoleImageEncoderFactory factory =
+                _imageEncoderFactory ?? AvaloniaLocator.Current.GetService<IConsoleImageEncoderFactory>();
+            _imageEncoder = factory?.CreateEncoder(this);
             if (_imageEncoder != null)
                 Capabilities |= ConsoleCapabilities.SupportsPixelImages;
             else
@@ -696,11 +704,14 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Writes frames to <paramref name="stream" /> the way <see cref="PrepareConsole" /> writes them
-        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given: for
-        ///     measuring and testing the output path.
+        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given and
+        ///     with the encoder <paramref name="imageEncoderFactory" /> makes: for measuring and testing the
+        ///     output path.
         /// </summary>
-        internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None)
+        internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None,
+            IConsoleImageEncoderFactory imageEncoderFactory = null)
         {
+            _imageEncoderFactory = imageEncoderFactory;
             InstallWriter(stream);
             Capabilities = capabilities;
             CellPixelWidth = DefaultCellPixelSize.Width;

@@ -63,7 +63,13 @@ namespace Consolonia.Controls
         /// </summary>
         ConsoleCapabilities Capabilities { get; }
 
-        int CellPixelWidth { get; }
-        int CellPixelHeight { get; }
+        // Defaults (8x16, the common VGA text cell) so consoles written before these existed still build
+        // and load.
+
+        /// <summary>The width of a cell in pixels, as the terminal reports it.</summary>
+        int CellPixelWidth => 8;
+
+        /// <summary>The height of a cell in pixels, as the terminal reports it.</summary>
+        int CellPixelHeight => 16;
     }
 }

@@ -88,6 +88,9 @@ namespace Consolonia.Gallery.Gallery.GalleryViews
         /// </summary>
         private static async Task<IReadOnlyList<string>> FetchPicsumSourcesAsync()
         {
+            if (!GalleryHttp.UseNetwork)
+                return [];
+
             var sources = new List<string>();
 
             try

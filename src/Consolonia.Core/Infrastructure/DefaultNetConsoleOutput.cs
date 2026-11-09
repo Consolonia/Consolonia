@@ -58,15 +58,18 @@ namespace Consolonia.Core.Infrastructure
                 try
                 {
                     MoveCursor(bufferPoint);
+
+                    // the next WritePixel at this position needs no move of its own
+                    _currentPosition = bufferPoint;
                 }
                 catch (ArgumentOutOfRangeException)
                 {
                     // ignore
                     // this happens while resizing.
+                    // The cursor did not move, so where it is is not known: a position no cell has makes
+                    // the next WritePixel move it, wherever it writes.
+                    _currentPosition = new PixelBufferCoordinate(ushort.MaxValue, ushort.MaxValue);
                 }
-
-                // the next WritePixel at this position needs no move of its own
-                _currentPosition = bufferPoint;
             }
         }
 
