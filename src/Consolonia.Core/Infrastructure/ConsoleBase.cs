@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -24,6 +26,10 @@ namespace Consolonia.Core.Infrastructure
     /// </remarks>
     public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
+        /// <summary>A text area size report: "CSI 4;height;width t", in pixels.</summary>
+        private static readonly Regex TextAreaSizeReport =
+            new(@"\e\[4;(\d{1,5});(\d{1,5})t", RegexOptions.CultureInvariant);
+
         private readonly IConsoleOutput _consoleOutput;
 
         protected ConsoleBase(IConsoleOutput consoleOutput)
@@ -278,10 +284,9 @@ namespace Consolonia.Core.Infrastructure
         public virtual void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
         {
             _consoleOutput.SetImageEncoderFactory(factory);
-            // the output's capabilities were taken when the console was prepared; whether it shows pixel
-            // images is decided now
-            Capabilities = (Capabilities & ~ConsoleCapabilities.SupportsPixelImages) |
-                           (_consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages);
+            // the output's capabilities were copied when the console was prepared, before it had a
+            // factory; pixel images are supported once the factory gave it an encoder
+            Capabilities |= _consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages;
         }
 
         public virtual void WriteText(string str)
@@ -316,22 +321,10 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         internal static (int CellWidth, int CellHeight) CellSizeFromReport(string response, int cols, int rows)
         {
-            int heightPx = 0;
-            int widthPx = 0;
-            int idx4 = response.IndexOf('4');
-            if (idx4 >= 0 && response.EndsWith('t'))
-            {
-                string inner = response[(idx4 + 1)..^1];
-                string[] parts = inner.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                // a stray keypress can land in the reply, so a malformed one must fall back, not throw
-                if (parts.Length == 2 &&
-                    int.TryParse(parts[0], out int parsedHeightPx) &&
-                    int.TryParse(parts[1], out int parsedWidthPx))
-                {
-                    heightPx = parsedHeightPx;
-                    widthPx = parsedWidthPx;
-                }
-            }
+            // a stray keypress can land around the reply, so the reply is found rather than expected whole
+            Match report = TextAreaSizeReport.Match(response);
+            int heightPx = report.Success ? int.Parse(report.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            int widthPx = report.Success ? int.Parse(report.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
 
             // a zero quotient would have pictures scaled to nothing
             if (cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows)

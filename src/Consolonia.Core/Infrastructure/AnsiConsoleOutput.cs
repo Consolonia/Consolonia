@@ -24,7 +24,7 @@ namespace Consolonia.Core.Infrastructure
     {
         private const string TestEmoji = "👨‍👩‍👧‍👦";
 
-        /// <summary>Characters of an image payload widened per write to Console.Out.</summary>
+        /// <summary>The most bytes of an image payload converted to chars for one write to Console.Out.</summary>
         private const int ImageChunkChars = 4096;
 
         private static readonly Lazy<IConsoleColorMode> ConsoleColorMode =
@@ -425,7 +425,7 @@ namespace Consolonia.Core.Infrastructure
                 return;
 
             // The picture doesn't support text overlay, and the cell has a glyph to draw over it. We approximate
-            // the picture with a the effective background color of the pixel.
+            // the picture with the effective background color of the pixel.
             var textCell = new Pixel(pixel.Foreground, new PixelBackground(pixel.EffectiveBackgroundColor),
                 pixel.CaretStyle);
             WriteTextCell(position, in textCell, false);

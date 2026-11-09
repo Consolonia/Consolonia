@@ -12,6 +12,8 @@ namespace Consolonia.Core.Tests
     public class ConsoleProbeTests
     {
         [TestCase("\u001b[4;800;1600t", 200, 50, 8, 16, TestName = "A report gives the cell size")]
+        [TestCase("[4;900;1800t", 200, 50, 9, 18, TestName = "A report of another cell size")]
+        [TestCase("x[4;900;1800t", 200, 50, 9, 18, TestName = "A keypress before the report is passed over")]
         [TestCase("", 200, 50, 8, 16, TestName = "No report falls back")]
         [TestCase("\u001b[4;8x0;1600t", 200, 50, 8, 16, TestName = "A malformed report falls back")]
         // fewer pixels than cells: a zero-sized cell would scale every picture to nothing
