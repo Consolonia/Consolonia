@@ -9,6 +9,7 @@ using System.Text.Unicode;
 using System.Threading;
 using Consolonia.Core.Infrastructure;
 
+// ReSharper disable once CheckNamespace
 namespace Consolonia.Imaging
 {
     /// <summary>

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
+// ReSharper disable once CheckNamespace
 namespace Consolonia.Imaging
 {
     /// <summary>

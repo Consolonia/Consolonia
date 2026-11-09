@@ -8,6 +8,7 @@ using Consolonia.Core.Drawing;
 using Consolonia.Core.Drawing.PixelBufferImplementation;
 using Consolonia.Core.Infrastructure;
 
+// ReSharper disable once CheckNamespace
 namespace Consolonia.Imaging
 {
     /// <summary>

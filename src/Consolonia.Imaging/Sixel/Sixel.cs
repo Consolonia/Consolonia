@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using JeremyAnsel.ColorQuant;
 
+// ReSharper disable once CheckNamespace
 namespace Consolonia.Imaging
 {
     /// <summary>
