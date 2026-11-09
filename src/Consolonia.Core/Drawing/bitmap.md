@@ -94,11 +94,11 @@ and the drawing contexts (replaced on every resize) borrow it:
 A Device Attributes request follows the queries as a fence. The cell size in pixels is asked for
 too. `CONSOLONIA_GRAPHICS=kitty|sixel|quad` overrides detection (`ApplyGraphicsProtocolOverride`).
 
-An encoder library hands the console its `IConsoleImageEncoderFactory` through
-`IConsoleOutput.SetImageEncoderFactory`, once the application is set up (from the builder's
-`AfterPlatformServicesSetup`, so it does not matter where in the chain it is enabled: consoles probe
-the terminal in their constructors, before the builder binds anything). `ConsoleBase` forwards it
-and takes the output's `SupportsPixelImages` again. The output asks the factory for an encoder
+An encoder library registers its `IConsoleImageEncoderFactory` with Avalonia's locator
+(`AppBuilder.With`). Consoles probe the terminal in their constructors, before the builder binds
+anything, so `UseConsolonia` has the output look the factory up once the application is set up
+(`AfterPlatformServicesSetup`), and `ConsoleBase` takes the output's `SupportsPixelImages` again.
+The output asks the factory for an encoder
 (`CreateEncoder(IConsoleOutput)`) then, and again whenever the console is prepared. The factory
 reads the capabilities and picks the protocol (its choice when the terminal has several) or returns
 null. With an encoder the output sets `SupportsPixelImages`; without one it clears it.

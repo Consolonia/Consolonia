@@ -51,12 +51,15 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Draws the pictures of the image cells, for the image protocol the console answered the probe
-        ///     with, as <see cref="_imageEncoderFactory" /> makes it; null when there is no factory or it made
-        ///     none.
+        ///     with, as the <see cref="IConsoleImageEncoderFactory" /> makes it; null when there is no factory
+        ///     or it made none.
         /// </summary>
         private IConsoleImageEncoder _imageEncoder;
 
-        /// <summary>The image library's factory, from <see cref="SetImageEncoderFactory" />; null without one.</summary>
+        /// <summary>
+        ///     The factory <see cref="RedirectOutput" /> was given, used instead of the one registered with
+        ///     <see cref="AvaloniaLocator" />; null otherwise.
+        /// </summary>
         private IConsoleImageEncoderFactory _imageEncoderFactory;
 
         private Color _lastBackground = Colors.Transparent;
@@ -384,13 +387,14 @@ namespace Consolonia.Core.Infrastructure
         }
 
         /// <summary>
-        ///     Takes the image library's factory and asks it for the encoder of the image protocol the
-        ///     capabilities name, now if the console is prepared and again whenever it is.
+        ///     Gets the encoder again from the <see cref="IConsoleImageEncoderFactory" /> registered with
+        ///     <see cref="AvaloniaLocator" /> (<c>UseConsoloniaImaging</c> registers one). The console is
+        ///     prepared before the application is set up, so before the factory is registered; this is
+        ///     called once it is.
         /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
-        public void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        internal void RefreshImageEncoder()
         {
-            _imageEncoderFactory = factory;
             InstallImageEncoder();
         }
 
@@ -568,7 +572,9 @@ namespace Consolonia.Core.Infrastructure
         /// </summary>
         private void InstallImageEncoder()
         {
-            _imageEncoder = _imageEncoderFactory?.CreateEncoder(this);
+            IConsoleImageEncoderFactory factory =
+                _imageEncoderFactory ?? AvaloniaLocator.Current.GetService<IConsoleImageEncoderFactory>();
+            _imageEncoder = factory?.CreateEncoder(this);
             if (_imageEncoder != null)
                 Capabilities |= ConsoleCapabilities.SupportsPixelImages;
             else
@@ -698,11 +704,14 @@ namespace Consolonia.Core.Infrastructure
 
         /// <summary>
         ///     Writes frames to <paramref name="stream" /> the way <see cref="PrepareConsole" /> writes them
-        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given: for
-        ///     measuring and testing the output path.
+        ///     to stdout, without the terminal set-up, for the <paramref name="capabilities" /> given and
+        ///     with the encoder <paramref name="imageEncoderFactory" /> makes: for measuring and testing the
+        ///     output path.
         /// </summary>
-        internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None)
+        internal void RedirectOutput(Stream stream, ConsoleCapabilities capabilities = ConsoleCapabilities.None,
+            IConsoleImageEncoderFactory imageEncoderFactory = null)
         {
+            _imageEncoderFactory = imageEncoderFactory;
             InstallWriter(stream);
             Capabilities = capabilities;
             CellPixelWidth = DefaultCellPixelSize.Width;

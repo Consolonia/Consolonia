@@ -59,8 +59,7 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             _factory.Creates = withEncoder;
             _stream = new MemoryStream();
             _output = new AnsiConsoleOutput { Size = new PixelBufferSize(Columns, Rows) };
-            _output.RedirectOutput(_stream, capabilities);
-            _output.SetImageEncoderFactory(_factory);
+            _output.RedirectOutput(_stream, capabilities, _factory);
             _screen = new PixelBuffer(Columns, Rows);
         }
 

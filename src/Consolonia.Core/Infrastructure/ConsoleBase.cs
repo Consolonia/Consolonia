@@ -281,11 +281,18 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ResetCache();
         }
 
-        public virtual void SetImageEncoderFactory(IConsoleImageEncoderFactory factory)
+        /// <summary>
+        ///     Has the output get its image encoder now that the application is set up; see
+        ///     <see cref="AnsiConsoleOutput.RefreshImageEncoder" />.
+        /// </summary>
+        internal void RefreshImageEncoder()
         {
-            _consoleOutput.SetImageEncoderFactory(factory);
-            // the output's capabilities were copied when the console was prepared, before it had a
-            // factory; pixel images are supported once the factory gave it an encoder
+            if (_consoleOutput is not AnsiConsoleOutput ansiConsoleOutput)
+                return;
+
+            ansiConsoleOutput.RefreshImageEncoder();
+            // the output's capabilities were copied when the console was prepared, before it had an
+            // encoder; pixel images are supported once it has one
             Capabilities |= _consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages;
         }
 

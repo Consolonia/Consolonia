@@ -1,9 +1,9 @@
 namespace Consolonia.Core.Infrastructure
 {
     /// <summary>
-    ///     Makes the <see cref="IConsoleImageEncoder" /> for a console: what a library that implements image
-    ///     protocols gives the console through <see cref="IConsoleOutput.SetImageEncoderFactory" />. Without
-    ///     one, or when it makes none, pictures are drawn as block glyphs.
+    ///     Makes the <see cref="IConsoleImageEncoder" /> for a console. A library that implements image
+    ///     protocols registers one with Avalonia's locator (<c>AppBuilder.With</c>). Without one, or when it
+    ///     makes none, pictures are drawn as block glyphs.
     /// </summary>
     public interface IConsoleImageEncoderFactory
     {
