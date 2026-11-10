@@ -142,11 +142,22 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
         }
 
         [Test]
+        public void IsEmpty()
+        {
+            Assert.That(new Symbol(string.Empty).IsEmpty, Is.True);
+            Assert.That(Symbol.Empty.IsEmpty, Is.True);
+            Assert.That(new Symbol(' ').IsEmpty, Is.False);
+            Assert.That(new Symbol('a').IsEmpty, Is.False);
+        }
+
+        [Test]
         public void IsWhiteSpace()
         {
-            Assert.That(new Symbol(string.Empty).NothingToDraw(), Is.True);
-            Assert.That(new Symbol(' ').NothingToDraw(), Is.False);
-            Assert.That(new Symbol('a').NothingToDraw(), Is.False);
+            Assert.That(new Symbol(' ').IsWhiteSpace, Is.True);
+            Assert.That(new Symbol(' ').IsWhiteSpace, Is.True, "a no-break space");
+            Assert.That(Symbol.Empty.IsWhiteSpace, Is.False);
+            Assert.That(new Symbol('a').IsWhiteSpace, Is.False);
+            Assert.That(new Symbol('　').IsWhiteSpace, Is.False, "two cells wide");
         }
 
         [Test]

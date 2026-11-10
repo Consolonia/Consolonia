@@ -32,7 +32,34 @@ namespace Consolonia.Controls
         /// <summary>
         ///     Supports complex composite emoji rendering
         /// </summary>
-        SupportsComplexEmoji = 0x20
+        SupportsComplexEmoji = 0x20,
+
+        /// <summary>
+        ///     Supports sixel graphics output
+        /// </summary>
+        SupportsSixel = 0x40,
+
+        /// <summary>
+        ///     Supports the kitty graphics protocol
+        /// </summary>
+        SupportsKittyGraphics = 0x80,
+
+        /// <summary>
+        ///     Supports synchronized output (DEC private mode 2026), so a whole frame is shown at once
+        /// </summary>
+        SupportsSynchronizedOutput = 0x100,
+
+        /// <summary>
+        ///     The console has an image encoder, so it can show pixel images (through sixel, kitty graphics
+        ///     or another protocol). Without an encoder, images are drawn with block characters.
+        /// </summary>
+        SupportsPixelImages = 0x200,
+
+        /// <summary>
+        ///     The mouse is reported in pixels (SGR-Pixels, DEC private mode 1016), so pointer positions carry
+        ///     where in a cell the pointer is, as fractional cells
+        /// </summary>
+        SupportsPixelMouse = 0x400
     }
 
     public interface IConsoleCapabilities
@@ -41,5 +68,14 @@ namespace Consolonia.Controls
         ///     Console Capabilities
         /// </summary>
         ConsoleCapabilities Capabilities { get; }
+
+        // The default 8x16 is the common VGA text cell. The defaults let existing console implementations
+        // build and load without implementing these properties.
+
+        /// <summary>The width of a cell in pixels, as the terminal reports it.</summary>
+        int CellPixelWidth => 8;
+
+        /// <summary>The height of a cell in pixels, as the terminal reports it.</summary>
+        int CellPixelHeight => 16;
     }
 }

@@ -18,7 +18,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return caretStyle != CaretStyle.None;
         }
 
-        public static bool IsCaret(this Pixel pixel)
+        public static bool IsCaret(this in Pixel pixel)
         {
             return pixel.CaretStyle.IsCaret();
         }

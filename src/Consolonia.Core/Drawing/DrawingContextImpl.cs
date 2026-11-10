@@ -17,7 +17,6 @@ namespace Consolonia.Core.Drawing
     internal partial class DrawingContextImpl : IDrawingContextImpl
     {
         private readonly Stack<PixelRect> _clipStack = new(100);
-        private readonly ConsoleWindowImpl _consoleWindowImpl;
         private readonly PixelBuffer _pixelBuffer;
         private readonly Matrix _postTransform = Matrix.Identity;
 
@@ -28,7 +27,7 @@ namespace Consolonia.Core.Drawing
 
         public DrawingContextImpl(ConsoleWindowImpl consoleWindowImpl, RenderTarget renderTarget)
         {
-            _consoleWindowImpl = consoleWindowImpl;
+            ConsoleWindowImpl = consoleWindowImpl;
             _renderTarget = renderTarget;
             _pixelBuffer = consoleWindowImpl.PixelBuffer;
             _clipStack.Push(_pixelBuffer.Size);
@@ -37,11 +36,13 @@ namespace Consolonia.Core.Drawing
         // ReSharper disable once ConvertToAutoPropertyWhenPossible Don't use this inside the class
         internal PixelBuffer PixelBuffer => _pixelBuffer;
 
+        internal ConsoleWindowImpl ConsoleWindowImpl { get; }
+
         private PixelRect CurrentClip => _clipStack.Peek();
 
         void IDisposable.Dispose()
         {
-            _renderTarget.RenderToDevice();
+            _renderTarget.EndDrawing();
         }
 
         public void Clear(Color color)
@@ -90,7 +91,7 @@ namespace Consolonia.Core.Drawing
             glyphTypefaceRender.DrawGlyphRun(this, startPosition, glyphRunImpl, foregroundColor,
                 out PixelRect rectToRefresh);
 
-            _consoleWindowImpl.DirtyRegions.AddRect(rectToRefresh);
+            ConsoleWindowImpl.DirtyRegions.AddRect(rectToRefresh);
         }
 
         public IDrawingContextLayerImpl CreateLayer(PixelSize size)
@@ -214,7 +215,7 @@ namespace Consolonia.Core.Drawing
             if (position.Y < CurrentClip.Y || position.Y >= CurrentClip.Bottom) return;
 
             if (CurrentClip.ContainsExclusive(position))
-                _pixelBuffer[position] = _pixelBuffer[position].Blend(pixel);
+                _pixelBuffer.Blend(position, in pixel);
 
             if (pixel.Width == 1)
                 return;
@@ -223,11 +224,11 @@ namespace Consolonia.Core.Drawing
 
             int leftLimit = int.Max(CurrentClip.X, position.X + 1);
 
+            var tail = new Pixel(PixelForeground.Empty, pixel.Background);
             for (int x = leftLimit; x <= rightLimit; x++)
             {
                 PixelPoint positionInSequence = position.WithX(x);
-                Pixel blendedPixel = _pixelBuffer[positionInSequence]
-                    .Blend(new Pixel(PixelForeground.Empty, pixel.Background));
+                Pixel blendedPixel = _pixelBuffer[positionInSequence].Blend(in tail);
 
                 _pixelBuffer[positionInSequence] = new Pixel(PixelForeground.Empty, blendedPixel.Background);
             }

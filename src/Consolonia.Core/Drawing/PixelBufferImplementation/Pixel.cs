@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -112,11 +111,44 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         [JsonIgnore] public ushort Width => Foreground.Symbol.Width;
 
+        /// <summary>
+        ///     The visible background color of the cell, as a single color. For a plain cell this is the
+        ///     background color. For an image cell this is the background color blended over the image's
+        ///     <see cref="PixelImage.DominantColor" />. Use it where one color is needed for the whole cell.
+        /// </summary>
+        [JsonIgnore]
+        public Color EffectiveBackgroundColor => Background.Image == null
+            ? Background.Color
+            : MergeColors(Background.Image.DominantColor, Background.Color, false);
+
         public bool Equals(Pixel other)
         {
-            return EqualityComparer<PixelForeground>.Default.Equals(Foreground, other.Foreground) &&
-                   EqualityComparer<PixelBackground>.Default.Equals(Background, other.Background) &&
-                   CaretStyle == other.CaretStyle;
+            return Same(in this, in other);
+        }
+
+        /// <summary>
+        ///     The field compare behind <see cref="Equals(Pixel)" /> and the operators, on two cells in place:
+        ///     the render target runs it on every cell of a frame against its cache, and a by-value compare
+        ///     would copy both cells, and their foregrounds, backgrounds and symbols, first.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool Same(in Pixel left, in Pixel right)
+        {
+            ref readonly PixelForeground leftForeground = ref left.Foreground;
+            ref readonly PixelForeground rightForeground = ref right.Foreground;
+            ref readonly Symbol leftSymbol = ref leftForeground.Symbol;
+            ref readonly Symbol rightSymbol = ref rightForeground.Symbol;
+            return leftSymbol.Character == rightSymbol.Character &&
+                   leftSymbol.Width == rightSymbol.Width &&
+                   leftSymbol.Pattern == rightSymbol.Pattern &&
+                   leftForeground.Color == rightForeground.Color &&
+                   left.Background.Color == right.Background.Color &&
+                   ReferenceEquals(left.Background.Image, right.Background.Image) &&
+                   leftForeground.Weight == rightForeground.Weight &&
+                   leftForeground.Style == rightForeground.Style &&
+                   leftForeground.TextDecoration == rightForeground.TextDecoration &&
+                   left.CaretStyle == right.CaretStyle &&
+                   string.Equals(leftSymbol.Complex, rightSymbol.Complex, StringComparison.Ordinal);
         }
 
         public Pixel Shade()
@@ -136,26 +168,32 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     Foreground.Weight,
                     Foreground.Style,
                     Foreground.TextDecoration),
-                new PixelBackground(Foreground.Color),
+                new PixelBackground(Foreground.Color, Background.Image),
                 CaretStyle);
         }
 
         /// <summary>
         ///     Blend the pixelAbove with this pixel.
         /// </summary>
-        /// <param name="pixelAbove"></param>
+        /// <param name="pixelAbove">
+        ///     The cell laid over this one, read in place: a blend copies the result out and nothing in.
+        ///     Blending into a cell of a <see cref="PixelBuffer" /> goes through
+        ///     <see cref="PixelBuffer.Blend(int, int, in Pixel)" />, which reads and writes the cell where it is.
+        /// </param>
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Pixel Blend(Pixel pixelAbove)
+        public Pixel Blend(in Pixel pixelAbove)
         {
             PixelForeground newForeground;
             CaretStyle newCaretStyle;
 
             Color aboveBgColor = pixelAbove.Background.Color;
-            byte aboveBgA = aboveBgColor.A;
+            // An image cell above replaces the whole cell, like an opaque color does. Its background color
+            // is only the (usually transparent) tint over the image, so its alpha is ignored here.
+            byte aboveBgA = pixelAbove.Background.Image != null ? (byte)0xFF : aboveBgColor.A;
 
-            bool isNoForegroundOnTop;
+            bool foregroundAboveIsTransparent;
 
             switch (aboveBgA)
             {
@@ -165,17 +203,19 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                 // Fast path: fully transparent overlay with no foreground and no caret change -> nothing to do
                 case 0x0:
                 {
-                    isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
-                    if (isNoForegroundOnTop && pixelAbove.CaretStyle == CaretStyle.None)
+                    foregroundAboveIsTransparent = pixelAbove.Foreground.IsTransparent;
+                    if (foregroundAboveIsTransparent && pixelAbove.CaretStyle == CaretStyle.None)
                         return this;
-                    newForeground = isNoForegroundOnTop ? Foreground : Foreground.Blend(pixelAbove.Foreground);
+                    newForeground = foregroundAboveIsTransparent
+                        ? Foreground
+                        : Foreground.Blend(pixelAbove.Foreground);
                     newCaretStyle = CaretStyle.Blend(pixelAbove.CaretStyle);
                 }
                     break;
                 default:
                     newCaretStyle = pixelAbove.CaretStyle;
-                    isNoForegroundOnTop = pixelAbove.Foreground.IsNothingToDraw();
-                    if (isNoForegroundOnTop)
+                    foregroundAboveIsTransparent = pixelAbove.Foreground.IsTransparent;
+                    if (foregroundAboveIsTransparent)
                         // merge the PixelForeground color with the pixelAbove background color
                         newForeground = new PixelForeground(Foreground.Symbol,
                             MergeColors(Foreground.Color, aboveBgColor, true),
@@ -188,8 +228,10 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     break;
             }
 
-            // Background is always blended
-            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false));
+            // The overlay is not opaque here (the opaque case returned above), so the image below is kept.
+            // The background color is blended. For an image cell it is the tint drawn over the image.
+            var newBackground = new PixelBackground(MergeColors(Background.Color, aboveBgColor, false),
+                Background.Image);
 
             return new Pixel(newForeground, newBackground, newCaretStyle);
         }
@@ -199,7 +241,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
         /// </summary>
         /// <returns>source blended into target</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
+        internal static Color MergeColors(in Color target, in Color source, bool isTargetForeground)
         {
             // Fast paths to avoid calling into the ConsoleColorMode when not needed
             byte a = source.A;
@@ -219,14 +261,14 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return HashCode.Combine(Foreground, Background, CaretStyle);
         }
 
-        public static bool operator ==(Pixel left, Pixel right)
+        public static bool operator ==(in Pixel left, in Pixel right)
         {
-            return left.Equals(right);
+            return Same(in left, in right);
         }
 
-        public static bool operator !=(Pixel left, Pixel right)
+        public static bool operator !=(in Pixel left, in Pixel right)
         {
-            return !left.Equals(right);
+            return !Same(in left, in right);
         }
     }
 }
