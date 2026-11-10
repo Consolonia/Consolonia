@@ -15,7 +15,7 @@ namespace Consolonia.Core.Helpers.Logging
                 ? (ParametrizedLogger)parametrizedLogger!
                 : new ParametrizedLogger(new NullSink(), level, areaName);
         }
-        
+
         public static ParametrizedLogger CreateInputLogger(LogEventLevel level)
         {
             return Create(LogCategory.Input, level);
@@ -29,14 +29,16 @@ namespace Consolonia.Core.Helpers.Logging
             logger.Log(sourceName, "{Raw}", message); // using template because our message contains placeholders
         }
 
-        public static void Log2<T>(this ParametrizedLogger logger,[StructuredMessageTemplate] string messageTemplate, T parameter,
+        public static void Log2<T>(this ParametrizedLogger logger, [StructuredMessageTemplate] string messageTemplate,
+            T parameter,
             [CallerFilePath] string sourcePath = null)
         {
             string sourceName = Path.GetFileName(sourcePath ?? "default");
             logger.Log(sourceName, messageTemplate, parameter);
         }
 
-        public static void Log3<T0, T1>(this ParametrizedLogger logger,[StructuredMessageTemplate] string messageTemplate, T0 propertyValue0,
+        public static void Log3<T0, T1>(this ParametrizedLogger logger,
+            [StructuredMessageTemplate] string messageTemplate, T0 propertyValue0,
             T1 propertyValue1,
             [CallerFilePath] string sourcePath = null)
         {
@@ -44,7 +46,8 @@ namespace Consolonia.Core.Helpers.Logging
             logger.Log(sourceName, messageTemplate, propertyValue0, propertyValue1);
         }
 
-        public static void Log3<T0, T1, T2>(this ParametrizedLogger logger,[StructuredMessageTemplate] string messageTemplate, T0 propertyValue0,
+        public static void Log3<T0, T1, T2>(this ParametrizedLogger logger,
+            [StructuredMessageTemplate] string messageTemplate, T0 propertyValue0,
             T1 propertyValue1, T2 propertyValue2,
             [CallerFilePath] string sourcePath = null)
         {
@@ -59,11 +62,13 @@ namespace Consolonia.Core.Helpers.Logging
                 return false;
             }
 
-            public void Log(LogEventLevel level, string area, object source,[StructuredMessageTemplate] string messageTemplate)
+            public void Log(LogEventLevel level, string area, object source,
+                [StructuredMessageTemplate] string messageTemplate)
             {
             }
 
-            public void Log(LogEventLevel level, string area, object source,[StructuredMessageTemplate] string messageTemplate,
+            public void Log(LogEventLevel level, string area, object source,
+                [StructuredMessageTemplate] string messageTemplate,
                 params object[] propertyValues)
             {
             }
