@@ -650,13 +650,12 @@ namespace Consolonia.PlatformSupport
             yield return new SafeLockMatcher(new RegexMatcher<int>(tuple =>
             {
                 var k = Key.Unknown;
-                // Simulates the AltMask itself by pressing Alt + Space.
                 int wch = tuple.Item2[0];
                 int wch2 = tuple.Item2[1];
 
                 if (wch2 == (int)Key.Space)
                 {
-                    k = Key.AltMask;
+                    k = Key.AltMask | Key.Space;
                 }
                 else if (wch2 - (int)Key.Space >= (uint)Key.A && wch2 - (int)Key.Space <= (uint)Key.Z)
                 {
