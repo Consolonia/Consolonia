@@ -1,5 +1,10 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 reviews:
+  changed_files_summary: false
+  sequence_diagrams: false
+  finishing_touches:
+    autofix:
+      enabled: false
   pre_merge_checks:
     docstrings:
       mode: "off"
