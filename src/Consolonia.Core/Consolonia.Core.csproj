@@ -10,6 +10,7 @@
         <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
         <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
         <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+        <PackageReference Include="JetBrains.Annotations.Sources" Version="2025.2.4" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>

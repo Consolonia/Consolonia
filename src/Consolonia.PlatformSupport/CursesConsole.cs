@@ -820,8 +820,8 @@ namespace Consolonia.PlatformSupport
                     LogEventLevel.Verbose,
                     LogExtensions.GetAreaName(LogCategory.Input)) is { } logger)
                 // guarded to disable flags parsing
-                logger.Log2(
-                    $"Mouse Event: {ev.ID} - {string.Join(" ", ev.ButtonState.GetFlags())}");
+                logger.Log3(
+                    "Mouse Event: {Id} - {ButtonState}", ev.ID, string.Join(" ", ev.ButtonState.GetFlags()));
             return ev;
         }
 

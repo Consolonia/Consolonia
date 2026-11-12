@@ -23,7 +23,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         protected void Complete(TComplete input)
         {
-            _logger.Log2($"Complete fired for {GetDebugInfo()} with input: {input}");
+            _logger.Log3("Complete fired for {Matcher} with input: {Input}", GetDebugInfo(), input);
             OnComplete.Invoke(input);
         }
     }
