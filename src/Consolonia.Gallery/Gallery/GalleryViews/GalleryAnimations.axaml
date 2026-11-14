@@ -30,15 +30,6 @@
         </Styles>
     </UserControl.Styles>
     <Panel>
-        <!-- A photo behind the animations, so the boxes are drawn over an image rather than a flat
-             background. It gets the middle quarter of the page and keeps its aspect ratio. -->
-        <Grid ColumnDefinitions="* 2* *"
-              RowDefinitions="* 2* *">
-            <Image x:Name="BackgroundImage"
-                   Grid.Row="1"
-                   Grid.Column="1"
-                   Stretch="Uniform" />
-        </Grid>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <Panel>
                 <Panel Width="40"
