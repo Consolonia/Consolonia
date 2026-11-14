@@ -15,6 +15,9 @@ namespace Consolonia.Core.Text
 
         // style modifiers
         public const string Reset = "\u001b[0m";
+
+        // Sets the terminal's default background color (SGR 49) instead of an explicit color.
+        public const string DefaultBackground = "\u001b[49m";
         public const string Normal = "\u001b[22m";
         public const string Bold = "\u001b[1m";
         public const string Dim = "\u001b[2m";
@@ -83,6 +86,40 @@ namespace Consolonia.Core.Text
         // Query current progressive enhancement flags. A terminal supporting the
         // Kitty keyboard protocol will reply with "CSI ? <flags> u".
         public const string QueryKittyKeyboardFlags = "\u001b[?u";
+
+        // Queries Primary Device Attributes (DA1). Reply: "CSI ? <class> ; <feature> ; ... c".
+        // Feature 4 means sixel graphics support.
+        public const string RequestDeviceAttributes = "\u001b[c";
+
+        // Kitty graphics protocol query. It sends a 1x1 RGB image with a=q (query only).
+        // A terminal with the protocol replies "APC _Gi=31;OK ST" and does not store the image.
+        // Other terminals ignore it.
+        public const string QueryKittyGraphics = "\u001b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\u001b\\";
+
+        // DECRQM for DEC private mode 2026. Reply: "CSI ? 2026 ; <state> $ y".
+        // State 1, 2 or 3 means synchronized output is supported. 0 means the mode is unknown,
+        // and 4 means it is permanently off.
+        public const string RequestSynchronizedOutputMode = "\u001b[?2026$p";
+
+        // Synchronized output. The terminal does not repaint between begin and end. So a frame that
+        // arrives in several chunks is shown all at once, without tearing.
+        public const string BeginSynchronizedUpdate = "\u001b[?2026h";
+        public const string EndSynchronizedUpdate = "\u001b[?2026l";
+
+        // DECRQM for DEC private mode 1016. Reply: "CSI ? 1016 ; <state> $ y", where state 1, 2 or
+        // 3 means the terminal can report the mouse in pixels and 0 means the mode is unknown.
+        public const string RequestSgrPixelsMouseMode = "\u001b[?1016$p";
+
+        // SGR-Pixels mouse mode: the same reports as SGR extended mouse mode (1006), but carrying
+        // the pointer's position in pixels instead of cells, so it can be placed within a cell.
+        public const string EnableSgrPixelsMouse = "\u001b[?1016h";
+        public const string DisableSgrPixelsMouse = "\u001b[?1016l";
+
+        // win32-input-mode: asks the Windows console to deliver each key as
+        // "CSI Vk ; Sc ; Uc ; Kd ; Cs ; Rc _" to a program reading virtual terminal input, rather
+        // than as the plain VT text it would otherwise turn the key into.
+        public const string EnableWin32InputMode = "\u001b[?9001h";
+        public const string DisableWin32InputMode = "\u001b[?9001l";
 
         /// <summary>
         ///     XTVERSION: asks the terminal its name and version, answered <c>DCS &gt; | text ST</c>.

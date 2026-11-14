@@ -69,7 +69,7 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             //todo: check default(char) is there
             Symbol symbolAbove = pixelAboveForeground.Symbol;
 
-            if (pixelAboveForeground.Color == Colors.Transparent)
+            if (pixelAboveForeground.IsTransparent)
                 // if pixelAbove is transparent then the foreground below should be unchanged.
                 return this;
 
@@ -101,9 +101,16 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
             return !left.Equals(right);
         }
 
+        /// <summary>
+        ///     True if this foreground draws nothing: it has no symbol, or its color is fully transparent.
+        ///     Blending it over another foreground leaves that foreground unchanged.
+        /// </summary>
+        public bool IsTransparent => Color.A == 0x0 || Symbol.IsEmpty;
+
+        [Obsolete("Use IsTransparent.")]
         public bool IsNothingToDraw()
         {
-            return Color.A == 0x0 || Symbol.NothingToDraw();
+            return IsTransparent;
         }
     }
 }

@@ -74,6 +74,33 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
 
         [JsonIgnore] public PixelRect Size => new(0, 0, Width, Height);
 
+        /// <summary>
+        ///     Returns a read-only reference to the cell at (x, y), without copying it. Use it for read-only scans.
+        /// </summary>
+        public ref readonly Pixel CellAt(int x, int y)
+        {
+            return ref _buffer[x, y];
+        }
+
+        /// <summary>
+        ///     Blends <paramref name="above" /> into the cell at (x, y) where it is. The drawing context does
+        ///     this for every cell it touches; through the indexers that was a copy of the whole cell out,
+        ///     one into the blend and one back.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Blend(int x, int y, in Pixel above)
+        {
+            ref Pixel cell = ref _buffer[x, y];
+            cell = cell.Blend(in above);
+        }
+
+        /// <inheritdoc cref="Blend(int, int, in Pixel)" />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Blend(PixelPoint point, in Pixel above)
+        {
+            Blend(point.X, point.Y, in above);
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private (ushort x, ushort y) ToXY(int i)
@@ -98,7 +125,9 @@ namespace Consolonia.Core.Drawing.PixelBufferImplementation
                     }
                     else if (pixel.Width > 0)
                     {
-                        stringBuilder.Append(pixel.Foreground.Symbol.GetText());
+                        // A cell with no symbol is printed as a space, not as '\0'.
+                        Symbol symbol = pixel.Foreground.Symbol;
+                        stringBuilder.Append(symbol.IsEmpty ? " " : symbol.GetText());
                         i += pixel.Width;
                     }
                     else

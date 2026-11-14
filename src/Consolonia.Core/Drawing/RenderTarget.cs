@@ -23,9 +23,16 @@ namespace Consolonia.Core.Drawing
         private readonly ConsoleWindowImpl _consoleTopLevelImpl;
 
         // cache of pixels written so we can ignore them if unchanged.
-        private Pixel?[,] _cache = null!; //todo: why Pixel can be null
+        // It holds what the terminal shows, cell by cell. Cells never written hold Pixel.Empty.
+        // At the end of a frame, the console gets this cache as the screen, not the pixel buffer. The two can
+        // differ because only dirty cells are written, and the cell under the mouse cursor shows the cursor.
+        private PixelBuffer _cache = null!;
 
         private ConsoleCursor _consoleCursor;
+
+        /// <summary>The converter that draws bitmaps on this terminal. See <see cref="BitmapConverter" />.</summary>
+        private BitmapConverter? _bitmapRenderer;
+
         private readonly Snapshot.Regions _cursorDirtyRegions = new();
         private Timer? _cursorTimer;
 
@@ -48,6 +55,10 @@ namespace Consolonia.Core.Drawing
             InitializeCacheInternal();
             _cursorTimer = new Timer(_ =>
                 {
+                    // Wait for any drawing in progress to finish. A frame written from a half-drawn buffer
+                    // would show half-drawn cells, and the image encoder would place half-drawn images.
+                    // Take RenderLock before the lock on this object, never after it.
+                    lock (_consoleTopLevelImpl.RenderLock)
                     lock (this)
                     {
                         if (_cursorTimer == null)
@@ -58,6 +69,7 @@ namespace Consolonia.Core.Drawing
                 }, null, Timeout.Infinite,
                 Timeout.Infinite);
             _consoleTopLevelImpl.CursorChanged += OnCursorChanged;
+            _consoleTopLevelImpl.TerminalContentsLost += ResetCache;
         }
 
         private void InitializeCacheInternal()
@@ -75,6 +87,7 @@ namespace Consolonia.Core.Drawing
         public void Dispose()
         {
             _consoleTopLevelImpl.CursorChanged -= OnCursorChanged;
+            _consoleTopLevelImpl.TerminalContentsLost -= ResetCache;
             _cursorTimer!.Dispose();
             _cursorTimer = null;
         }
@@ -93,14 +106,25 @@ namespace Consolonia.Core.Drawing
         public Vector Dpi { get; } = new(AvaloniaHardcodedDpi, AvaloniaHardcodedDpi);
         public PixelSize PixelSize { get; } = new(1, 1);
 
+        /// <summary>
+        ///     The converter that draws bitmaps on this terminal. It is created on first use, when the console's
+        ///     capabilities are known. Drawing contexts use it but do not own it. A resize creates a new drawing
+        ///     context, and the converter keeps its cached conversions across that change.
+        /// </summary>
+        internal BitmapConverter BitmapConverter => _bitmapRenderer ??= BitmapConverter.Create(_console);
+
         internal void RenderToDevice()
         {
-            try
+            // EndDrawing already holds this lock when it calls here. Monitor locks are re-entrant, so that is fine.
+            lock (_consoleTopLevelImpl.RenderLock)
             {
-                RenderToDevice(_consoleTopLevelImpl.DirtyRegions);
-            }
-            catch (InvalidDrawingContextException)
-            {
+                try
+                {
+                    RenderToDevice(_consoleTopLevelImpl.DirtyRegions);
+                }
+                catch (InvalidDrawingContextException)
+                {
+                }
             }
         }
 
@@ -124,15 +148,42 @@ namespace Consolonia.Core.Drawing
                 PreviousFrameIsRetained = true // otherwise full redrawing happens
             };
 
-            if (_drawingContextImpl is null || _drawingContextImpl.PixelBuffer != _consoleTopLevelImpl.PixelBuffer)
-                _drawingContextImpl = new DrawingContextImpl(_consoleTopLevelImpl, this);
+            // The lock stays held until the context is disposed and the frame is written (see EndDrawing).
+            Monitor.Enter(_consoleTopLevelImpl.RenderLock);
+            try
+            {
+                if (_drawingContextImpl is null ||
+                    _drawingContextImpl.PixelBuffer != _consoleTopLevelImpl.PixelBuffer)
+                    _drawingContextImpl = new DrawingContextImpl(_consoleTopLevelImpl, this);
 
-            return _drawingContextImpl;
+                return _drawingContextImpl;
+            }
+            catch
+            {
+                Monitor.Exit(_consoleTopLevelImpl.RenderLock);
+                throw;
+            }
         }
 
-        private static Pixel?[,] InitializeCache(ushort width, ushort height)
+        /// <summary>
+        ///     Called when the drawing context from <see cref="CreateDrawingContext" /> is finished. Writes the
+        ///     frame, then releases the window's render lock that <see cref="CreateDrawingContext" /> took.
+        /// </summary>
+        internal void EndDrawing()
         {
-            var cache = new Pixel?[width, height];
+            try
+            {
+                RenderToDevice();
+            }
+            finally
+            {
+                Monitor.Exit(_consoleTopLevelImpl.RenderLock);
+            }
+        }
+
+        private static PixelBuffer InitializeCache(ushort width, ushort height)
+        {
+            var cache = new PixelBuffer(width, height);
 
             // initialize the cache with Pixel.Empty as it literally means nothing
             for (ushort y = 0; y < height; y++)
@@ -142,17 +193,44 @@ namespace Consolonia.Core.Drawing
             return cache;
         }
 
+        /// <summary>
+        ///     Forgets what was written to the terminal, because the terminal may no longer show it. This happens
+        ///     when the screen is resized, or when another program used the terminal while console I/O was paused.
+        ///     The next frame writes every cell again. The console also clears its cached terminal state, so the
+        ///     image encoder places every image again.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        internal void ResetCache()
+        {
+            InitializeCacheInternal();
+            _console.ResetCache();
 
+            PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
+            _consoleTopLevelImpl.DirtyRegions.AddRect(new PixelRect(0, 0, pixelBuffer.Width, pixelBuffer.Height));
+        }
+
+        /// <summary>
+        ///     Writes a frame. Callers must hold the window's render lock, so the buffer is not half drawn.
+        /// </summary>
         [MethodImpl(MethodImplOptions.Synchronized)]
         private void RenderToDevice(Snapshot.Regions regions)
         {
             PixelBuffer pixelBuffer = _consoleTopLevelImpl.PixelBuffer;
+
+            // Skip the frame if the terminal changed size but the buffer has not been replaced yet.
+            // A frame of the old size would not fit the new terminal. Long rows would wrap, the last row
+            // would scroll the screen, and images would be placed at the wrong cells. The resize redraws
+            // everything, so the dirty regions are kept for it.
+            PixelBufferSize consoleSize = _console.Size;
+            if (consoleSize.Width != pixelBuffer.Width || consoleSize.Height != pixelBuffer.Height) return;
+
             Snapshot dirtyRegions = regions.GetSnapshotAndClear();
             dirtyRegions.Intersect(0, 0, pixelBuffer.Width, pixelBuffer.Height);
             if (dirtyRegions.IsEmpty) return;
 
-            if (pixelBuffer.Width != _cache.GetLength(0) || pixelBuffer.Height != _cache.GetLength(1))
-                _cache = InitializeCache(pixelBuffer.Width, pixelBuffer.Height);
+            // The buffer size changed, so reset the cache. This redraws everything.
+            if (pixelBuffer.Width != _cache.Width || pixelBuffer.Height != _cache.Height)
+                ResetCache();
 
 #if FPS
             var now = _stopwatch.Elapsed;
@@ -167,6 +245,20 @@ namespace Consolonia.Core.Drawing
                 _lastFpsUpdate = now;
             }
 #endif
+            _console.BeginUpdate();
+            try
+            {
+                RenderFrame(pixelBuffer, dirtyRegions);
+            }
+            finally
+            {
+                // Close the update even if writing a cell throws. Otherwise the terminal holds back all later output.
+                _console.EndUpdate(_cache);
+            }
+        }
+
+        private void RenderFrame(PixelBuffer pixelBuffer, Snapshot dirtyRegions)
+        {
             _console.HideCaret();
 
             PixelBufferCoordinate? caretPosition = null;
@@ -178,34 +270,40 @@ namespace Consolonia.Core.Drawing
                 // we can not run only from MinX to MaxX because of wide characters, also we can not run MinY/MaxY because we need to detect caret
                 for (ushort x = 0; x < pixelBuffer.Width; x++)
                 {
-                    Pixel pixel = pixelBuffer[x, y];
+                    // the cell is looked at in place; only a dirty one is copied out, since it may be
+                    // rewritten below before it is compared and written
+                    ref readonly Pixel cell = ref pixelBuffer.CellAt(x, y);
 
-                    if (pixel.IsCaret())
+                    if (cell.IsCaret())
                     {
                         if (caretPosition != null)
                             throw new InvalidOperationException("Caret is already shown");
                         caretPosition = new PixelBufferCoordinate(x, y);
-                        caretStyle = pixel.CaretStyle;
+                        caretStyle = cell.CaretStyle;
                     }
 
                     if (!dirtyRegions.Contains(x, y, false))
                         continue;
 
+                    Pixel pixel = cell;
+
                     // painting mouse cursor if within the range of current pixel (possibly wide)
-                    if (!_consoleCursor.IsEmpty() &&
-                        _consoleCursor.Coordinate.Y == y &&
-                        _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width)
+                    if (IsUnderMouseCursor(x, y))
                     {
+                        // The background color under the cursor glyph. For a cell with an image, this is the
+                        // image's main color blended with any color painted over it.
+                        Color cellColor = pixel.EffectiveBackgroundColor;
+
                         if (_consoleCursor.Type == " " && pixel.Width == 1)
                         {
-                            // floating cursor tracking effect 
+                            // floating cursor tracking effect
                             // if we are drawing a " " and the pixel underneath is not wide char
                             // then we lift the character from the underlying pixel and invert it
                             char cursorChar = pixel.Foreground.Symbol.Character != '\0'
                                 ? pixel.Foreground.Symbol.Character
                                 : ' ';
-                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), pixel.Background.Color),
-                                new PixelBackground(GetContrastColor(pixel.Background.Color)));
+                            pixel = new Pixel(new PixelForeground(new Symbol(cursorChar, 1), cellColor),
+                                new PixelBackground(GetContrastColor(cellColor)));
                         }
                         else
                         {
@@ -213,7 +311,7 @@ namespace Consolonia.Core.Drawing
                             // simply draw the mouse cursor character in the current pixel colors.
                             Color foreground = pixel.Foreground.Color != Colors.Transparent
                                 ? pixel.Foreground.Color
-                                : GetContrastColor(pixel.Background.Color);
+                                : GetContrastColor(cellColor);
                             pixel = new Pixel(
                                 new PixelForeground(new Symbol(cursorChar, 1), foreground,
                                     pixel.Foreground.Weight, pixel.Foreground.Style, pixel.Foreground.TextDecoration),
@@ -224,7 +322,7 @@ namespace Consolonia.Core.Drawing
                     if (pixel.Width > 1)
                         // checking that there are enough empty pixels after current wide character and if no, we want to render just empty space instead
                         for (ushort i = 1; i < pixel.Width && x + i < pixelBuffer.Width; i++)
-                            if (pixelBuffer[(ushort)(x + i), y].Width != 0)
+                            if (pixelBuffer.CellAt(x + i, y).Width != 0)
                             {
                                 pixel = new Pixel(
                                     new PixelForeground(Symbol.Space, pixel.Foreground.Color, pixel.Foreground.Weight,
@@ -251,13 +349,10 @@ namespace Consolonia.Core.Drawing
                     {
                         // checking cache
                         //todo: it does not consider that some of them will be replaced by space. But issue is pessimistic, just unnecessary redraws
-                        bool anyDifferent = false;
-                        for (ushort i = 0; i < ushort.Max(pixel.Width, 1); i++)
-                            if ((i == 0 ? pixel : pixelBuffer[(ushort)(x + i), y]) != _cache[x + i, y])
-                            {
-                                anyDifferent = true;
-                                break;
-                            }
+                        // both sides compared in place (the operators take the cells by reference)
+                        bool anyDifferent = pixel != _cache.CellAt(x, y);
+                        for (ushort i = 1; !anyDifferent && i < pixel.Width; i++)
+                            anyDifferent = pixelBuffer.CellAt(x + i, y) != _cache.CellAt(x + i, y);
 
                         if (!anyDifferent)
                             continue;
@@ -269,7 +364,6 @@ namespace Consolonia.Core.Drawing
                 }
             }
 
-            _console.Flush();
 #if FPS
             var fps = $"FPS: {_fps: 000}";
             for (ushort i = 0; i < fps.Length; i++)
@@ -278,21 +372,23 @@ namespace Consolonia.Core.Drawing
  new Pixel(new PixelForeground(new Symbol(fps[i]), Colors.White), new PixelBackground(Colors.Black));
                 _console.WritePixel(new PixelBufferCoordinate((ushort)(pixelBuffer.Width - fps.Length + i), (ushort)(pixelBuffer.Height - 1)), in pixel);
             }
-            _console.Flush();
 #endif
 
+            // The caret was hidden at the start of the frame, so it only needs to be shown here.
             if (caretPosition != null && caretStyle != CaretStyle.None)
             {
                 _console.SetCaretPosition((PixelBufferCoordinate)caretPosition);
                 _console.SetCaretStyle((CaretStyle)caretStyle!);
                 _console.ShowCaret();
             }
-            else
-            {
-                _console.HideCaret(); //todo: Caret was hidden at the beginning of this method, why to hide it again?
-            }
         }
 
+        private bool IsUnderMouseCursor(int x, int y)
+        {
+            return !_consoleCursor.IsEmpty() &&
+                   _consoleCursor.Coordinate.Y == y &&
+                   _consoleCursor.Coordinate.X <= x && x < _consoleCursor.Coordinate.X + _consoleCursor.Width;
+        }
 
         private static Color GetContrastColor(Color color)
         {

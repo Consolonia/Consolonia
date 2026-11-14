@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Input;
@@ -22,7 +26,14 @@ namespace Consolonia.Core.Infrastructure
     /// </remarks>
     public abstract class ConsoleBase : PauseBase, IConsole, IDisposable
     {
+        /// <summary>Matches a text area size report, "CSI 4;height;width t", with sizes in pixels.</summary>
+        private static readonly Regex TextAreaSizeReport =
+            new(@"\e\[4;(\d{1,5});(\d{1,5})t", RegexOptions.CultureInvariant);
+
         private readonly IConsoleOutput _consoleOutput;
+
+        /// <summary>The cell size the terminal reported, unrounded; empty when it reported none.</summary>
+        private Size _reportedCellPixelSize;
 
         protected ConsoleBase(IConsoleOutput consoleOutput)
         {
@@ -32,6 +43,12 @@ namespace Consolonia.Core.Infrastructure
             Console.TreatControlCAsInput = true;
 
             _consoleOutput = consoleOutput;
+
+            if (consoleOutput is AnsiConsoleOutput ansiConsoleOutput)
+            {
+                ansiConsoleOutput.GetConsoleCellSizeHandler = GetConsoleCellSize;
+                ansiConsoleOutput.RequestAnsiResponseHandler = RequestAnsiResponse;
+            }
 
             Size = consoleOutput.Size;
         }
@@ -132,6 +149,28 @@ namespace Consolonia.Core.Infrastructure
 
         public ConsoleCapabilities Capabilities { get; protected set; }
 
+        public int CellPixelWidth => _consoleOutput.CellPixelWidth;
+
+        public int CellPixelHeight => _consoleOutput.CellPixelHeight;
+
+        /// <summary>
+        ///     True when the terminal can report the mouse in pixels (SGR-Pixels, DEC private mode 1016)
+        ///     and has told us its cell size, without which those pixels cannot be turned back into cells.
+        /// </summary>
+        protected bool TerminalSupportsPixelMouse =>
+            _consoleOutput.Capabilities.HasFlag(ConsoleCapabilities.SupportsPixelMouse) &&
+            _reportedCellPixelSize is { Width: > 0, Height: > 0 };
+
+        /// <summary>
+        ///     Turns the position in an SGR-Pixels mouse report (one-based pixels) into a cell position,
+        ///     keeping the fraction that says where in the cell the pointer is.
+        /// </summary>
+        protected Point PixelToCell(int x, int y)
+        {
+            return new Point(Math.Max(0, x - 1) / _reportedCellPixelSize.Width,
+                Math.Max(0, y - 1) / _reportedCellPixelSize.Height);
+        }
+
         public event Action Resized;
 
         public virtual void ClearScreen()
@@ -153,7 +192,9 @@ namespace Consolonia.Core.Infrastructure
         public virtual void PrepareConsole()
         {
             _consoleOutput.PrepareConsole();
-            Capabilities |= _consoleOutput.Capabilities;
+            // the output says the terminal can report the mouse in pixels; the console says so only once it
+            // has turned that on (see TerminalSupportsPixelMouse)
+            Capabilities |= _consoleOutput.Capabilities & ~ConsoleCapabilities.SupportsPixelMouse;
         }
 
         public virtual void WritePixel(PixelBufferCoordinate position, in Pixel pixel)
@@ -248,9 +289,44 @@ namespace Consolonia.Core.Infrastructure
             _consoleOutput.ShowCaret();
         }
 
+        public virtual void BeginUpdate()
+        {
+            _consoleOutput.BeginUpdate();
+        }
+
+        public virtual void EndUpdate(PixelBuffer screen)
+        {
+            _consoleOutput.EndUpdate(screen);
+        }
+
+        public virtual void ResetCache()
+        {
+            _consoleOutput.ResetCache();
+        }
+
+        /// <summary>
+        ///     Tells the output to create its image encoder, now that the application is set up.
+        ///     See <see cref="AnsiConsoleOutput.RefreshImageEncoder" />.
+        /// </summary>
+        internal void RefreshImageEncoder()
+        {
+            if (_consoleOutput is not AnsiConsoleOutput ansiConsoleOutput)
+                return;
+
+            ansiConsoleOutput.RefreshImageEncoder();
+            // This console copied the output's capabilities when the console was prepared. At that time the
+            // output had no encoder yet. So add SupportsPixelImages if the output now has one.
+            Capabilities |= _consoleOutput.Capabilities & ConsoleCapabilities.SupportsPixelImages;
+        }
+
         public virtual void WriteText(string str)
         {
             _consoleOutput.WriteText(str);
+        }
+
+        public virtual void WriteBytes(ReadOnlySpan<byte> ascii)
+        {
+            _consoleOutput.WriteBytes(ascii);
         }
 
         protected bool CheckSize()
@@ -258,6 +334,81 @@ namespace Consolonia.Core.Infrastructure
             if (Size.Width == Console.WindowWidth && Size.Height == Console.WindowHeight) return false;
             Size = new PixelBufferSize((ushort)Console.WindowWidth, (ushort)Console.WindowHeight);
             return true;
+        }
+
+        protected virtual (int CellWidth, int CellHeight) GetConsoleCellSize()
+        {
+            int cols = Console.WindowWidth;
+            int rows = Console.WindowHeight;
+
+            string response = RequestAnsiResponse("\x1b[14t", 't', 200);
+
+            // SGR-Pixels mouse positions are converted to cells with the unrounded cell size.
+            if (TryParseTextAreaSize(response, cols, rows, out int widthPx, out int heightPx))
+                _reportedCellPixelSize = new Size((double)widthPx / cols, (double)heightPx / rows);
+
+            return CellSizeFromReport(response, cols, rows);
+        }
+
+        /// <summary>
+        ///     Returns the cell size in pixels from a text area size report ("CSI 4;height;width t").
+        ///     Returns 8x16 if the report is missing or malformed, or if it gives fewer pixels than cells.
+        /// </summary>
+        internal static (int CellWidth, int CellHeight) CellSizeFromReport(string response, int cols, int rows)
+        {
+            if (TryParseTextAreaSize(response, cols, rows, out int widthPx, out int heightPx))
+                return (widthPx / cols, heightPx / rows);
+
+            return (DefaultCellPixelSize.Width, DefaultCellPixelSize.Height);
+        }
+
+        /// <summary>
+        ///     Finds the text area size in pixels in a reply to "CSI 14 t". Returns false if there is no
+        ///     report, or if it gives a cell less than one pixel (that would scale images to nothing).
+        /// </summary>
+        private static bool TryParseTextAreaSize(string response, int cols, int rows, out int widthPx,
+            out int heightPx)
+        {
+            // A stray keypress can arrive before or after the reply, so search for the reply in the text.
+            Match report = TextAreaSizeReport.Match(response);
+            heightPx = report.Success ? int.Parse(report.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            widthPx = report.Success ? int.Parse(report.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
+            return cols > 0 && rows > 0 && widthPx >= cols && heightPx >= rows;
+        }
+
+        protected virtual string RequestAnsiResponse(string request, char terminator, int timeoutMs)
+        {
+            // When stdin is redirected, there is no terminal to reply and Console.KeyAvailable throws.
+            // Return no reply, so every query uses its fallback.
+            if (Console.IsInputRedirected)
+                return string.Empty;
+
+            // conhost/ConPTY turns terminal replies into key events and drops APC replies (such as the
+            // kitty graphics reply). Virtual terminal input passes the reply through unchanged.
+            using VirtualTerminalInput.Scope scope = VirtualTerminalInput.Enable();
+
+            WriteText(request);
+            Flush();
+
+            var sb = new StringBuilder();
+            long deadline = Environment.TickCount64 + timeoutMs;
+            while (Environment.TickCount64 < deadline)
+            {
+                if (!Console.KeyAvailable)
+                {
+                    // Without this sleep, polling would keep a CPU core busy for the whole timeout on
+                    // terminals that never reply.
+                    Thread.Sleep(1);
+                    continue;
+                }
+
+                char c = Console.ReadKey(true).KeyChar;
+                sb.Append(c);
+                if (c == terminator)
+                    break;
+            }
+
+            return sb.ToString();
         }
 
         #endregion

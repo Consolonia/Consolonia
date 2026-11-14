@@ -47,6 +47,8 @@ namespace Consolonia.Core.Tests.WithLifetimeFixture
             public List<string> Written { get; } = [];
 
             public ConsoleCapabilities Capabilities => ConsoleCapabilities.SupportsAltSolo;
+            public int CellPixelWidth => 8;
+            public int CellPixelHeight => 16;
             public PixelBufferSize Size { get; set; } = new(80, 25);
             public IReadOnlySet<string> SupportedPointerShapes => supported;
 
