@@ -9,6 +9,31 @@ using Consolonia.Core.Helpers.Logging;
 
 namespace Consolonia.Core.Helpers.InputProcessing
 {
+    //  +------------------------------------------------------------------------------+
+    //  |                                    WANTED            _     _    ___   ___    |
+    //  |                               DEAD OR READABLE      | |   / |  / _ \ / _ \   |
+    //  |                                                    / __)  | | | | | | | | |  |
+    //  |                             .-----------------.    \__ \  | | | |_| | |_| |  |
+    //  |                             |      INPUT      |    (   /  |_|  \___/ \___/   |
+    //  |                             |        v        |     |_|                      |
+    //  |                             |   +--> if --+   |                              |
+    //  |                             |   |    v   |    |                              |
+    //  |                             |   |   ??? <+    |                              |
+    //  |                             |   |  / | \      |                              |
+    //  |                             |   +-- if --+    |                              |
+    //  |                             |      retry      |                              |
+    //  |                             |     OUTPUT      |                              |
+    //  |                             '-----------------'                              |
+    //  |                                                                              |
+    //  |                              INPUT PROCESSOR                                 |
+    //  |                                                                              |
+    //  |  todo: low: $100 bounty for teaching me how to significantly simplify this   |
+    //  |  processor (possibly with IMatcher contract)                                 |
+    //  |  in a way I don't have to spend several hours every time to  understand      |
+    //  |  how just half of it works                                                   |
+    //  |  $50 for a partial relief.                                                   |
+    //  +------------------------------------------------------------------------------+
+
     public class InputProcessor<T>(IEnumerable<IMatcher<T>> matchers)
     {
         private readonly ParametrizedLogger _infoLogger = Log.CreateInputLogger(LogEventLevel.Information);
@@ -29,7 +54,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             LogMatchersState();
         }
 
-        private void ProcessSingleInput(T input)
+        private void ProcessSingleInput(T input, bool canRetry = true /*solving "AAB" input for {"AB, "A"} matchers*/)
         {
             _infoLogger.Log2("Processing single input: {Input}", input);
             int currentTopMatcherIndex = Matchers.Length;
@@ -56,10 +81,19 @@ namespace Consolonia.Core.Helpers.InputProcessing
                     if (result == AppendResult.NoMatch)
                     {
                         logSb.Insert(0, '❌');
-                        if (isPreviousTopMatcher)
+                        if (_previousTopMatcherIndex >= 0 && // there was some top matcher 
+                            i >= _previousTopMatcherIndex && // we've reached it or a lower candidate
+                            currentTopMatcherIndex == Matchers.Length) // no one yet accepted new character
                         {
                             logSb.Insert(1, "?");
-                            TryFlushStartingFrom(i);
+                            AppendResult flushResult = TryFlushStartingFrom(i, true);
+                            if (flushResult != AppendResult.Match && canRetry)
+                            {
+                                // The old prefix is resolved; retry the unconsumed input once.
+                                _previousTopMatcherIndex = -1;
+                                ProcessSingleInput(input, false);
+                                return;
+                            }
                         }
                         else
                         {
@@ -111,21 +145,39 @@ namespace Consolonia.Core.Helpers.InputProcessing
             _previousTopMatcherIndex = currentTopMatcherIndex;
         }
 
-        private void TryFlushStartingFrom(int startIndex)
+        private AppendResult TryFlushStartingFrom(int startIndex, bool resetPendingStartMatcher = false)
         {
             for (int i = startIndex; i < Matchers.Length; i++)
-                if (Matchers[i].TryFlush())
+                switch (Matchers[i].TryFlush())
                 {
-                    _infoLogger.Log3(
-                        "Matcher {Matcher} at index {MatcherIndex} flushed successfully, resetting matchers from index {NextMatcherIndex}",
-                        Matchers[i].GetDebugInfo(), i, i + 1);
-                    ResetMatchersFrom(i + 1);
-                    break;
+                    case AppendResult.AutoFlushed:
+                    {
+                        _infoLogger.Log3(
+                            "Matcher {Matcher} at index {MatcherIndex} flushed successfully, resetting matchers from index {NextMatcherIndex}",
+                            Matchers[i].GetDebugInfo(), i, i + 1);
+                        ResetMatchersFrom(i + 1);
+                        return AppendResult.AutoFlushed;
+                    }
+
+                    case AppendResult.Match:
+                    {
+                        if (resetPendingStartMatcher && i == startIndex)
+                        {
+                            Matchers[i].Reset();
+                            continue;
+                        }
+
+                        return AppendResult.Match;
+                    }
+
+                    case AppendResult.NoMatch:
+                    {
+                        Matchers[i].Reset();
+                        continue;
+                    }
                 }
-            /*else
-            {
-                // because of 15F2A2C4-218D-4B4D-86CE-330A312EF6A6 we can not reset all others even if it seems logical
-            }*/
+
+            return AppendResult.NoMatch;
         }
 
         private void ResetMatchersFrom(int startIndex)

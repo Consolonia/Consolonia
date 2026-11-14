@@ -63,12 +63,11 @@ namespace Consolonia.Core.Helpers.InputProcessing
             return (keyCode, modifiers, eventType, terminator, shiftedKeyCode);
         }
 
-        public override bool TryFlush()
+        public override AppendResult TryFlush()
         {
-            // Always return false: CSI sequences are auto-flushed on completion,
-            // and returning true here would block lower-priority matchers (like
-            // SgrMouseMatcher) from flushing when this matcher has partial data.
-            return false;
+            return Accumulator.Length > 0
+                ? AppendResult.Match
+                : AppendResult.NoMatch;
         }
 
         /// <summary>

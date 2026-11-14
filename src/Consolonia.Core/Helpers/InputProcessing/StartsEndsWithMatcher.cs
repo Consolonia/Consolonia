@@ -6,7 +6,6 @@ namespace Consolonia.Core.Helpers.InputProcessing
     /// <summary>
     ///     Matches a sequence of characters that starts with a given string and ends with another given string.
     /// </summary>
-    [Obsolete("Use with caution 79927B8B-848F-437D-AEDD-5E52FB993526", false)]
     public class StartsEndsWithMatcher<T>(
         Action<string> onComplete,
         Func<T, Rune> toRune,
@@ -15,49 +14,56 @@ namespace Consolonia.Core.Helpers.InputProcessing
         : MatcherWithComplete<T, string>(onComplete)
     {
         private readonly StringBuilder _accumulator = new();
+        private bool _isCapturing;
 
         public override AppendResult Append(T input)
         {
             Rune rune = toRune(input);
 
-            AppendResult matchResultInternal = MatchResultInternal(_accumulator.ToString() + rune);
-            if (matchResultInternal == AppendResult.Match) _accumulator.Append(rune);
+            _accumulator.Append(rune);
+            string accumulated = _accumulator.ToString();
 
-            return matchResultInternal;
-        }
-
-        private AppendResult MatchResultInternal(string toTest)
-        {
-            bool startsWithTrue = toTest.StartsWith(startsWith, StringComparison.Ordinal);
-
-            if (startsWithTrue && toTest.EndsWith(endsWith, StringComparison.Ordinal))
+            if (_isCapturing)
             {
-                // consider this https://github.com/Consolonia/Consolonia/pull/708#discussion_r4447661127 before fixing OutOfRangeException (79927B8B-848F-437D-AEDD-5E52FB993526)
-                string output = toTest.Substring(startsWith.Length,
-                    toTest.Length - startsWith.Length - endsWith.Length);
+                if (accumulated.EndsWith(endsWith, StringComparison.Ordinal))
+                {
+                    string output = accumulated[..^endsWith.Length];
+                    _isCapturing = false;
+                    Reset();
+                    Complete(output);
+                }
 
-                Complete(output);
-                _accumulator.Clear();
                 return AppendResult.AutoFlushed;
             }
 
-            if (startsWithTrue || startsWith.StartsWith(toTest, StringComparison.Ordinal)) return AppendResult.Match;
+            if (accumulated == startsWith)
+            {
+                _accumulator.Clear();
+                _isCapturing = true;
+                return AppendResult.AutoFlushed;
+            }
 
-            _accumulator.Clear();
+            if (startsWith.StartsWith(accumulated, StringComparison.Ordinal))
+                return AppendResult.Match;
 
+            Reset();
             return AppendResult.NoMatch;
         }
 
-        public override bool TryFlush()
+        public override AppendResult TryFlush()
         {
-            return _accumulator.Length != 0;
-            // if any input, always lying that we are flushed to
-            // indicate others should not flush 15F2A2C4-218D-4B4D-86CE-330A312EF6A6
+            return _isCapturing || _accumulator.Length > 0
+                ? AppendResult.Match
+                : AppendResult.NoMatch;
         }
 
         public override void Reset()
         {
-            // because of 15F2A2C4-218D-4B4D-86CE-330A312EF6A6 we are pretending to reset, but we are not buying the lie of the previous tag matcher 
+            // AutoFlushed makes the processor reset every matcher, including this one.
+            if (_isCapturing)
+                return;
+
+            _accumulator.Clear();
         }
 
         public override string GetDebugInfo()

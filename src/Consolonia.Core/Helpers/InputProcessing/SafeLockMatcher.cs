@@ -38,28 +38,24 @@ namespace Consolonia.Core.Helpers.InputProcessing
             }
 
             if (_keyStep > 0)
-            {
-                _lockedMatcher.Append(0); // should reset the liers
-                _lockedMatcher.Reset(); // should reset civilians
-                _keyStep = 0;
-            }
+                Reset();
 
             return AppendResult.NoMatch;
         }
 
-        public bool TryFlush()
+        public AppendResult TryFlush()
         {
-            bool hasFlushed = _lockedMatcher.TryFlush();
-            if (hasFlushed)
+            AppendResult result = _lockedMatcher.TryFlush();
+            if (result is AppendResult.AutoFlushed or AppendResult.NoMatch)
                 _keyStep = 0;
 
-            return hasFlushed;
+            return result;
         }
 
         public void Reset()
         {
             _lockedMatcher.Reset();
-            // doing nothing, we reset only when append does not match
+            _keyStep = 0;
         }
 
         public string GetDebugInfo()

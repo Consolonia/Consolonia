@@ -14,7 +14,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
         }
 
         public abstract AppendResult Append(T input);
-        public abstract bool TryFlush();
+        public abstract AppendResult TryFlush();
         public abstract void Reset();
 
         public abstract string GetDebugInfo();

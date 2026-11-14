@@ -61,7 +61,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
 
         public override void Reset()
         {
-            // Intentionally not clearing - same pattern as StartsEndsWithMatcher
+            Accumulator.Clear();
         }
 
         public override string GetDebugInfo()

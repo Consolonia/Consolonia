@@ -28,11 +28,11 @@ namespace Consolonia.Core.Helpers.InputProcessing
             return (button, x, y, isRelease);
         }
 
-        public override bool TryFlush()
+        public override AppendResult TryFlush()
         {
-            return
-                Accumulator.Length !=
-                0; //todo: this file is Claude production inspired by CsiKeyboardMatcher. I did not check this one well, but it works. However I have no idea why to pretend flushing if something accumulated
+            return Accumulator.Length != 0
+                ? AppendResult.Match
+                : AppendResult.NoMatch;
         }
 
         /// <summary>

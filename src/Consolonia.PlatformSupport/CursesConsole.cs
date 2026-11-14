@@ -629,10 +629,11 @@ namespace Consolonia.PlatformSupport
                 ("\x1B[27;5;13~", Key.CtrlMask | Key.Enter)
             ];
 
-            // the table of sequences terminfo has no entry for; SafeLockMatcher has issue with (15F2A2C4-218D-4B4D-86CE-330A312EF6A6), so using canMatch instead
-            yield return new SequenceTableMatcher<(int, int), Key>(
-                key => DispatchInputAsyncWait(() => { RaiseKeyPressInternal(key); }), cp => new Rune(cp.Item2),
-                fSequences, cp => cp.Item1 == 0);
+            // The table of sequences terminfo has no entry for.
+            yield return new SafeLockMatcher(
+                new SequenceTableMatcher<int, Key>(
+                    key => DispatchInputAsyncWait(() => { RaiseKeyPressInternal(key); }), cp => new Rune(cp),
+                    fSequences, _ => true), 0, 0);
 
             // escape of ESC
             yield return new SafeLockMatcher(
@@ -794,14 +795,8 @@ namespace Consolonia.PlatformSupport
 
             // general keys backup
             yield return new SafeLockMatcher(
-                new GenericMatcher<int>(i =>
-                {
-                    DispatchInputAsyncWait(() => { ProcessKeyInternal(i); });
-                    // related to 15F2A2C4-218D-4B4D-86CE-330A312EF6A6, we have to reset text input ourselves, because 
-                    // common logic of InputProcessor resets only everything below
-                    // todo: should we reset all other matchers actually?
-                    textInputMatcher.Reset();
-                }, EscapeDoesNotComeItselfInCurses), 0);
+                new GenericMatcher<int>(i => { DispatchInputAsyncWait(() => { ProcessKeyInternal(i); }); },
+                    EscapeDoesNotComeItselfInCurses), 0);
 
             yield break;
 

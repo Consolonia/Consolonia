@@ -9,10 +9,10 @@ namespace Consolonia.Core.Helpers.InputProcessing
     public class TextInputMatcher<T>(Action<(string, T[])> onComplete, Func<T, Rune> toRune, uint? min = null)
         : RegexMatcher<T>(onComplete, toRune, @"\A[^\x00\x0A\x0D\x1B]+\z")
     {
-        public override bool TryFlush()
+        public override AppendResult TryFlush()
         {
             if (min != null && GetAccumulatedLength() < (uint)min)
-                return false;
+                return AppendResult.NoMatch;
 
             return base.TryFlush();
         }
