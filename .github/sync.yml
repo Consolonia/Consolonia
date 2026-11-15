@@ -9,6 +9,7 @@ group:
       exclude: |
         repo-file-sync.yml
         release.yml
+        native_aot_smoke.yml
     - source: global.json
       dest: global.json
       deleteOrphaned: true
