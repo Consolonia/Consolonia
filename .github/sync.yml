@@ -9,6 +9,9 @@ group:
       exclude: |
         repo-file-sync.yml
         release.yml
+    - source: global.json
+      dest: global.json
+      deleteOrphaned: true
     - source: .editorconfig
       dest: .editorconfig
       deleteOrphaned: true
