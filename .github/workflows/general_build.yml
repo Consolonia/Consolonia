@@ -141,3 +141,28 @@ jobs:
           name: release-metadata
           path: ./src/release-metadata/
           if-no-files-found: error
+
+  native-aot-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install NativeAOT prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang zlib1g-dev
+
+      - name: Publish NativeAOT smoke app
+        working-directory: ./src
+        # Avalonia.Controls.DataGrid currently emits these two dependency-level analyzer warnings.
+        # Keep other Release warnings as errors while allowing the smoke app to publish and run.
+        run: dotnet publish Tests/Consolonia.NativeAot.Smoke/Consolonia.NativeAot.Smoke.csproj --configuration Release --runtime linux-x64 --output ./artifacts/nativeaot-smoke -p:WarningsNotAsErrors=IL2104%3BIL3053
+
+      - name: Run NativeAOT smoke app
+        run: ./src/artifacts/nativeaot-smoke/Consolonia.NativeAot.Smoke
