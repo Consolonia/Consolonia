@@ -7,7 +7,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
     public interface IMatcher<in T>
     {
         AppendResult Append(T input);
-        bool TryFlush();
+        AppendResult TryFlush();
         void Reset();
         string GetDebugInfo();
     }
