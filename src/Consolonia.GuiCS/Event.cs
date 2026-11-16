@@ -489,7 +489,7 @@ namespace Terminal.Gui {
 		KeyModifiers keyModifiers;
 
 		/// <summary>
-		/// Symb olid definition for the key.
+		/// Symbolic definition for the key.
 		/// </summary>
 		public Key Key;
 
@@ -513,28 +513,27 @@ namespace Terminal.Gui {
 		public bool IsAlt => keyModifiers.Alt;
 
 		/// <summary>
-		/// Determines whether the value is a control key (and NOT just the ctrl key)
+		/// Gets a value indicating whether the Ctrl key was pressed (real or synthesized)
 		/// </summary>
 		/// <value><c>true</c> if is ctrl; otherwise, <c>false</c>.</value>
-		//public bool IsCtrl => ((uint)Key >= 1) && ((uint)Key <= 26);
 		public bool IsCtrl => keyModifiers.Ctrl;
 
 		/// <summary>
 		/// Gets a value indicating whether the Caps lock key was pressed (real or synthesized)
 		/// </summary>
-		/// <value><c>true</c> if is alternate; otherwise, <c>false</c>.</value>
+		/// <value><c>true</c> if is caps lock; otherwise, <c>false</c>.</value>
 		public bool IsCapslock => keyModifiers.Capslock;
 
 		/// <summary>
 		/// Gets a value indicating whether the Num lock key was pressed (real or synthesized)
 		/// </summary>
-		/// <value><c>true</c> if is alternate; otherwise, <c>false</c>.</value>
+		/// <value><c>true</c> if is num lock; otherwise, <c>false</c>.</value>
 		public bool IsNumlock => keyModifiers.Numlock;
 
 		/// <summary>
 		/// Gets a value indicating whether the Scroll lock key was pressed (real or synthesized)
 		/// </summary>
-		/// <value><c>true</c> if is alternate; otherwise, <c>false</c>.</value>
+		/// <value><c>true</c> if is scroll lock; otherwise, <c>false</c>.</value>
 		public bool IsScrolllock => keyModifiers.Scrolllock;
 
 		/// <summary>
@@ -697,7 +696,7 @@ namespace Terminal.Gui {
 		/// </summary>
 		WheeledUp = unchecked((int)0x10000000),
 		/// <summary>
-		/// Vertical button wheeled up.
+		/// Vertical button wheeled down.
 		/// </summary>
 		WheeledDown = unchecked((int)0x20000000),
 		/// <summary>

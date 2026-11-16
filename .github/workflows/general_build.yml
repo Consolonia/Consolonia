@@ -61,7 +61,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ env.WORKFLOW_DOTNET_VERSION || '8.0' }}
+          global-json-file: global.json
       - name: Restore dependencies
         run: dotnet restore /p:Configuration=Release
       - name: Build

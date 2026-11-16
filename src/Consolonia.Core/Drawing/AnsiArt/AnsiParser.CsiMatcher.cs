@@ -45,9 +45,11 @@ namespace Consolonia.Core.Drawing.AnsiArt
                 }
             }
 
-            public bool TryFlush()
+            public AppendResult TryFlush()
             {
-                return false;
+                return _accumulator.Length > 0
+                    ? AppendResult.Match
+                    : AppendResult.NoMatch;
             }
 
             public void Reset()
