@@ -20,15 +20,15 @@ namespace Consolonia.Core.Helpers.InputProcessing
             return AppendResult.Match;
         }
 
-        public override bool TryFlush()
+        public override AppendResult TryFlush()
         {
             if (_accumulatedKeys.Count == 0)
-                return false;
+                return AppendResult.NoMatch;
 
             foreach (TKey key in _accumulatedKeys)
                 Complete(key);
             _accumulatedKeys.Clear();
-            return true;
+            return AppendResult.AutoFlushed;
         }
 
         public override void Reset()

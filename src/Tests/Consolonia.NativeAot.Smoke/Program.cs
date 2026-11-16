@@ -105,10 +105,10 @@ var autoGrid = new AutoDataGridStyles();
 var host = new Control();
 host.Styles.Add(autoGrid);
 host.Resources[AutoThemeStylesBase.ConsoloniaThemeFamilyKey] = AutoThemeStylesBase.ModernThemeKey;
-if (autoGrid.Count != 1 || autoGrid[0] is not ModernDataGridStyles)
+if (!SmokeAssertions.HasSingleStyle<ModernDataGridStyles>(autoGrid))
     throw new InvalidOperationException("NativeAOT Modern DataGrid styles were not selected.");
 host.Resources[AutoThemeStylesBase.ConsoloniaThemeFamilyKey] = AutoThemeStylesBase.TurboVisionThemeKey;
-if (autoGrid.Count != 1 || autoGrid[0] is not TurboVisionDataGridStyles)
+if (!SmokeAssertions.HasSingleStyle<TurboVisionDataGridStyles>(autoGrid))
     throw new InvalidOperationException("NativeAOT TurboVision DataGrid styles were not selected.");
 
 AppBuilder.Configure<ProbeApp>()
@@ -136,6 +136,12 @@ Console.WriteLine("NativeAOT brushes, PixelBuffer JSON, compiled theme styles, l
 [JsonSerializable(typeof(PixelBuffer))]
 internal partial class PixelBufferJsonContext : JsonSerializerContext
 {
+}
+
+internal static class SmokeAssertions
+{
+    public static bool HasSingleStyle<TStyle>(AutoDataGridStyles styles) =>
+        styles.Count == 1 && styles[0] is TStyle;
 }
 
 internal sealed class ProbeConsole : DummyConsoleOutput, IConsole
