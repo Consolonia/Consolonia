@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  high_level_summary: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  finishing_touches:
+    autofix:
+      enabled: false
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+  path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Do not require docstrings, comments, or documentation additions.
+        Flag incorrect, obsolete, or redundant comments in changed code;
+        retain useful context.
