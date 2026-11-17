@@ -137,7 +137,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
                 "Legend: * - top matcher, ✅ - match, ❌ - no match, ⚡ - auto flushed, ? - reset matchers from this index");
             logAllSb.AppendLine("-----------------------------------------------------");
 
-            _infoLogger.Log2(logAllSb.ToString());
+            _infoLogger.Log2<string>("{Raw}", logAllSb.ToString());
 
             _infoLogger.Log3(
                 "Finished processing input: {Input}, current top matcher index: {CurrentTopMatcherIndex}, previous top matcher index: {PreviousTopMatcherIndex}, updating previous to current",
@@ -199,7 +199,7 @@ namespace Consolonia.Core.Helpers.InputProcessing
             }
 
             sb.AppendLine("-----------------------------------------------------");
-            _infoLogger.Log2(sb.ToString());
+            _infoLogger.Log2<string>("{Raw}", sb.ToString());
         }
     }
 }
