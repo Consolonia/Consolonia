@@ -22,7 +22,7 @@ namespace Consolonia.Gallery.Tests
         [TestCase(2)]
         public async Task AwaitOnUiThreadResumes(int appCycle)
         {
-            Task resumed = Dispatcher.UIThread.InvokeAsync(async () => await Task.Delay(1),
+            Task resumed = Dispatcher.UIThread.InvokeAsync(async () => await Task.Yield(),
                 DispatcherPriority.Normal);
 
             Task finished = await Task.WhenAny(resumed, Task.Delay(TimeSpan.FromSeconds(10)));
