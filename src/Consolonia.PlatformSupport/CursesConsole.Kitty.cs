@@ -297,7 +297,10 @@ namespace Consolonia.PlatformSupport
                 }
             }
 
-            RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+            DispatchInputAsyncWait(() =>
+            {
+                RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+            });
 
             return;
 
