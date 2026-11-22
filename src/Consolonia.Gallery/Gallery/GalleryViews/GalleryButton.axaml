@@ -68,6 +68,8 @@
             <TextBlock TextWrapping="Wrap">A button control that functions as a navigateable hyperlink.</TextBlock>
 
 
+            <!--
+            this does not work with no DISPLAY variable (todo: implement replace of BclLauncher)
             <StackPanel Orientation="Horizontal">
                 <HyperlinkButton x:Name="EnabledHyperlinkButton"
                                  VerticalAlignment="Center"
@@ -85,7 +87,7 @@
                              HorizontalAlignment="Left"
                              NavigateUri="https://docs.avaloniaui.net/docs/welcome">
                 <TextBlock Text="Avalonia Docs" />
-            </HyperlinkButton>
+            </HyperlinkButton>-->
 
             <!-- DropDownButton -->
             <TextBlock Text="DropDownButton"
