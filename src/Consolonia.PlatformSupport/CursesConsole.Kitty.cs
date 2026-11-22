@@ -102,6 +102,10 @@ namespace Consolonia.PlatformSupport
                 ((CsiTildeKeyCode)4, Key.End),
                 ((CsiTildeKeyCode)5, Key.PageUp),
                 ((CsiTildeKeyCode)6, Key.PageDown),
+                ((CsiTildeKeyCode)11, Key.F1),
+                ((CsiTildeKeyCode)12, Key.F2),
+                ((CsiTildeKeyCode)13, Key.F3),
+                ((CsiTildeKeyCode)14, Key.F4),
                 ((CsiTildeKeyCode)15, Key.F5),
                 ((CsiTildeKeyCode)17, Key.F6),
                 ((CsiTildeKeyCode)18, Key.F7),
@@ -297,7 +301,10 @@ namespace Consolonia.PlatformSupport
                 }
             }
 
-            RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+            DispatchInputAsyncWait(() =>
+            {
+                RaiseKeyPress(key, character, rawModifiers, isDown, (ulong)Environment.TickCount64);
+            });
 
             return;
 
