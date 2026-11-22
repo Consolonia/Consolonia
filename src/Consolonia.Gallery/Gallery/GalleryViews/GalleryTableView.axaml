@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Consolonia.Gallery.Gallery.GalleryViews.GalleryTableView">
+    <Grid RowDefinitions="Auto,*">
+        <StackPanel Orientation="Vertical"
+                    Spacing="1"
+                    Grid.Row="0">
+            <TextBlock>TableView</TextBlock>
+            <TextBlock>A read-only table control with bound columns, selection, scrolling and column resizing.</TextBlock>
+        </StackPanel>
+        <TableView x:Name="TableView1"
+                   Grid.Row="1"
+                   Margin="1">
+            <TableView.Columns>
+                <TableViewColumn Header="Country"
+                                 Binding="{Binding Name}"
+                                 Width="6*" />
+                <TableViewColumn Header="Region"
+                                 Binding="{Binding Region}"
+                                 Width="4*" />
+                <TableViewColumn Header="Population"
+                                 Binding="{Binding Population}"
+                                 Width="2*" />
+                <TableViewColumn Header="Area"
+                                 Binding="{Binding Area}"
+                                 Width="2*" />
+                <TableViewColumn Header="GDP"
+                                 Binding="{Binding GDP}"
+                                 Width="2*" />
+            </TableView.Columns>
+        </TableView>
+    </Grid>
+</UserControl>
