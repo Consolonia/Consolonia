@@ -65,6 +65,9 @@ namespace Consolonia.NUnit
                 _disposeTaskCompletionSource = new TaskCompletionSource();
 
                 ResetDispatcherForUnitTests();
+                // The thread keeps the previous app's AvaloniaSynchronizationContext, which Avalonia
+                // does not replace and which posts to the dispatcher that was just shut down.
+                SynchronizationContext.SetSynchronizationContext(null);
 
                 _scope = AvaloniaLocator.EnterScope();
                 _lifetime = ApplicationStartup.CreateLifetime(CreateAppBuilder(), Args);
