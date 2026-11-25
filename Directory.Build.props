@@ -17,7 +17,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Authors>https://github.com/consolonia/consolonia/graphs/contributors</Authors>
+        <Authors>jinek;tomlm</Authors>
         <Copyright>© 2021–2025 Evgeny Gorbovoy &amp; Tom Laird-McConnell</Copyright>
         <ProjectUrl>https://github.com/consolonia/consolonia</ProjectUrl>
         <RepositoryUrl>https://github.com/consolonia/consolonia</RepositoryUrl>
