@@ -49,6 +49,7 @@
                 <MergeResourceInclude Source="/Templates/Controls/SymbolsControl.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/TabControl.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/TabItem.axaml" />
+                <MergeResourceInclude Source="/Templates/Controls/TableView.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/TextBlock.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/TextBox.axaml" />
                 <MergeResourceInclude Source="/Templates/Controls/ToggleButton.axaml" />
